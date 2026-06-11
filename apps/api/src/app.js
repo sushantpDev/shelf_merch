@@ -28,6 +28,7 @@ import redemptionsRoutes from './modules/redemptions/redemptions.routes.js';
 import notificationsRoutes from './modules/notifications/notifications.routes.js';
 import paymentsRoutes from './modules/payments/payments.routes.js';
 import invoicesRoutes from './modules/invoices/invoices.routes.js';
+import ordersRoutes from './modules/orders/orders.routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -81,6 +82,7 @@ export function createApp() {
   api.use('/notifications', notificationsRoutes);
   api.use('/payments', paymentsRoutes);
   api.use('/invoices', invoicesRoutes);
+  api.use('/orders', ordersRoutes);
 
   app.use('/api/v1', api);
 

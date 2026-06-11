@@ -94,7 +94,7 @@ to `mongodb-memory-server` when Docker isn't available.
 - [x] **Phase 3 — Catalog & Store**: shops, platform catalog, collections, kits, R2/local uploads
 - [x] **Phase 4 — Contacts & Campaigns**: CSV import (BullMQ + inline fallback), campaign state machine, launch debits
 - [x] **Phase 5 — Redemption Portal**: public token routes, MSG91 OTP/SMS, session JWT on catalog/submit
-- [ ] Phase 6 — Orders, Fulfillment, Platform Control Plane (incl. impersonation endpoints)
+- [x] **Phase 6 (partial) — Orders API**: list/detail, status transitions + ABAC; frontend Orders page wired. Platform impersonation/shipments still pending.
 - [x] **Phase 7 — Payments & Invoicing**: Razorpay order + signed webhook → wallet fund, GST invoices (PDF), in-app + SMS notifications
 - [ ] Phase 8 — Hardening & deployment
 - [x] **Frontend API integration (MVP)**: `apps/web/src/services/` API client,

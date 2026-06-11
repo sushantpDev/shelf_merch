@@ -77,6 +77,7 @@ export function applyWorkspaceToState(S: Record<string, unknown>, data: Workspac
   S.collections = data.collections;
   S.catalogProducts = data.catalogProducts;
   S.campaigns = data.campaigns;
+  S.orders = data.orders;
   S.wallets = data.wallets;
   S.primaryEntityId = data.primaryEntityId;
   S.org = { ...(S.org as object), ...data.org };

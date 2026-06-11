@@ -46,6 +46,19 @@ export type UiCollection = {
   products: UiProduct[];
 };
 
+export type UiOrder = {
+  id: string;
+  date: string;
+  name: string;
+  orderNumber: string;
+  status: string;
+  rawStatus: string;
+  amount: number;
+  track: string;
+  delivered: string;
+  items: [string, string][];
+};
+
 export type UiCampaign = {
   id: string;
   name: string;
@@ -178,6 +191,29 @@ export function mapCollection(c: ApiProduct, createdByName = ""): UiCollection {
     status: c.status || "draft",
     shopId: String(c.shopId),
     products: (c.productRefs || []).map(mapProductRef),
+  };
+}
+
+function mapOrderDisplayStatus(status: string): string {
+  if (status === "delivered") return "Delivered";
+  if (status === "shipped") return "Shipped";
+  return "Processing";
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapOrder(o: any, campaignName = ""): UiOrder {
+  const deliveredEntry = (o.statusHistory || []).find((h: { status: string }) => h.status === "delivered");
+  return {
+    id: String(o._id),
+    date: formatDate(o.createdAt),
+    name: campaignName || o.orderNumber,
+    orderNumber: o.orderNumber,
+    status: mapOrderDisplayStatus(o.status),
+    rawStatus: o.status,
+    amount: o.amountBreakdown?.total ?? 0,
+    track: o.trackingNumber || "",
+    delivered: deliveredEntry ? formatDate(deliveredEntry.at) : "",
+    items: (o.items || []).map((i: { name: string; qty: number }) => [i.name, String(i.qty)]),
   };
 }
 

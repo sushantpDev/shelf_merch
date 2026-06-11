@@ -1163,7 +1163,12 @@ function statusTag(s){
   return `<span class="tag ${m[s]||'tag-proc'}">${s}</span>`;
 }
 function ViewOrders(){
-  const rows = S.orders.map(o=>`
+  const list=S.orders||[];
+  if(!list.length){
+    return `<div class="page-h"><div><h1>Orders</h1><div class="sub">Track every swag, kit and points order across your workspace.</div></div></div>
+      <div class="card empty"><div class="ic">${I.orders.replace('currentColor','#cdd6cf')}</div><h3>No orders yet</h3><p>Orders appear here when recipients redeem gifts or you send kits at scale.</p></div>`;
+  }
+  const rows = list.map(o=>`
     <tr data-act="orderOpen" data-arg="${o.id}" style="cursor:pointer">
       <td class="num">${o.date}</td>
       <td style="font-weight:600">${esc(o.name)}</td>
@@ -1190,7 +1195,7 @@ function orderOpen(id){
     : `<div class="banner" style="margin-bottom:14px">${I.truck}<div>Your order is being prepared. Tracking will appear here once it ships.</div></div>`;
   const items = o.items.map(([n,q])=>`<div class="row" style="justify-content:space-between;border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 14px;margin-bottom:8px"><span style="font-weight:600">${esc(n)}</span><span class="muted">Qty ${q}</span></div>`).join('');
   openModal(`<div class="modal-pad">
-    <div class="modal-h"><div><div class="eyebrow">${o.date} · ${inr(o.amount)}</div><h3>${esc(o.name)}</h3></div><button class="xbtn" data-act="closeLayer">✕</button></div>
+    <div class="modal-h"><div><div class="eyebrow">${o.date} · ${inr(o.amount)} · ${esc(o.orderNumber||'')}</div><h3>${esc(o.name)}</h3></div><button class="xbtn" data-act="closeLayer">✕</button></div>
     <div style="margin-top:14px">${head}
       <div class="lbl" style="margin-bottom:8px">Items in shipment</div>${items}</div>
     <div class="row" style="margin-top:18px;gap:10px"><button class="btn btn-ghost btn-block" data-act="toast" data-arg="Invoice downloaded">Download invoice</button>${o.track?`<button class="btn btn-dark btn-block" data-act="toast" data-arg="Opening carrier tracking…">Track shipment</button>`:''}</div>

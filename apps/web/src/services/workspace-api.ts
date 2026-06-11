@@ -7,9 +7,11 @@ import {
   mapContact,
   mapEntityToDept,
   mapKit,
+  mapOrder,
   mapShop,
   mapWallet,
   type UiCampaign,
+  type UiOrder,
   type UiCollection,
   type UiContact,
   type UiKit,
@@ -28,6 +30,7 @@ export type WorkspaceSnapshot = {
   collections: UiCollection[];
   catalogProducts: UiProduct[];
   campaigns: UiCampaign[];
+  orders: UiOrder[];
   wallets: UiWallet[];
   primaryEntityId?: string;
   org: {
@@ -67,6 +70,7 @@ export async function fetchWorkspaceSnapshot(): Promise<WorkspaceSnapshot> {
     collections,
     catalog,
     campaigns,
+    ordersPage,
     wallets,
     entities,
     users,
@@ -78,6 +82,7 @@ export async function fetchWorkspaceSnapshot(): Promise<WorkspaceSnapshot> {
     apiFetch<unknown[]>("/collections"),
     apiFetch<{ items: unknown[] }>("/catalog/products?limit=100"),
     apiFetch<unknown[]>("/campaigns").catch(() => []),
+    apiFetch<{ items: unknown[] }>("/orders?limit=100"),
     apiFetch<unknown[]>("/wallets"),
     apiFetch<unknown[]>("/entities"),
     apiFetch<unknown[]>("/users").catch(() => []),
@@ -127,6 +132,9 @@ export async function fetchWorkspaceSnapshot(): Promise<WorkspaceSnapshot> {
     collections: mappedCollections,
     catalogProducts: (catalog.items || []).map(mapCatalogProduct),
     campaigns: (campaigns as never[]).map(mapCampaign),
+    orders: (ordersPage.items || []).map((o) =>
+      mapOrder(o, (o as { campaignName?: string }).campaignName || ""),
+    ),
     wallets: (wallets as never[]).map((w) => mapWallet(w, owner)),
     primaryEntityId: walletEntities[0]
       ? String((walletEntities[0] as { _id: string })._id)

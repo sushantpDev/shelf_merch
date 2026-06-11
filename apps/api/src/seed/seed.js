@@ -61,7 +61,8 @@ async function seed() {
     passwordHash: password,
     status: 'active',
   });
-  const superAdmin = await User.findOne({ email: 'admin@shelfmerch.io' });
+  // const superAdmin = await User.findOne({ email: 'admin@shelfmerch.io' });
+  const superAdmin = await User.findOne({ email: 'hr@rubix.net' });
   await RoleAssignment.create({
     tenantId: null,
     userId: superAdmin._id,
