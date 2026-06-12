@@ -7,6 +7,7 @@ export type UiProduct = {
   nm: string;
   price: string;
   sw: number;
+  colors?: string[];
 };
 
 export type UiShop = {
@@ -16,6 +17,10 @@ export type UiShop = {
   live: boolean;
   categories: string[];
   collections: string[];
+  logoUrl?: string;
+  bannerConfig?: Record<string, unknown>;
+  createdAt?: string;
+  createdBy?: string;
 };
 
 export type UiContact = {
@@ -43,6 +48,8 @@ export type UiCollection = {
   by: string;
   status: string;
   shopId: string;
+  artworkUrl?: string;
+  preferredColors?: string[];
   products: UiProduct[];
 };
 
@@ -120,6 +127,9 @@ function formatDate(d: string | Date | undefined): string {
 }
 
 export function mapCatalogProduct(p: ApiProduct): UiProduct {
+  const variantColors = Array.isArray(p.variants)
+    ? [...new Set(p.variants.map((v: { color?: string }) => v.color).filter(Boolean) as string[])]
+    : [];
   return {
     id: String(p._id),
     g: p.group || "tee",
@@ -127,6 +137,7 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
     nm: p.name,
     price: formatInr(p.basePriceInr ?? 0),
     sw: Array.isArray(p.variants) ? Math.max(p.variants.length, 2) : 4,
+    colors: variantColors,
   };
 }
 
@@ -154,6 +165,10 @@ export function mapShop(s: ApiProduct): UiShop {
     live: s.status === "live",
     categories: s.categories || [],
     collections: [],
+    logoUrl: s.logoUrl || "",
+    bannerConfig: s.bannerConfig || {},
+    createdAt: s.createdAt ? String(s.createdAt) : undefined,
+    createdBy: s.createdBy || "",
   };
 }
 
@@ -191,6 +206,8 @@ export function mapCollection(c: ApiProduct, createdByName = ""): UiCollection {
     by: createdByName,
     status: c.status || "draft",
     shopId: String(c.shopId),
+    artworkUrl: (c as { artworkUrl?: string }).artworkUrl || "",
+    preferredColors: Array.isArray(c.preferredColors) ? c.preferredColors : [],
     products: (c.productRefs || []).map(mapProductRef),
   };
 }

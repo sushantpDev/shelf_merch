@@ -159,6 +159,7 @@ async function seed() {
     code: 'C343955972',
     name: 'New employee Swag',
     status: 'ready',
+    preferredColors: ['Black', 'White'],
     productRefs: [
       { catalogProductId: productByGroup.pack._id, brand: 'Mercer+Mettle', name: 'Commuter Backpack', group: 'pack' },
       { catalogProductId: productByGroup.hoodie._id, brand: 'Bella + Canvas', name: 'Sponge Fleece Pullover Hoodie', group: 'hoodie' },

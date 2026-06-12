@@ -215,6 +215,8 @@ export async function createShopApi(payload: {
   name: string;
   currencyMode: "points" | "inr" | "priceless";
   categories: string[];
+  logoUrl?: string;
+  bannerConfig?: Record<string, unknown>;
 }) {
   const shop = await apiFetch<unknown>("/shops", {
     method: "POST",
@@ -225,6 +227,22 @@ export async function createShopApi(payload: {
 
 export async function publishShopApi(shopId: string) {
   const shop = await apiFetch<unknown>(`/shops/${shopId}/publish`, { method: "POST" });
+  return mapShop(shop as never);
+}
+
+export async function updateShopApi(
+  shopId: string,
+  payload: {
+    name?: string;
+    logoUrl?: string;
+    bannerConfig?: Record<string, unknown>;
+    categories?: string[];
+  },
+) {
+  const shop = await apiFetch<unknown>(`/shops/${shopId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
   return mapShop(shop as never);
 }
 
