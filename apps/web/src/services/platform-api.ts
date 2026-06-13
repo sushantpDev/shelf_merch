@@ -334,3 +334,19 @@ export function archiveProduct(id: string) {
 export function listCategories() {
   return apiFetch<{ _id: string; name: string }[]>("/platform/categories");
 }
+
+export type ShopifyImportSummary = {
+  domain: string;
+  total: number;
+  imported: number;
+  skipped: number;
+  failed: number;
+  items: { title: string; status: string; reason?: string }[];
+};
+
+export function importShopify(domain: string, accessToken: string) {
+  return apiFetch<ShopifyImportSummary>("/platform/products/import/shopify", {
+    method: "POST",
+    body: JSON.stringify({ domain, accessToken }),
+  });
+}

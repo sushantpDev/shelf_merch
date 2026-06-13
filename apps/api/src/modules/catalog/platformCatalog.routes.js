@@ -13,6 +13,7 @@ import { PRODUCT_STATUSES, INVENTORY_MODES, CUSTOMIZATION_METHODS } from './cata
 import { INVENTORY_TXN_TYPES } from './inventoryTransaction.model.js';
 import * as catalogService from './platformCatalog.service.js';
 import * as inventoryService from './inventory.service.js';
+import { importFromShopify } from './shopifyImport.service.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
@@ -146,6 +147,28 @@ platformProductsRouter.patch(
       after: { sellingPriceInr: after.sellingPriceInr, costPriceInr: after.costPriceInr, gstRate: after.gstRate, hsnCode: after.hsnCode, reason },
     });
     res.json(after);
+  }),
+);
+
+platformProductsRouter.post(
+  '/import/shopify',
+  catalogWrite,
+  validate({
+    body: z.object({
+      domain: z.string().min(1),
+      accessToken: z.string().min(1),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const summary = await importFromShopify({ domain: req.body.domain, token: req.body.accessToken });
+    // Audit the import — never the access token.
+    writeAudit({
+      req,
+      action: 'catalog.import.shopify',
+      entityType: 'CatalogProduct',
+      after: { domain: summary.domain, imported: summary.imported, skipped: summary.skipped, failed: summary.failed },
+    });
+    res.json(summary);
   }),
 );
 

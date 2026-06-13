@@ -195,9 +195,14 @@ export function CatalogPage() {
         subtitle="Platform product master with internal cost and margin."
         actions={
           canWrite ? (
-            <Link to="/platform/catalog/new" className="btn btn-brand btn-sm">
-              + New product
-            </Link>
+            <>
+              <Link to="/platform/catalog/import" className="btn btn-ghost btn-sm">
+                Import from Shopify
+              </Link>
+              <Link to="/platform/catalog/new" className="btn btn-brand btn-sm">
+                + New product
+              </Link>
+            </>
           ) : null
         }
       />

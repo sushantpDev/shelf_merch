@@ -32,6 +32,7 @@ import { Route as PlatformCatalogIndexRouteImport } from './routes/platform.cata
 import { Route as PlatformKitsNewRouteImport } from './routes/platform.kits.new'
 import { Route as PlatformKitsIdRouteImport } from './routes/platform.kits.$id'
 import { Route as PlatformCatalogNewRouteImport } from './routes/platform.catalog.new'
+import { Route as PlatformCatalogImportRouteImport } from './routes/platform.catalog.import'
 import { Route as PlatformCatalogIdRouteImport } from './routes/platform.catalog.$id'
 
 const PlatformRoute = PlatformRouteImport.update({
@@ -149,6 +150,11 @@ const PlatformCatalogNewRoute = PlatformCatalogNewRouteImport.update({
   path: '/new',
   getParentRoute: () => PlatformCatalogRoute,
 } as any)
+const PlatformCatalogImportRoute = PlatformCatalogImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => PlatformCatalogRoute,
+} as any)
 const PlatformCatalogIdRoute = PlatformCatalogIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -175,6 +181,7 @@ export interface FileRoutesByFullPath {
   '/redeem/$token': typeof RedeemTokenRoute
   '/platform/': typeof PlatformIndexRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
+  '/platform/catalog/import': typeof PlatformCatalogImportRoute
   '/platform/catalog/new': typeof PlatformCatalogNewRoute
   '/platform/kits/$id': typeof PlatformKitsIdRoute
   '/platform/kits/new': typeof PlatformKitsNewRoute
@@ -198,6 +205,7 @@ export interface FileRoutesByTo {
   '/redeem/$token': typeof RedeemTokenRoute
   '/platform': typeof PlatformIndexRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
+  '/platform/catalog/import': typeof PlatformCatalogImportRoute
   '/platform/catalog/new': typeof PlatformCatalogNewRoute
   '/platform/kits/$id': typeof PlatformKitsIdRoute
   '/platform/kits/new': typeof PlatformKitsNewRoute
@@ -225,6 +233,7 @@ export interface FileRoutesById {
   '/redeem/$token': typeof RedeemTokenRoute
   '/platform/': typeof PlatformIndexRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
+  '/platform/catalog/import': typeof PlatformCatalogImportRoute
   '/platform/catalog/new': typeof PlatformCatalogNewRoute
   '/platform/kits/$id': typeof PlatformKitsIdRoute
   '/platform/kits/new': typeof PlatformKitsNewRoute
@@ -253,6 +262,7 @@ export interface FileRouteTypes {
     | '/redeem/$token'
     | '/platform/'
     | '/platform/catalog/$id'
+    | '/platform/catalog/import'
     | '/platform/catalog/new'
     | '/platform/kits/$id'
     | '/platform/kits/new'
@@ -276,6 +286,7 @@ export interface FileRouteTypes {
     | '/redeem/$token'
     | '/platform'
     | '/platform/catalog/$id'
+    | '/platform/catalog/import'
     | '/platform/catalog/new'
     | '/platform/kits/$id'
     | '/platform/kits/new'
@@ -302,6 +313,7 @@ export interface FileRouteTypes {
     | '/redeem/$token'
     | '/platform/'
     | '/platform/catalog/$id'
+    | '/platform/catalog/import'
     | '/platform/catalog/new'
     | '/platform/kits/$id'
     | '/platform/kits/new'
@@ -479,6 +491,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlatformCatalogNewRouteImport
       parentRoute: typeof PlatformCatalogRoute
     }
+    '/platform/catalog/import': {
+      id: '/platform/catalog/import'
+      path: '/import'
+      fullPath: '/platform/catalog/import'
+      preLoaderRoute: typeof PlatformCatalogImportRouteImport
+      parentRoute: typeof PlatformCatalogRoute
+    }
     '/platform/catalog/$id': {
       id: '/platform/catalog/$id'
       path: '/$id'
@@ -491,12 +510,14 @@ declare module '@tanstack/react-router' {
 
 interface PlatformCatalogRouteChildren {
   PlatformCatalogIdRoute: typeof PlatformCatalogIdRoute
+  PlatformCatalogImportRoute: typeof PlatformCatalogImportRoute
   PlatformCatalogNewRoute: typeof PlatformCatalogNewRoute
   PlatformCatalogIndexRoute: typeof PlatformCatalogIndexRoute
 }
 
 const PlatformCatalogRouteChildren: PlatformCatalogRouteChildren = {
   PlatformCatalogIdRoute: PlatformCatalogIdRoute,
+  PlatformCatalogImportRoute: PlatformCatalogImportRoute,
   PlatformCatalogNewRoute: PlatformCatalogNewRoute,
   PlatformCatalogIndexRoute: PlatformCatalogIndexRoute,
 }
