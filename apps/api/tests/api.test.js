@@ -335,4 +335,47 @@ describe('impersonation guard (must-have §11.1)', () => {
     expect(fund.status).toBe(403);
     expect(fund.body.error.message).toMatch(/impersonation/i);
   });
+
+  it('super admin starts impersonation and gets a tenant-scoped token; sensitive routes stay blocked', async () => {
+    const platform = await makeUser(null, 'platform_super_admin', 'platform');
+
+    const start = await request(app)
+      .post(`/api/v1/platform/tenants/${tenantA._id}/impersonate`)
+      .set('Authorization', `Bearer ${platform.token}`)
+      .send({ reason: 'debugging a redemption issue', reasonCategory: 'support' });
+    expect(start.status).toBe(200);
+    expect(start.body.accessToken).toBeTruthy();
+    expect(start.body.tenant.id).toBe(String(tenantA._id));
+
+    const impToken = start.body.accessToken;
+
+    // The impersonation token can read the tenant's wallets…
+    const read = await request(app)
+      .get('/api/v1/wallets')
+      .set('Authorization', `Bearer ${impToken}`);
+    expect(read.status).toBe(200);
+
+    // …but wallet funding is still blocked under impersonation.
+    const fund = await request(app)
+      .post(`/api/v1/wallets/${walletA._id}/fund`)
+      .set('Authorization', `Bearer ${impToken}`)
+      .send({ amount: 5000 });
+    expect(fund.status).toBe(403);
+
+    // Ending impersonation succeeds with the impersonation token.
+    const end = await request(app)
+      .post('/api/v1/platform/impersonate/end')
+      .set('Authorization', `Bearer ${impToken}`);
+    expect(end.status).toBe(200);
+    expect(end.body.ok).toBe(true);
+  });
+
+  it('non-super-admin cannot start impersonation', async () => {
+    const support = await makeUser(null, 'platform_support_agent', 'platform');
+    const res = await request(app)
+      .post(`/api/v1/platform/tenants/${tenantA._id}/impersonate`)
+      .set('Authorization', `Bearer ${support.token}`)
+      .send({ reason: 'x', reasonCategory: 'support' });
+    expect(res.status).toBe(403);
+  });
 });

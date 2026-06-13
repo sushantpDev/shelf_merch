@@ -11,6 +11,9 @@ export const ROLES = [
   'platform_readonly_auditor',
   'company_admin',
   'entity_manager',
+  'company_finance_user',
+  'approver',
+  'recipient',
 ];
 
 export const PLATFORM_ROLES = ROLES.filter((r) => r.startsWith('platform_'));

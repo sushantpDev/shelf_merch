@@ -17,7 +17,7 @@ const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const hashPassword = (plain) => bcrypt.hash(plain, BCRYPT_ROUNDS);
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
-export function signAccessToken(user, roleAssignment, impersonation = null) {
+export function signAccessToken(user, roleAssignment, impersonation = null, { expiresIn } = {}) {
   const payload = {
     sub: String(user._id),
     tenantId: roleAssignment.tenantId ? String(roleAssignment.tenantId) : null,
@@ -27,7 +27,7 @@ export function signAccessToken(user, roleAssignment, impersonation = null) {
     assignedEntityIds: (roleAssignment.assignedEntityIds ?? []).map(String),
     ...(impersonation ? { impersonation } : {}),
   };
-  return jwt.sign(payload, env.JWT_ACCESS_SECRET, { expiresIn: env.JWT_ACCESS_TTL });
+  return jwt.sign(payload, env.JWT_ACCESS_SECRET, { expiresIn: expiresIn ?? env.JWT_ACCESS_TTL });
 }
 
 /** Short-lived token for platform impersonation (§6.4). */

@@ -1,6 +1,10 @@
 import * as tenantsService from './tenants.service.js';
+import { signAccessToken } from '../auth/auth.service.js';
 import { writeAudit } from '../../services/audit.service.js';
+import { ForbiddenError } from '../../utils/errors.js';
 import { env } from '../../config/env.js';
+
+const IMPERSONATION_TTL = '15m';
 
 export async function create(req, res) {
   const { tenant, admin, inviteToken } = await tenantsService.createTenant(req.body);
