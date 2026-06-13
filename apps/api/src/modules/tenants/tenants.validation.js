@@ -61,8 +61,3 @@ export const impersonateSchema = z.object({
   reason: z.string().min(1),
   reasonCategory: z.string().min(1),
 });
-
-export const impersonateSchema = z.object({
-  reason: z.string().min(1),
-  reasonCategory: z.string().min(1),
-});
