@@ -30,6 +30,20 @@ export function signAccessToken(user, roleAssignment, impersonation = null, { ex
   return jwt.sign(payload, env.JWT_ACCESS_SECRET, { expiresIn: expiresIn ?? env.JWT_ACCESS_TTL });
 }
 
+/** Short-lived token for platform impersonation (§6.4). */
+export function signImpersonationAccessToken(user, roleAssignment, impersonation) {
+  const payload = {
+    sub: String(user._id),
+    tenantId: roleAssignment.tenantId ? String(roleAssignment.tenantId) : null,
+    role: roleAssignment.role,
+    scopeType: roleAssignment.scopeType,
+    scopeId: roleAssignment.scopeId ? String(roleAssignment.scopeId) : null,
+    assignedEntityIds: (roleAssignment.assignedEntityIds ?? []).map(String),
+    impersonation,
+  };
+  return jwt.sign(payload, env.JWT_ACCESS_SECRET, { expiresIn: '15m' });
+}
+
 async function issueRefreshToken(userId, { ip = '', userAgent = '' } = {}) {
   const token = crypto.randomBytes(48).toString('hex');
   await RefreshToken.create({
@@ -43,15 +57,17 @@ async function issueRefreshToken(userId, { ip = '', userAgent = '' } = {}) {
 }
 
 export async function getPrimaryRoleAssignment(userId) {
-  const assignment = await RoleAssignment.findOne({ userId }).sort({ createdAt: 1 });
-  if (!assignment) throw new ApiError(403, 'User has no role assignment', 'NO_ROLE');
-  return assignment;
+  const assignments = await RoleAssignment.find({ userId }).sort({ createdAt: 1 });
+  if (!assignments.length) throw new ApiError(403, 'User has no role assignment', 'NO_ROLE');
+  // Prefer tenant/entity scope when a user has both platform and tenant hats.
+  const tenantScoped = assignments.find((a) => a.scopeType !== 'platform' && a.tenantId);
+  return tenantScoped ?? assignments[0];
 }
 
 function publicUser(user, roleAssignment) {
   return {
     id: String(user._id),
-    tenantId: user.tenantId ? String(user.tenantId) : null,
+    tenantId: roleAssignment.tenantId ? String(roleAssignment.tenantId) : null,
     name: user.name,
     email: user.email,
     role: roleAssignment.role,
@@ -79,8 +95,19 @@ async function uniqueTenantSlug(companyName) {
   return slug;
 }
 
-/** Self-service signup — creates tenant + active company_admin, returns tokens like login. */
+/**
+ * Self-service signup — creates tenant + active company_admin, returns tokens
+ * like login. Gated by platformSettings `signup.mode` (SUPER_ADMIN_FLOW §3.4):
+ * open → tenant starts active; approval (default) → tenant starts in trial
+ * until a super admin activates it; closed → signup refused.
+ */
 export async function register({ name, email, password, companyName, ip, userAgent }) {
+  const { getSetting } = await import('../platform/platformSettings.service.js');
+  const signupMode = await getSetting('signup.mode');
+  if (signupMode === 'closed') {
+    throw new ApiError(403, 'Self-service signup is currently disabled', 'SIGNUP_CLOSED');
+  }
+
   const normalizedEmail = email.toLowerCase();
   const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) {
@@ -89,6 +116,7 @@ export async function register({ name, email, password, companyName, ip, userAge
 
   const passwordHash = await hashPassword(password);
   const slug = await uniqueTenantSlug(companyName);
+  const tenantStatus = signupMode === 'open' ? 'active' : 'trial';
 
   const session = await mongoose.startSession();
   let user;
@@ -96,7 +124,7 @@ export async function register({ name, email, password, companyName, ip, userAge
   try {
     await session.withTransaction(async () => {
       const [tenant] = await Tenant.create(
-        [{ name: companyName, slug, currency: 'INR', status: 'trial' }],
+        [{ name: companyName, slug, currency: 'INR', status: tenantStatus }],
         { session },
       );
       [user] = await User.create(
@@ -156,6 +184,14 @@ export async function login({ email, password, ip, userAgent }) {
 
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) throw new UnauthorizedError('Invalid email or password');
+
+  // §3.4 — archived tenants have logins refused.
+  if (user.tenantId) {
+    const tenant = await Tenant.findOne({ _id: user.tenantId }).select('status');
+    if (tenant?.status === 'archived') {
+      throw new UnauthorizedError('This workspace has been archived — contact support');
+    }
+  }
 
   const roleAssignment = await getPrimaryRoleAssignment(user._id);
   user.lastLoginAt = new Date();

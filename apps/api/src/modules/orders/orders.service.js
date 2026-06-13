@@ -1,9 +1,15 @@
-import { Order } from './order.model.js';
+import { Order, sanitizeOrderItems } from './order.model.js';
 import { Campaign } from '../campaigns/campaign.model.js';
 import { Recipient } from '../campaigns/recipient.model.js';
 import { transitionState, validNextStatuses } from '../../services/stateMachine.service.js';
-import { NotFoundError, ForbiddenError } from '../../utils/errors.js';
+import { ApiError, NotFoundError, ForbiddenError } from '../../utils/errors.js';
 import { getPagination, paginatedResponse } from '../../utils/pagination.js';
+
+/**
+ * §3.5 — tenants only keep the mockup quality gate. Every other transition is
+ * platform-only via /platform/orders/:id/status.
+ */
+const TENANT_ALLOWED_STATUSES = ['mockup_approved', 'issue_raised'];
 
 async function campaignIdsForUser(tenantId, user) {
   if (user.scopeType !== 'entity') return null;
@@ -26,8 +32,10 @@ async function assertOrderAccess({ tenantId, user, order }) {
 
 function withMeta(order, extras = {}) {
   const obj = order.toObject ? order.toObject() : order;
+  const { internalNotes, ...safe } = obj; // internal notes are platform-only
   return {
-    ...obj,
+    ...safe,
+    items: sanitizeOrderItems(obj.items ?? []),
     validNextStatuses: validNextStatuses('order', obj.status),
     ...extras,
   };
@@ -83,6 +91,17 @@ export async function getOrder({ tenantId, user, orderId }) {
 export async function updateOrderStatus({ tenantId, user, orderId, status, note, trackingNumber }) {
   const order = await Order.findOne({ _id: orderId, tenantId });
   if (!order) throw new NotFoundError('Order not found');
+
+  // Platform users (impersonating or not) keep full control; tenant admins
+  // only retain the mockup approve/reject gate and raising an issue (§3.5).
+  const isPlatform = String(user.role ?? '').startsWith('platform_');
+  if (!isPlatform && !TENANT_ALLOWED_STATUSES.includes(status)) {
+    throw new ApiError(
+      403,
+      'Order status changes are managed by ShelfMerch operations. You can only approve/reject mockups or raise an issue.',
+      'PLATFORM_ONLY_TRANSITION',
+    );
+  }
 
   transitionState('order', order, status, { userId: user.userId }, note);
   if (trackingNumber) order.trackingNumber = trackingNumber;

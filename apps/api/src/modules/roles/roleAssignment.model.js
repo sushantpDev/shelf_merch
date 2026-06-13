@@ -3,10 +3,10 @@ import mongoose from 'mongoose';
 export const ROLES = [
   'platform_super_admin',
   'platform_ops_admin',
+  'platform_catalog_admin',
   'platform_production_manager',
   'platform_finance_admin',
   'platform_support_agent',
-  'platform_catalog_admin',
   'platform_logistics_manager',
   'platform_readonly_auditor',
   'company_admin',

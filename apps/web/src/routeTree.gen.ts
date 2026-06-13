@@ -9,10 +9,30 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PlatformRouteImport } from './routes/platform'
 import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PlatformIndexRouteImport } from './routes/platform.index'
 import { Route as RedeemTokenRouteImport } from './routes/redeem.$token'
+import { Route as PlatformTenantsRouteImport } from './routes/platform.tenants'
+import { Route as PlatformTeamRouteImport } from './routes/platform.team'
+import { Route as PlatformSupportRouteImport } from './routes/platform.support'
+import { Route as PlatformShipmentsRouteImport } from './routes/platform.shipments'
+import { Route as PlatformSettingsRouteImport } from './routes/platform.settings'
+import { Route as PlatformProductionRouteImport } from './routes/platform.production'
+import { Route as PlatformOrdersRouteImport } from './routes/platform.orders'
+import { Route as PlatformKitsRouteImport } from './routes/platform.kits'
+import { Route as PlatformInventoryRouteImport } from './routes/platform.inventory'
+import { Route as PlatformFinanceRouteImport } from './routes/platform.finance'
+import { Route as PlatformDashboardRouteImport } from './routes/platform.dashboard'
+import { Route as PlatformCatalogRouteImport } from './routes/platform.catalog'
+import { Route as PlatformAuditRouteImport } from './routes/platform.audit'
 
+const PlatformRoute = PlatformRouteImport.update({
+  id: '/platform',
+  path: '/platform',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AcceptInviteRoute = AcceptInviteRouteImport.update({
   id: '/accept-invite',
   path: '/accept-invite',
@@ -23,44 +43,220 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlatformIndexRoute = PlatformIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PlatformRoute,
+} as any)
 const RedeemTokenRoute = RedeemTokenRouteImport.update({
   id: '/redeem/$token',
   path: '/redeem/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlatformTenantsRoute = PlatformTenantsRouteImport.update({
+  id: '/tenants',
+  path: '/tenants',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformTeamRoute = PlatformTeamRouteImport.update({
+  id: '/team',
+  path: '/team',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformSupportRoute = PlatformSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformShipmentsRoute = PlatformShipmentsRouteImport.update({
+  id: '/shipments',
+  path: '/shipments',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformSettingsRoute = PlatformSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformProductionRoute = PlatformProductionRouteImport.update({
+  id: '/production',
+  path: '/production',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformOrdersRoute = PlatformOrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformKitsRoute = PlatformKitsRouteImport.update({
+  id: '/kits',
+  path: '/kits',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformInventoryRoute = PlatformInventoryRouteImport.update({
+  id: '/inventory',
+  path: '/inventory',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformFinanceRoute = PlatformFinanceRouteImport.update({
+  id: '/finance',
+  path: '/finance',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformDashboardRoute = PlatformDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformCatalogRoute = PlatformCatalogRouteImport.update({
+  id: '/catalog',
+  path: '/catalog',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformAuditRoute = PlatformAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => PlatformRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accept-invite': typeof AcceptInviteRoute
+  '/platform': typeof PlatformRouteWithChildren
+  '/platform/audit': typeof PlatformAuditRoute
+  '/platform/catalog': typeof PlatformCatalogRoute
+  '/platform/dashboard': typeof PlatformDashboardRoute
+  '/platform/finance': typeof PlatformFinanceRoute
+  '/platform/inventory': typeof PlatformInventoryRoute
+  '/platform/kits': typeof PlatformKitsRoute
+  '/platform/orders': typeof PlatformOrdersRoute
+  '/platform/production': typeof PlatformProductionRoute
+  '/platform/settings': typeof PlatformSettingsRoute
+  '/platform/shipments': typeof PlatformShipmentsRoute
+  '/platform/support': typeof PlatformSupportRoute
+  '/platform/team': typeof PlatformTeamRoute
+  '/platform/tenants': typeof PlatformTenantsRoute
   '/redeem/$token': typeof RedeemTokenRoute
+  '/platform/': typeof PlatformIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accept-invite': typeof AcceptInviteRoute
+  '/platform/audit': typeof PlatformAuditRoute
+  '/platform/catalog': typeof PlatformCatalogRoute
+  '/platform/dashboard': typeof PlatformDashboardRoute
+  '/platform/finance': typeof PlatformFinanceRoute
+  '/platform/inventory': typeof PlatformInventoryRoute
+  '/platform/kits': typeof PlatformKitsRoute
+  '/platform/orders': typeof PlatformOrdersRoute
+  '/platform/production': typeof PlatformProductionRoute
+  '/platform/settings': typeof PlatformSettingsRoute
+  '/platform/shipments': typeof PlatformShipmentsRoute
+  '/platform/support': typeof PlatformSupportRoute
+  '/platform/team': typeof PlatformTeamRoute
+  '/platform/tenants': typeof PlatformTenantsRoute
   '/redeem/$token': typeof RedeemTokenRoute
+  '/platform': typeof PlatformIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/accept-invite': typeof AcceptInviteRoute
+  '/platform': typeof PlatformRouteWithChildren
+  '/platform/audit': typeof PlatformAuditRoute
+  '/platform/catalog': typeof PlatformCatalogRoute
+  '/platform/dashboard': typeof PlatformDashboardRoute
+  '/platform/finance': typeof PlatformFinanceRoute
+  '/platform/inventory': typeof PlatformInventoryRoute
+  '/platform/kits': typeof PlatformKitsRoute
+  '/platform/orders': typeof PlatformOrdersRoute
+  '/platform/production': typeof PlatformProductionRoute
+  '/platform/settings': typeof PlatformSettingsRoute
+  '/platform/shipments': typeof PlatformShipmentsRoute
+  '/platform/support': typeof PlatformSupportRoute
+  '/platform/team': typeof PlatformTeamRoute
+  '/platform/tenants': typeof PlatformTenantsRoute
   '/redeem/$token': typeof RedeemTokenRoute
+  '/platform/': typeof PlatformIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/accept-invite' | '/redeem/$token'
+  fullPaths:
+    | '/'
+    | '/accept-invite'
+    | '/platform'
+    | '/platform/audit'
+    | '/platform/catalog'
+    | '/platform/dashboard'
+    | '/platform/finance'
+    | '/platform/inventory'
+    | '/platform/kits'
+    | '/platform/orders'
+    | '/platform/production'
+    | '/platform/settings'
+    | '/platform/shipments'
+    | '/platform/support'
+    | '/platform/team'
+    | '/platform/tenants'
+    | '/redeem/$token'
+    | '/platform/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/accept-invite' | '/redeem/$token'
-  id: '__root__' | '/' | '/accept-invite' | '/redeem/$token'
+  to:
+    | '/'
+    | '/accept-invite'
+    | '/platform/audit'
+    | '/platform/catalog'
+    | '/platform/dashboard'
+    | '/platform/finance'
+    | '/platform/inventory'
+    | '/platform/kits'
+    | '/platform/orders'
+    | '/platform/production'
+    | '/platform/settings'
+    | '/platform/shipments'
+    | '/platform/support'
+    | '/platform/team'
+    | '/platform/tenants'
+    | '/redeem/$token'
+    | '/platform'
+  id:
+    | '__root__'
+    | '/'
+    | '/accept-invite'
+    | '/platform'
+    | '/platform/audit'
+    | '/platform/catalog'
+    | '/platform/dashboard'
+    | '/platform/finance'
+    | '/platform/inventory'
+    | '/platform/kits'
+    | '/platform/orders'
+    | '/platform/production'
+    | '/platform/settings'
+    | '/platform/shipments'
+    | '/platform/support'
+    | '/platform/team'
+    | '/platform/tenants'
+    | '/redeem/$token'
+    | '/platform/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AcceptInviteRoute: typeof AcceptInviteRoute
+  PlatformRoute: typeof PlatformRouteWithChildren
   RedeemTokenRoute: typeof RedeemTokenRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/platform': {
+      id: '/platform'
+      path: '/platform'
+      fullPath: '/platform'
+      preLoaderRoute: typeof PlatformRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/accept-invite': {
       id: '/accept-invite'
       path: '/accept-invite'
@@ -75,6 +271,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/platform/': {
+      id: '/platform/'
+      path: '/'
+      fullPath: '/platform/'
+      preLoaderRoute: typeof PlatformIndexRouteImport
+      parentRoute: typeof PlatformRoute
+    }
     '/redeem/$token': {
       id: '/redeem/$token'
       path: '/redeem/$token'
@@ -82,12 +285,142 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RedeemTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/platform/tenants': {
+      id: '/platform/tenants'
+      path: '/tenants'
+      fullPath: '/platform/tenants'
+      preLoaderRoute: typeof PlatformTenantsRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/team': {
+      id: '/platform/team'
+      path: '/team'
+      fullPath: '/platform/team'
+      preLoaderRoute: typeof PlatformTeamRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/support': {
+      id: '/platform/support'
+      path: '/support'
+      fullPath: '/platform/support'
+      preLoaderRoute: typeof PlatformSupportRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/shipments': {
+      id: '/platform/shipments'
+      path: '/shipments'
+      fullPath: '/platform/shipments'
+      preLoaderRoute: typeof PlatformShipmentsRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/settings': {
+      id: '/platform/settings'
+      path: '/settings'
+      fullPath: '/platform/settings'
+      preLoaderRoute: typeof PlatformSettingsRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/production': {
+      id: '/platform/production'
+      path: '/production'
+      fullPath: '/platform/production'
+      preLoaderRoute: typeof PlatformProductionRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/orders': {
+      id: '/platform/orders'
+      path: '/orders'
+      fullPath: '/platform/orders'
+      preLoaderRoute: typeof PlatformOrdersRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/kits': {
+      id: '/platform/kits'
+      path: '/kits'
+      fullPath: '/platform/kits'
+      preLoaderRoute: typeof PlatformKitsRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/inventory': {
+      id: '/platform/inventory'
+      path: '/inventory'
+      fullPath: '/platform/inventory'
+      preLoaderRoute: typeof PlatformInventoryRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/finance': {
+      id: '/platform/finance'
+      path: '/finance'
+      fullPath: '/platform/finance'
+      preLoaderRoute: typeof PlatformFinanceRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/dashboard': {
+      id: '/platform/dashboard'
+      path: '/dashboard'
+      fullPath: '/platform/dashboard'
+      preLoaderRoute: typeof PlatformDashboardRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/catalog': {
+      id: '/platform/catalog'
+      path: '/catalog'
+      fullPath: '/platform/catalog'
+      preLoaderRoute: typeof PlatformCatalogRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/audit': {
+      id: '/platform/audit'
+      path: '/audit'
+      fullPath: '/platform/audit'
+      preLoaderRoute: typeof PlatformAuditRouteImport
+      parentRoute: typeof PlatformRoute
+    }
   }
 }
+
+interface PlatformRouteChildren {
+  PlatformAuditRoute: typeof PlatformAuditRoute
+  PlatformCatalogRoute: typeof PlatformCatalogRoute
+  PlatformDashboardRoute: typeof PlatformDashboardRoute
+  PlatformFinanceRoute: typeof PlatformFinanceRoute
+  PlatformInventoryRoute: typeof PlatformInventoryRoute
+  PlatformKitsRoute: typeof PlatformKitsRoute
+  PlatformOrdersRoute: typeof PlatformOrdersRoute
+  PlatformProductionRoute: typeof PlatformProductionRoute
+  PlatformSettingsRoute: typeof PlatformSettingsRoute
+  PlatformShipmentsRoute: typeof PlatformShipmentsRoute
+  PlatformSupportRoute: typeof PlatformSupportRoute
+  PlatformTeamRoute: typeof PlatformTeamRoute
+  PlatformTenantsRoute: typeof PlatformTenantsRoute
+  PlatformIndexRoute: typeof PlatformIndexRoute
+}
+
+const PlatformRouteChildren: PlatformRouteChildren = {
+  PlatformAuditRoute: PlatformAuditRoute,
+  PlatformCatalogRoute: PlatformCatalogRoute,
+  PlatformDashboardRoute: PlatformDashboardRoute,
+  PlatformFinanceRoute: PlatformFinanceRoute,
+  PlatformInventoryRoute: PlatformInventoryRoute,
+  PlatformKitsRoute: PlatformKitsRoute,
+  PlatformOrdersRoute: PlatformOrdersRoute,
+  PlatformProductionRoute: PlatformProductionRoute,
+  PlatformSettingsRoute: PlatformSettingsRoute,
+  PlatformShipmentsRoute: PlatformShipmentsRoute,
+  PlatformSupportRoute: PlatformSupportRoute,
+  PlatformTeamRoute: PlatformTeamRoute,
+  PlatformTenantsRoute: PlatformTenantsRoute,
+  PlatformIndexRoute: PlatformIndexRoute,
+}
+
+const PlatformRouteWithChildren = PlatformRoute._addFileChildren(
+  PlatformRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AcceptInviteRoute: AcceptInviteRoute,
+  PlatformRoute: PlatformRouteWithChildren,
   RedeemTokenRoute: RedeemTokenRoute,
 }
 export const routeTree = rootRouteImport

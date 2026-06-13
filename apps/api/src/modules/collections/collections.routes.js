@@ -32,6 +32,7 @@ const createSchema = z.object({
   shopId: objectId,
   name: z.string().min(1),
   productRefs: z.array(productRef).min(1),
+  preferredColors: z.array(z.string().min(1)).optional().default([]),
 });
 
 router.get(
@@ -57,10 +58,33 @@ router.post(
       code: `C${crypto.randomInt(100_000_000, 999_999_999)}`,
       name: req.body.name,
       productRefs: req.body.productRefs,
+      preferredColors: req.body.preferredColors || [],
       createdBy: req.user.userId,
     });
     writeAudit({ req, action: 'collection.create', entityType: 'Collection', entityId: collection._id, after: collection.toObject() });
     res.status(201).json(collection);
+  }),
+);
+
+const patchSchema = z.object({
+  shopId: objectId.optional(),
+});
+
+router.patch(
+  '/:id',
+  adminOnly,
+  validate({ params: z.object({ id: objectId }), body: patchSchema }),
+  asyncHandler(async (req, res) => {
+    const collection = await Collection.findOne({ _id: req.params.id, tenantId: req.tenantId });
+    if (!collection) throw new NotFoundError('Collection not found');
+    if (req.body.shopId) {
+      const shop = await Shop.findOne({ _id: req.body.shopId, tenantId: req.tenantId });
+      if (!shop) throw new NotFoundError('Shop not found');
+      collection.shopId = shop._id;
+    }
+    await collection.save();
+    writeAudit({ req, action: 'collection.update', entityType: 'Collection', entityId: collection._id, after: collection.toObject() });
+    res.json(collection);
   }),
 );
 

@@ -36,49 +36,82 @@ export async function getOne(req, res) {
 
 export async function setStatus(req, res) {
   const tenant = await tenantsService.setTenantStatus(req.params.id, req.body.status);
-  writeAudit({ req, action: 'tenant.set_status', entityType: 'Tenant', entityId: tenant._id, after: { status: tenant.status } });
+  writeAudit({
+    req,
+    action: 'tenant.set_status',
+    entityType: 'Tenant',
+    entityId: tenant._id,
+    after: { status: tenant.status, reason: req.body.reason ?? '' },
+  });
   res.json(tenant);
 }
 
-/** §6.4 — start impersonation: issue a 15-min token scoped to the target tenant. */
+export async function setPlan(req, res) {
+  const { tenant, previous } = await tenantsService.setTenantPlan(req.params.id, req.body.plan);
+  writeAudit({
+    req,
+    action: 'tenant.set_plan',
+    entityType: 'Tenant',
+    entityId: tenant._id,
+    before: { plan: previous },
+    after: { plan: tenant.plan },
+  });
+  res.json(tenant);
+}
+
+export async function setLimits(req, res) {
+  const { tenant, previous } = await tenantsService.setTenantLimits(req.params.id, req.body.limits);
+  writeAudit({
+    req,
+    action: 'tenant.set_limits',
+    entityType: 'Tenant',
+    entityId: tenant._id,
+    before: { limits: previous },
+    after: { limits: tenant.toObject().limits },
+  });
+  res.json(tenant);
+}
+
+export async function overview(req, res) {
+  res.json(await tenantsService.getTenantOverview(req.params.id));
+}
+
+export async function resetAdminAccess(req, res) {
+  const { admin, inviteToken } = await tenantsService.resetAdminAccess(req.params.id);
+  writeAudit({
+    req,
+    action: 'tenant.reset_admin_access',
+    entityType: 'Tenant',
+    entityId: req.params.id,
+    after: { adminEmail: admin.email },
+  });
+  res.json({
+    admin: { id: String(admin._id), email: admin.email, status: admin.status },
+    ...(env.NODE_ENV !== 'production' ? { inviteToken } : {}),
+  });
+}
+
 export async function impersonate(req, res) {
-  const tenant = await tenantsService.getTenant(req.params.tenantId);
-
-  const impersonation = { isImpersonating: true, originalUserId: req.user.userId };
-  const accessToken = signAccessToken(
-    { _id: req.user.userId },
-    {
-      tenantId: tenant._id,
-      role: req.user.role,
-      scopeType: 'platform',
-      scopeId: null,
-      assignedEntityIds: [],
-    },
-    impersonation,
-    { expiresIn: IMPERSONATION_TTL },
-  );
-
+  const result = await tenantsService.startImpersonation({
+    user: { _id: req.user.userId },
+    tenantId: req.params.tenantId,
+    reason: req.body.reason,
+    reasonCategory: req.body.reasonCategory,
+  });
   writeAudit({
     req,
     action: 'impersonation.start',
     entityType: 'Tenant',
-    entityId: tenant._id,
-    after: { reason: req.body.reason, reasonCategory: req.body.reasonCategory },
+    entityId: req.params.tenantId,
+    after: {
+      reason: req.body.reason,
+      reasonCategory: req.body.reasonCategory,
+      impersonation: result.impersonation,
+    },
   });
-
   res.json({
-    accessToken,
-    expiresIn: IMPERSONATION_TTL,
-    tenant: { id: String(tenant._id), name: tenant.name, slug: tenant.slug },
+    accessToken: result.accessToken,
+    expiresIn: result.expiresIn,
+    tenant: result.tenant,
   });
-}
-
-/** §6.4 — end impersonation. Access tokens are stateless, so this is an
- *  audited acknowledgement; the short-lived token expires on its own. */
-export async function endImpersonation(req, res) {
-  if (!req.impersonation?.isImpersonating) {
-    throw new ForbiddenError('Not currently impersonating');
-  }
-  writeAudit({ req, action: 'impersonation.end', entityType: 'Tenant', entityId: req.tenantId });
-  res.json({ ok: true });
 }

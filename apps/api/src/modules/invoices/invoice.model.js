@@ -1,10 +1,14 @@
 import mongoose from 'mongoose';
 import { tenantScopePlugin } from '../../plugins/tenantScope.plugin.js';
+import { softDeletePlugin } from '../../plugins/softDelete.plugin.js';
 
 const invoiceSchema = new mongoose.Schema(
   {
     invoiceNumber: { type: String, required: true, unique: true },
-    paymentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment', required: true },
+    // §3.8 — proforma (pre-pay) vs tax (post-pay, GST/HSN/GSTIN).
+    type: { type: String, enum: ['proforma', 'tax'], default: 'tax' },
+    paymentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment', default: null },
+    relatedOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
     lineItems: [
       {
         description: String,
@@ -19,12 +23,14 @@ const invoiceSchema = new mongoose.Schema(
     gstAmount: { type: Number, required: true },
     senderGstin: { type: String, default: '' },
     receiverGstin: { type: String, default: '' },
-    status: { type: String, enum: ['draft', 'issued', 'paid'], default: 'issued' },
+    status: { type: String, enum: ['draft', 'issued', 'paid', 'void'], default: 'issued' },
+    dueAt: { type: Date, default: null },
     pdfUrl: { type: String, default: '' },
   },
   { timestamps: true },
 );
 
 invoiceSchema.plugin(tenantScopePlugin);
+invoiceSchema.plugin(softDeletePlugin);
 
 export const Invoice = mongoose.model('Invoice', invoiceSchema);

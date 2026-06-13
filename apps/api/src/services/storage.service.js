@@ -12,6 +12,8 @@ const ALLOWED_TYPES = {
   artwork: ['image/svg+xml', 'image/png', 'image/jpeg'],
   document: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
   logo: ['image/svg+xml', 'image/png', 'image/jpeg'],
+  product: ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'],
+  production: ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'],
 };
 
 const r2Configured = () => Boolean(env.R2_ENDPOINT && env.R2_ACCESS_KEY && env.R2_SECRET_KEY);

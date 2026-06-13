@@ -127,11 +127,43 @@ export async function createKitApi(payload: {
   return mapKit(kit);
 }
 
+type ArtworkInput = { file?: File; preview?: string; name?: string };
+
+async function artworkFileFromInput(art: ArtworkInput): Promise<File | null> {
+  if (art.file instanceof File) return art.file;
+  if (art.preview?.startsWith("data:")) {
+    const res = await fetch(art.preview);
+    const blob = await res.blob();
+    return new File([blob], art.name || "artwork.png", { type: blob.type || "image/png" });
+  }
+  return null;
+}
+
+export async function uploadCollectionArtworkApi(collectionId: string, file: File) {
+  const form = new FormData();
+  form.append("artwork", file);
+  const col = await apiFetch<Record<string, unknown>>(`/collections/${collectionId}/artwork`, {
+    method: "POST",
+    body: form,
+  });
+  return mapCollection(col);
+}
+
+export async function linkCollectionToShopApi(collectionId: string, shopId: string) {
+  const col = await apiFetch<Record<string, unknown>>(`/collections/${collectionId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ shopId }),
+  });
+  return mapCollection(col);
+}
+
 export async function createCollectionApi(payload: {
   shopId: string;
   name: string;
   pickedIndices: number[];
   catalog: UiProduct[];
+  preferredColors?: string[];
+  artwork?: ArtworkInput;
 }) {
   const productRefs = payload.pickedIndices.map((i) => {
     const p = payload.catalog[i];
@@ -144,9 +176,15 @@ export async function createCollectionApi(payload: {
       shopId: payload.shopId,
       name: payload.name,
       productRefs,
+      preferredColors: payload.preferredColors || [],
     }),
   });
-  return mapCollection(col);
+  let result = mapCollection(col);
+  if (payload.artwork) {
+    const file = await artworkFileFromInput(payload.artwork);
+    if (file) result = await uploadCollectionArtworkApi(result.id, file);
+  }
+  return result;
 }
 
 export async function launchPointsCampaignApi(payload: {

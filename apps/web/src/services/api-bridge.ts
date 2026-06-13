@@ -2,24 +2,36 @@
  * Thin bridge between the vanilla shelf-merch.js engine and TypeScript API services.
  */
 import { ApiError, apiFetch, publicFetch } from "./api";
-import { clearSession, getRefreshToken, isAuthenticated, setSession } from "./auth-store";
+import {
+  clearSession,
+  getRefreshToken,
+  getStoredUser,
+  isAuthenticated,
+  isPlatformUser,
+  setSession,
+  type AuthUser,
+} from "./auth-store";
 import { USE_MOCKS } from "./config";
 import {
   createCollectionApi,
   createKitApi,
   launchPointsCampaignApi,
+  linkCollectionToShopApi,
   syncOrgWizardApi,
 } from "./mutations-api";
+import type { UiCollection } from "./mappers";
 import {
   createContactsApi,
   createShopApi,
   fetchWorkspaceSnapshot,
   publishShopApi,
+  updateShopApi,
   type WorkspaceSnapshot,
 } from "./workspace-api";
 import type { UiProduct } from "./mappers";
 
-export { ApiError };
+export { ApiError, getStoredUser, isAuthenticated, isPlatformUser };
+export type { AuthUser };
 
 export function useMocks(): boolean {
   return USE_MOCKS;
@@ -75,8 +87,10 @@ export async function logout() {
 
 export async function tryRestoreSession(): Promise<boolean> {
   if (!isAuthenticated()) return false;
+  const me = getStoredUser();
+  if (isPlatformUser(me)) return true;
   try {
-    await fetchWorkspaceSnapshot();
+    await fetchWorkspaceSnapshot(me);
     return true;
   } catch {
     clearSession();
@@ -84,9 +98,11 @@ export async function tryRestoreSession(): Promise<boolean> {
   }
 }
 
-export async function hydrateWorkspace(): Promise<WorkspaceSnapshot> {
-  return fetchWorkspaceSnapshot();
+export async function hydrateWorkspace(sessionUser?: AuthUser | null): Promise<WorkspaceSnapshot> {
+  return fetchWorkspaceSnapshot(sessionUser);
 }
+
+export { fetchPlatformDashboard } from "./platform-api";
 
 export function applyWorkspaceToState(S: Record<string, unknown>, data: WorkspaceSnapshot) {
   const prevOrg = (S.org ?? {}) as {
@@ -124,6 +140,8 @@ export async function createShopFlow(payload: {
   name: string;
   currency: string;
   categories: string[];
+  logoUrl?: string;
+  bannerConfig?: Record<string, unknown>;
 }) {
   const currencyMode =
     payload.currency === "INR"
@@ -135,8 +153,17 @@ export async function createShopFlow(payload: {
     name: payload.name,
     currencyMode,
     categories: payload.categories,
+    logoUrl: payload.logoUrl || "",
+    bannerConfig: payload.bannerConfig || {},
   });
   return publishShopApi(draft.id);
+}
+
+export async function updateShopFlow(
+  shopId: string,
+  payload: { logoUrl?: string; bannerConfig?: Record<string, unknown> },
+) {
+  return updateShopApi(shopId, payload);
 }
 
 export async function addContactsFlow(emails: string[], role: string) {
@@ -166,8 +193,40 @@ export async function createCollectionFlow(payload: {
   name: string;
   pickedIndices: number[];
   catalog: UiProduct[];
+  preferredColors?: string[];
+  artwork?: { file?: File; preview?: string; name?: string };
 }) {
   return createCollectionApi(payload);
+}
+
+export async function linkCollectionToShopFlow(collectionId: string, shopId: string) {
+  return linkCollectionToShopApi(collectionId, shopId);
+}
+
+export async function addProductToShopFlow(payload: {
+  shopId: string;
+  collection: UiCollection;
+  product: UiProduct;
+  catalog: UiProduct[];
+}) {
+  const catalogIndex = payload.product.id
+    ? payload.catalog.findIndex((p) => p.id === payload.product.id)
+    : payload.catalog.findIndex(
+        (p) =>
+          p.g === payload.product.g &&
+          p.nm === payload.product.nm &&
+          (p.brand || "") === (payload.product.brand || ""),
+      );
+  if (catalogIndex < 0) {
+    throw new Error("Could not match this product to the catalog");
+  }
+  return createCollectionApi({
+    shopId: payload.shopId,
+    name: payload.collection.name,
+    pickedIndices: [catalogIndex],
+    catalog: payload.catalog,
+    preferredColors: payload.collection.preferredColors || [],
+  });
 }
 
 export async function launchPointsCampaignFlow(payload: {

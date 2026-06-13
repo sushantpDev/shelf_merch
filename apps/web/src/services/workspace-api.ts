@@ -19,7 +19,7 @@ import {
   type UiShop,
   type UiWallet,
 } from "./mappers";
-import { getStoredUser } from "./auth-store";
+import { getStoredUser, type AuthUser } from "./auth-store";
 
 export type WorkspaceSnapshot = {
   account: string;
@@ -59,8 +59,8 @@ function usersMap(users: any[]) {
   return new Map(users.map((u) => [String(u._id), u]));
 }
 
-export async function fetchWorkspaceSnapshot(): Promise<WorkspaceSnapshot> {
-  const me = getStoredUser();
+export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Promise<WorkspaceSnapshot> {
+  const me = sessionUser ?? getStoredUser();
   if (!me?.tenantId) throw new Error("No tenant context");
 
   const [
@@ -215,6 +215,8 @@ export async function createShopApi(payload: {
   name: string;
   currencyMode: "points" | "inr" | "priceless";
   categories: string[];
+  logoUrl?: string;
+  bannerConfig?: Record<string, unknown>;
 }) {
   const shop = await apiFetch<unknown>("/shops", {
     method: "POST",
@@ -225,6 +227,22 @@ export async function createShopApi(payload: {
 
 export async function publishShopApi(shopId: string) {
   const shop = await apiFetch<unknown>(`/shops/${shopId}/publish`, { method: "POST" });
+  return mapShop(shop as never);
+}
+
+export async function updateShopApi(
+  shopId: string,
+  payload: {
+    name?: string;
+    logoUrl?: string;
+    bannerConfig?: Record<string, unknown>;
+    categories?: string[];
+  },
+) {
+  const shop = await apiFetch<unknown>(`/shops/${shopId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
   return mapShop(shop as never);
 }
 

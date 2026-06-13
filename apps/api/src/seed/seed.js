@@ -1,5 +1,5 @@
 /**
- * Dev/demo seed — mirrors the frontend's mock data (apps/web/src/lib/shelf-merch.js).
+ * Dev/demo seed — full mock dataset for every role and major entity field.
  * NEVER run against production.
  */
 import mongoose from 'mongoose';
@@ -9,39 +9,39 @@ import { logger } from '../config/logger.js';
 import { Tenant } from '../modules/tenants/tenant.model.js';
 import { User } from '../modules/users/user.model.js';
 import { RoleAssignment } from '../modules/roles/roleAssignment.model.js';
-import { RefreshToken } from '../modules/auth/refreshToken.model.js';
 import { Wallet } from '../modules/wallets/wallet.model.js';
 import { Entity } from '../modules/entities/entity.model.js';
-import { AuditLog } from '../modules/auditLogs/auditLog.model.js';
 import { CatalogProduct } from '../modules/catalog/catalogProduct.model.js';
 import { Shop } from '../modules/shops/shop.model.js';
 import { Collection } from '../modules/collections/collection.model.js';
 import { Kit } from '../modules/kits/kit.model.js';
 import { Contact } from '../modules/contacts/contact.model.js';
-import { Campaign } from '../modules/campaigns/campaign.model.js';
-import { Recipient } from '../modules/campaigns/recipient.model.js';
 import { hashPassword } from '../modules/auth/auth.service.js';
 import * as ledger from '../services/ledger.service.js';
 import { transitionThrough } from '../services/stateMachine.service.js';
 import * as campaignsService from '../modules/campaigns/campaigns.service.js';
 import { CATALOG_PRODUCTS } from './catalogProducts.js';
+import {
+  DEMO_PASSWORD,
+  DEMO_REDEMPTION_TOKEN,
+  DEPARTMENTS,
+  PLATFORM_LOGINS,
+  TENANT_LOGINS,
+  formatLoginTable,
+} from './demoReference.js';
+import { seedTenantDemo } from './seedTenantDemo.js';
+import { seedPlatformDemo } from './seedPlatformDemo.js';
 
-export const DEMO_REDEMPTION_TOKEN = 'seedDemoRedemptionTokenRubix26!';
-
-const DEPARTMENTS = [
-  { name: 'Marketing', desc: 'Events, conferences, swag campaigns and promotions.', users: 25, allocated: 300000, color: '#2563EB', mgr: { name: 'Priya Sharma', email: 'priya@rubix.net', mobile: '+91 98765 43210' } },
-  { name: 'Sales', desc: 'Client gifting, field sales kits and prospect merchandise.', users: 40, allocated: 200000, color: '#7C3AED', mgr: { name: 'Ravi Kumar', email: 'ravi@rubix.net', mobile: '+91 98220 11234' } },
-  { name: 'HR', desc: 'Onboarding kits, employee rewards and recognition.', users: 30, allocated: 200000, color: '#0E9CB5', mgr: { name: 'Anita Rao', email: 'anita@rubix.net', mobile: '+91 99001 22789' } },
-  { name: 'Admin', desc: 'Office supplies, signage and facility merchandise.', users: 12, allocated: 150000, color: '#E08600', mgr: { name: 'Karan Gupta', email: 'karan@rubix.net', mobile: '+91 90040 55678' } },
-  { name: 'Customer Success', desc: 'Customer welcome kits and loyalty merchandise.', users: 18, allocated: 150000, color: '#0A8F5B', mgr: { name: 'Amit Singh', email: 'amit@rubix.net', mobile: '+91 96320 99001' } },
-];
+export { DEMO_REDEMPTION_TOKEN, DEMO_PASSWORD, PLATFORM_LOGINS, TENANT_LOGINS };
 
 async function wipe() {
   const cols = [
     'tenants', 'users', 'roleassignments', 'refreshtokens', 'wallets', 'wallettransactions',
     'entities', 'auditlogs', 'catalogproducts', 'shops', 'collections', 'kits', 'contacts',
     'campaigns', 'recipients', 'orders', 'importjobs', 'importmappings', 'notifications',
-    'idempotencykeys',
+    'idempotencykeys', 'shipments', 'supporttickets', 'vendors', 'productiontasks',
+    'platformsettings', 'categories', 'inventorytransactions', 'platformkits',
+    'invoices', 'payments', 'creditnotes',
   ];
   await Promise.all(cols.map((c) => mongoose.connection.collection(c).deleteMany({})));
 }
@@ -52,7 +52,8 @@ async function seed() {
   logger.warn('Wiping existing data…');
   await wipe();
 
-  const password = await hashPassword('demo1234');
+  const password = await hashPassword(DEMO_PASSWORD);
+  const platformUsersByRole = {};
 
   await User.create({
     tenantId: null,
@@ -61,16 +62,40 @@ async function seed() {
     passwordHash: password,
     status: 'active',
   });
-  // const superAdmin = await User.findOne({ email: 'admin@shelfmerch.io' });
-  const superAdmin = await User.findOne({ email: 'hr@rubix.net' });
+  const superAdmin = await User.findOne({ email: 'admin@shelfmerch.io' });
   await RoleAssignment.create({
     tenantId: null,
     userId: superAdmin._id,
     role: 'platform_super_admin',
     scopeType: 'platform',
   });
+  platformUsersByRole.platform_super_admin = superAdmin;
 
-  const tenant = await Tenant.create({ name: 'Rubix', slug: 'rubix', currency: 'INR', status: 'active' });
+  for (const member of PLATFORM_LOGINS.filter((m) => m.role !== 'platform_super_admin')) {
+    const user = await User.create({
+      tenantId: null,
+      name: member.name,
+      email: member.email,
+      passwordHash: password,
+      status: 'active',
+    });
+    await RoleAssignment.create({
+      tenantId: null,
+      userId: user._id,
+      role: member.role,
+      scopeType: 'platform',
+    });
+    platformUsersByRole[member.role] = user;
+  }
+
+  const tenant = await Tenant.create({
+    name: 'Rubix',
+    slug: 'rubix',
+    currency: 'INR',
+    status: 'active',
+    plan: 'growth',
+    gstin: '36AABCR5678B1Z2',
+  });
 
   const [owner, admin] = await User.create([
     { tenantId: tenant._id, name: 'Jonna Madhavi', email: 'jonnaml2015@gmail.com', passwordHash: password, status: 'active' },
@@ -81,6 +106,7 @@ async function seed() {
     { tenantId: tenant._id, userId: admin._id, role: 'company_admin', scopeType: 'tenant' },
   ]);
 
+  const walletTotal = DEPARTMENTS.reduce((s, d) => s + d.allocated, 0);
   const wallet = await Wallet.create({
     tenantId: tenant._id,
     name: 'FY2026 Merchandise Budget',
@@ -97,13 +123,16 @@ async function seed() {
     tenantId: tenant._id,
     walletId: wallet._id,
     type: 'fund_in',
-    amount: 1_000_000,
+    amount: walletTotal,
     description: 'PO-RUBIX-2026-0417 — FY2026 merchandise budget funding',
     performedBy: owner._id,
   });
 
   const entities = [];
+  const entityByName = {};
   const allocations = [];
+  const managersByEmail = {};
+
   for (const dept of DEPARTMENTS) {
     const entity = await Entity.create({
       tenantId: tenant._id,
@@ -114,6 +143,7 @@ async function seed() {
       expectedUsers: dept.users,
     });
     entities.push(entity);
+    entityByName[dept.name] = entity;
 
     const manager = await User.create({
       tenantId: tenant._id,
@@ -123,6 +153,7 @@ async function seed() {
       passwordHash: password,
       status: 'active',
     });
+    managersByEmail[dept.mgr.email] = manager;
     await RoleAssignment.create({
       tenantId: tenant._id,
       userId: manager._id,
@@ -141,7 +172,6 @@ async function seed() {
   transitionThrough('wallet', freshWallet, 'active', { userId: owner._id });
   await freshWallet.save();
 
-  // --- Phase 3: Catalog, shop, collection, kits ---
   const products = await CatalogProduct.insertMany(CATALOG_PRODUCTS);
   const productByGroup = Object.fromEntries(products.map((p) => [p.group, p]));
 
@@ -159,6 +189,7 @@ async function seed() {
     code: 'C343955972',
     name: 'New employee Swag',
     status: 'ready',
+    preferredColors: ['Black', 'White'],
     productRefs: [
       { catalogProductId: productByGroup.pack._id, brand: 'Mercer+Mettle', name: 'Commuter Backpack', group: 'pack' },
       { catalogProductId: productByGroup.hoodie._id, brand: 'Bella + Canvas', name: 'Sponge Fleece Pullover Hoodie', group: 'hoodie' },
@@ -196,7 +227,6 @@ async function seed() {
     },
   ]);
 
-  // --- Phase 4: Contacts ---
   await Contact.insertMany([
     { tenantId: tenant._id, name: 'Jonna Madhavi', email: 'jonnaml2015@gmail.com', role: 'Owner', source: 'manual' },
     {
@@ -209,12 +239,13 @@ async function seed() {
     },
   ]);
 
-  // --- Phase 4/5: Launched campaign with fixed redemption token for E2E demos ---
-  const marketingEntity = entities[0];
-  const priya = await User.findOne({ email: 'priya@rubix.net' });
+  const priya = managersByEmail['priya@rubix.net'];
+  const ravi = managersByEmail['ravi@rubix.net'];
   const priyaRole = await RoleAssignment.findOne({ userId: priya._id });
+  const raviRole = await RoleAssignment.findOne({ userId: ravi._id });
+  const marketingEntity = entityByName.Marketing;
 
-  const campaign = await campaignsService.createCampaign({
+  const marketingCampaign = await campaignsService.createCampaign({
     tenantId: tenant._id,
     userId: priya._id,
     data: {
@@ -229,7 +260,7 @@ async function seed() {
 
   await campaignsService.importRecipients({
     tenantId: tenant._id,
-    campaignId: campaign._id,
+    campaignId: marketingCampaign._id,
     user: {
       userId: priya._id,
       role: priyaRole.role,
@@ -244,38 +275,57 @@ async function seed() {
 
   await campaignsService.allocateCredits({
     tenantId: tenant._id,
-    campaignId: campaign._id,
+    campaignId: marketingCampaign._id,
     user: { userId: priya._id, scopeType: 'entity', assignedEntityIds: [String(marketingEntity._id)] },
     creditsPerRecipient: 5000,
   });
 
   await campaignsService.launchCampaign({
     tenantId: tenant._id,
-    campaignId: campaign._id,
+    campaignId: marketingCampaign._id,
     user: { userId: priya._id, scopeType: 'entity', assignedEntityIds: [String(marketingEntity._id)] },
   });
 
-  // Pin a known token on Chandra's recipient for incognito redemption testing.
-  await Recipient.updateOne(
-    { tenantId: tenant._id, campaignId: campaign._id, email: 'konetibaba@gmail.com' },
-    { redemptionToken: DEMO_REDEMPTION_TOKEN },
-  );
+  const tenantDemo = await seedTenantDemo({
+    tenant,
+    owner,
+    entities,
+    entityByName,
+    shop,
+    productByGroup,
+    priya,
+    priyaRole,
+    ravi,
+    raviRole,
+    marketingCampaign,
+  });
+
+  await seedPlatformDemo({
+    tenant,
+    wallet: freshWallet,
+    superAdmin,
+    platformUsersByRole,
+    orders: tenantDemo.orders,
+    products,
+  });
 
   logger.info(
     {
       tenant: tenant.slug,
-      wallet: { balance: freshWallet.balance, allocated: freshWallet.allocatedAmount, status: freshWallet.status },
+      wallet: {
+        balance: freshWallet.balance,
+        allocated: freshWallet.allocatedAmount,
+        status: freshWallet.status,
+        departments: DEPARTMENTS.map((d) => ({ name: d.name, allocated: d.allocated })),
+      },
       catalogProducts: products.length,
-      shop: shop.name,
-      campaign: 'Diwali Gift 2026 (redemption_open)',
+      shops: ['Rubix Dubai', tenantDemo.shopBlr.name],
+      campaigns: ['Diwali Gift 2026 (Marketing)', 'Q1 Prospect Gifting (Sales)'],
+      orders: Object.values(tenantDemo.orders).map((o) => ({ number: o.orderNumber, status: o.status })),
       redemptionToken: DEMO_REDEMPTION_TOKEN,
-      logins: [
-        'admin@shelfmerch.io / demo1234 (platform_super_admin)',
-        'hr@rubix.net / demo1234 (company_admin)',
-        'priya@rubix.net / demo1234 (entity_manager — Marketing)',
-      ],
+      logins: formatLoginTable(),
     },
-    'Seed complete',
+    'Seed complete — all roles populated',
   );
 }
 

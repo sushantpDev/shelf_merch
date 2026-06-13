@@ -20,6 +20,7 @@ const collectionSchema = new mongoose.Schema(
     status: { type: String, enum: ['draft', 'ready', 'archived'], default: 'draft' },
     artworkUrl: { type: String, default: '' },
     productRefs: { type: [productRefSchema], default: [] },
+    preferredColors: { type: [String], default: [] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },
   { timestamps: true },

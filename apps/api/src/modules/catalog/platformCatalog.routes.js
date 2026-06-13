@@ -1,0 +1,364 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import multer from 'multer';
+import { asyncHandler } from '../../utils/asyncHandler.js';
+import { authenticate } from '../../middleware/auth.middleware.js';
+import { resolveTenant } from '../../middleware/tenant.middleware.js';
+import { platformArea } from '../../middleware/platformAccess.middleware.js';
+import { validate } from '../../middleware/validate.middleware.js';
+import { objectId } from '../users/users.validation.js';
+import { uploadFile } from '../../services/storage.service.js';
+import { writeAudit } from '../../services/audit.service.js';
+import { PRODUCT_STATUSES, INVENTORY_MODES, CUSTOMIZATION_METHODS } from './catalogProduct.model.js';
+import { INVENTORY_TXN_TYPES } from './inventoryTransaction.model.js';
+import * as catalogService from './platformCatalog.service.js';
+import * as inventoryService from './inventory.service.js';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+
+const idParam = z.object({ id: objectId });
+
+const createProductSchema = z.object({
+  name: z.string().min(1),
+  slug: z.string().optional(),
+  description: z.string().optional().default(''),
+  category: z.string().min(1),
+  brand: z.string().optional().default(''),
+  group: z.string().optional().default(''),
+  sku: z.string().optional(),
+  skuPrefix: z.string().optional(),
+  sellingPriceInr: z.number().positive(),
+  costPriceInr: z.number().nonnegative().optional().default(0),
+  supplierName: z.string().optional().default(''),
+  gstRate: z.number().min(0).max(28).optional().default(18),
+  hsnCode: z.string().optional().default(''),
+  moq: z.number().int().positive().optional().default(1),
+  material: z.string().optional().default(''),
+  printableAreas: z.array(z.string()).optional().default([]),
+  customizationMethods: z.array(z.string()).optional().default([]),
+  productionDays: z.number().int().positive().optional().default(7),
+});
+
+const updateProductSchema = createProductSchema
+  .partial()
+  .extend({ reason: z.string().optional() });
+
+const variantSchema = z.object({
+  size: z.string().optional().default(''),
+  color: z.string().optional().default(''),
+  material: z.string().optional().default(''),
+  sku: z.string().min(1),
+  priceOverrideInr: z.number().positive().nullable().optional(),
+  stock: z.number().int().nonnegative().optional().default(0),
+});
+
+const customizationSchema = z.object({
+  customization: z.array(
+    z.object({
+      method: z.enum(CUSTOMIZATION_METHODS),
+      printableArea: z.string().optional().default(''),
+      extraCostInr: z.number().nonnegative().optional().default(0),
+    }),
+  ),
+});
+
+const listProductsQuery = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().optional(),
+  status: z.enum(PRODUCT_STATUSES).optional(),
+  category: z.string().optional(),
+  search: z.string().optional(),
+});
+
+// ---- /api/v1/platform/products ----
+export const platformProductsRouter = Router();
+platformProductsRouter.use(authenticate, resolveTenant);
+
+const catalogRead = platformArea('catalog', 'read');
+const catalogWrite = platformArea('catalog', 'write');
+
+platformProductsRouter.get(
+  '/',
+  catalogRead,
+  validate({ query: listProductsQuery }),
+  asyncHandler(async (req, res) => res.json(await catalogService.listProducts({ query: req.query }))),
+);
+
+platformProductsRouter.get(
+  '/:id',
+  catalogRead,
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) =>
+    res.json(catalogService.platformProductDto(await catalogService.getProduct(req.params.id))),
+  ),
+);
+
+platformProductsRouter.post(
+  '/',
+  catalogWrite,
+  validate({ body: createProductSchema }),
+  asyncHandler(async (req, res) => {
+    const product = await catalogService.createProduct(req.body);
+    writeAudit({ req, action: 'product.create', entityType: 'CatalogProduct', entityId: product._id, after: { name: product.name, sku: product.sku } });
+    res.status(201).json(catalogService.platformProductDto(product));
+  }),
+);
+
+platformProductsRouter.patch(
+  '/:id',
+  catalogWrite,
+  validate({ params: idParam, body: updateProductSchema }),
+  asyncHandler(async (req, res) => {
+    const { reason, ...patch } = req.body;
+    const { before, product, touchesSensitive } = await catalogService.updateProduct(
+      req.params.id,
+      patch,
+      reason,
+    );
+    const after = catalogService.platformProductDto(product);
+    writeAudit({
+      req,
+      action: touchesSensitive ? 'product.price_change' : 'product.update',
+      entityType: 'CatalogProduct',
+      entityId: product._id,
+      before: { sellingPriceInr: before.sellingPriceInr, costPriceInr: before.costPriceInr, gstRate: before.gstRate, hsnCode: before.hsnCode },
+      after: { sellingPriceInr: after.sellingPriceInr, costPriceInr: after.costPriceInr, gstRate: after.gstRate, hsnCode: after.hsnCode, reason },
+    });
+    res.json(after);
+  }),
+);
+
+platformProductsRouter.post(
+  '/:id/publish',
+  catalogWrite,
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    const product = await catalogService.publishProduct(req.params.id);
+    writeAudit({ req, action: 'product.publish', entityType: 'CatalogProduct', entityId: product._id });
+    res.json(catalogService.platformProductDto(product));
+  }),
+);
+
+platformProductsRouter.post(
+  '/:id/unpublish',
+  catalogWrite,
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    const product = await catalogService.unpublishProduct(req.params.id);
+    writeAudit({ req, action: 'product.unpublish', entityType: 'CatalogProduct', entityId: product._id });
+    res.json(catalogService.platformProductDto(product));
+  }),
+);
+
+platformProductsRouter.post(
+  '/:id/archive',
+  catalogWrite,
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    const product = await catalogService.archiveProduct(req.params.id);
+    writeAudit({ req, action: 'product.archive', entityType: 'CatalogProduct', entityId: product._id });
+    res.json(catalogService.platformProductDto(product));
+  }),
+);
+
+platformProductsRouter.post(
+  '/:id/duplicate',
+  catalogWrite,
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    const product = await catalogService.duplicateProduct(req.params.id);
+    writeAudit({ req, action: 'product.duplicate', entityType: 'CatalogProduct', entityId: product._id });
+    res.status(201).json(catalogService.platformProductDto(product));
+  }),
+);
+
+platformProductsRouter.get(
+  '/:id/variants',
+  catalogRead,
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    const product = await catalogService.getProduct(req.params.id);
+    res.json(product.variants);
+  }),
+);
+
+platformProductsRouter.post(
+  '/:id/variants',
+  catalogWrite,
+  validate({ params: idParam, body: variantSchema }),
+  asyncHandler(async (req, res) => {
+    const product = await catalogService.addVariant(req.params.id, req.body);
+    writeAudit({ req, action: 'product.variant_add', entityType: 'CatalogProduct', entityId: product._id, after: req.body });
+    res.status(201).json(product.variants);
+  }),
+);
+
+platformProductsRouter.patch(
+  '/:id/variants/:variantId',
+  catalogWrite,
+  validate({ params: z.object({ id: objectId, variantId: objectId }), body: variantSchema.partial() }),
+  asyncHandler(async (req, res) => {
+    const product = await catalogService.updateVariant(req.params.id, req.params.variantId, req.body);
+    writeAudit({ req, action: 'product.variant_update', entityType: 'CatalogProduct', entityId: product._id, after: req.body });
+    res.json(product.variants);
+  }),
+);
+
+platformProductsRouter.post(
+  '/:id/images',
+  catalogWrite,
+  validate({ params: idParam }),
+  upload.array('images', 8),
+  asyncHandler(async (req, res) => {
+    const files = req.files ?? [];
+    const urls = [];
+    for (const file of files) {
+      const { url } = await uploadFile({ tenantId: 'platform', kind: 'product', file });
+      urls.push(url);
+    }
+    // Also accept pre-uploaded URLs in the body for API-driven imports.
+    if (Array.isArray(req.body?.urls)) urls.push(...req.body.urls);
+    const product = await catalogService.addImages(req.params.id, urls, {
+      primary: req.body?.primary === 'true' || req.body?.primary === true,
+    });
+    writeAudit({ req, action: 'product.images_add', entityType: 'CatalogProduct', entityId: product._id, after: { urls } });
+    res.status(201).json({ imageUrls: product.imageUrls, primaryImageUrl: product.primaryImageUrl });
+  }),
+);
+
+platformProductsRouter.get(
+  '/:id/customization',
+  catalogRead,
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    const product = await catalogService.getProduct(req.params.id);
+    res.json(product.customization);
+  }),
+);
+
+platformProductsRouter.post(
+  '/:id/customization',
+  catalogWrite,
+  validate({ params: idParam, body: customizationSchema }),
+  asyncHandler(async (req, res) => {
+    const product = await catalogService.setCustomization(req.params.id, req.body.customization);
+    writeAudit({ req, action: 'product.customization_set', entityType: 'CatalogProduct', entityId: product._id, after: { customization: req.body.customization } });
+    res.json(product.customization);
+  }),
+);
+
+// ---- /api/v1/platform/categories ----
+export const platformCategoriesRouter = Router();
+platformCategoriesRouter.use(authenticate, resolveTenant);
+
+platformCategoriesRouter.get(
+  '/',
+  catalogRead,
+  asyncHandler(async (_req, res) => res.json(await catalogService.listCategories())),
+);
+platformCategoriesRouter.post(
+  '/',
+  catalogWrite,
+  validate({ body: z.object({ name: z.string().min(1), description: z.string().optional() }) }),
+  asyncHandler(async (req, res) => {
+    const category = await catalogService.createCategory(req.body);
+    writeAudit({ req, action: 'category.create', entityType: 'Category', entityId: category._id, after: { name: category.name } });
+    res.status(201).json(category);
+  }),
+);
+platformCategoriesRouter.patch(
+  '/:id',
+  catalogWrite,
+  validate({
+    params: idParam,
+    body: z.object({
+      name: z.string().min(1).optional(),
+      description: z.string().optional(),
+      status: z.enum(['active', 'archived']).optional(),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const category = await catalogService.updateCategory(req.params.id, req.body);
+    writeAudit({ req, action: 'category.update', entityType: 'Category', entityId: category._id, after: req.body });
+    res.json(category);
+  }),
+);
+
+// ---- /api/v1/platform/inventory ----
+export const platformInventoryRouter = Router();
+platformInventoryRouter.use(authenticate, resolveTenant);
+
+const inventoryRead = platformArea('inventory', 'read');
+const inventoryWrite = platformArea('inventory', 'write');
+
+platformInventoryRouter.get(
+  '/',
+  inventoryRead,
+  validate({
+    query: z.object({
+      page: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().positive().optional(),
+      mode: z.enum(INVENTORY_MODES).optional(),
+      stockStatus: z.enum(['in_stock', 'low_stock', 'out_of_stock', 'made_to_order']).optional(),
+      search: z.string().optional(),
+    }),
+  }),
+  asyncHandler(async (req, res) => res.json(await inventoryService.listInventory({ query: req.query }))),
+);
+
+platformInventoryRouter.get(
+  '/:id/transactions',
+  inventoryRead,
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) =>
+    res.json(await inventoryService.listInventoryTransactions(req.params.id, req.query)),
+  ),
+);
+
+platformInventoryRouter.post(
+  '/:id/transactions',
+  inventoryWrite,
+  validate({
+    params: idParam,
+    body: z.object({
+      type: z.enum(INVENTORY_TXN_TYPES),
+      qty: z.number().int(),
+      reason: z.string().min(1),
+      variantSku: z.string().optional(),
+      relatedCampaignId: objectId.optional(),
+      relatedOrderId: objectId.optional(),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const result = await inventoryService.applyInventoryTransaction({
+      productId: req.params.id,
+      ...req.body,
+      performedBy: req.user.userId,
+    });
+    writeAudit({
+      req,
+      action: 'inventory.transaction',
+      entityType: 'CatalogProduct',
+      entityId: req.params.id,
+      after: { type: req.body.type, qty: req.body.qty, reason: req.body.reason, ...result.inventory.toObject?.() ?? result.inventory },
+    });
+    res.status(201).json(result);
+  }),
+);
+
+platformInventoryRouter.patch(
+  '/:id/mode',
+  inventoryWrite,
+  validate({
+    params: idParam,
+    body: z.object({
+      mode: z.enum(INVENTORY_MODES).optional(),
+      lowStockThreshold: z.number().int().nonnegative().optional(),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const inventory = await inventoryService.setInventoryMode(req.params.id, req.body);
+    writeAudit({ req, action: 'inventory.mode_set', entityType: 'CatalogProduct', entityId: req.params.id, after: req.body });
+    res.json(inventory);
+  }),
+);

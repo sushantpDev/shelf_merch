@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { tenantScopePlugin } from '../../plugins/tenantScope.plugin.js';
+import { softDeletePlugin } from '../../plugins/softDelete.plugin.js';
 
 export const DEFAULT_MAPPING = {
   name: 'name',
@@ -29,5 +30,6 @@ const importMappingSchema = new mongoose.Schema(
 );
 
 importMappingSchema.plugin(tenantScopePlugin);
+importMappingSchema.plugin(softDeletePlugin);
 
 export const ImportMapping = mongoose.model('ImportMapping', importMappingSchema);

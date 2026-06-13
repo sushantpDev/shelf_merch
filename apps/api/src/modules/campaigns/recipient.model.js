@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { tenantScopePlugin } from '../../plugins/tenantScope.plugin.js';
+import { softDeletePlugin } from '../../plugins/softDelete.plugin.js';
 
 export const REDEMPTION_STATUSES = [
   'invited',
@@ -34,6 +35,7 @@ const recipientSchema = new mongoose.Schema(
 );
 
 recipientSchema.plugin(tenantScopePlugin);
+recipientSchema.plugin(softDeletePlugin);
 recipientSchema.index({ tenantId: 1, campaignId: 1, email: 1 }, { unique: true });
 
 export const Recipient = mongoose.model('Recipient', recipientSchema);
