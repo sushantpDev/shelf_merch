@@ -18,7 +18,6 @@ import usersRoutes from './modules/users/users.routes.js';
 import {
   tenantsRouter,
   platformTenantsRouter,
-  platformImpersonateRouter,
 } from './modules/tenants/tenants.routes.js';
 import walletsRoutes from './modules/wallets/wallets.routes.js';
 import entitiesRoutes from './modules/entities/entities.routes.js';
@@ -93,7 +92,6 @@ export function createApp() {
   api.use('/users', usersRoutes);
   api.use('/tenants', tenantsRouter);
   api.use('/platform/tenants', platformTenantsRouter);
-  api.use('/platform/impersonate', platformImpersonateRouter);
   api.use('/wallets', walletsRoutes);
   api.use('/entities', entitiesRoutes);
   api.use('/shops', shopsRoutes);

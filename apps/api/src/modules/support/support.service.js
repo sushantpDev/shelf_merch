@@ -93,7 +93,11 @@ export async function assignTicket({ ticketId, userId, actor }) {
 
 export async function linkTicketToOrder({ ticketId, orderId }) {
   const ticket = await getSupportTicket(ticketId);
-  const order = await Order.findById(orderId).setOptions({ skipTenantGuard: true });
+  // A ticket may only ever link to an order in its OWN tenant — scope by
+  // ticket.tenantId even on the platform path (skipTenantGuard).
+  const order = await Order.findOne({ _id: orderId, tenantId: ticket.tenantId }).setOptions({
+    skipTenantGuard: true,
+  });
   if (!order) throw new NotFoundError('Order not found');
   ticket.relatedOrderId = order._id;
   if (!ticket.relatedRecipientId) ticket.relatedRecipientId = order.recipientId;
@@ -140,13 +144,17 @@ export async function crossTenantSearch(q) {
 async function recipientForTicket(ticket) {
   let recipientId = ticket.relatedRecipientId;
   if (!recipientId && ticket.relatedOrderId) {
-    const order = await Order.findById(ticket.relatedOrderId).setOptions({ skipTenantGuard: true });
+    const order = await Order.findOne({ _id: ticket.relatedOrderId, tenantId: ticket.tenantId }).setOptions({
+      skipTenantGuard: true,
+    });
     recipientId = order?.recipientId ?? null;
   }
   if (!recipientId) {
     throw new ApiError(422, 'Ticket has no linked recipient or order', 'NO_RECIPIENT');
   }
-  const recipient = await Recipient.findById(recipientId).setOptions({ skipTenantGuard: true });
+  const recipient = await Recipient.findOne({ _id: recipientId, tenantId: ticket.tenantId }).setOptions({
+    skipTenantGuard: true,
+  });
   if (!recipient?.email) throw new ApiError(422, 'No recipient email on file', 'NO_RECIPIENT_EMAIL');
   return recipient;
 }
@@ -173,7 +181,9 @@ export async function resendTrackingLink({ ticketId }) {
   const ticket = await getSupportTicket(ticketId);
   if (!ticket.relatedOrderId) throw new ApiError(422, 'Ticket has no linked order', 'NO_ORDER');
 
-  const order = await Order.findById(ticket.relatedOrderId).setOptions({ skipTenantGuard: true });
+  const order = await Order.findOne({ _id: ticket.relatedOrderId, tenantId: ticket.tenantId }).setOptions({
+    skipTenantGuard: true,
+  });
   if (!order) throw new NotFoundError('Order not found');
   const recipient = await recipientForTicket(ticket);
 
@@ -194,7 +204,9 @@ export async function updateTicketOrderAddress({ ticketId, address }) {
   const ticket = await getSupportTicket(ticketId);
   if (!ticket.relatedOrderId) throw new ApiError(422, 'Ticket has no linked order', 'NO_ORDER');
 
-  const order = await Order.findById(ticket.relatedOrderId).setOptions({ skipTenantGuard: true });
+  const order = await Order.findOne({ _id: ticket.relatedOrderId, tenantId: ticket.tenantId }).setOptions({
+    skipTenantGuard: true,
+  });
   if (!order) throw new NotFoundError('Order not found');
   if (['shipped', 'delivered'].includes(order.status)) {
     throw new ApiError(422, `Cannot change the address of a ${order.status} order`, 'TOO_LATE');
