@@ -89,10 +89,18 @@ const catalogProductSchema = new mongoose.Schema(
     },
     vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null },
     status: { type: String, enum: PRODUCT_STATUSES, default: 'active' },
+    // Provenance — set when a product is imported (e.g. Shopify) for dedupe.
+    source: {
+      provider: { type: String, default: 'manual' }, // 'manual' | 'shopify'
+      domain: { type: String, default: '' },
+      externalId: { type: String, default: '' }, // Shopify product id (string)
+      handle: { type: String, default: '' },
+    },
   },
   { timestamps: true },
 );
 
 catalogProductSchema.index({ status: 1, category: 1 });
+catalogProductSchema.index({ 'source.provider': 1, 'source.externalId': 1 });
 
 export const CatalogProduct = mongoose.model('CatalogProduct', catalogProductSchema);
