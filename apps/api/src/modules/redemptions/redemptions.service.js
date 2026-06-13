@@ -4,7 +4,7 @@ import { Recipient } from '../campaigns/recipient.model.js';
 import { Campaign } from '../campaigns/campaign.model.js';
 import { Shop } from '../shops/shop.model.js';
 import { CatalogProduct } from '../catalog/catalogProduct.model.js';
-import { Order } from '../orders/order.model.js';
+import { Order, sanitizeOrderItems } from '../orders/order.model.js';
 import { transitionRedemption } from '../campaigns/campaigns.service.js';
 import { computeAmountBreakdown } from '../../services/pricing.service.js';
 import { env } from '../../config/env.js';
@@ -179,16 +179,23 @@ export async function submitRedemption(token, { items, shippingAddress }) {
     throw new ApiError(403, 'Verify OTP before submitting your order', 'NOT_VERIFIED');
   }
 
+  // Non-negotiable #4: every order item carries a full product snapshot
+  // (price, cost, GST, HSN, image) frozen at order time.
   const lineItems = [];
   for (const item of items) {
-    const product = await CatalogProduct.findById(item.productId);
+    const product = await CatalogProduct.findById(item.productId).select('+costPriceInr');
     if (!product) throw new NotFoundError(`Product ${item.productId} not found`);
     lineItems.push({
       catalogProductId: product._id,
       name: product.name,
+      sku: product.sku,
       variant: item.variant ?? {},
       qty: item.qty,
       unitPriceInr: product.basePriceInr,
+      costPriceInr: product.costPriceInr ?? 0,
+      gstRate: product.gstRate ?? 18,
+      hsnCode: product.hsnCode ?? '',
+      imageUrl: product.primaryImageUrl || product.imageUrls?.[0] || '',
     });
   }
 
@@ -218,6 +225,28 @@ export async function submitRedemption(token, { items, shippingAddress }) {
   transitionRedemption(recipient, 'order_created');
   await recipient.save();
 
+  // §3.2 reservation hook — redemption consumes stock. Best-effort: an
+  // inventory bookkeeping error must never block a recipient's order.
+  try {
+    const { applyInventoryTransaction } = await import('../catalog/inventory.service.js');
+    for (const line of lineItems) {
+      const product = await CatalogProduct.findById(line.catalogProductId);
+      if (product?.inventory?.mode !== 'physical') continue;
+      await applyInventoryTransaction({
+        productId: line.catalogProductId,
+        variantSku: line.sku,
+        type: 'reduce',
+        qty: line.qty,
+        reason: `Redemption order ${order.orderNumber}`,
+        relatedOrderId: order._id,
+        relatedCampaignId: campaign._id,
+        consumeReserved: product.inventory.reserved >= line.qty,
+      });
+    }
+  } catch {
+    // Stock drift is reconciled by catalog admins via /platform/inventory.
+  }
+
   return { orderNumber: order.orderNumber, estimatedDelivery: '7-10 business days', orderId: String(order._id) };
 }
 
@@ -230,7 +259,7 @@ export async function trackRedemption(token) {
     orderNumber: order.orderNumber,
     status: order.status,
     amountBreakdown: order.amountBreakdown,
-    items: order.items,
+    items: sanitizeOrderItems(order.items),
     shippingAddress: order.shippingAddress,
     redemptionStatus: recipient.redemptionStatus,
   };

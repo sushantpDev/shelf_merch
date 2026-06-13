@@ -2,7 +2,15 @@
  * Thin bridge between the vanilla shelf-merch.js engine and TypeScript API services.
  */
 import { ApiError, apiFetch, publicFetch } from "./api";
-import { clearSession, getRefreshToken, isAuthenticated, setSession } from "./auth-store";
+import {
+  clearSession,
+  getRefreshToken,
+  getStoredUser,
+  isAuthenticated,
+  isPlatformUser,
+  setSession,
+  type AuthUser,
+} from "./auth-store";
 import { USE_MOCKS } from "./config";
 import {
   createCollectionApi,
@@ -22,7 +30,8 @@ import {
 } from "./workspace-api";
 import type { UiProduct } from "./mappers";
 
-export { ApiError };
+export { ApiError, getStoredUser, isAuthenticated, isPlatformUser };
+export type { AuthUser };
 
 export function useMocks(): boolean {
   return USE_MOCKS;
@@ -78,8 +87,10 @@ export async function logout() {
 
 export async function tryRestoreSession(): Promise<boolean> {
   if (!isAuthenticated()) return false;
+  const me = getStoredUser();
+  if (isPlatformUser(me)) return true;
   try {
-    await fetchWorkspaceSnapshot();
+    await fetchWorkspaceSnapshot(me);
     return true;
   } catch {
     clearSession();
@@ -87,9 +98,11 @@ export async function tryRestoreSession(): Promise<boolean> {
   }
 }
 
-export async function hydrateWorkspace(): Promise<WorkspaceSnapshot> {
-  return fetchWorkspaceSnapshot();
+export async function hydrateWorkspace(sessionUser?: AuthUser | null): Promise<WorkspaceSnapshot> {
+  return fetchWorkspaceSnapshot(sessionUser);
 }
+
+export { fetchPlatformDashboard } from "./platform-api";
 
 export function applyWorkspaceToState(S: Record<string, unknown>, data: WorkspaceSnapshot) {
   const prevOrg = (S.org ?? {}) as {

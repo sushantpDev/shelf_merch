@@ -6,18 +6,37 @@ import { InvalidTransitionError } from '../utils/errors.js';
  * transitionState().
  */
 const TRANSITIONS = {
+  // SUPER_ADMIN_FLOW §3.5: any → issue_raised ; any → cancelled ;
+  // issue_raised → replacement_processing.
   order: {
-    created: ['approved', 'issue_raised'],
-    approved: ['mockup_pending', 'issue_raised'],
-    mockup_pending: ['mockup_approved', 'issue_raised'],
-    mockup_approved: ['in_production', 'issue_raised'],
-    in_production: ['qc_pending', 'issue_raised'],
-    qc_pending: ['packed', 'issue_raised'],
-    packed: ['shipped', 'issue_raised'],
-    shipped: ['delivered', 'issue_raised'],
+    created: ['approved', 'issue_raised', 'cancelled'],
+    approved: ['mockup_pending', 'issue_raised', 'cancelled'],
+    mockup_pending: ['mockup_approved', 'issue_raised', 'cancelled'],
+    mockup_approved: ['in_production', 'issue_raised', 'cancelled'],
+    in_production: ['qc_pending', 'issue_raised', 'cancelled'],
+    qc_pending: ['packed', 'issue_raised', 'cancelled'],
+    packed: ['shipped', 'issue_raised', 'cancelled'],
+    shipped: ['delivered', 'issue_raised', 'cancelled'],
     delivered: ['issue_raised'],
-    issue_raised: ['replacement_processing'],
+    issue_raised: ['replacement_processing', 'cancelled'],
     replacement_processing: [],
+    cancelled: [],
+  },
+  // SUPER_ADMIN_FLOW §3.6 — the factory floor.
+  productionTask: {
+    created: ['material_pending', 'mockup_pending', 'issue'],
+    material_pending: ['mockup_pending', 'issue'],
+    mockup_pending: ['mockup_approved', 'issue'],
+    mockup_approved: ['in_production', 'issue'],
+    in_production: ['printing', 'embroidery', 'qc_pending', 'issue'],
+    printing: ['embroidery', 'qc_pending', 'issue'],
+    embroidery: ['qc_pending', 'issue'],
+    // QC fail loops the task back to in_production with a reason.
+    qc_pending: ['packing', 'in_production', 'issue'],
+    packing: ['ready_to_ship', 'issue'],
+    ready_to_ship: ['completed', 'issue'],
+    completed: [],
+    issue: ['in_production', 'material_pending'],
   },
   campaign: {
     draft: ['recipients_uploaded'],
@@ -45,6 +64,30 @@ const TRANSITIONS = {
     redeemed: ['order_created'],
     order_created: [],
     expired: [],
+  },
+  // SUPER_ADMIN_FLOW §3.7: pending → packed → shipped → in_transit →
+  // out_for_delivery → delivered ; any → delayed | rto | lost | damaged.
+  shipment: {
+    pending: ['packed', 'shipped', 'delayed', 'rto', 'lost', 'damaged'],
+    packed: ['shipped', 'delayed', 'rto', 'lost', 'damaged'],
+    shipped: ['in_transit', 'delayed', 'rto', 'lost', 'damaged'],
+    in_transit: ['out_for_delivery', 'delivered', 'delayed', 'rto', 'lost', 'damaged'],
+    out_for_delivery: ['delivered', 'delayed', 'rto', 'lost', 'damaged'],
+    delivered: [],
+    // A delayed shipment can resume its journey or end in an exception.
+    delayed: ['in_transit', 'out_for_delivery', 'delivered', 'rto', 'lost', 'damaged'],
+    rto: [],
+    lost: [],
+    damaged: [],
+  },
+  // SUPER_ADMIN_FLOW §3.9: open → in_progress → waiting_on_customer →
+  // in_progress → resolved → closed (reopen allowed).
+  supportTicket: {
+    open: ['in_progress', 'closed'],
+    in_progress: ['waiting_on_customer', 'resolved', 'closed'],
+    waiting_on_customer: ['in_progress', 'closed'],
+    resolved: ['closed', 'in_progress'],
+    closed: ['in_progress'],
   },
 };
 

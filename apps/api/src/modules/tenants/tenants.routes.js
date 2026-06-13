@@ -6,8 +6,16 @@ import { resolveTenant, requireTenantContext } from '../../middleware/tenant.mid
 import { requireRole } from '../../middleware/rbac.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { objectId } from '../users/users.validation.js';
+import { platformArea } from '../../middleware/platformAccess.middleware.js';
 import * as controller from './tenants.controller.js';
-import { createTenantSchema, updateTenantSchema, tenantStatusSchema } from './tenants.validation.js';
+import {
+  createTenantSchema,
+  updateTenantSchema,
+  tenantStatusSchema,
+  tenantPlanSchema,
+  tenantLimitsSchema,
+  impersonateSchema,
+} from './tenants.validation.js';
 
 // Tenant-facing routes: /api/v1/tenants
 export const tenantsRouter = Router();
@@ -30,13 +38,57 @@ tenantsRouter.patch(
 
 // Platform control plane: /api/v1/platform/tenants
 export const platformTenantsRouter = Router();
-platformTenantsRouter.use(authenticate, resolveTenant, requireRole('platform_super_admin', 'platform_support_agent', 'platform_readonly_auditor'));
+platformTenantsRouter.use(authenticate, resolveTenant);
 
-platformTenantsRouter.get('/', asyncHandler(controller.list));
-platformTenantsRouter.get('/:id', validate({ params: z.object({ id: objectId }) }), asyncHandler(controller.getOne));
+const tenantsRead = platformArea('tenants', 'read');
+const tenantsWrite = platformArea('tenants', 'write'); // super admin only
+
+platformTenantsRouter.get('/', tenantsRead, asyncHandler(controller.list));
+platformTenantsRouter.post(
+  '/',
+  tenantsWrite,
+  validate({ body: createTenantSchema }),
+  asyncHandler(controller.create),
+);
+platformTenantsRouter.get(
+  '/:id',
+  tenantsRead,
+  validate({ params: z.object({ id: objectId }) }),
+  asyncHandler(controller.getOne),
+);
+platformTenantsRouter.get(
+  '/:id/overview',
+  tenantsRead,
+  validate({ params: z.object({ id: objectId }) }),
+  asyncHandler(controller.overview),
+);
 platformTenantsRouter.patch(
   '/:id/status',
-  requireRole('platform_super_admin'),
+  tenantsWrite,
   validate({ params: z.object({ id: objectId }), body: tenantStatusSchema }),
   asyncHandler(controller.setStatus),
+);
+platformTenantsRouter.patch(
+  '/:id/plan',
+  tenantsWrite,
+  validate({ params: z.object({ id: objectId }), body: tenantPlanSchema }),
+  asyncHandler(controller.setPlan),
+);
+platformTenantsRouter.patch(
+  '/:id/limits',
+  tenantsWrite,
+  validate({ params: z.object({ id: objectId }), body: tenantLimitsSchema }),
+  asyncHandler(controller.setLimits),
+);
+platformTenantsRouter.post(
+  '/:id/reset-admin-access',
+  tenantsWrite,
+  validate({ params: z.object({ id: objectId }) }),
+  asyncHandler(controller.resetAdminAccess),
+);
+platformTenantsRouter.post(
+  '/:tenantId/impersonate',
+  requireRole('platform_super_admin'),
+  validate({ params: z.object({ tenantId: objectId }), body: impersonateSchema }),
+  asyncHandler(controller.impersonate),
 );

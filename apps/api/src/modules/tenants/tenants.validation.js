@@ -32,6 +32,32 @@ export const updateTenantSchema = z
   })
   .partial();
 
-export const tenantStatusSchema = z.object({
-  status: z.enum(['active', 'suspended', 'trial']),
+export const tenantStatusSchema = z
+  .object({
+    status: z.enum(['active', 'suspended', 'trial', 'archived']),
+    reason: z.string().optional(),
+  })
+  .refine((body) => !['suspended', 'archived'].includes(body.status) || Boolean(body.reason), {
+    message: 'Suspending or archiving a tenant requires a reason (audited)',
+    path: ['reason'],
+  });
+
+export const tenantPlanSchema = z.object({
+  plan: z.enum(['trial', 'starter', 'growth', 'enterprise']),
+});
+
+export const tenantLimitsSchema = z.object({
+  limits: z
+    .object({
+      maxCampaigns: z.number().int().positive(),
+      maxRecipientsPerCampaign: z.number().int().positive(),
+      maxWallets: z.number().int().positive(),
+      maxUsers: z.number().int().positive(),
+    })
+    .partial(),
+});
+
+export const impersonateSchema = z.object({
+  reason: z.string().min(1),
+  reasonCategory: z.string().min(1),
 });

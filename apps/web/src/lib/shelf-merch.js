@@ -2260,8 +2260,8 @@ function readAuthForm(){
   const inputs=document.querySelectorAll('.auth-form .inp');
   return { email:(inputs[0]?.value||'').trim(), password:inputs[1]?.value||'' };
 }
-async function hydrateFromApi(){
-  const data=await api.hydrateWorkspace();
+async function hydrateFromApi(sessionUser){
+  const data=await api.hydrateWorkspace(sessionUser);
   api.applyWorkspaceToState(S,data);
 }
 async function auth(){
@@ -2283,8 +2283,12 @@ async function auth(){
     const user=isSignup
       ? await api.register({ name:form.name, email:form.email, password:form.password, companyName:form.companyName })
       : await api.login(form.email,form.password);
+    if(api.isPlatformUser(user)){
+      window.location.href='/platform/dashboard';
+      return;
+    }
     S.user={name:user.name,initials:user.name.split(/\s+/).slice(0,2).map(p=>p[0]?.toUpperCase()||'').join(''),email:user.email,role:user.role||'company_admin'};
-    await hydrateFromApi();
+    await hydrateFromApi(user);
     S.authed=true; S.nav='orders'; S.view='orders'; S.flow={};
     toast(isSignup ? 'Welcome to Shelf Merch, '+user.name.split(' ')[0]+'!' : 'Welcome back, '+user.name.split(' ')[0]);
   }catch(err){
@@ -2550,8 +2554,13 @@ async function init(){
   S.loading=true; render();
   const ok=await api.tryRestoreSession();
   if(ok){
+    const me=api.getStoredUser();
+    if(api.isPlatformUser(me)){
+      window.location.href='/platform/dashboard';
+      return;
+    }
     try{
-      const data=await api.hydrateWorkspace();
+      const data=await api.hydrateWorkspace(me);
       api.applyWorkspaceToState(S,data);
       S.authed=true; S.nav='orders'; S.view='orders';
     }catch{

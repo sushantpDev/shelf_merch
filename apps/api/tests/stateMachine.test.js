@@ -25,12 +25,23 @@ describe('stateMachine.service', () => {
       );
     });
 
-    it('allows issue_raised from any state, then replacement_processing only', () => {
+    it('allows issue_raised from any state, then replacement_processing or cancelled', () => {
       for (const from of ['created', 'in_production', 'shipped', 'delivered']) {
         expect(canTransition('order', from, 'issue_raised')).toBe(true);
       }
-      expect(validNextStatuses('order', 'issue_raised')).toEqual(['replacement_processing']);
+      expect(validNextStatuses('order', 'issue_raised')).toEqual([
+        'replacement_processing',
+        'cancelled',
+      ]);
       expect(canTransition('order', 'issue_raised', 'created')).toBe(false);
+    });
+
+    it('allows cancellation from any active state, but never from delivered', () => {
+      for (const from of ['created', 'approved', 'in_production', 'shipped']) {
+        expect(canTransition('order', from, 'cancelled')).toBe(true);
+      }
+      expect(canTransition('order', 'delivered', 'cancelled')).toBe(false);
+      expect(validNextStatuses('order', 'cancelled')).toEqual([]);
     });
 
     it('appends to statusHistory when present', () => {

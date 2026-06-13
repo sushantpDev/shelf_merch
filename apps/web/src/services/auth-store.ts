@@ -49,3 +49,8 @@ export function clearSession() {
 export function isAuthenticated(): boolean {
   return Boolean(getAccessToken() && getStoredUser());
 }
+
+export function isPlatformUser(user: AuthUser | null | undefined): boolean {
+  if (!user) return false;
+  return user.scopeType === "platform" || Boolean(user.role?.startsWith("platform_"));
+}

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { tenantScopePlugin } from '../../plugins/tenantScope.plugin.js';
+import { softDeletePlugin } from '../../plugins/softDelete.plugin.js';
 
 // Job status lives in Mongo so the frontend can poll without touching Redis.
 const importJobSchema = new mongoose.Schema(
@@ -20,5 +21,6 @@ const importJobSchema = new mongoose.Schema(
 );
 
 importJobSchema.plugin(tenantScopePlugin);
+importJobSchema.plugin(softDeletePlugin);
 
 export const ImportJob = mongoose.model('ImportJob', importJobSchema);

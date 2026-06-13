@@ -159,23 +159,30 @@ describe('orders API (Phase 6)', () => {
     expect(res2.body.items).toHaveLength(0);
   });
 
-  it('updates order status through state machine', async () => {
+  it('blocks tenant-side status writes except the mockup gate (§3.5)', async () => {
     const list = await request(app).get('/api/v1/orders').set('Authorization', `Bearer ${adminToken}`);
     const orderId = list.body.items[0]._id;
 
+    // General transitions are platform-only now.
     const bad = await request(app)
       .patch(`/api/v1/orders/${orderId}/status`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ status: 'shipped' });
-    expect(bad.status).toBe(422);
+      .send({ status: 'approved', note: 'Reviewed' });
+    expect(bad.status).toBe(403);
+    expect(bad.body.error.code).toBe('PLATFORM_ONLY_TRANSITION');
 
+    // The mockup approve gate still belongs to the tenant.
+    await Order.updateOne(
+      { _id: orderId, tenantId: tenant._id },
+      { status: 'mockup_pending' },
+    );
     const ok = await request(app)
       .patch(`/api/v1/orders/${orderId}/status`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ status: 'approved', note: 'Reviewed' });
+      .send({ status: 'mockup_approved', note: 'Looks great' });
     expect(ok.status).toBe(200);
-    expect(ok.body.status).toBe('approved');
-    expect(ok.body.validNextStatuses).toContain('mockup_pending');
+    expect(ok.body.status).toBe('mockup_approved');
+    expect(ok.body.validNextStatuses).toContain('in_production');
   });
 
   it('entity manager cannot update order status', async () => {

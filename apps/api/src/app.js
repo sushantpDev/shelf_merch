@@ -29,6 +29,25 @@ import notificationsRoutes from './modules/notifications/notifications.routes.js
 import paymentsRoutes from './modules/payments/payments.routes.js';
 import invoicesRoutes from './modules/invoices/invoices.routes.js';
 import ordersRoutes from './modules/orders/orders.routes.js';
+import vendorsRoutes from './modules/vendors/vendors.routes.js';
+import shipmentsRoutes from './modules/shipments/shipments.routes.js';
+import { tenantSupportRouter, platformSupportRouter } from './modules/support/support.routes.js';
+import {
+  platformDashboardRouter,
+  platformOrdersRouter,
+  platformProductionRouter,
+  platformAuditRouter,
+  platformImpersonateRouter,
+  platformTeamRouter,
+  platformSettingsRouter,
+} from './modules/platform/platform.routes.js';
+import platformFinanceRoutes from './modules/platform/finance.routes.js';
+import {
+  platformProductsRouter,
+  platformCategoriesRouter,
+  platformInventoryRouter,
+} from './modules/catalog/platformCatalog.routes.js';
+import { platformKitsRouter } from './modules/kits/platformKits.routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -83,6 +102,23 @@ export function createApp() {
   api.use('/payments', paymentsRoutes);
   api.use('/invoices', invoicesRoutes);
   api.use('/orders', ordersRoutes);
+  api.use('/support-tickets', tenantSupportRouter);
+  // Platform control plane (SUPER_ADMIN_FLOW) — /api/v1/platform/*
+  api.use('/platform/dashboard', platformDashboardRouter);
+  api.use('/platform/products', platformProductsRouter);
+  api.use('/platform/categories', platformCategoriesRouter);
+  api.use('/platform/inventory', platformInventoryRouter);
+  api.use('/platform/kits', platformKitsRouter);
+  api.use('/platform/vendors', vendorsRoutes);
+  api.use('/platform/shipments', shipmentsRoutes);
+  api.use('/platform/orders', platformOrdersRouter);
+  api.use('/platform/production', platformProductionRouter);
+  api.use('/platform/finance', platformFinanceRoutes);
+  api.use('/platform/audit-logs', platformAuditRouter);
+  api.use('/platform/support-tickets', platformSupportRouter);
+  api.use('/platform/team', platformTeamRouter);
+  api.use('/platform/settings', platformSettingsRouter);
+  api.use('/platform/impersonate', platformImpersonateRouter);
 
   app.use('/api/v1', api);
 

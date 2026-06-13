@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { tenantScopePlugin } from '../../plugins/tenantScope.plugin.js';
+import { softDeletePlugin } from '../../plugins/softDelete.plugin.js';
 
 const paymentSchema = new mongoose.Schema(
   {
@@ -19,6 +20,7 @@ const paymentSchema = new mongoose.Schema(
 );
 
 paymentSchema.plugin(tenantScopePlugin);
+paymentSchema.plugin(softDeletePlugin);
 paymentSchema.index({ tenantId: 1, providerRefId: 1 });
 
 export const Payment = mongoose.model('Payment', paymentSchema);

@@ -14,20 +14,39 @@ export const ORDER_STATUSES = [
   'delivered',
   'issue_raised',
   'replacement_processing',
+  'cancelled',
 ];
+
+/**
+ * Non-negotiable #3: cost price and margin never leak to tenant/public
+ * responses. Every tenant-facing serializer must run items through this.
+ */
+export function sanitizeOrderItems(items = []) {
+  return items.map((item) => {
+    const { costPriceInr, ...safe } = item.toObject ? item.toObject() : item;
+    return safe;
+  });
+}
 
 const orderSchema = new mongoose.Schema(
   {
     campaignId: { type: mongoose.Schema.Types.ObjectId, ref: 'Campaign', required: true, index: true },
     recipientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Recipient', required: true, index: true },
     orderNumber: { type: String, required: true, unique: true },
+    // Non-negotiable #4: full product snapshot at order time (price, cost,
+    // GST, HSN, image). costPriceInr is internal-only — see sanitizeOrderItems.
     items: [
       {
         catalogProductId: { type: mongoose.Schema.Types.ObjectId, ref: 'CatalogProduct' },
         name: String,
+        sku: { type: String, default: '' },
         variant: { size: String, color: String },
         qty: Number,
         unitPriceInr: Number,
+        costPriceInr: { type: Number, default: 0 },
+        gstRate: { type: Number, default: 18 },
+        hsnCode: { type: String, default: '' },
+        imageUrl: { type: String, default: '' },
       },
     ],
     shippingAddress: {
@@ -50,6 +69,16 @@ const orderSchema = new mongoose.Schema(
     statusHistory: [{ status: String, at: Date, actorUserId: mongoose.Schema.Types.ObjectId, note: String }],
     trackingNumber: { type: String, default: '' },
     vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null },
+    mockupUrl: { type: String, default: '' },
+    // §3.5 — replacement = zero-charge clone, linked back to the original.
+    replacementOfOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
+    internalNotes: [
+      {
+        body: { type: String, required: true },
+        authorUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        at: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true },
 );

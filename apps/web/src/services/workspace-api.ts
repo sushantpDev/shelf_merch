@@ -19,7 +19,7 @@ import {
   type UiShop,
   type UiWallet,
 } from "./mappers";
-import { getStoredUser } from "./auth-store";
+import { getStoredUser, type AuthUser } from "./auth-store";
 
 export type WorkspaceSnapshot = {
   account: string;
@@ -59,8 +59,8 @@ function usersMap(users: any[]) {
   return new Map(users.map((u) => [String(u._id), u]));
 }
 
-export async function fetchWorkspaceSnapshot(): Promise<WorkspaceSnapshot> {
-  const me = getStoredUser();
+export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Promise<WorkspaceSnapshot> {
+  const me = sessionUser ?? getStoredUser();
   if (!me?.tenantId) throw new Error("No tenant context");
 
   const [
