@@ -28,6 +28,7 @@ import kitsRoutes from './modules/kits/kits.routes.js';
 import contactsRoutes from './modules/contacts/contacts.routes.js';
 import campaignsRoutes from './modules/campaigns/campaigns.routes.js';
 import redemptionsRoutes from './modules/redemptions/redemptions.routes.js';
+import storefrontRoutes from './modules/storefront/storefront.routes.js';
 import notificationsRoutes from './modules/notifications/notifications.routes.js';
 import paymentsRoutes from './modules/payments/payments.routes.js';
 import invoicesRoutes from './modules/invoices/invoices.routes.js';
@@ -101,6 +102,7 @@ export function createApp() {
   api.use('/contacts', contactsRoutes);
   api.use('/campaigns', campaignsRoutes);
   api.use('/redemptions', redemptionsRoutes);
+  api.use('/storefront', storefrontRoutes);
   api.use('/notifications', notificationsRoutes);
   api.use('/payments', paymentsRoutes);
   api.use('/invoices', invoicesRoutes);

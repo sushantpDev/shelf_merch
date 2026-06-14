@@ -13,6 +13,7 @@ import { Route as PlatformRouteImport } from './routes/platform'
 import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlatformIndexRouteImport } from './routes/platform.index'
+import { Route as ShopIdRouteImport } from './routes/shop.$id'
 import { Route as RedeemTokenRouteImport } from './routes/redeem.$token'
 import { Route as PlatformTenantsRouteImport } from './routes/platform.tenants'
 import { Route as PlatformTeamRouteImport } from './routes/platform.team'
@@ -54,6 +55,11 @@ const PlatformIndexRoute = PlatformIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => PlatformRoute,
+} as any)
+const ShopIdRoute = ShopIdRouteImport.update({
+  id: '/shop/$id',
+  path: '/shop/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const RedeemTokenRoute = RedeemTokenRouteImport.update({
   id: '/redeem/$token',
@@ -179,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/platform/team': typeof PlatformTeamRoute
   '/platform/tenants': typeof PlatformTenantsRoute
   '/redeem/$token': typeof RedeemTokenRoute
+  '/shop/$id': typeof ShopIdRoute
   '/platform/': typeof PlatformIndexRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
   '/platform/catalog/import': typeof PlatformCatalogImportRoute
@@ -203,6 +210,7 @@ export interface FileRoutesByTo {
   '/platform/team': typeof PlatformTeamRoute
   '/platform/tenants': typeof PlatformTenantsRoute
   '/redeem/$token': typeof RedeemTokenRoute
+  '/shop/$id': typeof ShopIdRoute
   '/platform': typeof PlatformIndexRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
   '/platform/catalog/import': typeof PlatformCatalogImportRoute
@@ -231,6 +239,7 @@ export interface FileRoutesById {
   '/platform/team': typeof PlatformTeamRoute
   '/platform/tenants': typeof PlatformTenantsRoute
   '/redeem/$token': typeof RedeemTokenRoute
+  '/shop/$id': typeof ShopIdRoute
   '/platform/': typeof PlatformIndexRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
   '/platform/catalog/import': typeof PlatformCatalogImportRoute
@@ -260,6 +269,7 @@ export interface FileRouteTypes {
     | '/platform/team'
     | '/platform/tenants'
     | '/redeem/$token'
+    | '/shop/$id'
     | '/platform/'
     | '/platform/catalog/$id'
     | '/platform/catalog/import'
@@ -284,6 +294,7 @@ export interface FileRouteTypes {
     | '/platform/team'
     | '/platform/tenants'
     | '/redeem/$token'
+    | '/shop/$id'
     | '/platform'
     | '/platform/catalog/$id'
     | '/platform/catalog/import'
@@ -311,6 +322,7 @@ export interface FileRouteTypes {
     | '/platform/team'
     | '/platform/tenants'
     | '/redeem/$token'
+    | '/shop/$id'
     | '/platform/'
     | '/platform/catalog/$id'
     | '/platform/catalog/import'
@@ -326,6 +338,7 @@ export interface RootRouteChildren {
   AcceptInviteRoute: typeof AcceptInviteRoute
   PlatformRoute: typeof PlatformRouteWithChildren
   RedeemTokenRoute: typeof RedeemTokenRoute
+  ShopIdRoute: typeof ShopIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -357,6 +370,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/platform/'
       preLoaderRoute: typeof PlatformIndexRouteImport
       parentRoute: typeof PlatformRoute
+    }
+    '/shop/$id': {
+      id: '/shop/$id'
+      path: '/shop/$id'
+      fullPath: '/shop/$id'
+      preLoaderRoute: typeof ShopIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/redeem/$token': {
       id: '/redeem/$token'
@@ -585,6 +605,7 @@ const rootRouteChildren: RootRouteChildren = {
   AcceptInviteRoute: AcceptInviteRoute,
   PlatformRoute: PlatformRouteWithChildren,
   RedeemTokenRoute: RedeemTokenRoute,
+  ShopIdRoute: ShopIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
