@@ -1799,8 +1799,10 @@ function campaignStatusTag(status){
 function ViewCampaigns(){
   const list=S.campaigns||[];
   if(!list.length){
-    return `<div class="page-h"><div><h1>Campaigns</h1><div class="sub">Launch points campaigns and track redemptions.</div></div></div>
-      <div class="card empty"><div class="ic">${I.camp.replace('currentColor','#cdd6cf')}</div><h3>No campaigns yet</h3><p>Create a campaign from a shop or entity budget to send redemption invites.</p></div>`;
+    return `<div class="page-h"><div><h1>Campaigns</h1><div class="sub">Launch points campaigns and track redemptions.</div></div>
+      <button class="btn btn-dark" data-act="sendGift">${I.send}<span>Send Gift</span></button></div>
+      <div class="card empty"><div class="ic">${I.camp.replace('currentColor','#cdd6cf')}</div><h3>No campaigns yet</h3><p>Create a campaign from a shop or entity budget to send redemption invites.</p>
+        <button class="btn btn-brand" style="margin-top:14px" data-act="sendGift">${I.send} Send your first gift</button></div>`;
   }
   const rows=list.map(c=>`<tr>
     <td style="font-weight:600">${esc(c.name)}</td>
@@ -1810,7 +1812,8 @@ function ViewCampaigns(){
     <td class="num">${inr(c.totalBudget)}</td>
     <td class="num">${inr(c.creditsPerRecipient)}</td>
   </tr>`).join('');
-  return `<div class="page-h"><div><h1>Campaigns</h1><div class="sub">Points campaigns, recipient invites and redemption tracking.</div></div></div>
+  return `<div class="page-h"><div><h1>Campaigns</h1><div class="sub">Points campaigns, recipient invites and redemption tracking.</div></div>
+    <button class="btn btn-dark" data-act="sendGift">${I.send}<span>Send Gift</span></button></div>
     <div class="card" style="padding:18px"><table class="tbl"><thead><tr><th>Campaign</th><th>Type</th><th>Status</th><th>Recipients</th><th>Total budget</th><th>Per recipient</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function miniChart(){
