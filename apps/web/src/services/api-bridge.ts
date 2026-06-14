@@ -280,6 +280,24 @@ export async function getRedemptionPortal(token: string) {
   return publicFetch(`/redemptions/${token}`);
 }
 
+export type StorefrontData = {
+  shop: { id: string; name: string; logoUrl?: string; bannerTheme?: string; currencyMode: string };
+  products: Array<{
+    _id: string;
+    name: string;
+    brand?: string;
+    group?: string;
+    category?: string;
+    basePriceInr: number;
+    primaryImageUrl?: string;
+    imageUrls?: string[];
+  }>;
+};
+
+export async function getPublicStorefront(shopId: string) {
+  return publicFetch<StorefrontData>(`/storefront/${shopId}`);
+}
+
 export async function sendRedemptionOtp(token: string, contact: string) {
   return publicFetch(`/redemptions/${token}/send-otp`, {
     method: "POST",

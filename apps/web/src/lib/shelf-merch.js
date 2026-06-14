@@ -1305,7 +1305,7 @@ function ViewShopDetail(){
   ${backLink('Back to shops','nav','shops')}
   <div class="row" style="align-items:center;gap:16px;margin-bottom:18px">
     <div style="width:160px;flex:none">${shopBannerHtml(s,{height:84,layout:'center',logoSize:46,radius:10})}</div>
-    <div style="flex:1"><h1 style="font-size:26px">${esc(s.name)}</h1><div style="margin-top:6px">${s.live?'<span class="tag tag-live"><span class="dot"></span>Live</span>':''} <span class="lnk" style="margin-left:8px" data-act="toast" data-arg="Opening live shop…">View shop</span></div></div>
+    <div style="flex:1"><h1 style="font-size:26px">${esc(s.name)}</h1><div style="margin-top:6px">${s.live?'<span class="tag tag-live"><span class="dot"></span>Live</span>':''} ${s.live?`<span class="lnk" style="margin-left:8px" data-act="viewShop" data-arg="${s.id}">View shop</span>`:`<span class="mut3" style="margin-left:8px;font-size:13px">Publish to view shop</span>`}</div></div>
     <button class="btn btn-dark" data-act="sendPointsStart" data-arg="${s.id}">${I.coin}Send points</button>
   </div>
   <div class="tabs" style="margin-bottom:22px">${SHOP_TABS.map(t=>`<button class="${t===tab?'on':''}" data-act="shopTab" data-arg="${t}">${t}</button>`).join('')}</div>
@@ -1350,7 +1350,8 @@ function shopTabBody(s,tab){
   }
   if(tab==='Shop Catalog'){
     const ps=getCatalogList().slice(0,8);
-    return `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${ps.map(p=>pcard(p,{price:p.price,swatches:p.sw,act:'toast',arg:'Product enabled in shop'})).join('')}</div>`;
+    return `<div class="banner" style="margin-bottom:16px">${I.spark.replace('width="24" height="24"','width="16" height="16"')}<div>These are the catalog products available to brand. Curate what your recipients see by creating designs in <b>Branded Swag → Start designing</b>.</div></div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${ps.map(p=>pcard(p,{price:p.price,swatches:p.sw})).join('')}</div>`;
   }
   if(tab==='Reports'){
     return `<div class="grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
@@ -2355,6 +2356,7 @@ const ACT = {
   auth:()=>auth(),
   logout:()=>logout(),
   sendGift:()=>sendGift(),
+  viewShop:(el,a)=>window.open('/shop/'+a,'_blank'),
   userMenu:()=>userMenu(),
   toast:(el,a)=>toast(a||'Done'),
   noop:()=>{},
