@@ -91,10 +91,14 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
 
   const userById = usersMap(users);
   const owner = me ? { name: me.name, email: me.email } : undefined;
+  const catalogProducts = (catalog.items || []).map(mapCatalogProduct);
+  const catalogById = new Map(
+    catalogProducts.filter((p) => p.id).map((p) => [p.id as string, p]),
+  );
   const mappedShops = shops.map((s) => mapShop(s as never));
   const mappedCollections = (collections as never[]).map((c) => {
     const creator = userById.get(String((c as { createdBy?: string }).createdBy));
-    return mapCollection(c, creator?.name || "");
+    return mapCollection(c, creator?.name || "", catalogById);
   });
 
   for (const shop of mappedShops) {
@@ -172,7 +176,7 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
     contacts: (contacts as never[]).map(mapContact),
     kits: (kits as never[]).map(mapKit),
     collections: mappedCollections,
-    catalogProducts: (catalog.items || []).map(mapCatalogProduct),
+    catalogProducts,
     campaigns: (campaigns as never[]).map(mapCampaign),
     orders: (ordersPage.items || []).map((o) =>
       mapOrder(o, (o as { campaignName?: string }).campaignName || ""),
