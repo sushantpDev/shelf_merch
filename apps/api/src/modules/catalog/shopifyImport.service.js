@@ -107,6 +107,10 @@ export function mapShopifyProduct(p, domain) {
     imageUrls: images,
     primaryImageUrl: p.image?.src || images[0] || '',
     status: 'draft',
+    // Imported products are fulfilled on demand, not warehoused — default to
+    // made-to-order so they don't surface as "out of stock". A catalog admin
+    // can switch a product to physical and restock it from the Inventory page.
+    inventory: { mode: 'made_to_order' },
     source: {
       provider: 'shopify',
       domain,

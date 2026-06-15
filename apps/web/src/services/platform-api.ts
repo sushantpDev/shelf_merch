@@ -71,12 +71,35 @@ export async function fetchPlatformInventory(limit = 100) {
       productId: string;
       name: string;
       sku: string;
+      mode: string;
       available: number;
       reserved: number;
       lowStockThreshold: number;
       stockStatus: string;
     }>
   >(`/platform/inventory?limit=${limit}`);
+}
+
+export type InventoryTxnType = "add" | "reduce" | "adjust";
+
+export function adjustInventory(
+  productId: string,
+  body: { type: InventoryTxnType; qty: number; reason: string; variantSku?: string },
+) {
+  return apiFetch(`/platform/inventory/${productId}/transactions`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function setInventoryMode(
+  productId: string,
+  body: { mode?: "physical" | "made_to_order"; lowStockThreshold?: number },
+) {
+  return apiFetch(`/platform/inventory/${productId}/mode`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
 }
 
 export async function fetchPlatformKits() {
