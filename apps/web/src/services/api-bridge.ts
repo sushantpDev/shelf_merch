@@ -15,6 +15,7 @@ import { USE_MOCKS } from "./config";
 import {
   createCollectionApi,
   createKitApi,
+  launchKitCampaignApi,
   launchPointsCampaignApi,
   linkCollectionToShopApi,
   syncOrgWizardApi,
@@ -254,6 +255,30 @@ export async function launchPointsCampaignFlow(payload: {
     name: payload.name,
     creditsPerRecipient: payload.creditsPerRecipient,
     message: payload.message,
+    recipients,
+  });
+}
+
+export async function launchKitCampaignFlow(payload: {
+  entityId: string;
+  kitId: string;
+  name: string;
+  message: { from: string; body: string };
+  schedule?: { mode: "now" | "scheduled" | "self"; sendAt?: string | null; timezone?: string };
+  contactIds: string[];
+  contacts: Array<{ id: string; name: string; email: string; phone?: string }>;
+}) {
+  const recipients = payload.contactIds
+    .map((id) => payload.contacts.find((c) => c.id === id))
+    .filter(Boolean)
+    .map((c) => ({ name: c!.name, email: c!.email, phone: c!.phone }));
+  if (!recipients.length) throw new Error("Select at least one recipient");
+  return launchKitCampaignApi({
+    entityId: payload.entityId,
+    kitId: payload.kitId,
+    name: payload.name,
+    message: payload.message,
+    schedule: payload.schedule,
     recipients,
   });
 }

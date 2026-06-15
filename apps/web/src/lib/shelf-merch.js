@@ -3,6 +3,10 @@
 import * as api from '../services/api-bridge.js';
 
 let __mounted = false;
+/** Survives Vite HMR so a hot reload does not reset authed state or re-run boot. */
+const bootState = typeof window !== 'undefined'
+  ? (window.__shelfMerchBoot ??= { gen: 0, sessionAt: 0 })
+  : { gen: 0, sessionAt: 0 };
 export function mountShelfMerch() {
   if (__mounted) return; __mounted = true;
 /* =================================================================
@@ -82,7 +86,7 @@ function backLink(label,act,arg,opts={}){
 }
 
 /* ---------- state ---------- */
-const S = {
+const defaultState = {
   authed:false, view:'login', nav:'orders', loading:false,
   account:'Rubix', user:{name:'Chandra Sekhar', initials:'CS', email:'hr@rubix.net'},
   catalogProducts:[], campaigns:[], primaryEntityId:null,
@@ -142,6 +146,18 @@ const S = {
     ],
   },
 };
+const S = (typeof window !== 'undefined' && window.__shelfMerchState)
+  ? window.__shelfMerchState
+  : { ...defaultState, org: { ...defaultState.org, departments: defaultState.org.departments.map(d=>({...d,mgr:{...d.mgr}})) },
+      wallets: defaultState.wallets.map(w=>({...w,activity:[...w.activity]})),
+      shops: defaultState.shops.map(s=>({...s})),
+      collections: defaultState.collections.map(c=>({...c,products:[...c.products]})),
+      kits: defaultState.kits.map(k=>({...k})),
+      contacts: defaultState.contacts.map(c=>({...c})),
+      departments: defaultState.departments.map(d=>({...d})),
+      orders: defaultState.orders.map(o=>({...o,items:[...o.items]})),
+    };
+if (typeof window !== 'undefined') window.__shelfMerchState = S;
 const nid = p => p+(++S.uid);
 
 /* ---------- nav config ---------- */
@@ -154,10 +170,20 @@ const NAV = [
 
 /* ---------- router ---------- */
 const APP = ()=>document.getElementById('app');
-let bootGen = 0;
+function markSessionActive(){
+  bootState.sessionAt=Date.now();
+}
 function syncAuthState(){
   if(api.useMocks()) return;
-  if(S.authed && !api.isAuthenticated()){ S.authed=false; S.view='login'; }
+  if(S.loading) return;
+  if(api.isAuthenticated()){
+    if(!S.authed) S.authed=true;
+    return;
+  }
+  if(!S.authed) return;
+  // Brief grace after login/hydrate — avoids racing boot or token refresh.
+  if(Date.now()-bootState.sessionAt<8000) return;
+  S.authed=false; S.view='login';
 }
 function go(view, opts={}){ S.view=view; if(opts.nav)S.nav=opts.nav; Object.assign(S.flow, opts.flow||{}); window.scrollTo(0,0); render(); }
 async function setNav(n){
@@ -374,7 +400,7 @@ const Wizards={};
 
 /* ---------- CREATE KIT ---------- */
 const KIT_STEPS=['Name','Products','Branding','Packaging'];
-function createKitStart(){ S.flow={exitTo:'kits',step:0,kitName:'Welcome Kit',picked:[0,2,3],logos:false,notes:'',pkg:'box'}; go('createKit'); }
+function createKitStart(){ S.flow={exitTo:'kits',step:0,kitName:'Welcome Kit',picked:[0,2,3],logoFile:null,notes:'',pkg:'box'}; go('createKit'); }
 Wizards.createKit=function(){
   const f=S.flow; const step=f.step;
   let body='';
@@ -387,14 +413,21 @@ Wizards.createKit=function(){
       <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">${getCatalogList().map((p,i)=>{const on=f.picked.includes(i);return `<div class="pcard" style="${on?'border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-50)':''}" data-act="ktPick" data-arg="${i}"><div class="img">${productImg(p)}<div style="position:absolute;right:10px;bottom:10px;width:30px;height:30px;border-radius:50%;background:${on?'var(--brand)':'#fff'};color:${on?'#fff':'var(--brand)'};border:1px solid var(--brand);display:grid;place-items:center;font-weight:700">${on?'✓':'+'}</div></div><div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div><div class="pr">${p.price}</div></div></div>`;}).join('')}</div>`;
   } else if(step===2){
     const prods=f.picked.map(i=>getCatalogList()[i]);
+    const hasLogo=!!f.logoFile?.preview;
+    const lf=f.logoFile||{};
+    const logoName=esc(lf.name||'logo');
+    const logoMeta=esc(lf.ext&&lf.size?lf.ext+' · '+fmtFileSize(lf.size):lf.ext||'');
+    const logoPicker=hasLogo
+      ?`<div class="row" style="align-items:center;justify-content:space-between;border:1px solid var(--brand);border-radius:var(--r-sm);padding:10px 12px;background:var(--brand-50);margin-bottom:12px"><div class="row" style="gap:10px;align-items:center"><div class="logo-chip" style="width:36px;height:36px;overflow:hidden;padding:3px">${kitLogoImg(f)}</div><div><div style="font-weight:600;font-size:13px">${logoName}</div><div class="mut3" style="font-size:11px">${logoMeta}</div></div></div><button type="button" class="xbtn" data-act="ktLogoClear">✕</button></div>`
+      :`<div id="kt-logo-drop" style="border:1.5px dashed var(--line);border-radius:var(--r);padding:24px;text-align:center;color:var(--ink-2);background:#fff;margin-bottom:12px;cursor:pointer" data-act="ktLogoUpload">${I.upload.replace('currentColor','#15784C')}<div style="margin-top:8px;font-weight:600">Upload logo</div><div class="mut3" style="font-size:11px;margin-top:6px">SVG, PNG, WEBP, JPEG · max 5 MB</div></div>`;
     body=`<div style="display:grid;grid-template-columns:380px 1fr;gap:26px">
       <div><h1 style="font-size:22px;margin-bottom:6px">Brand your kit</h1><p class="muted" style="font-size:13px;margin-bottom:16px">Upload logos and leave notes for our design team. We'll mock up each item for approval.</p>
-        ${f.logos?`<div class="row" style="gap:10px;align-items:center;border:1px solid var(--brand);border-radius:var(--r-sm);padding:10px;background:var(--brand-50);margin-bottom:12px"><div class="logo-chip" style="width:36px;height:36px">${LOGO_DECO}</div><div><div style="font-weight:600">rubix-mark.svg</div><div class="mut3" style="font-size:11px">SVG · 660 KB</div></div></div>`
-          :`<div style="border:1.5px dashed var(--line);border-radius:var(--r);padding:24px;text-align:center;color:var(--ink-2);background:#fff;margin-bottom:12px" data-act="ktLogo">${I.upload.replace('currentColor','#15784C')}<div style="margin-top:8px;font-weight:600">Upload logos</div><div class="mut3" style="font-size:11px;margin-top:6px">SVG, PNG · 300 DPI+</div></div>`}
-        <button class="btn ${f.logos?'btn-ghost':'btn-dark'} btn-block" data-act="ktLogo">${f.logos?'Add another logo':'Add logo'}</button>
+        ${logoPicker}
+        <input type="file" id="kt-logo-inp" accept=".svg,.png,.webp,.jpeg,.jpg,image/svg+xml,image/png,image/webp,image/jpeg" style="display:none">
+        <button class="btn ${hasLogo?'btn-ghost':'btn-dark'} btn-block" data-act="ktLogoUpload">${hasLogo?'Replace logo':'Add logo'}</button>
         <div class="field" style="margin-top:16px"><label class="lbl">Notes to design team</label><textarea class="inp" id="kt-notes" rows="4" placeholder="e.g. White logo on the chest, full-colour on mugs">${esc(f.notes)}</textarea></div></div>
-      <div><div class="${f.logos?'banner info':'banner'}" style="margin-bottom:16px">${f.logos?I.spark.replace('width="24" height="24"','width="16" height="16"')+'<div>Branding applied. Our team will share proofs within 2 business days.</div>':'<div>Add a logo to preview branded mockups for each item.</div>'}</div>
-        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">${prods.map(p=>pcard(p,{branded:f.logos,act:'noop'})).join('')}</div></div></div>`;
+      <div><div class="${hasLogo?'banner info':'banner'}" style="margin-bottom:16px">${hasLogo?'<div>Branding applied. Our team will share proofs within 2 business days.</div>':'<div>Add a logo to preview branded mockups for each item.</div>'}</div>
+        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">${prods.map(p=>pcard(p,{branded:hasLogo,artworkUrl:f.logoFile?.preview,act:'noop'})).join('')}</div></div></div>`;
   } else {
     const pk=f.pkg;
     body=`<div style="max-width:680px;margin:0 auto"><h1 style="font-size:24px;margin-bottom:6px">Choose packaging</h1><p class="muted" style="margin-bottom:18px">How should "${esc(f.kitName)}" arrive? Premium packaging is charged per kit.</p>
@@ -408,32 +441,54 @@ Wizards.createKit=function(){
   return wzChrome('Create a kit',KIT_STEPS,step,body,back+next);
 };
 function ktPick(el){ const i=+el.dataset.arg; const a=S.flow.picked; const k=a.indexOf(i); if(k<0)a.push(i); else a.splice(k,1); render(); }
-function ktLogo(){ S.flow.logos=true; render(); }
+function kitLogoImg(f){
+  const url=f?.logoFile?.preview;
+  if(url) return `<img src="${url}" alt="Kit logo" style="max-width:100%;max-height:100%;object-fit:contain;display:block">`;
+  return '';
+}
+function ktLogoSetFile(file){
+  if(!LOGO_ACCEPT.test(file.name)){ toast('Accepted formats: SVG, PNG, WEBP, JPEG, JPG',false); return; }
+  if(file.size>LOGO_MAX){ toast('File must be 5 MB or smaller',false); return; }
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const entry={name:file.name,size:file.size,ext:logoExt(file.name),preview:reader.result,file};
+    S.flow.logoFile=entry;
+    S.logoUploads=S.logoUploads||[];
+    const dup=S.logoUploads.findIndex(u=>u.name===entry.name&&u.size===entry.size);
+    if(dup>=0) S.logoUploads.splice(dup,1);
+    S.logoUploads.unshift(entry);
+    if(S.logoUploads.length>12) S.logoUploads.length=12;
+    render();
+  };
+  reader.readAsDataURL(file);
+}
+function ktLogoUpload(){ document.getElementById('kt-logo-inp')?.click(); }
+function ktLogoClear(){ S.flow.logoFile=null; render(); }
 function ktPkg(el){ S.flow.pkg=el.dataset.arg; render(); }
 function ktBack(){ S.flow.step--; render(); }
 function ktNext(){ const f=S.flow; if(f.step===0)f.kitName=document.getElementById('kt-name').value||'New Kit'; if(f.step===2)f.notes=(document.getElementById('kt-notes')||{}).value||''; f.step++; render(); }
 async function kitPublish(){
   const f=S.flow;
   if(api.useMocks()){
-    const k={id:nid('k'),name:f.kitName,items:f.picked.length,status:'live',sent:false};
+    const k={id:nid('k'),name:f.kitName,items:f.picked.length,status:'live',sent:false,artworkUrl:f.logoFile?.preview||''};
     S.kits.push(k);
     toast('Kit "'+k.name+'" published');
-    sendItemsStartFor(k.id, f.picked.slice());
+    sendItemsStartFor(k.id, f.picked.slice(), k.artworkUrl);
     return;
   }
   try{
     S.loading=true; render();
-    const k=await api.createKitFlow({
+    const k={...await api.createKitFlow({
       name:f.kitName||'New Kit',
       pickedIndices:f.picked,
       catalog:getCatalogList(),
       packaging:f.pkg||'box',
       designNotes:f.notes||'',
-    });
+    }),artworkUrl:f.logoFile?.preview||''};
     S.kits.push(k);
     S.loading=false;
     toast('Kit "'+k.name+'" saved to your workspace');
-    sendItemsStartFor(k.id, f.picked.slice());
+    sendItemsStartFor(k.id, f.picked.slice(), k.artworkUrl);
   }catch(err){
     S.loading=false; render();
     toast(err.message||'Failed to save kit');
@@ -445,10 +500,11 @@ const SI_STEPS=['Items','Recipients','Experience','Checkout'];
 function sendItemsStart(el){ const id=el&&el.dataset?el.dataset.arg:null; closeLayer();
   const k=S.kits.find(x=>x.id===id);
   const picked = k? [0,2,3].slice(0,k.items) : [0,2,3];
-  sendItemsStartFor(id, picked);
+  sendItemsStartFor(id, picked, k?.artworkUrl);
 }
-function sendItemsStartFor(kitId, picked){
-  S.flow={exitTo:'kits',step:0,kitId,picked,selRecips:S.contacts.slice(0,2).map(c=>c.id),mode:'redeem',
+function sendItemsStartFor(kitId, picked, artworkUrl){
+  const k=S.kits.find(x=>x.id===kitId);
+  S.flow={exitTo:'kits',step:0,kitId,picked,artworkUrl:artworkUrl||k?.artworkUrl||'',selRecips:S.contacts.slice(0,2).map(c=>c.id),mode:'redeem',
     note:'Welcome to the team — we are thrilled to have you!',pkg:'box',
     from:'People Team, '+S.account, when:'now',
     msg:"Your welcome kit is on its way! A little something from all of us — we're so glad you're here.",
@@ -460,9 +516,11 @@ Wizards.sendItems=function(){
   let body='';
   if(step===0){
     const prods=f.picked.map(i=>getCatalogList()[i]);
+    const artUrl=f.artworkUrl||'';
+    const hasBrand=!!artUrl;
     body=`<h1 style="font-size:24px;margin-bottom:4px">Items in this send</h1><p class="muted" style="margin-bottom:18px">${k?'From kit "'+esc(k.name)+'". ':''}Confirm what goes out. Quantities scale to your recipient list.</p>
-      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">${prods.map(p=>pcard(p,{branded:true,act:'noop'})).join('')}
-        <div class="pcard" style="display:grid;place-items:center;border-style:dashed;cursor:pointer" data-act="toast" data-arg="Add more from catalog"><div style="text-align:center;color:var(--brand)">${I.plus}<div style="font-weight:700;margin-top:6px">Add item</div></div></div></div>`;
+      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">${prods.map(p=>pcard(p,{branded:hasBrand,artworkUrl:artUrl,act:'noop'})).join('')}
+        <div class="pcard" style="display:grid;place-items:center;border-style:dashed;cursor:pointer" data-act="siAddOpen"><div style="text-align:center;color:var(--brand)">${I.plus}<div style="font-weight:700;margin-top:6px">Add item</div></div></div></div>`;
   } else if(step===1){
     body=recipientPicker(f,"Who's receiving this?","Choose how recipients get their items, then pick people.",{modes:true});
     if(f.mode==='surprise'){ const missing=S.contacts.filter(c=>f.selRecips.includes(c.id)&&!c.address);
@@ -501,10 +559,93 @@ Wizards.sendItems=function(){
 };
 function siBack(){ S.flow.step--; render(); }
 function siNext(){ const f=S.flow; if(f.step===2){ const n=document.getElementById('si-note'); if(n)f.note=n.value; const fr=document.getElementById('re-from'); if(fr)f.from=fr.value; const m=document.getElementById('re-msg'); if(m)f.msg=m.value; } f.step++; render(); }
-function sendItemsDo(){ const f=S.flow; const k=S.kits.find(x=>x.id===f.kitId); if(k)k.sent=true;
-  go('orders',{nav:'orders'});
-  S.orders.unshift({id:nid('o'),date:new Date().toLocaleDateString('en-GB'),name:(k?k.name:'Custom kit'),status:'Processing',amount:4200*f.selRecips.length,track:'',items:f.picked.map(i=>[DEMO_PRODUCTS[i].nm,String(f.selRecips.length)])});
-  render(); toast('Order placed for '+f.selRecips.length+' recipients! 📦');
+function siAddOpen(){
+  const catalog=getCatalogList();
+  if(!catalog.length){ toast('No products in catalog'); return; }
+  const cards=catalog.map((p,i)=>{
+    const on=S.flow.picked.includes(i);
+    return `<div class="pcard" style="${on?'border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-50)':''}" data-act="siPick" data-arg="${i}"><div class="img">${productImg(p)}<div style="position:absolute;right:10px;bottom:10px;width:30px;height:30px;border-radius:50%;background:${on?'var(--brand)':'#fff'};color:${on?'#fff':'var(--brand)'};border:1px solid var(--brand);display:grid;place-items:center;font-weight:700">${on?'✓':'+'}</div></div><div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div><div class="pr">${p.price}</div></div></div>`;
+  }).join('');
+  openModal(`<div class="modal-pad" style="max-width:900px"><div class="modal-h"><div><h3>Add products</h3><p class="muted" style="font-size:13px;margin-top:4px">Tap products to add or remove them from this send.</p></div><button class="xbtn" data-act="closeLayer">✕</button></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));max-height:58vh;overflow:auto;padding:2px">${cards}</div>
+    <div class="row" style="margin-top:20px;justify-content:space-between;align-items:center">
+      <span class="tag tag-soft" style="background:var(--brand-50);color:var(--brand-d)">${S.flow.picked.length} item${S.flow.picked.length===1?'':'s'} selected</span>
+      <button class="btn btn-dark" data-act="siAddDone">Done</button>
+    </div></div>`);
+}
+function siPick(el){
+  const i=+el.dataset.arg;
+  const a=S.flow.picked;
+  const k=a.indexOf(i);
+  if(k<0)a.push(i); else a.splice(k,1);
+  const card=el.closest('.pcard');
+  if(card){
+    const on=a.includes(i);
+    card.style.borderColor=on?'var(--brand)':'';
+    card.style.boxShadow=on?'0 0 0 2px var(--brand-50)':'';
+    const badge=card.querySelector('.img > div');
+    if(badge){
+      badge.style.background=on?'var(--brand)':'#fff';
+      badge.style.color=on?'#fff':'var(--brand)';
+      badge.textContent=on?'✓':'+';
+    }
+    const countEl=document.querySelector('#layer .tag-soft');
+    if(countEl) countEl.textContent=`${a.length} item${a.length===1?'':'s'} selected`;
+    return;
+  }
+  render();
+}
+function siAddDone(){ closeLayer(); render(); }
+function siScheduleFromFlow(f){
+  if(f.when==='self') return {mode:'self'};
+  if(f.when==='sched'){
+    const s=f.sched||{};
+    const date=s.date||new Date(Date.now()+86400000).toISOString().slice(0,10);
+    const time=s.time||'10:00';
+    const tz=(s.tz||'Asia/Kolkata (IST)').split(' ')[0];
+    return {mode:'scheduled',sendAt:`${date}T${time}:00`,timezone:tz};
+  }
+  return {mode:'now'};
+}
+async function sendItemsDo(){
+  const f=S.flow;
+  const k=S.kits.find(x=>x.id===f.kitId);
+  const finishUi=()=>{
+    if(k)k.sent=true;
+    go('orders',{nav:'orders'});
+    toast('Order placed for '+f.selRecips.length+' recipients! 📦');
+  };
+  if(api.useMocks()){
+    S.orders.unshift({id:nid('o'),date:new Date().toLocaleDateString('en-GB'),name:(k?k.name:'Custom kit'),status:'Processing',amount:4200*f.selRecips.length,track:'',items:f.picked.map(i=>[DEMO_PRODUCTS[i].nm,String(f.selRecips.length)])});
+    finishUi();
+    render();
+    return;
+  }
+  const entityId=S.primaryEntityId||(S.org.departments[0]&&S.org.departments[0].id);
+  if(!entityId){ toast('No department budget found — complete wallet setup first'); return; }
+  if(!f.kitId){ toast('Kit not found — reload and try again'); return; }
+  if(!f.selRecips.length){ toast('Select at least one recipient'); return; }
+  try{
+    S.loading=true; render();
+    const campaign=await api.launchKitCampaignFlow({
+      entityId:String(entityId),
+      kitId:String(f.kitId),
+      name:k?k.name:'Kit send',
+      message:{from:f.from||'',body:f.msg||''},
+      schedule:siScheduleFromFlow(f),
+      contactIds:f.selRecips,
+      contacts:S.contacts,
+    });
+    S.campaigns=(S.campaigns||[]);
+    S.campaigns.unshift(campaign);
+    await hydrateFromApi();
+    S.loading=false;
+    finishUi();
+    render();
+  }catch(err){
+    S.loading=false; render();
+    toast(err.message||'Failed to send kit');
+  }
 }
 
 
@@ -2356,7 +2497,7 @@ async function auth(){
     }
     if(form.password.length<8){ toast('Password must be at least 8 characters'); return; }
   } else if(!form.email||!form.password){ toast('Enter email and password'); return; }
-  const gen=++bootGen;
+  const gen=++bootState.gen;
   S.loading=true; render();
   try{
     const user=isSignup
@@ -2368,17 +2509,19 @@ async function auth(){
     }
     S.user={name:user.name,initials:user.name.split(/\s+/).slice(0,2).map(p=>p[0]?.toUpperCase()||'').join(''),email:user.email,role:user.role||'company_admin'};
     await hydrateFromApi(user);
-    if(gen!==bootGen) return;
+    if(gen!==bootState.gen) return;
+    markSessionActive();
     S.authed=true; S.nav='orders'; S.view='orders'; S.flow={};
     toast(isSignup ? 'Welcome to Shelf Merch, '+user.name.split(' ')[0]+'!' : 'Welcome back, '+user.name.split(' ')[0]);
   }catch(err){
-    if(gen===bootGen) toast(err.message||(isSignup?'Sign up failed':'Login failed'));
+    if(gen===bootState.gen) toast(err.message||(isSignup?'Sign up failed':'Login failed'));
   }finally{
-    if(gen===bootGen){ S.loading=false; render(); }
+    if(gen===bootState.gen){ S.loading=false; render(); }
   }
 }
 async function logout(){
-  ++bootGen;
+  ++bootState.gen;
+  bootState.sessionAt=0;
   if(!api.useMocks()) await api.logout().catch(()=>{});
   S.authed=false; S.view='login'; S.flow={}; closeLayer(); render();
 }
@@ -2516,13 +2659,17 @@ const ACT = {
   kitOpen:(el,a)=>kitOpen(a),
   createKitStart:()=>createKitStart(),
   ktPick:(el)=>ktPick(el),
-  ktLogo:()=>ktLogo(),
+  ktLogoUpload:()=>ktLogoUpload(),
+  ktLogoClear:()=>ktLogoClear(),
   ktPkg:(el)=>ktPkg(el),
   ktBack:()=>ktBack(),
   ktNext:()=>ktNext(),
   kitPublish:()=>kitPublish(),
   // send items
   sendItemsStart:(el)=>sendItemsStart(el),
+  siAddOpen:()=>siAddOpen(),
+  siPick:(el)=>siPick(el),
+  siAddDone:()=>siAddDone(),
   siBack:()=>siBack(),
   siNext:()=>siNext(),
   sendItemsDo:()=>sendItemsDo(),
@@ -2579,6 +2726,12 @@ document.addEventListener('input', function(e){
 });
 
 document.addEventListener('change', function(e){
+  if(e.target.id==='kt-logo-inp'){
+    const f=e.target.files?.[0];
+    if(f) ktLogoSetFile(f);
+    e.target.value='';
+    return;
+  }
   if(e.target.id==='sh-logo-inp'){
     const f=e.target.files?.[0];
     if(f) shopLogoSetFile(f);
@@ -2607,18 +2760,20 @@ document.addEventListener('change', function(e){
 });
 
 document.addEventListener('dragover', function(e){
-  if(e.target.closest('#sh-logo-drop')||e.target.closest('#sw-art-drop')||e.target.closest('#shop-edit-logo-drop')) e.preventDefault();
+  if(e.target.closest('#sh-logo-drop')||e.target.closest('#kt-logo-drop')||e.target.closest('#sw-art-drop')||e.target.closest('#shop-edit-logo-drop')) e.preventDefault();
 });
 
 document.addEventListener('drop', function(e){
   const logoDrop=e.target.closest('#sh-logo-drop');
+  const kitLogoDrop=e.target.closest('#kt-logo-drop');
   const artDrop=e.target.closest('#sw-art-drop');
   const editLogoDrop=e.target.closest('#shop-edit-logo-drop');
-  if(!logoDrop&&!artDrop&&!editLogoDrop) return;
+  if(!logoDrop&&!kitLogoDrop&&!artDrop&&!editLogoDrop) return;
   e.preventDefault();
   const f=e.dataTransfer?.files?.[0];
   if(!f) return;
   if(editLogoDrop) shopEditSetLogoFile(f);
+  else if(kitLogoDrop) ktLogoSetFile(f);
   else if(logoDrop) shopLogoSetFile(f);
   else swArtSetFile(f);
 });
@@ -2633,10 +2788,14 @@ async function init(){
     S.authed=false; S.view='login'; render();
     return;
   }
-  const gen=++bootGen;
+  if(S.authed && api.isAuthenticated()){
+    markSessionActive();
+    return;
+  }
+  const gen=++bootState.gen;
   S.loading=true; render();
   const snapshot=await api.tryRestoreSession();
-  if(gen!==bootGen||S.authed){
+  if(gen!==bootState.gen||S.authed){
     S.loading=false; render();
     return;
   }
@@ -2646,14 +2805,10 @@ async function init(){
   }
   if(snapshot){
     api.applyWorkspaceToState(S,snapshot);
+    markSessionActive();
     S.authed=true; S.nav='orders'; S.view='orders';
   }else{
-    if(gen!==bootGen||S.authed){
-      S.loading=false; render();
-      return;
-    }
-    if(api.isAuthenticated()) await api.logout().catch(()=>{});
-    if(gen!==bootGen||S.authed){
+    if(gen!==bootState.gen||S.authed){
       S.loading=false; render();
       return;
     }

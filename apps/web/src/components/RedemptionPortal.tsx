@@ -19,6 +19,8 @@ type Shop = StoreShop & { currencyMode?: "points" | "inr" | "priceless" };
 type PortalData = {
   campaign: { name: string; message?: { body?: string }; shop?: Shop | null };
   recipient: { name: string; creditAmount: number };
+  alreadyVerified?: boolean;
+  sessionToken?: string;
 };
 
 export default function RedemptionPortal({ token }: { token: string }) {
@@ -37,6 +39,13 @@ export default function RedemptionPortal({ token }: { token: string }) {
     try {
       const data = (await getRedemptionPortal(token)) as PortalData;
       setPortal(data);
+      if (data.alreadyVerified && data.sessionToken) {
+        setSessionToken(data.sessionToken);
+        const catalog = (await getRedemptionCatalog(token, data.sessionToken)) as { products: StoreProduct[] };
+        setProducts(catalog.products || []);
+        setStep("shop");
+        return;
+      }
       setStep("portal");
     } catch (e) {
       if (e instanceof ApiError && e.code === "ALREADY_REDEEMED") {

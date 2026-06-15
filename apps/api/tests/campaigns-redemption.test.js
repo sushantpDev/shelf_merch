@@ -12,6 +12,7 @@ import { Collection } from '../src/modules/collections/collection.model.js';
 import { CatalogProduct } from '../src/modules/catalog/catalogProduct.model.js';
 import { Campaign } from '../src/modules/campaigns/campaign.model.js';
 import { Recipient } from '../src/modules/campaigns/recipient.model.js';
+import { Kit } from '../src/modules/kits/kit.model.js';
 import { Order } from '../src/modules/orders/order.model.js';
 import { signAccessToken } from '../src/modules/auth/auth.service.js';
 import * as ledger from '../src/services/ledger.service.js';
@@ -131,6 +132,52 @@ describe('campaign lifecycle (§11.1)', () => {
 
     const entityAfter = await Entity.findOne({ _id: entity._id, tenantId: tenant._id });
     expect(entityAfter.spentAmount - entityBefore.spentAmount).toBe(4000);
+  });
+
+  it('kit send → recipients → launch without wallet debit', async () => {
+    const kit = await Kit.create({
+      tenantId: tenant._id,
+      name: 'Welcome Kit',
+      productRefs: [{ catalogProductId: product._id, name: 'Test Tee', brand: '', group: 'tee' }],
+      status: 'live',
+    });
+
+    const created = await request(app)
+      .post('/api/v1/campaigns')
+      .set('Authorization', `Bearer ${managerToken}`)
+      .send({
+        entityId: String(entity._id),
+        name: 'Onboarding kit',
+        type: 'kit',
+        kitId: String(kit._id),
+        message: { from: 'People Team', body: 'Your welcome kit is ready!' },
+        schedule: { mode: 'now' },
+      });
+    expect(created.status).toBe(201);
+    const id = created.body._id;
+
+    const imported = await request(app)
+      .post(`/api/v1/campaigns/${id}/recipients/import`)
+      .set('Authorization', `Bearer ${managerToken}`)
+      .send({
+        recipients: [{ name: 'Alice', email: 'alice@test.io' }],
+      });
+    expect(imported.status).toBe(200);
+    expect(imported.body.campaign.status).toBe('approved');
+
+    const entityBefore = await Entity.findOne({ _id: entity._id, tenantId: tenant._id });
+    const launch = await request(app)
+      .post(`/api/v1/campaigns/${id}/launch`)
+      .set('Authorization', `Bearer ${managerToken}`)
+      .set('Idempotency-Key', `launch-kit-${id}`);
+    expect(launch.status).toBe(200);
+    expect(launch.body.status).toBe('redemption_open');
+
+    const entityAfter = await Entity.findOne({ _id: entity._id, tenantId: tenant._id });
+    expect(entityAfter.spentAmount).toBe(entityBefore.spentAmount);
+
+    const updatedKit = await Kit.findOne({ _id: kit._id, tenantId: tenant._id });
+    expect(updatedKit.lastSentAt).toBeTruthy();
   });
 });
 

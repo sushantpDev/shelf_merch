@@ -6,6 +6,7 @@ import { Entity } from '../entities/entity.model.js';
 import { Contact } from '../contacts/contact.model.js';
 import { Shop } from '../shops/shop.model.js';
 import { Kit } from '../kits/kit.model.js';
+import { Tenant } from '../tenants/tenant.model.js';
 import * as ledger from '../../services/ledger.service.js';
 import { transitionState, validNextStatuses, canTransition } from '../../services/stateMachine.service.js';
 import { notify } from '../notifications/notifications.service.js';
@@ -138,6 +139,13 @@ export async function importRecipients({ tenantId, campaignId, user, recipients 
   if (campaign.status === 'draft') {
     transitionState('campaign', campaign, 'recipients_uploaded', { userId: user.userId });
   }
+  // Kit / items sends skip credit allocation — approve once recipients are uploaded.
+  if (['kit', 'items'].includes(campaign.type) && campaign.status === 'recipients_uploaded') {
+    campaign.creditsPerRecipient = 0;
+    campaign.totalBudget = 0;
+    transitionState('campaign', campaign, 'credits_allocated', { userId: user.userId });
+    transitionState('campaign', campaign, 'approved', { userId: user.userId });
+  }
   await campaign.save();
   return { count: rows.length, campaign: withCampaignMeta(campaign) };
 }
@@ -193,31 +201,62 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
   }
 
   const entity = await Entity.findOne({ _id: campaign.entityId, tenantId });
-  await ledger.createTransaction({
-    tenantId,
-    walletId: entity.walletId,
-    type: 'campaign_spend',
-    amount: -campaign.totalBudget,
-    relatedEntityId: entity._id,
-    description: `Campaign launch: ${campaign.name}`,
-    performedBy: user.userId,
-  });
+  const isFulfillment = campaign.type === 'kit' || campaign.type === 'items';
+  if (!isFulfillment && campaign.totalBudget > 0) {
+    await ledger.createTransaction({
+      tenantId,
+      walletId: entity.walletId,
+      type: 'campaign_spend',
+      amount: -campaign.totalBudget,
+      relatedEntityId: entity._id,
+      description: `Campaign launch: ${campaign.name}`,
+      performedBy: user.userId,
+    });
+  }
 
   transitionState('campaign', campaign, 'launched', { userId: user.userId });
   transitionState('campaign', campaign, 'redemption_open', { userId: user.userId });
   await campaign.save();
 
-  const recipients = await Recipient.find({ tenantId, campaignId: campaign._id });
-  for (const r of recipients) {
-    await notify({
-      type: 'redemption_invite',
-      tenantId,
-      email: r.email,
-      phone: r.phone || null,
-      title: `You're invited: ${campaign.name}`,
-      body: campaign.message?.body ?? 'Redeem your gift using the link we sent.',
-      link: `/redeem/${r.redemptionToken}`,
-    });
+  const scheduleMode = campaign.schedule?.mode ?? 'now';
+  const sendInvites = scheduleMode === 'now';
+  const fromLabel = campaign.message?.from?.trim() || campaign.name;
+  const inviteBody =
+    campaign.message?.body?.trim() ||
+    (isFulfillment ? 'Choose your gift using the link below.' : 'Redeem your gift using the link we sent.');
+  const inviteTitle = isFulfillment ? `${fromLabel} sent you a gift` : `You're invited: ${campaign.name}`;
+
+  if (sendInvites) {
+    const [tenant, kit] = await Promise.all([
+      Tenant.findById(tenantId).select('name').lean(),
+      campaign.kitId ? Kit.findOne({ _id: campaign.kitId, tenantId }).select('name').lean() : null,
+    ]);
+    const companyName = tenant?.name || 'your company';
+    const giftName = kit?.name || campaign.name;
+    const recipients = await Recipient.find({ tenantId, campaignId: campaign._id });
+    for (const r of recipients) {
+      await notify({
+        type: 'redemption_invite',
+        tenantId,
+        email: r.email,
+        phone: r.phone || null,
+        title: inviteTitle,
+        body: inviteBody,
+        link: `/redeem/${r.redemptionToken}`,
+        meta: {
+          recipientName: r.name,
+          senderName: fromLabel,
+          message: inviteBody,
+          giftName,
+          companyName,
+          campaignType: campaign.type,
+        },
+      });
+    }
+  }
+
+  if (campaign.kitId) {
+    await Kit.updateOne({ _id: campaign.kitId, tenantId }, { lastSentAt: new Date() });
   }
   if (entity.managerUserId) {
     await notify({
@@ -225,7 +264,7 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
       tenantId,
       userId: entity.managerUserId,
       title: `Campaign launched: ${campaign.name}`,
-      body: `${recipients.length} recipients invited.`,
+      body: `${campaign.recipientCount} recipients invited.`,
       link: `/campaigns/${campaign._id}`,
     });
   }
