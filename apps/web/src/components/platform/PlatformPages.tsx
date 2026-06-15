@@ -3,9 +3,16 @@ import { Link } from "@tanstack/react-router";
 import { getStoredUser } from "@/services/auth-store";
 import { canAccessArea } from "@/services/platform-access";
 import {
+  addOrderNote,
+  addShipmentEvent,
+  addTicketMessage,
   adjustInventory,
   approveFunding,
+  assignOrderVendor,
+  assignTicket,
   changeTeamRole,
+  createOrderReplacement,
+  createShipment,
   deactivateTeamMember,
   fetchAuditLogs,
   fetchFinanceOutstanding,
@@ -20,17 +27,32 @@ import {
   fetchPlatformSupport,
   fetchPlatformTeam,
   fetchPlatformTenants,
+  fetchPlatformVendors,
   fetchProductionBoard,
+  fetchProductionTasks,
   inviteTeamMember,
+  ORDER_STATUSES,
   PLATFORM_ROLES,
+  PRODUCTION_TASK_STATUSES,
   reactivateTeamMember,
+  recordTaskQc,
   rejectFunding,
+  resendRedemptionLink,
+  resendShipmentTracking,
+  resendTicketTracking,
   setInventoryMode,
+  setOrderStatus,
+  setTaskStatus,
   setTenantPlan,
   setTenantStatus,
+  setTicketStatus,
+  SHIPMENT_STATUSES,
+  SUPPORT_TICKET_STATUSES,
   TENANT_PLANS,
   TENANT_STATUSES,
+  updateShipment,
   updateSetting,
+  uploadOrderMockup,
   type InventoryTxnType,
 } from "@/services/platform-api";
 import {
@@ -220,42 +242,141 @@ function TenantManageModal({ row, onClose, onChanged }: { row: TenantRow; onClos
 }
 
 export function OrdersPage() {
-  const { data, error, loading } = useLoad(() => fetchPlatformOrders({ limit: 100 }));
+  const [reloadKey, setReloadKey] = useState(0);
+  const [managing, setManaging] = useState<Record<string, unknown> | null>(null);
+  const { data, error, loading } = useLoad(() => fetchPlatformOrders({ limit: 100 }), [reloadKey]);
+  const canWrite = canAccessArea(getStoredUser()?.role, "orders", "write");
+
+  const columns: { key: string; label: string; render?: (row: Record<string, unknown>) => ReactNode }[] = [
+    { key: "orderNumber", label: "Order #" },
+    { key: "tenantName", label: "Tenant" },
+    { key: "status", label: "Status", render: (r) => <StatusTag status={String(r.status)} /> },
+    {
+      key: "total",
+      label: "Total",
+      render: (r) => {
+        const b = r.amountBreakdown as { total?: number } | undefined;
+        return inr(Number(b?.total ?? 0));
+      },
+    },
+    { key: "createdAt", label: "Created", render: (r) => new Date(String(r.createdAt)).toLocaleDateString("en-IN") },
+  ];
+  if (canWrite) {
+    columns.push({
+      key: "manage",
+      label: "",
+      render: (r) => (
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setManaging(r)}>Manage</button>
+      ),
+    });
+  }
 
   return (
     <>
       <PlatformPageHeader title="Orders" subtitle="Cross-tenant order pipeline." />
       {loading && <PlatformLoading />}
       {error && <PlatformError message={error} />}
-      {data && (
-        <DataTable
-          empty="No orders yet."
-          rows={data.items}
-          columns={[
-            { key: "orderNumber", label: "Order #" },
-            { key: "tenantName", label: "Tenant" },
-            {
-              key: "status",
-              label: "Status",
-              render: (r) => <StatusTag status={String(r.status)} />,
-            },
-            {
-              key: "total",
-              label: "Total",
-              render: (r) => {
-                const b = r.amountBreakdown as { total?: number } | undefined;
-                return inr(Number(b?.total ?? 0));
-              },
-            },
-            {
-              key: "createdAt",
-              label: "Created",
-              render: (r) => new Date(String(r.createdAt)).toLocaleDateString("en-IN"),
-            },
-          ]}
-        />
+      {data && <DataTable empty="No orders yet." rows={data.items} columns={columns} />}
+      {managing && (
+        <OrderManageModal row={managing} onClose={() => setManaging(null)} onChanged={() => setReloadKey((k) => k + 1)} />
       )}
     </>
+  );
+}
+
+function OrderManageModal({ row, onClose, onChanged }: { row: Record<string, unknown>; onClose: () => void; onChanged: () => void }) {
+  const id = String(row._id);
+  const [status, setStatus] = useState(String(row.status ?? "created"));
+  const [note, setNote] = useState("");
+  const [vendors, setVendors] = useState<{ _id: string; name: string }[]>([]);
+  const [vendorId, setVendorId] = useState("");
+  const [mockupUrl, setMockupUrl] = useState("");
+  const [replacementReason, setReplacementReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [okNote, setOkNote] = useState("");
+
+  useEffect(() => {
+    fetchPlatformVendors().then(setVendors).catch(() => setVendors([]));
+  }, []);
+
+  async function run(fn: () => Promise<unknown>, ok: string) {
+    setBusy(true);
+    setErr("");
+    setOkNote("");
+    try {
+      await fn();
+      setOkNote(ok);
+      onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <PlatformModal title={`Order ${row.orderNumber ?? ""}`} subtitle={String(row.tenantName ?? "")} onClose={onClose}>
+      {err && <PlatformError message={err} />}
+      {okNote && <div className="card" style={{ padding: 10, marginBottom: 12, color: "var(--brand)", fontSize: 13 }}>{okNote}</div>}
+
+      <div className="field">
+        <label className="lbl">Status</label>
+        <select className="inp" value={status} onChange={(e) => setStatus(e.target.value)}>
+          {ORDER_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+        </select>
+      </div>
+      <input className="inp" placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+      <button type="button" className="btn btn-soft btn-sm" style={{ marginTop: 10 }} disabled={busy || status === row.status}
+        onClick={() => run(() => setOrderStatus(id, status, note || undefined), "Status updated.")}>
+        Save status
+      </button>
+
+      <div className="divider" style={{ margin: "18px 0" }} />
+      <div className="field">
+        <label className="lbl">Assign production vendor</label>
+        <select className="inp" value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
+          <option value="">Select a vendor…</option>
+          {vendors.map((v) => <option key={v._id} value={v._id}>{v.name}</option>)}
+        </select>
+      </div>
+      <button type="button" className="btn btn-soft btn-sm" disabled={busy || !vendorId}
+        onClick={() => run(() => assignOrderVendor(id, vendorId), "Vendor assigned.")}>
+        Assign vendor
+      </button>
+
+      <div className="divider" style={{ margin: "18px 0" }} />
+      <div className="field">
+        <label className="lbl">Internal note</label>
+        <input className="inp" placeholder="Add an internal note" value={note} onChange={(e) => setNote(e.target.value)} />
+      </div>
+      <div className="row" style={{ gap: 8 }}>
+        <button type="button" className="btn btn-ghost btn-sm" disabled={busy || !note.trim()}
+          onClick={() => run(() => addOrderNote(id, note.trim()), "Note added.")}>
+          Add note
+        </button>
+      </div>
+
+      <div className="divider" style={{ margin: "18px 0" }} />
+      <div className="field">
+        <label className="lbl">Mockup image URL</label>
+        <input className="inp" placeholder="https://…" value={mockupUrl} onChange={(e) => setMockupUrl(e.target.value)} />
+      </div>
+      <button type="button" className="btn btn-ghost btn-sm" disabled={busy || !mockupUrl.trim()}
+        onClick={() => run(() => uploadOrderMockup(id, mockupUrl.trim()), "Mockup attached.")}>
+        Attach mockup
+      </button>
+
+      <div className="divider" style={{ margin: "18px 0" }} />
+      <div className="field">
+        <label className="lbl">Create replacement (reason)</label>
+        <input className="inp" placeholder="Why a replacement is needed" value={replacementReason} onChange={(e) => setReplacementReason(e.target.value)} />
+      </div>
+      <button type="button" className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} disabled={busy || !replacementReason.trim()}
+        onClick={() => run(() => createOrderReplacement(id, replacementReason.trim()), "Replacement created.")}>
+        Create replacement order
+      </button>
+    </PlatformModal>
   );
 }
 
@@ -589,83 +710,298 @@ export function KitsPage() {
 }
 
 export function ShipmentsPage() {
-  const { data, error, loading } = useLoad(() => fetchPlatformShipments(100));
+  const [reloadKey, setReloadKey] = useState(0);
+  const [managing, setManaging] = useState<Record<string, unknown> | null>(null);
+  const [creating, setCreating] = useState(false);
+  const { data, error, loading } = useLoad(() => fetchPlatformShipments(100), [reloadKey]);
+  const canWrite = canAccessArea(getStoredUser()?.role, "shipments", "write");
+  const reload = () => setReloadKey((k) => k + 1);
+
+  const columns: { key: string; label: string; render?: (row: Record<string, unknown>) => ReactNode }[] = [
+    { key: "awb", label: "AWB", render: (r) => String(r.awb ?? r.trackingNumber ?? "—") },
+    { key: "courier", label: "Courier" },
+    { key: "orderNumber", label: "Order", render: (r) => String(r.orderNumber ?? "—") },
+    { key: "status", label: "Status", render: (r) => <StatusTag status={String(r.status)} /> },
+    { key: "createdAt", label: "Created", render: (r) => new Date(String(r.createdAt)).toLocaleDateString("en-IN") },
+  ];
+  if (canWrite) {
+    columns.push({
+      key: "manage",
+      label: "",
+      render: (r) => <button type="button" className="btn btn-ghost btn-sm" onClick={() => setManaging(r)}>Manage</button>,
+    });
+  }
 
   return (
     <>
-      <PlatformPageHeader title="Shipments" subtitle="AWB tracking and delivery exceptions." />
+      <PlatformPageHeader
+        title="Shipments"
+        subtitle="AWB tracking and delivery exceptions."
+        actions={canWrite ? <button type="button" className="btn btn-brand btn-sm" onClick={() => setCreating(true)}>+ New shipment</button> : null}
+      />
       {loading && <PlatformLoading />}
       {error && <PlatformError message={error} />}
-      {data && (
-        <DataTable
-          empty="No shipments yet."
-          rows={data.items}
-          columns={[
-            { key: "awb", label: "AWB", render: (r) => String(r.awb ?? r.trackingNumber ?? "—") },
-            { key: "courier", label: "Courier" },
-            {
-              key: "status",
-              label: "Status",
-              render: (r) => <StatusTag status={String(r.status)} />,
-            },
-            {
-              key: "createdAt",
-              label: "Created",
-              render: (r) => new Date(String(r.createdAt)).toLocaleDateString("en-IN"),
-            },
-          ]}
-        />
-      )}
+      {data && <DataTable empty="No shipments yet." rows={data.items} columns={columns} />}
+      {managing && <ShipmentManageModal row={managing} onClose={() => setManaging(null)} onChanged={reload} />}
+      {creating && <ShipmentCreateModal onClose={() => setCreating(false)} onDone={() => { setCreating(false); reload(); }} />}
     </>
   );
 }
 
+function ShipmentCreateModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [orderId, setOrderId] = useState("");
+  const [courier, setCourier] = useState("");
+  const [awb, setAwb] = useState("");
+  const [trackingUrl, setTrackingUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function submit() {
+    if (!orderId.trim() || !courier.trim() || !awb.trim()) {
+      setErr("Order ID, courier and AWB are required.");
+      return;
+    }
+    setBusy(true);
+    setErr("");
+    try {
+      await createShipment({ orderId: orderId.trim(), courier: courier.trim(), awb: awb.trim(), trackingUrl: trackingUrl.trim() || undefined });
+      onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not create shipment");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <PlatformModal title="New shipment" onClose={onClose}>
+      {err && <PlatformError message={err} />}
+      <div className="field"><label className="lbl">Order ID</label><input className="inp" value={orderId} onChange={(e) => setOrderId(e.target.value)} /></div>
+      <div className="field"><label className="lbl">Courier</label><input className="inp" value={courier} onChange={(e) => setCourier(e.target.value)} /></div>
+      <div className="field"><label className="lbl">AWB</label><input className="inp" value={awb} onChange={(e) => setAwb(e.target.value)} /></div>
+      <div className="field"><label className="lbl">Tracking URL (optional)</label><input className="inp" value={trackingUrl} onChange={(e) => setTrackingUrl(e.target.value)} /></div>
+      <button type="button" className="btn btn-brand btn-block" disabled={busy} onClick={submit}>{busy ? "Creating…" : "Create shipment"}</button>
+    </PlatformModal>
+  );
+}
+
+function ShipmentManageModal({ row, onClose, onChanged }: { row: Record<string, unknown>; onClose: () => void; onChanged: () => void }) {
+  const id = String(row._id);
+  const [evStatus, setEvStatus] = useState(String(row.status ?? "pending"));
+  const [location, setLocation] = useState("");
+  const [evNote, setEvNote] = useState("");
+  const [courier, setCourier] = useState(String(row.courier ?? ""));
+  const [awb, setAwb] = useState(String(row.awb ?? ""));
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [okNote, setOkNote] = useState("");
+
+  async function run(fn: () => Promise<unknown>, ok: string) {
+    setBusy(true);
+    setErr("");
+    setOkNote("");
+    try {
+      await fn();
+      setOkNote(ok);
+      onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <PlatformModal title={`Shipment ${row.awb ?? ""}`} subtitle={String(row.courier ?? "")} onClose={onClose}>
+      {err && <PlatformError message={err} />}
+      {okNote && <div className="card" style={{ padding: 10, marginBottom: 12, color: "var(--brand)", fontSize: 13 }}>{okNote}</div>}
+
+      <label className="lbl">Add tracking event</label>
+      <div className="field">
+        <select className="inp" value={evStatus} onChange={(e) => setEvStatus(e.target.value)}>
+          {SHIPMENT_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+        </select>
+      </div>
+      <div className="row" style={{ gap: 8 }}>
+        <input className="inp" placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} />
+        <input className="inp" placeholder="Note" value={evNote} onChange={(e) => setEvNote(e.target.value)} />
+      </div>
+      <button type="button" className="btn btn-soft btn-sm" style={{ marginTop: 10 }} disabled={busy}
+        onClick={() => run(() => addShipmentEvent(id, { status: evStatus, location: location || undefined, note: evNote || undefined }), "Event added.")}>
+        Add event
+      </button>
+
+      <div className="divider" style={{ margin: "18px 0" }} />
+      <label className="lbl">Edit courier / AWB</label>
+      <div className="row" style={{ gap: 8 }}>
+        <input className="inp" placeholder="Courier" value={courier} onChange={(e) => setCourier(e.target.value)} />
+        <input className="inp" placeholder="AWB" value={awb} onChange={(e) => setAwb(e.target.value)} />
+      </div>
+      <button type="button" className="btn btn-soft btn-sm" style={{ marginTop: 10 }} disabled={busy || (courier === row.courier && awb === row.awb) || !courier.trim() || !awb.trim()}
+        onClick={() => run(() => updateShipment(id, { courier: courier.trim(), awb: awb.trim() }), "Shipment updated.")}>
+        Save changes
+      </button>
+
+      <div className="divider" style={{ margin: "18px 0" }} />
+      <button type="button" className="btn btn-ghost btn-sm" disabled={busy}
+        onClick={() => run(() => resendShipmentTracking(id), "Tracking email resent.")}>
+        Resend tracking email
+      </button>
+    </PlatformModal>
+  );
+}
+
 export function SupportPage() {
-  const { data, error, loading } = useLoad(() => fetchPlatformSupport(100));
+  const [reloadKey, setReloadKey] = useState(0);
+  const [managing, setManaging] = useState<Record<string, unknown> | null>(null);
+  const { data, error, loading } = useLoad(() => fetchPlatformSupport(100), [reloadKey]);
+  const canWrite = canAccessArea(getStoredUser()?.role, "support", "write");
+
+  const columns: { key: string; label: string; render?: (row: Record<string, unknown>) => ReactNode }[] = [
+    { key: "subject", label: "Subject" },
+    { key: "type", label: "Type" },
+    { key: "status", label: "Status", render: (r) => <StatusTag status={String(r.status)} /> },
+    { key: "createdAt", label: "Opened", render: (r) => new Date(String(r.createdAt)).toLocaleDateString("en-IN") },
+  ];
+  if (canWrite) {
+    columns.push({
+      key: "manage",
+      label: "",
+      render: (r) => <button type="button" className="btn btn-ghost btn-sm" onClick={() => setManaging(r)}>Manage</button>,
+    });
+  }
 
   return (
     <>
       <PlatformPageHeader title="Support" subtitle="Cross-tenant help desk queue." />
       {loading && <PlatformLoading />}
       {error && <PlatformError message={error} />}
-      {data && (
-        <DataTable
-          empty="No tickets."
-          rows={data.items}
-          columns={[
-            { key: "subject", label: "Subject" },
-            { key: "type", label: "Type" },
-            {
-              key: "status",
-              label: "Status",
-              render: (r) => <StatusTag status={String(r.status)} />,
-            },
-            {
-              key: "createdAt",
-              label: "Opened",
-              render: (r) => new Date(String(r.createdAt)).toLocaleDateString("en-IN"),
-            },
-          ]}
-        />
+      {data && <DataTable empty="No tickets." rows={data.items} columns={columns} />}
+      {managing && (
+        <SupportManageModal row={managing} onClose={() => setManaging(null)} onChanged={() => setReloadKey((k) => k + 1)} />
       )}
     </>
   );
 }
 
+function SupportManageModal({ row, onClose, onChanged }: { row: Record<string, unknown>; onClose: () => void; onChanged: () => void }) {
+  const id = String(row._id);
+  const [status, setStatus] = useState(String(row.status ?? "open"));
+  const [team, setTeam] = useState<{ userId: string; name: string }[]>([]);
+  const [assignee, setAssignee] = useState("");
+  const [reply, setReply] = useState("");
+  const [internal, setInternal] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [okNote, setOkNote] = useState("");
+
+  useEffect(() => {
+    fetchPlatformTeam().then((t) => setTeam(t.filter((m) => m.status === "active"))).catch(() => setTeam([]));
+  }, []);
+
+  async function run(fn: () => Promise<unknown>, ok: string) {
+    setBusy(true);
+    setErr("");
+    setOkNote("");
+    try {
+      await fn();
+      setOkNote(ok);
+      onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <PlatformModal title={String(row.subject ?? "Ticket")} subtitle={String(row.type ?? "")} onClose={onClose}>
+      {err && <PlatformError message={err} />}
+      {okNote && <div className="card" style={{ padding: 10, marginBottom: 12, color: "var(--brand)", fontSize: 13 }}>{okNote}</div>}
+
+      <div className="field">
+        <label className="lbl">Status</label>
+        <select className="inp" value={status} onChange={(e) => setStatus(e.target.value)}>
+          {SUPPORT_TICKET_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+        </select>
+      </div>
+      <button type="button" className="btn btn-soft btn-sm" disabled={busy || status === row.status}
+        onClick={() => run(() => setTicketStatus(id, status), "Status updated.")}>
+        Save status
+      </button>
+
+      <div className="divider" style={{ margin: "18px 0" }} />
+      <div className="field">
+        <label className="lbl">Assign to</label>
+        <select className="inp" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
+          <option value="">Select a team member…</option>
+          {team.map((m) => <option key={m.userId} value={m.userId}>{m.name}</option>)}
+        </select>
+      </div>
+      <button type="button" className="btn btn-soft btn-sm" disabled={busy || !assignee}
+        onClick={() => run(() => assignTicket(id, assignee), "Ticket assigned.")}>
+        Assign
+      </button>
+
+      <div className="divider" style={{ margin: "18px 0" }} />
+      <div className="field">
+        <label className="lbl">Reply</label>
+        <textarea className="inp" rows={3} value={reply} onChange={(e) => setReply(e.target.value)} />
+        <label className="row" style={{ gap: 6, alignItems: "center", fontSize: 13, marginTop: 6 }}>
+          <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} /> Internal note (not sent to customer)
+        </label>
+      </div>
+      <button type="button" className="btn btn-brand btn-sm" disabled={busy || !reply.trim()}
+        onClick={() => run(async () => { await addTicketMessage(id, reply.trim(), internal); setReply(""); }, "Reply added.")}>
+        Send reply
+      </button>
+
+      <div className="divider" style={{ margin: "18px 0" }} />
+      <div className="row" style={{ gap: 8 }}>
+        <button type="button" className="btn btn-ghost btn-sm" disabled={busy}
+          onClick={() => run(() => resendRedemptionLink(id), "Redemption link resent.")}>
+          Resend redemption link
+        </button>
+        <button type="button" className="btn btn-ghost btn-sm" disabled={busy}
+          onClick={() => run(() => resendTicketTracking(id), "Tracking link resent.")}>
+          Resend tracking link
+        </button>
+      </div>
+    </PlatformModal>
+  );
+}
+
 export function ProductionPage() {
-  const { data, error, loading } = useLoad(() => fetchProductionBoard());
+  const [reloadKey, setReloadKey] = useState(0);
+  const [managing, setManaging] = useState<Record<string, unknown> | null>(null);
+  const board = useLoad(() => fetchProductionBoard(), [reloadKey]);
+  const tasks = useLoad(() => fetchProductionTasks({ limit: 100 }), [reloadKey]);
+  const canWrite = canAccessArea(getStoredUser()?.role, "production", "write");
+  const data = board.data;
+
+  const taskColumns: { key: string; label: string; render?: (row: Record<string, unknown>) => ReactNode }[] = [
+    { key: "_id", label: "Task", render: (r) => String(r._id).slice(-6) },
+    { key: "orderId", label: "Order", render: (r) => String(r.orderId ?? "").slice(-6) },
+    { key: "assignedTo", label: "Assignee", render: (r) => String(r.assignedTo || "—") },
+    { key: "status", label: "Status", render: (r) => <StatusTag status={String(r.status)} /> },
+    { key: "qcResult", label: "QC", render: (r) => String(r.qcResult || "—") },
+  ];
+  if (canWrite) {
+    taskColumns.push({
+      key: "manage",
+      label: "",
+      render: (r) => <button type="button" className="btn btn-ghost btn-sm" onClick={() => setManaging(r)}>Manage</button>,
+    });
+  }
 
   return (
     <>
       <PlatformPageHeader title="Production" subtitle="Task board and orders in production." />
-      {loading && <PlatformLoading />}
-      {error && <PlatformError message={error} />}
+      {board.loading && <PlatformLoading />}
+      {board.error && <PlatformError message={board.error} />}
       {data && (
         <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div className="card" style={{ padding: 16 }}>
-            <div className="h1" style={{ fontSize: 16, marginBottom: 12 }}>
-              Tasks by status
-            </div>
+            <div className="h1" style={{ fontSize: 16, marginBottom: 12 }}>Tasks by status</div>
             {Object.entries(data.taskBuckets).map(([status, bucket]) => (
               <div key={status} className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
                 <StatusTag status={status} />
@@ -674,9 +1010,7 @@ export function ProductionPage() {
             ))}
           </div>
           <div className="card" style={{ padding: 16 }}>
-            <div className="h1" style={{ fontSize: 16, marginBottom: 12 }}>
-              Orders in production
-            </div>
+            <div className="h1" style={{ fontSize: 16, marginBottom: 12 }}>Orders in production</div>
             {Object.entries(data.orderBuckets).map(([status, bucket]) =>
               bucket.count > 0 ? (
                 <div key={status} className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
@@ -688,7 +1022,71 @@ export function ProductionPage() {
           </div>
         </div>
       )}
+
+      <h3 style={{ margin: "24px 0 12px" }}>Production tasks</h3>
+      {tasks.error && <PlatformError message={tasks.error} />}
+      {tasks.data && <DataTable empty="No production tasks." rows={tasks.data.items} columns={taskColumns} />}
+      {managing && (
+        <TaskManageModal row={managing} onClose={() => setManaging(null)} onChanged={() => setReloadKey((k) => k + 1)} />
+      )}
     </>
+  );
+}
+
+function TaskManageModal({ row, onClose, onChanged }: { row: Record<string, unknown>; onClose: () => void; onChanged: () => void }) {
+  const id = String(row._id);
+  const [status, setStatus] = useState(String(row.status ?? "created"));
+  const [note, setNote] = useState("");
+  const [qcPassed, setQcPassed] = useState(true);
+  const [qcReason, setQcReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [okNote, setOkNote] = useState("");
+
+  async function run(fn: () => Promise<unknown>, ok: string) {
+    setBusy(true);
+    setErr("");
+    setOkNote("");
+    try {
+      await fn();
+      setOkNote(ok);
+      onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <PlatformModal title={`Task ${id.slice(-6)}`} subtitle={`Order ${String(row.orderId ?? "").slice(-6)}`} onClose={onClose}>
+      {err && <PlatformError message={err} />}
+      {okNote && <div className="card" style={{ padding: 10, marginBottom: 12, color: "var(--brand)", fontSize: 13 }}>{okNote}</div>}
+
+      <div className="field">
+        <label className="lbl">Advance status</label>
+        <select className="inp" value={status} onChange={(e) => setStatus(e.target.value)}>
+          {PRODUCTION_TASK_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+        </select>
+      </div>
+      <input className="inp" placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+      <button type="button" className="btn btn-soft btn-sm" style={{ marginTop: 10 }} disabled={busy || status === row.status}
+        onClick={() => run(() => setTaskStatus(id, status, note || undefined), "Status updated.")}>
+        Save status
+      </button>
+
+      <div className="divider" style={{ margin: "18px 0" }} />
+      <label className="lbl">Quality check</label>
+      <div className="row" style={{ gap: 8, marginBottom: 8 }}>
+        <button type="button" className={qcPassed ? "btn btn-dark btn-sm" : "btn btn-ghost btn-sm"} onClick={() => setQcPassed(true)}>Pass</button>
+        <button type="button" className={!qcPassed ? "btn btn-dark btn-sm" : "btn btn-ghost btn-sm"} onClick={() => setQcPassed(false)}>Fail</button>
+      </div>
+      {!qcPassed && <input className="inp" placeholder="Failure reason" value={qcReason} onChange={(e) => setQcReason(e.target.value)} />}
+      <button type="button" className="btn btn-brand btn-sm" style={{ marginTop: 10 }} disabled={busy || (!qcPassed && !qcReason.trim())}
+        onClick={() => run(() => recordTaskQc(id, qcPassed, qcReason.trim() || undefined), "QC recorded.")}>
+        Record QC
+      </button>
+    </PlatformModal>
   );
 }
 

@@ -452,3 +452,94 @@ export function importShopify(domain: string, accessToken: string) {
     body: JSON.stringify({ domain, accessToken }),
   });
 }
+
+// ---- Operations desk: status/action enums ----
+export const ORDER_STATUSES = [
+  "created", "approved", "mockup_pending", "mockup_approved", "in_production",
+  "qc_pending", "packed", "shipped", "delivered", "issue_raised",
+  "replacement_processing", "cancelled",
+] as const;
+
+export const SUPPORT_TICKET_STATUSES = [
+  "open", "in_progress", "waiting_on_customer", "resolved", "closed",
+] as const;
+
+export const PRODUCTION_TASK_STATUSES = [
+  "created", "material_pending", "mockup_pending", "mockup_approved", "in_production",
+  "printing", "embroidery", "qc_pending", "packing", "ready_to_ship", "completed", "issue",
+] as const;
+
+export const SHIPMENT_STATUSES = [
+  "pending", "packed", "shipped", "in_transit", "out_for_delivery",
+  "delivered", "delayed", "rto", "lost", "damaged",
+] as const;
+
+// ---- Orders ----
+export function fetchPlatformVendors(status = "active") {
+  return apiFetch<Array<{ _id: string; name: string; type: string; status: string }>>(
+    `/platform/vendors?status=${status}`,
+  );
+}
+export function setOrderStatus(id: string, status: string, note?: string) {
+  return apiFetch(`/platform/orders/${id}/status`, { method: "PATCH", body: JSON.stringify({ status, note: note ?? "" }) });
+}
+export function assignOrderVendor(id: string, vendorId: string) {
+  return apiFetch(`/platform/orders/${id}/assign-vendor`, { method: "PATCH", body: JSON.stringify({ vendorId }) });
+}
+export function addOrderNote(id: string, body: string) {
+  return apiFetch(`/platform/orders/${id}/notes`, { method: "POST", body: JSON.stringify({ body }) });
+}
+export function uploadOrderMockup(id: string, url: string) {
+  return apiFetch(`/platform/orders/${id}/mockup`, { method: "POST", body: JSON.stringify({ url }) });
+}
+export function createOrderReplacement(id: string, reason: string) {
+  return apiFetch(`/platform/orders/${id}/replacement`, { method: "POST", body: JSON.stringify({ reason }) });
+}
+
+// ---- Support tickets ----
+export function setTicketStatus(id: string, status: string) {
+  return apiFetch(`/platform/support-tickets/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+export function assignTicket(id: string, userId: string) {
+  return apiFetch(`/platform/support-tickets/${id}/assign`, { method: "PATCH", body: JSON.stringify({ userId }) });
+}
+export function addTicketMessage(id: string, body: string, internal = false) {
+  return apiFetch(`/platform/support-tickets/${id}/messages`, { method: "POST", body: JSON.stringify({ body, internal }) });
+}
+export function resendRedemptionLink(id: string) {
+  return apiFetch(`/platform/support-tickets/${id}/resend-redemption-link`, { method: "POST" });
+}
+export function resendTicketTracking(id: string) {
+  return apiFetch(`/platform/support-tickets/${id}/resend-tracking-link`, { method: "POST" });
+}
+
+// ---- Production tasks ----
+export function fetchProductionTasks(params?: { status?: string; limit?: number }) {
+  const q = new URLSearchParams();
+  if (params?.status) q.set("status", params.status);
+  q.set("limit", String(params?.limit ?? 100));
+  return apiFetch<Paginated<Record<string, unknown>>>(`/platform/production/tasks?${q}`);
+}
+export function setTaskStatus(id: string, status: string, note?: string) {
+  return apiFetch(`/platform/production/tasks/${id}/status`, { method: "PATCH", body: JSON.stringify({ status, note: note ?? "" }) });
+}
+export function recordTaskQc(id: string, passed: boolean, reason?: string, photoUrl?: string) {
+  return apiFetch(`/platform/production/tasks/${id}/qc`, { method: "POST", body: JSON.stringify({ passed, reason: reason ?? "", photoUrl: photoUrl ?? "" }) });
+}
+export function createProductionTask(orderId: string, assignedTo?: string) {
+  return apiFetch("/platform/production/tasks", { method: "POST", body: JSON.stringify({ orderId, assignedTo: assignedTo ?? "" }) });
+}
+
+// ---- Shipments ----
+export function createShipment(body: { orderId: string; courier: string; awb: string; trackingUrl?: string }) {
+  return apiFetch("/platform/shipments", { method: "POST", body: JSON.stringify(body) });
+}
+export function addShipmentEvent(id: string, body: { status: string; location?: string; note?: string }) {
+  return apiFetch(`/platform/shipments/${id}/events`, { method: "POST", body: JSON.stringify(body) });
+}
+export function updateShipment(id: string, body: { courier?: string; awb?: string; trackingUrl?: string }) {
+  return apiFetch(`/platform/shipments/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+export function resendShipmentTracking(id: string) {
+  return apiFetch(`/platform/shipments/${id}/resend-tracking`, { method: "POST" });
+}

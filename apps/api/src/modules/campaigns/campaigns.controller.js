@@ -44,7 +44,9 @@ export async function importRecipients(req, res) {
     entityId: req.params.id,
     after: { count: result.count },
   });
-  res.status(201).json(result);
+  // Import updates an existing campaign's recipients (and may auto-approve
+  // kit/items sends) — return 200 with the updated campaign, not 201.
+  res.json(result);
 }
 
 export async function allocateCredits(req, res) {
