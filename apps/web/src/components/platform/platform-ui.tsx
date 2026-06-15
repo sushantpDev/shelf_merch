@@ -1,5 +1,37 @@
 import type { ReactNode } from "react";
 
+export function PlatformModal({
+  title,
+  subtitle,
+  onClose,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "grid", placeItems: "center", zIndex: 50, padding: 20 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="card"
+        style={{ padding: 24, maxWidth: 460, width: "100%", maxHeight: "90vh", overflowY: "auto" }}
+      >
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", marginBottom: subtitle ? 4 : 16 }}>
+          <h3 style={{ fontSize: 18 }}>{title}</h3>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+        {subtitle && <p className="muted" style={{ fontSize: 12, marginBottom: 16 }}>{subtitle}</p>}
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function inr(n: number) {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",

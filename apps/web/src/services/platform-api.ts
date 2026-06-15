@@ -214,10 +214,75 @@ export async function fetchFundingApprovals() {
   return apiFetch<unknown[]>("/platform/finance/funding-approvals");
 }
 
+export function approveFunding(walletId: string, amount: number) {
+  return apiFetch(`/platform/finance/funding-approvals/${walletId}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ amount }),
+  });
+}
+
+export function rejectFunding(walletId: string, reason: string) {
+  return apiFetch(`/platform/finance/funding-approvals/${walletId}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
 export async function fetchPlatformTeam() {
   return apiFetch<
     Array<{ userId: string; name: string; email: string; role: string; status: string }>
   >("/platform/team");
+}
+
+// ---- Tenant lifecycle controls ----
+export const TENANT_STATUSES = ["active", "suspended", "trial", "archived"] as const;
+export const TENANT_PLANS = ["trial", "starter", "growth", "enterprise"] as const;
+
+export function setTenantStatus(id: string, status: string, reason?: string) {
+  return apiFetch(`/platform/tenants/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, ...(reason ? { reason } : {}) }),
+  });
+}
+
+export function setTenantPlan(id: string, plan: string) {
+  return apiFetch(`/platform/tenants/${id}/plan`, {
+    method: "PATCH",
+    body: JSON.stringify({ plan }),
+  });
+}
+
+// ---- Platform team management ----
+export const PLATFORM_ROLES = [
+  "platform_super_admin",
+  "platform_ops_admin",
+  "platform_catalog_admin",
+  "platform_finance_admin",
+  "platform_logistics_manager",
+  "platform_production_manager",
+  "platform_support_agent",
+  "platform_readonly_auditor",
+] as const;
+
+export function inviteTeamMember(body: { name: string; email: string; role: string }) {
+  return apiFetch("/platform/team", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function changeTeamRole(userId: string, role: string) {
+  return apiFetch(`/platform/team/${userId}`, { method: "PATCH", body: JSON.stringify({ role }) });
+}
+
+export function deactivateTeamMember(userId: string) {
+  return apiFetch(`/platform/team/${userId}/deactivate`, { method: "POST" });
+}
+
+export function reactivateTeamMember(userId: string) {
+  return apiFetch(`/platform/team/${userId}/reactivate`, { method: "POST" });
+}
+
+// ---- Settings ----
+export function updateSetting(key: string, value: unknown) {
+  return apiFetch(`/platform/settings/${key}`, { method: "PUT", body: JSON.stringify({ value }) });
 }
 
 export async function fetchPlatformSettings() {

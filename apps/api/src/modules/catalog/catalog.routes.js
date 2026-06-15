@@ -2,10 +2,12 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
+import { resolveTenant, requireTenantContext } from '../../middleware/tenant.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { objectId } from '../users/users.validation.js';
 import { tenantCatalogFilter } from './catalogFilters.js';
 import { CatalogProduct } from './catalogProduct.model.js';
+import { PlatformKit } from '../kits/platformKit.model.js';
 import { NotFoundError } from '../../utils/errors.js';
 import { getPagination, paginatedResponse } from '../../utils/pagination.js';
 
@@ -47,6 +49,30 @@ router.get(
     const product = await CatalogProduct.findById(req.params.id);
     if (!product) throw new NotFoundError('Product not found');
     res.json(product);
+  }),
+);
+
+// Platform-curated kits a tenant can send. Tenant context required — platform
+// users (no tenant) get 403; only active kits are exposed.
+router.get(
+  '/kits',
+  resolveTenant,
+  requireTenantContext,
+  asyncHandler(async (_req, res) => {
+    const kits = await PlatformKit.find({ status: 'active' }).sort({ name: 1 }).lean();
+    res.json(kits);
+  }),
+);
+
+router.get(
+  '/kits/:id',
+  resolveTenant,
+  requireTenantContext,
+  validate({ params: z.object({ id: objectId }) }),
+  asyncHandler(async (req, res) => {
+    const kit = await PlatformKit.findOne({ _id: req.params.id, status: 'active' }).lean();
+    if (!kit) throw new NotFoundError('Kit not found');
+    res.json(kit);
   }),
 );
 
