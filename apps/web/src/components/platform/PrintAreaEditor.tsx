@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { PrintArea } from "@/services/platform-api";
+import { TintedGarment } from "../store/TintedGarment";
 
 export const CUSTOMIZATION_METHODS = [
   "screen_print",
@@ -32,14 +33,17 @@ const DEFAULT_BOX = { xPct: 30, yPct: 30, widthPct: 40, heightPct: 30 };
  */
 export function PrintAreaEditor({
   images,
+  colors = [],
   value,
   onChange,
 }: {
   images: string[];
+  colors?: { name: string; hex: string }[];
   value: PrintArea[];
   onChange: (areas: PrintArea[]) => void;
 }) {
   const [mockup, setMockup] = useState(images[0] ?? "");
+  const [tintHex, setTintHex] = useState("");
   const [selected, setSelected] = useState(0);
   const drag = useRef<DragState | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -126,6 +130,23 @@ export function PrintAreaEditor({
             </select>
           </div>
         )}
+        {colors.length > 0 && (
+          <div className="field">
+            <label className="lbl">Preview colour</label>
+            <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+              <button type="button" className={tintHex === "" ? "btn btn-dark btn-sm" : "btn btn-ghost btn-sm"} onClick={() => setTintHex("")}>None</button>
+              {colors.map((c) => (
+                <button
+                  key={c.hex + c.name}
+                  type="button"
+                  title={c.name}
+                  onClick={() => setTintHex(c.hex)}
+                  style={{ width: 26, height: 26, borderRadius: 6, background: c.hex, cursor: "pointer", border: tintHex === c.hex ? "2px solid var(--brand)" : "1px solid var(--line)" }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
         <div
           ref={stageRef}
           onPointerMove={onPointerMove}
@@ -143,12 +164,9 @@ export function PrintAreaEditor({
           }}
         >
           {mockup ? (
-            <img
-              src={mockup}
-              alt="mockup"
-              draggable={false}
-              style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }}
-            />
+            <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+              <TintedGarment src={mockup} hex={tintHex} alt="mockup" />
+            </div>
           ) : (
             <div className="muted" style={{ display: "grid", placeItems: "center", height: "100%" }}>
               Upload an image first
