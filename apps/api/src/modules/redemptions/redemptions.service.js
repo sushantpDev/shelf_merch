@@ -245,7 +245,7 @@ export async function submitRedemption(token, { items, shippingAddress }) {
       costPriceInr: product.costPriceInr ?? 0,
       gstRate: product.gstRate ?? 18,
       hsnCode: product.hsnCode ?? '',
-      imageUrl: product.primaryImageUrl || product.imageUrls?.[0] || '',
+      imageUrl: product.maskImageUrl || product.primaryImageUrl || product.imageUrls?.[0] || '',
     });
   }
 

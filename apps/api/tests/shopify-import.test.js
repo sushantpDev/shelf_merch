@@ -103,7 +103,7 @@ describe('Shopify catalog import', () => {
     expect(tee.basePriceInr).toBe(499); // min variant price
     expect(tee.variants).toHaveLength(2);
     expect(tee.variants[0]).toMatchObject({ color: 'Black', size: 'M', sku: 'TEE-BLK-M' });
-    expect(tee.imageUrls).toContain('https://cdn.shopify.com/tee.jpg');
+    expect(tee.maskImageUrl).toBe('https://cdn.shopify.com/tee.jpg');
     expect(tee.source.provider).toBe('shopify');
     // Imported products are made-to-order so they don't read as "out of stock".
     expect(tee.inventory.mode).toBe('made_to_order');

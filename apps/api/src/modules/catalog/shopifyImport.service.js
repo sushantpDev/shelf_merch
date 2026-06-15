@@ -104,8 +104,7 @@ export function mapShopifyProduct(p, domain) {
     category: p.product_type || 'Imported',
     basePriceInr,
     variants,
-    imageUrls: images,
-    primaryImageUrl: p.image?.src || images[0] || '',
+    maskImageUrl: p.image?.src || images[0] || '',
     status: 'draft',
     // Imported products are fulfilled on demand, not warehoused — default to
     // made-to-order so they don't surface as "out of stock". A catalog admin

@@ -107,7 +107,9 @@ export async function publishProduct(productId) {
   }
   if (!(product.gstRate >= 0 && product.gstRate <= 28)) problems.push('gstRate must be set (0–28)');
   if (!product.hsnCode) problems.push('hsnCode is required');
-  if (!product.imageUrls.length) problems.push('At least one image is required');
+  if (!product.maskImageUrl && !product.imageUrls?.length) {
+    problems.push('Mask image is required');
+  }
   if (problems.length) {
     throw new ApiError(422, 'Product is not ready to publish', 'PUBLISH_VALIDATION_FAILED', problems);
   }
@@ -167,12 +169,10 @@ export async function updateVariant(productId, variantId, patch) {
   return product;
 }
 
-export async function addImages(productId, urls, { primary = false } = {}) {
+export async function addImages(productId, urls) {
   const product = await getProduct(productId);
-  product.imageUrls.push(...urls);
-  if (primary || !product.primaryImageUrl) {
-    product.primaryImageUrl = urls[0] ?? product.primaryImageUrl;
-  }
+  const url = urls[urls.length - 1];
+  if (url) product.maskImageUrl = url;
   await product.save();
   return product;
 }

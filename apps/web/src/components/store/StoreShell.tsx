@@ -47,7 +47,7 @@ type CartLine = {
 };
 
 function productImage(p: StoreProduct) {
-  return p.primaryImageUrl || p.imageUrls?.[0] || "";
+  return p.maskImageUrl || p.primaryImageUrl || p.imageUrls?.[0] || "";
 }
 
 function distinct(values: Array<string | undefined>) {

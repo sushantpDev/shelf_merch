@@ -19,7 +19,7 @@ export type UiProduct = {
   price: string;
   sw: number;
   colors?: string[];
-  /** Resolved product photo URL (primaryImageUrl or first imageUrls entry). */
+  /** Resolved product photo URL (mask image). */
   imgUrl?: string;
   /** Super-admin design zones — artwork is clipped to the first matching area. */
   printAreas?: UiPrintArea[];
@@ -160,7 +160,7 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
   const variantColors = Array.isArray(p.variants)
     ? [...new Set(p.variants.map((v: { color?: string }) => v.color).filter(Boolean) as string[])]
     : [];
-  const imgUrl = resolveMediaUrl(p.primaryImageUrl || p.imageUrls?.[0]);
+  const imgUrl = resolveMediaUrl(p.maskImageUrl || p.primaryImageUrl || p.imageUrls?.[0]);
   const printAreas = Array.isArray(p.printAreas)
     ? (p.printAreas as UiPrintArea[]).filter((a) => a?.box?.widthPct > 0 && a?.box?.heightPct > 0)
     : undefined;
@@ -180,7 +180,7 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
 export function mapProductRef(ref: ApiProduct, catalogById?: Map<string, UiProduct>): UiProduct {
   const id = ref.catalogProductId ? String(ref.catalogProductId) : undefined;
   const fromCatalog = id && catalogById?.get(id);
-  const imgUrl = resolveMediaUrl(ref.imgUrl || ref.primaryImageUrl || ref.imageUrls?.[0] || fromCatalog?.imgUrl);
+  const imgUrl = resolveMediaUrl(ref.imgUrl || ref.maskImageUrl || ref.primaryImageUrl || ref.imageUrls?.[0] || fromCatalog?.imgUrl);
   return {
     id,
     g: ref.group || fromCatalog?.g || "tee",

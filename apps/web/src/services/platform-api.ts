@@ -393,16 +393,6 @@ export function updateVariant(id: string, variantId: string, patch: Partial<Prod
   });
 }
 
-export function uploadProductImages(id: string, files: File[], primary = false) {
-  const form = new FormData();
-  for (const file of files) form.append("images", file);
-  if (primary) form.append("primary", "true");
-  return apiFetch<{ imageUrls: string[]; primaryImageUrl: string }>(
-    `/platform/products/${id}/images`,
-    { method: "POST", body: form },
-  );
-}
-
 /** Upload the recolourable master pair: role 'base' (internal) or 'mask' (customer). */
 export function uploadProductImage(id: string, file: File, role: "base" | "mask") {
   const form = new FormData();

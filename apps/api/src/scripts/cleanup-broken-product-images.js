@@ -12,7 +12,7 @@ import { LOCAL_UPLOAD_DIR } from '../services/storage.service.js';
 const dryRun = process.argv.includes('--dry-run');
 
 function productImageUrl(product) {
-  return product.primaryImageUrl || product.imageUrls?.[0] || '';
+  return product.maskImageUrl || product.primaryImageUrl || product.imageUrls?.[0] || '';
 }
 
 async function localUploadMissing(url) {

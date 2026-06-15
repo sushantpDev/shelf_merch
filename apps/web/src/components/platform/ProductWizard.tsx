@@ -13,7 +13,6 @@ import {
   setPrintAreas,
   updateProduct,
   uploadProductImage,
-  uploadProductImages,
 } from "@/services/platform-api";
 import { PlatformError, PlatformPageHeader } from "./platform-ui";
 import { PrintAreaEditor } from "./PrintAreaEditor";
@@ -121,20 +120,6 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to add variant");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function uploadImages(files: FileList | null) {
-    if (!id || !files?.length) return;
-    setBusy(true);
-    setError("");
-    try {
-      await uploadProductImages(id, Array.from(files), !product?.primaryImageUrl);
-      await refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
       setBusy(false);
     }
@@ -360,22 +345,13 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
                 <input type="file" accept="image/png,image/webp,image/jpeg" disabled={busy} onChange={(e) => uploadMaster(e.target.files?.[0], "base")} />
               </div>
               <div>
-                <label className="lbl">Mask image — customer gallery (transparent PNG)</label>
+                <label className="lbl">Mask image (transparent PNG)</label>
                 <div style={{ width: 140, height: 140, borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface-2)", overflow: "hidden", marginBottom: 8 }}>
                   <TintedGarment src={product?.maskImageUrl} hex={firstHex} />
                 </div>
                 <input type="file" accept="image/png" disabled={busy} onChange={(e) => uploadMaster(e.target.files?.[0], "mask")} />
               </div>
             </div>
-
-            <h3 style={{ marginBottom: 12 }}>Gallery images</h3>
-            <div className="row" style={{ flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
-              {(product?.imageUrls ?? []).map((url) => (
-                <img key={url} src={url} alt="" style={{ width: 90, height: 90, objectFit: "cover", borderRadius: 8, border: url === product?.primaryImageUrl ? "2px solid var(--brand)" : "1px solid var(--line)" }} />
-              ))}
-              {!product?.imageUrls?.length && <p className="muted">No gallery images uploaded yet.</p>}
-            </div>
-            <input type="file" accept="image/*" multiple disabled={busy} onChange={(e) => uploadImages(e.target.files)} />
             <div className="row" style={{ gap: 8, marginTop: 18 }}>
               <button type="button" className="btn btn-ghost" onClick={() => setStep(1)}>Back</button>
               <button type="button" className="btn btn-brand" onClick={() => setStep(3)}>Continue</button>
@@ -387,7 +363,7 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
           <>
             <h3 style={{ marginBottom: 12 }}>Design placeholders</h3>
             <PrintAreaEditor
-              images={[product?.baseImageUrl, ...(product?.imageUrls ?? [])].filter(Boolean) as string[]}
+              images={[product?.baseImageUrl, product?.maskImageUrl].filter(Boolean) as string[]}
               value={printAreas}
               onChange={setAreas}
             />
@@ -403,7 +379,8 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
             <h3 style={{ marginBottom: 12 }}>Review &amp; publish</h3>
             <p className="muted" style={{ marginBottom: 6 }}>
               {product?.name} · {product?.sku} · {product?.variants?.length ?? 0} variants ·{" "}
-              {product?.imageUrls?.length ?? 0} images · {printAreas.length} print areas
+              {product?.baseImageUrl ? "base image" : "no base image"} ·{" "}
+              {product?.maskImageUrl ? "mask image" : "no mask image"} · {printAreas.length} print areas
             </p>
             {problems.length > 0 && (
               <ul style={{ color: "var(--danger)", margin: "10px 0", paddingLeft: 18 }}>

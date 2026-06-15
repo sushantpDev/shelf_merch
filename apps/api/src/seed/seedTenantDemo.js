@@ -18,7 +18,7 @@ function orderItem(product, qty = 1) {
     costPriceInr: Math.round(product.basePriceInr * 0.45),
     gstRate: product.gstRate ?? 18,
     hsnCode: product.hsnCode ?? '6109',
-    imageUrl: product.primaryImageUrl || '',
+    imageUrl: product.maskImageUrl || product.primaryImageUrl || '',
   };
 }
 
