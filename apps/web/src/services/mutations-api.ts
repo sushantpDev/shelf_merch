@@ -234,6 +234,45 @@ export async function launchPointsCampaignApi(payload: {
   return mapCampaign(launched);
 }
 
+export async function launchKitCampaignApi(payload: {
+  entityId: string;
+  kitId: string;
+  name: string;
+  message: { from: string; body: string };
+  schedule?: { mode: "now" | "scheduled" | "self"; sendAt?: string | null; timezone?: string };
+  recipients: Array<{ name: string; email: string; phone?: string }>;
+}) {
+  const campaign = await apiFetch<Record<string, unknown>>("/campaigns", {
+    method: "POST",
+    body: JSON.stringify({
+      entityId: payload.entityId,
+      name: payload.name,
+      type: "kit",
+      kitId: payload.kitId,
+      message: payload.message,
+      schedule: payload.schedule ?? { mode: "now" },
+    }),
+  });
+  const campaignId = String(campaign._id);
+
+  await apiFetch(`/campaigns/${campaignId}/recipients/import`, {
+    method: "POST",
+    body: JSON.stringify({
+      recipients: payload.recipients.map((r) => ({
+        name: r.name,
+        email: r.email,
+        phone: r.phone || "",
+      })),
+    }),
+  });
+
+  const launched = await apiFetch<Record<string, unknown>>(`/campaigns/${campaignId}/launch`, {
+    method: "POST",
+    idempotencyKey: `launch-kit-${campaignId}-${Date.now()}`,
+  });
+  return mapCampaign(launched);
+}
+
 export type OrgWizardInvite = {
   email: string;
   name: string;

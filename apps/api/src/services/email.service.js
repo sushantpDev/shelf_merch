@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import { env, emailConfigured } from '../config/env.js';
 import { logger } from '../config/logger.js';
 import { ApiError } from '../utils/errors.js';
+import { buildRedemptionInviteEmail } from './email-templates/redemptionInvite.template.js';
 
 let transporter;
 
@@ -84,6 +85,34 @@ export async function sendInviteEmail(to, token, { name = '' } = {}) {
     return await sendEmail({ to, subject, text, html });
   } catch (err) {
     logger.error({ err, to }, 'Invite email send failed');
+  }
+}
+
+export async function sendRedemptionInviteEmail({
+  to,
+  recipientName = '',
+  senderName = 'Your team',
+  message = '',
+  giftName = 'Your gift',
+  companyName = 'your company',
+  link = '',
+  campaignType = 'kit',
+}) {
+  const { subject, html, text } = buildRedemptionInviteEmail({
+    recipientName,
+    senderName,
+    message,
+    giftName,
+    companyName,
+    link,
+    campaignType,
+  });
+
+  try {
+    return await sendEmail({ to, subject, text, html });
+  } catch (err) {
+    logger.warn({ err, to, subject }, 'Redemption invite email send failed');
+    return { success: false, provider: 'smtp' };
   }
 }
 

@@ -3,7 +3,7 @@ import { getNotificationQueue } from '../../jobs/queues.js';
 import { ensureRedisReady } from '../../config/redis.js';
 import { logger } from '../../config/logger.js';
 import { sendSms } from '../../services/msg91.service.js';
-import { sendNotificationEmail } from '../../services/email.service.js';
+import { sendNotificationEmail, sendRedemptionInviteEmail } from '../../services/email.service.js';
 
 /**
  * §7.12 — delivery handler used by the notification worker.
@@ -20,12 +20,26 @@ export async function deliverNotification({
   title,
   body = '',
   link = '',
+  meta = null,
 }) {
   if (userId) {
     await Notification.create({ tenantId, userId, type, title, body, link });
   }
   if (email) {
-    await sendNotificationEmail({ to: email, title, body, link });
+    if (type === 'redemption_invite' && meta) {
+      await sendRedemptionInviteEmail({
+        to: email,
+        recipientName: meta.recipientName ?? '',
+        senderName: meta.senderName ?? title,
+        message: meta.message ?? body,
+        giftName: meta.giftName ?? 'Your gift',
+        companyName: meta.companyName ?? 'your company',
+        link,
+        campaignType: meta.campaignType ?? 'kit',
+      });
+    } else {
+      await sendNotificationEmail({ to: email, title, body, link });
+    }
   }
   if (phone) {
     const message = [title, body, link].filter(Boolean).join(' — ');

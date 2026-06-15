@@ -55,18 +55,29 @@ export async function getRedemptionPortal(token) {
     await recipient.save();
   }
 
+  const shopPayload = shop
+    ? {
+        name: shop.name,
+        currencyMode: shop.currencyMode,
+        logoUrl: shop.logoUrl || '',
+        bannerTheme: shop.bannerConfig?.theme || 'light',
+      }
+    : null;
+
+  if (recipient.redemptionStatus === 'verified') {
+    return {
+      alreadyVerified: true,
+      sessionToken: signRedemptionSession(recipient),
+      campaign: { name: campaign.name, message: campaign.message, shop: shopPayload },
+      recipient: { name: recipient.name, creditAmount: recipient.creditAmount },
+    };
+  }
+
   return {
     campaign: {
       name: campaign.name,
       message: campaign.message,
-      shop: shop
-        ? {
-            name: shop.name,
-            currencyMode: shop.currencyMode,
-            logoUrl: shop.logoUrl || '',
-            bannerTheme: shop.bannerConfig?.theme || 'light',
-          }
-        : null,
+      shop: shopPayload,
     },
     recipient: { name: recipient.name, creditAmount: recipient.creditAmount },
   };
@@ -94,6 +105,9 @@ export async function sendOtp(token, { contact }) {
   recipient.otpHash = sha256(code);
   recipient.otpExpiresAt = new Date(Date.now() + OTP_TTL_MS);
   recipient.otpAttempts = 0;
+  if (recipient.redemptionStatus === 'invited') {
+    transitionRedemption(recipient, 'opened');
+  }
   await recipient.save();
 
   if (isEmail) {
@@ -130,6 +144,10 @@ export async function verifyOtp(token, { code }) {
   if (!recipient) throw new NotFoundError('Invalid redemption link');
   await loadCampaignContext(recipient);
 
+  if (recipient.redemptionStatus === 'verified') {
+    return { sessionToken: signRedemptionSession(recipient) };
+  }
+
   if (!recipient.otpHash || !recipient.otpExpiresAt || recipient.otpExpiresAt < new Date()) {
     throw new ApiError(400, 'OTP expired — request a new code', 'OTP_EXPIRED');
   }
@@ -145,6 +163,13 @@ export async function verifyOtp(token, { code }) {
 
   recipient.otpHash = null;
   recipient.otpExpiresAt = null;
+  if (recipient.redemptionStatus === 'verified') {
+    await recipient.save();
+    return { sessionToken: signRedemptionSession(recipient) };
+  }
+  if (recipient.redemptionStatus === 'invited') {
+    transitionRedemption(recipient, 'opened');
+  }
   transitionRedemption(recipient, 'verified');
   await recipient.save();
 
