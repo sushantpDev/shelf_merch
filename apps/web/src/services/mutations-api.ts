@@ -170,6 +170,9 @@ export async function createCollectionApi(payload: {
     if (!p) throw new Error("Invalid product selection");
     return productRefFromUi(p);
   });
+  const catalogById = new Map(
+    payload.catalog.filter((p) => p.id).map((p) => [p.id as string, p]),
+  );
   const col = await apiFetch<Record<string, unknown>>("/collections", {
     method: "POST",
     body: JSON.stringify({
@@ -179,7 +182,7 @@ export async function createCollectionApi(payload: {
       preferredColors: payload.preferredColors || [],
     }),
   });
-  let result = mapCollection(col);
+  let result = mapCollection(col, "", catalogById);
   if (payload.artwork) {
     const file = await artworkFileFromInput(payload.artwork);
     if (file) result = await uploadCollectionArtworkApi(result.id, file);

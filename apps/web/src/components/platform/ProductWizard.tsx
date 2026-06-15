@@ -141,7 +141,8 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
     setError("");
     try {
       await setPrintAreas(id, printAreas);
-      await refresh();
+      const p = await refresh();
+      if (p?.printAreas) setAreas(p.printAreas);
       setStep(4);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save print areas");
@@ -150,12 +151,35 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
     }
   }
 
+  async function goToStep(i: number) {
+    if (!id) return;
+    if (i === 4 && step === 3 && printAreas.length) {
+      setBusy(true);
+      setError("");
+      try {
+        await setPrintAreas(id, printAreas);
+        const p = await refresh();
+        if (p?.printAreas) setAreas(p.printAreas);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to save print areas");
+        setBusy(false);
+        return;
+      }
+      setBusy(false);
+    }
+    setStep(i);
+  }
+
   async function doPublish() {
     if (!id) return;
     setBusy(true);
     setError("");
     setProblems([]);
     try {
+      if (printAreas.length) {
+        await setPrintAreas(id, printAreas);
+        await refresh();
+      }
       await publishProduct(id);
       navigate({ to: "/platform/catalog" });
     } catch (e) {
@@ -188,7 +212,7 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
             className={`chip${i === step ? "" : ""}`}
             style={i === step ? { borderColor: "var(--brand)", color: "var(--brand-d)", fontWeight: 700 } : undefined}
             disabled={!id && i > 0}
-            onClick={() => id && setStep(i)}
+            onClick={() => goToStep(i)}
           >
             {i + 1}. {label}
           </button>
