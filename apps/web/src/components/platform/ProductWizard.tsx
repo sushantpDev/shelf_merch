@@ -388,7 +388,6 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
             <h3 style={{ marginBottom: 12 }}>Design placeholders</h3>
             <PrintAreaEditor
               images={[product?.baseImageUrl, ...(product?.imageUrls ?? [])].filter(Boolean) as string[]}
-              colors={(product?.variants ?? []).filter((v) => v.colorHex).map((v) => ({ name: v.color || "", hex: v.colorHex || "" }))}
               value={printAreas}
               onChange={setAreas}
             />
