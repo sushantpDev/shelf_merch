@@ -27,6 +27,27 @@ function dist(r: number, g: number, b: number, c: [number, number, number]) {
   return Math.sqrt((r - c[0]) ** 2 + (g - c[1]) ** 2 + (b - c[2]) ** 2);
 }
 
+/**
+ * A "knockout" mask has the garment knocked out (transparent) on an OPAQUE
+ * surround — the inverse of a cut-out. We detect it by opaque corners plus a
+ * sizeable transparent/semi-transparent region (the garment). Such masks are
+ * recoloured by painting the colour behind the mask (alpha encodes shading),
+ * not by tinting pixels.
+ */
+function isKnockoutMask(img: ImageData): boolean {
+  const { data, width: w, height: h } = img;
+  const idx = (x: number, y: number) => (y * w + x) * 4;
+  const corners = [idx(0, 0), idx(w - 1, 0), idx(0, h - 1), idx(w - 1, h - 1)];
+  if (!corners.every((i) => data[i + 3] > 200)) return false;
+  let nonOpaque = 0;
+  let total = 0;
+  for (let i = 3; i < data.length; i += 4 * 16) {
+    total += 1;
+    if (data[i] < 200) nonOpaque += 1;
+  }
+  return total > 0 && nonOpaque / total > 0.08;
+}
+
 /** Remove a uniform background (flood fill from edges), then multiply-tint. */
 function recolorImageData(img: ImageData, target: [number, number, number]) {
   const { data, width: w, height: h } = img;
@@ -122,8 +143,18 @@ export function TintedGarment({
       ctx.drawImage(image, 0, 0, w, h);
       try {
         const data = ctx.getImageData(0, 0, w, h);
-        recolorImageData(data, hexToRgb(hex));
-        ctx.putImageData(data, 0, 0);
+        if (isKnockoutMask(data)) {
+          // Garment is transparent on an opaque surround: paint the colour
+          // underneath, then lay the mask back on top so the cut-out shows
+          // the colour (the mask's alpha gives the folds/shading).
+          ctx.clearRect(0, 0, w, h);
+          ctx.fillStyle = hex;
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(image, 0, 0, w, h);
+        } else {
+          recolorImageData(data, hexToRgb(hex));
+          ctx.putImageData(data, 0, 0);
+        }
       } catch {
         setFailed(true); // tainted canvas (cross-origin w/o CORS)
       }
