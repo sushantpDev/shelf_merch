@@ -1,6 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { StoreBanner, type StoreShop, BANNER_THEMES } from "../StoreBanner";
-import { TintedGarment } from "./TintedGarment";
+import { resolveColorHex } from "@/lib/colorMap";
+
+type PrintArea = {
+  key?: string;
+  label?: string;
+  mockupImageUrl?: string;
+  box: { xPct: number; yPct: number; widthPct: number; heightPct: number };
+};
 
 export type StoreProduct = {
   _id: string;
@@ -14,13 +21,164 @@ export type StoreProduct = {
   imageUrls?: string[];
   maskImageUrl?: string;
   baseImageUrl?: string;
+  artworkUrl?: string;
+  preferredColors?: string[];
+  printAreas?: PrintArea[];
   variants?: Array<{ size?: string; color?: string; colorHex?: string; material?: string; sku?: string }>;
 };
 
-/** Hex for a colour name from the product's variants (for mask tinting). */
-function hexForColor(p: StoreProduct, color?: string) {
-  if (!color) return p.variants?.find((v) => v.colorHex)?.colorHex || "";
-  return p.variants?.find((v) => v.color === color && v.colorHex)?.colorHex || "";
+function normMediaPath(url?: string) {
+  if (!url) return "";
+  const path = url.replace(/^https?:\/\/[^/]+/i, "");
+  return path.startsWith("/") ? path : `/${path}`;
+}
+
+function variantColorNames(p: StoreProduct) {
+  return distinct(p.variants?.map((v) => v.color) ?? []);
+}
+
+function distinct(values: Array<string | undefined>) {
+  return Array.from(new Set(values.filter((v): v is string => !!v)));
+}
+
+function isWhiteColor(name: string) {
+  return name.toLowerCase().trim() === "white";
+}
+
+function sortColorsWhiteFirst(colors: Array<{ name: string; hex: string }>) {
+  const whiteIdx = colors.findIndex((c) => isWhiteColor(c.name));
+  if (whiteIdx <= 0) return colors;
+  const sorted = [...colors];
+  const [white] = sorted.splice(whiteIdx, 1);
+  return [white, ...sorted];
+}
+
+/** White is always the primary/default colour option for mockup preview. */
+function ensureWhitePrimary(colors: Array<{ name: string; hex: string }>) {
+  if (colors.some((c) => isWhiteColor(c.name))) return sortColorsWhiteFirst(colors);
+  return [{ name: "White", hex: "#FFFFFF" }, ...colors];
+}
+
+function primaryColorIndex(_colors: Array<{ name: string; hex: string }>) {
+  return 0;
+}
+
+function productColorOptions(p: StoreProduct): Array<{ name: string; hex: string }> {
+  const available = variantColorNames(p);
+  const prefs = p.preferredColors || [];
+  const names = prefs.length ? prefs.filter((c) => !available.length || available.includes(c)) : available;
+  const finalNames = names.length ? names : available;
+  return ensureWhitePrimary(
+    finalNames.map((name) => ({
+      name,
+      hex: resolveColorHex(name, p.variants?.find((v) => v.color === name)?.colorHex),
+    })),
+  );
+}
+
+function pickPrintArea(p: StoreProduct): PrintArea | null {
+  const areas = p.printAreas;
+  if (!areas?.length) return null;
+  const mask = normMediaPath(p.maskImageUrl);
+  if (mask) {
+    const maskArea = areas.find((a) => normMediaPath(a.mockupImageUrl) === mask);
+    if (maskArea) return maskArea;
+  }
+  const img = normMediaPath(productImage(p));
+  if (img) {
+    const match = areas.find((a) => normMediaPath(a.mockupImageUrl) === img);
+    if (match) return match;
+  }
+  return areas.find((a) => a?.box?.widthPct > 0 && a?.box?.heightPct > 0) || areas[0] || null;
+}
+
+function printAreaWrapStyle(box?: PrintArea["box"]): CSSProperties {
+  if (!box?.widthPct || !box?.heightPct) {
+    return {
+      position: "absolute",
+      left: "50%",
+      top: "50%",
+      transform: "translate(-50%, -50%)",
+      width: "34%",
+      height: "34%",
+      boxSizing: "border-box",
+      overflow: "hidden",
+      display: "grid",
+      placeItems: "center",
+      pointerEvents: "none",
+    };
+  }
+  return {
+    position: "absolute",
+    left: `${box.xPct}%`,
+    top: `${box.yPct}%`,
+    width: `${box.widthPct}%`,
+    height: `${box.heightPct}%`,
+    boxSizing: "border-box",
+    overflow: "hidden",
+    display: "grid",
+    placeItems: "center",
+    pointerEvents: "none",
+  };
+}
+
+function ArtworkMockup({ product, className, style }: { product: StoreProduct; className?: string; style?: CSSProperties }) {
+  const img = productImage(product);
+  const area = pickPrintArea(product);
+  const overlay = product.artworkUrl;
+
+  if (!img) {
+    return (
+      <div className={className} style={{ display: "grid", placeItems: "center", height: "100%", ...style }}>
+        <span className="mut3" style={{ fontSize: 12 }}>No image</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={className} style={{ position: "relative", width: "100%", height: "100%", ...style }}>
+      <img
+        className="mockup-base"
+        src={img}
+        alt={product.name}
+        style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+      />
+      {overlay && area && (
+        <div className="art-overlay" style={printAreaWrapStyle(area.box)}>
+          <img className="art-overlay-img" src={overlay} alt="Artwork" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ColorSwatches({
+  colors,
+  selected,
+  onSelect,
+  size = "md",
+}: {
+  colors: Array<{ name: string; hex: string }>;
+  selected: number;
+  onSelect: (index: number) => void;
+  size?: "sm" | "md";
+}) {
+  if (!colors.length) return null;
+  const btnClass = size === "sm" ? "sw" : "pd-sw";
+  return (
+    <div className={size === "sm" ? "swatches" : "pd-swatches"}>
+      {colors.map((c, i) => (
+        <button
+          key={c.name}
+          type="button"
+          className={`${btnClass} ${i === selected ? "on" : ""}`}
+          style={{ background: c.hex }}
+          onClick={() => onSelect(i)}
+          title={c.name}
+        />
+      ))}
+    </div>
+  );
 }
 
 export type CheckoutItem = { productId: string; qty: number; variant?: { size?: string; color?: string } };
@@ -48,10 +206,6 @@ type CartLine = {
 
 function productImage(p: StoreProduct) {
   return p.maskImageUrl || p.primaryImageUrl || p.imageUrls?.[0] || "";
-}
-
-function distinct(values: Array<string | undefined>) {
-  return Array.from(new Set(values.filter((v): v is string => !!v)));
 }
 
 export default function StoreShell({
@@ -399,23 +553,24 @@ function ProductGrid({ products, onOpen, fmt }: { products: StoreProduct[]; onOp
   return (
     <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 16 }}>
       {products.map((p) => {
-        const img = productImage(p);
-        const hex = hexForColor(p);
+        const colors = productColorOptions(p);
         return (
           <button key={p._id} type="button" onClick={() => onOpen(p._id)} className="card" style={{ padding: 0, overflow: "hidden", textAlign: "left", cursor: "pointer", border: "1px solid var(--line)", background: "var(--surface)" }}>
-            <div style={{ aspectRatio: "1 / 1", background: "var(--surface-2)", padding: 8 }}>
-              {p.maskImageUrl ? (
-                <TintedGarment src={p.maskImageUrl} hex={hex} alt={p.name} />
-              ) : img ? (
-                <img src={img} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                <div style={{ display: "grid", placeItems: "center", height: "100%" }}><span className="mut3" style={{ fontSize: 12 }}>No image</span></div>
-              )}
+            <div className="store-mockup-slot" style={{ aspectRatio: "1 / 1", background: colors[0]?.hex || "#ffffff" }}>
+              <ArtworkMockup product={p} />
             </div>
             <div style={{ padding: 14 }}>
               {p.brand && <div className="mut3" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".04em" }}>{p.brand}</div>}
               <div style={{ fontWeight: 600, fontSize: 14, marginTop: 2 }}>{p.name}</div>
               <div style={{ marginTop: 6, fontWeight: 700, color: "var(--brand)" }}>{fmt(p.basePriceInr)}</div>
+              {colors.length > 0 && (
+                <div className="swatches" style={{ marginTop: 8 }}>
+                  {colors.slice(0, 4).map((c) => (
+                    <span key={c.name} className="sw" style={{ background: c.hex }} title={c.name} />
+                  ))}
+                  {colors.length > 4 && <span className="mut3" style={{ fontSize: 10, alignSelf: "center" }}>+{colors.length - 4}</span>}
+                </div>
+              )}
             </div>
           </button>
         );
@@ -450,24 +605,35 @@ function ProductDetail({ product, mode, fmt, onBack, onAdd }: {
   onAdd: (variant: { size?: string; color?: string }, qty: number) => void;
 }) {
   const variants = product.variants || [];
-  const sizes = distinct(variants.map((v) => v.size));
-  const colors = distinct(variants.map((v) => v.color));
-  const [size, setSize] = useState<string | undefined>(sizes[0]);
-  const [color, setColor] = useState<string | undefined>(colors[0]);
+  const sizes = useMemo(() => distinct(variants.map((v) => v.size)), [variants]);
+  const colorOptions = useMemo(() => productColorOptions(product), [product]);
+  const [selColor, setSelColor] = useState(() => primaryColorIndex(colorOptions));
+  const [size, setSize] = useState<string | undefined>(() => sizes[0]);
   const [qty, setQty] = useState(1);
-  const img = productImage(product);
+  const selectedColor = colorOptions[selColor];
+  const previewBg = selectedColor?.hex || "#ffffff";
+
+  useEffect(() => {
+    setSelColor(primaryColorIndex(colorOptions));
+    setSize(sizes[0]);
+    setQty(1);
+  }, [product._id]);
 
   return (
     <>
       <button type="button" className="lnk" onClick={onBack} style={{ marginBottom: 16 }}>← Back to products</button>
       <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 28, alignItems: "start" }}>
-        <div className="card" style={{ overflow: "hidden", aspectRatio: "1 / 1", background: "var(--surface-2)", padding: product.maskImageUrl ? 16 : 0, display: "grid", placeItems: "center" }}>
-          {product.maskImageUrl ? (
-            <TintedGarment src={product.maskImageUrl} hex={hexForColor(product, color)} alt={product.name} />
-          ) : img ? (
-            <img src={img} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          ) : (
-            <span className="mut3">No image</span>
+        <div className="pd-gallery">
+          <div className="pd-img" style={{ background: previewBg }}>
+            <div className="pd-img-inner pd-img-mockup">
+              <ArtworkMockup product={product} />
+            </div>
+          </div>
+          {colorOptions.length > 0 && (
+            <div className="pd-colors" style={{ marginTop: 14 }}>
+              <div className="lbl" style={{ marginBottom: 10 }}>Color preview</div>
+              <ColorSwatches colors={colorOptions} selected={selColor} onSelect={setSelColor} />
+            </div>
           )}
         </div>
         <div>
@@ -476,19 +642,22 @@ function ProductDetail({ product, mode, fmt, onBack, onAdd }: {
           <div style={{ fontSize: 20, fontWeight: 700, color: "var(--brand)", marginBottom: 14 }}>{fmt(product.basePriceInr)}</div>
           {product.description && <p className="muted" style={{ marginBottom: 18 }}>{product.description}</p>}
 
-          {colors.length > 0 && (
+          {colorOptions.length > 0 && (
             <div className="field">
               <label className="lbl">Colour</label>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {colors.map((c) => {
-                  const swatch = hexForColor(product, c);
-                  return (
-                    <button key={c} type="button" onClick={() => setColor(c)} className={color === c ? "btn btn-dark btn-sm" : "btn btn-ghost btn-sm"} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                      {swatch && <span style={{ width: 12, height: 12, borderRadius: 3, background: swatch, border: "1px solid rgba(0,0,0,.2)" }} />}
-                      {c}
-                    </button>
-                  );
-                })}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                {colorOptions.map((c, i) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => setSelColor(i)}
+                    className={selColor === i ? "btn btn-dark btn-sm" : "btn btn-ghost btn-sm"}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                  >
+                    <span style={{ width: 12, height: 12, borderRadius: 3, background: c.hex, border: "1px solid rgba(0,0,0,.2)" }} />
+                    {c.name}
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -506,7 +675,7 @@ function ProductDetail({ product, mode, fmt, onBack, onAdd }: {
           {mode === "redeem" ? (
             <div className="row" style={{ gap: 12, marginTop: 18, alignItems: "center" }}>
               <input className="inp" type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value)))} style={{ width: 80 }} />
-              <button className="btn btn-brand" onClick={() => onAdd({ size, color }, qty)}>Add to cart</button>
+              <button className="btn btn-brand" onClick={() => onAdd({ size, color: selectedColor?.name }, qty)}>Add to cart</button>
             </div>
           ) : (
             <p className="mut3" style={{ fontSize: 12, marginTop: 18 }}>Open your private invite link to redeem this item.</p>

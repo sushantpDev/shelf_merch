@@ -324,6 +324,14 @@ export type StorefrontData = {
     imageUrls?: string[];
     maskImageUrl?: string;
     baseImageUrl?: string;
+    artworkUrl?: string;
+    preferredColors?: string[];
+    printAreas?: Array<{
+      key?: string;
+      label?: string;
+      mockupImageUrl?: string;
+      box: { xPct: number; yPct: number; widthPct: number; heightPct: number };
+    }>;
     variants?: Array<{ size?: string; color?: string; colorHex?: string; material?: string; sku?: string }>;
   }>;
 };

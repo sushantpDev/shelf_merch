@@ -74,6 +74,52 @@ describe('public storefront (no auth)', () => {
     expect(tee.variants[0]).toMatchObject({ color: 'Navy', colorHex: '#1e3a8a' });
   });
 
+  it('returns printAreas and collection artworkUrl on curated products', async () => {
+    curated.printAreas = [{
+      key: 'chest',
+      label: 'Chest',
+      mockupImageUrl: '/uploads/platform/product/mask.png',
+      box: { xPct: 30, yPct: 25, widthPct: 40, heightPct: 35 },
+    }];
+    await curated.save();
+
+    const shop = await Shop.create({ tenantId: tenant._id, name: 'Mockup Store', status: 'live' });
+    await Collection.create({
+      tenantId: tenant._id,
+      shopId: shop._id,
+      code: 'C2',
+      name: 'Branded',
+      status: 'ready',
+      artworkUrl: '/uploads/tenant/artwork/logo.png',
+      productRefs: [{ catalogProductId: curated._id, brand: 'Uber', name: 'Welcome Tee', group: 'tee' }],
+    });
+
+    const res = await request(app).get(`/api/v1/storefront/${shop._id}`);
+    expect(res.status).toBe(200);
+    const tee = res.body.products.find((p) => p._id === String(curated._id));
+    expect(tee.artworkUrl).toBe('/uploads/tenant/artwork/logo.png');
+    expect(tee.printAreas).toHaveLength(1);
+    expect(tee.printAreas[0].box).toMatchObject({ xPct: 30, yPct: 25, widthPct: 40, heightPct: 35 });
+  });
+
+  it('returns collection preferredColors on curated products', async () => {
+    const shop = await Shop.create({ tenantId: tenant._id, name: 'Color Store', status: 'live' });
+    await Collection.create({
+      tenantId: tenant._id,
+      shopId: shop._id,
+      code: 'C3',
+      name: 'Swag',
+      status: 'ready',
+      preferredColors: ['Black', 'White'],
+      productRefs: [{ catalogProductId: curated._id, brand: 'Uber', name: 'Welcome Tee', group: 'tee' }],
+    });
+
+    const res = await request(app).get(`/api/v1/storefront/${shop._id}`);
+    expect(res.status).toBe(200);
+    const tee = res.body.products.find((p) => p._id === String(curated._id));
+    expect(tee.preferredColors).toEqual(['Black', 'White']);
+  });
+
   it('404s a draft shop so it stays private', async () => {
     const shop = await Shop.create({ tenantId: tenant._id, name: 'Draft Store', status: 'draft' });
     const res = await request(app).get(`/api/v1/storefront/${shop._id}`);

@@ -135,7 +135,13 @@ select.inp{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http
 .pcard:hover{box-shadow:var(--sh-2);transform:translateY(-2px);border-color:#d7ddd8}
 .pcard .img{aspect-ratio:1;background:var(--surface-2);display:grid;place-items:center;position:relative;border-bottom:1px solid var(--line-2)}
 .pcard .img svg,.pcard .img img{width:64%;height:64%;object-fit:contain}
-.pcard .img.img-mockup svg,.pcard .img.img-mockup img{width:100%;height:100%}
+.pcard .img.img-mockup>svg,.pcard .img.img-mockup>img{width:100%;height:100%;object-fit:contain}
+.pcard .img .art-overlay{box-sizing:border-box;z-index:2}
+.pcard .img .art-overlay-img,.pd-img-inner .art-overlay-img{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;display:block}
+.pd-img-inner.pd-img-mockup .mockup-base,.store-mockup-slot .mockup-base{width:100%;height:100%;object-fit:contain;display:block}
+.store-mockup-slot{position:relative;overflow:hidden}
+.store-mockup-slot>div{position:absolute;inset:0}
+.store-mockup-slot .art-overlay{box-sizing:border-box;z-index:2}
 .pcard .meta{padding:13px 14px}
 .pcard .meta .brand{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
 .pcard .meta .nm{font-weight:600;margin-top:3px;font-size:13.5px}

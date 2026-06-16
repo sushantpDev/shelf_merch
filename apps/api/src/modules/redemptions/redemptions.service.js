@@ -180,6 +180,29 @@ export async function getCatalog(token) {
   const recipient = await findRecipientByToken(token);
   const { campaign } = await loadCampaignContext(recipient);
 
+  const artworkByProductId = new Map();
+  const preferredColorsByProductId = new Map();
+  let shopCollections = [];
+  if (campaign.shopId) {
+    shopCollections = await Collection.find({
+      shopId: campaign.shopId,
+      tenantId: recipient.tenantId,
+      status: { $ne: 'archived' },
+    })
+      .select('productRefs artworkUrl preferredColors')
+      .lean();
+    for (const col of shopCollections) {
+      for (const ref of col.productRefs || []) {
+        const pid = ref.catalogProductId ? String(ref.catalogProductId) : '';
+        if (!pid) continue;
+        if (col.artworkUrl && !artworkByProductId.has(pid)) artworkByProductId.set(pid, col.artworkUrl);
+        if (col.preferredColors?.length && !preferredColorsByProductId.has(pid)) {
+          preferredColorsByProductId.set(pid, col.preferredColors);
+        }
+      }
+    }
+  }
+
   const filter = { status: 'active' };
   if (campaign.catalogMode === 'selected_products' && campaign.selectedProductIds.length) {
     // Campaign explicitly hand-picked products — those win over the shop.
@@ -187,21 +210,24 @@ export async function getCatalog(token) {
   } else if (campaign.shopId) {
     // Curated store: limit the catalog to products in the shop's collections so
     // recipients see the branded store's selection, not the whole platform catalog.
-    const collections = await Collection.find({
-      shopId: campaign.shopId,
-      tenantId: recipient.tenantId,
-      status: { $ne: 'archived' },
-    })
-      .select('productRefs')
-      .lean();
-    const ids = collections
+    const ids = shopCollections
       .flatMap((c) => (c.productRefs || []).map((r) => r.catalogProductId))
       .filter(Boolean);
     // Fall back to the full active catalog when the shop has no curated products yet,
     // so recipients are never stranded with an empty store.
     if (ids.length) filter._id = { $in: ids };
   }
-  const products = await CatalogProduct.find(filter).sort({ name: 1 }).lean();
+  const products = await CatalogProduct.find(filter)
+    .select('name brand group category description basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas')
+    .sort({ name: 1 })
+    .lean()
+    .then((rows) =>
+      rows.map((p) => ({
+        ...p,
+        artworkUrl: artworkByProductId.get(String(p._id)) || '',
+        preferredColors: preferredColorsByProductId.get(String(p._id)) || [],
+      })),
+    );
   return { products };
 }
 

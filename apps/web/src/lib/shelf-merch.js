@@ -1034,9 +1034,20 @@ const DEFAULT_PRODUCT_COLOR_NAMES={
   default:['Black','White','Navy','Gray'],
 };
 function swagColorHex(name){ return SWAG_COLOR_HEX[name]||'#9a9a9a'; }
+function sortWhiteFirst(names){
+  const i=names.findIndex(n=>String(n).toLowerCase()==='white');
+  if(i<=0) return names;
+  const out=[...names];
+  const [w]=out.splice(i,1);
+  return [w,...out];
+}
+function ensureWhitePrimaryNames(names){
+  if(names.some(n=>String(n).toLowerCase()==='white')) return sortWhiteFirst(names);
+  return ['White',...names];
+}
 function productColorNames(p){
-  if(p?.colors?.length) return p.colors;
-  return DEFAULT_PRODUCT_COLOR_NAMES[p?.g]||DEFAULT_PRODUCT_COLOR_NAMES.default;
+  const names=p?.colors?.length?p.colors:DEFAULT_PRODUCT_COLOR_NAMES[p?.g]||DEFAULT_PRODUCT_COLOR_NAMES.default;
+  return ensureWhitePrimaryNames(names);
 }
 function catalogMatchesColors(p,prefs){
   if(!prefs?.length) return true;
@@ -1048,9 +1059,10 @@ function catalogEntriesForPrefs(catalog,prefs){
 function collectionProductColorNames(col,p){
   const prefs=col?.preferredColors||[];
   const available=productColorNames(p);
-  const names=prefs.length?prefs.filter(c=>available.includes(c)):available;
-  return names.length?names:available;
+  const names=prefs.length?prefs.filter(c=>!available.length||available.includes(c)):available;
+  return ensureWhitePrimaryNames(names.length?names:available);
 }
+function primaryColorSel(){ return 0; }
 function collectionProductSwatches(col,p){
   const names=collectionProductColorNames(col,p);
   const hexes=names.map(swagColorHex);
@@ -1422,22 +1434,35 @@ function enrichProduct(p){
   if(!full) return p;
   return {...p, printAreas:full.printAreas, imgUrl:p.imgUrl||full.imgUrl};
 }
+function normMediaPath(url){
+  if(!url) return '';
+  const path=String(url).replace(/^https?:\/\/[^/]+/i,'');
+  return path.startsWith('/')?path:`/${path}`;
+}
 function pickPrintArea(p){
   const prod=enrichProduct(p);
   const areas=prod.printAreas;
   if(!areas?.length) return null;
+  const full=catalogProductById(prod.id);
+  const maskUrl=full?.imgUrl||prod.imgUrl;
+  if(maskUrl){
+    const maskNorm=normMediaPath(maskUrl);
+    const maskArea=areas.find(a=>normMediaPath(a.mockupImageUrl)===maskNorm);
+    if(maskArea) return maskArea;
+  }
   const img=catalogImgUrl(prod);
   if(img){
-    const match=areas.find(a=>a.mockupImageUrl===img);
+    const imgNorm=normMediaPath(img);
+    const match=areas.find(a=>normMediaPath(a.mockupImageUrl)===imgNorm);
     if(match) return match;
   }
-  return areas[0];
+  return areas.find(a=>a?.box?.widthPct>0)||areas[0];
 }
 function printAreaWrapStyle(box){
   if(!box||!box.widthPct||!box.heightPct){
-    return 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:34%;height:34%;overflow:hidden;display:grid;place-items:center;pointer-events:none';
+    return 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:34%;height:34%;box-sizing:border-box;overflow:hidden;display:grid;place-items:center;pointer-events:none';
   }
-  return `position:absolute;left:${box.xPct}%;top:${box.yPct}%;width:${box.widthPct}%;height:${box.heightPct}%;overflow:hidden;display:grid;place-items:center;pointer-events:none`;
+  return `position:absolute;left:${box.xPct}%;top:${box.yPct}%;width:${box.widthPct}%;height:${box.heightPct}%;box-sizing:border-box;overflow:hidden;display:grid;place-items:center;pointer-events:none`;
 }
 function printAreaGuide(p){
   const area=pickPrintArea(enrichProduct(p));
@@ -1448,11 +1473,11 @@ function printAreaGuide(p){
 function productArtOverlay(p,artworkUrl){
   const area=pickPrintArea(enrichProduct(p));
   const inner=collectionArtOverlay(artworkUrl);
-  return `<div style="${printAreaWrapStyle(area?.box)}">${inner}</div>`;
+  return `<div class="art-overlay" style="${printAreaWrapStyle(area?.box)}">${inner}</div>`;
 }
 function collectionArtOverlay(url){
   if(!url) return LOGO_DECO;
-  return `<img src="${url}" alt="Artwork" style="max-width:100%;max-height:100%;object-fit:contain;display:block">`;
+  return `<img class="art-overlay-img" src="${url}" alt="Artwork">`;
 }
 function catalogImgUrl(p){
   if(p?.imgUrl) return p.imgUrl;
@@ -1870,7 +1895,7 @@ function productOpen(arg){
   const backFlow=backView==='shopDetail'
     ?{shopId:S.flow.shopId,shopTab:'Branded Swag',swSub:'Saved Designs'}
     :{swagTab:'Saved Designs'};
-  go('productDetail',{nav:S.nav,flow:{...S.flow,colId,pIdx,selColor:0,descExpanded:false,productBackView:backView,productBackFlow:backFlow}});
+  go('productDetail',{nav:S.nav,flow:{...S.flow,colId,pIdx,selColor:primaryColorSel(),descExpanded:false,productBackView:backView,productBackFlow:backFlow}});
 }
 function productBack(){
   const view=S.flow.productBackView||'swag';

@@ -19,11 +19,24 @@ export async function getStorefront(shopId) {
     status: { $ne: 'archived' },
   })
     .setOptions({ skipTenantGuard: true })
-    .select('productRefs')
+    .select('productRefs artworkUrl preferredColors')
     .lean();
   const ids = collections
     .flatMap((c) => (c.productRefs || []).map((r) => r.catalogProductId))
     .filter(Boolean);
+
+  const artworkByProductId = new Map();
+  const preferredColorsByProductId = new Map();
+  for (const col of collections) {
+    for (const ref of col.productRefs || []) {
+      const pid = ref.catalogProductId ? String(ref.catalogProductId) : '';
+      if (!pid) continue;
+      if (col.artworkUrl && !artworkByProductId.has(pid)) artworkByProductId.set(pid, col.artworkUrl);
+      if (col.preferredColors?.length && !preferredColorsByProductId.has(pid)) {
+        preferredColorsByProductId.set(pid, col.preferredColors);
+      }
+    }
+  }
 
   const filter = { status: 'active' };
   // Fall back to the full active catalog when the shop has no curated products
@@ -31,9 +44,16 @@ export async function getStorefront(shopId) {
   if (ids.length) filter._id = { $in: ids };
   const products = await CatalogProduct.find(filter)
     .setOptions({ skipTenantGuard: true })
-    .select('name brand group category description basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants')
+    .select('name brand group category description basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas')
     .sort({ name: 1 })
-    .lean();
+    .lean()
+    .then((rows) =>
+      rows.map((p) => ({
+        ...p,
+        artworkUrl: artworkByProductId.get(String(p._id)) || '',
+        preferredColors: preferredColorsByProductId.get(String(p._id)) || [],
+      })),
+    );
 
   return {
     shop: {
