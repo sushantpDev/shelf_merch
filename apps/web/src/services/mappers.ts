@@ -246,7 +246,7 @@ export function mapCollection(c: ApiProduct, createdByName = "", catalogById?: M
     created: formatDate(c.createdAt),
     by: createdByName,
     status: c.status || "draft",
-    shopId: String(c.shopId),
+    shopId: c.shopId ? String(c.shopId) : '',
     artworkUrl: (c as { artworkUrl?: string }).artworkUrl || "",
     preferredColors: Array.isArray(c.preferredColors) ? c.preferredColors : [],
     products: (c.productRefs || []).map((ref: ApiProduct) => mapProductRef(ref, catalogById)),

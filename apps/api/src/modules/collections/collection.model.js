@@ -14,7 +14,7 @@ const productRefSchema = new mongoose.Schema(
 
 const collectionSchema = new mongoose.Schema(
   {
-    shopId: { type: mongoose.Schema.Types.ObjectId, ref: 'Shop', required: true, index: true },
+    shopId: { type: mongoose.Schema.Types.ObjectId, ref: 'Shop', default: null, index: true },
     code: { type: String, required: true }, // e.g. "C343955972"
     name: { type: String, required: true, trim: true },
     status: { type: String, enum: ['draft', 'ready', 'archived'], default: 'draft' },

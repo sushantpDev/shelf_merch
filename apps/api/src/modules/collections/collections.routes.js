@@ -29,7 +29,7 @@ const productRef = z.object({
 });
 
 const createSchema = z.object({
-  shopId: objectId,
+  shopId: objectId.optional(),
   name: z.string().min(1),
   productRefs: z.array(productRef).min(1),
   preferredColors: z.array(z.string().min(1)).optional().default([]),
@@ -50,11 +50,15 @@ router.post(
   adminOnly,
   validate({ body: createSchema }),
   asyncHandler(async (req, res) => {
-    const shop = await Shop.findOne({ _id: req.body.shopId, tenantId: req.tenantId });
-    if (!shop) throw new NotFoundError('Shop not found');
+    let shopId = null;
+    if (req.body.shopId) {
+      const shop = await Shop.findOne({ _id: req.body.shopId, tenantId: req.tenantId });
+      if (!shop) throw new NotFoundError('Shop not found');
+      shopId = shop._id;
+    }
     const collection = await Collection.create({
       tenantId: req.tenantId,
-      shopId: shop._id,
+      shopId,
       code: `C${crypto.randomInt(100_000_000, 999_999_999)}`,
       name: req.body.name,
       productRefs: req.body.productRefs,

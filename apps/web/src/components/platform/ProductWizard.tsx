@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   addVariant,
@@ -35,6 +35,138 @@ const emptyDetails: ProductInput = {
 };
 
 const emptyVariant: ProductVariant = { size: "", color: "", colorHex: "#ffffff", sku: "", stock: 0 };
+
+function UploadIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 16V4M8 8l4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
+    </svg>
+  );
+}
+
+function MasterImageUpload({
+  label,
+  hint,
+  accept,
+  imageUrl,
+  tintHex,
+  disabled,
+  onFile,
+}: {
+  label: string;
+  hint: string;
+  accept: string;
+  imageUrl?: string;
+  tintHex?: string;
+  disabled?: boolean;
+  onFile: (file: File | undefined) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [hover, setHover] = useState(false);
+  const [fileName, setFileName] = useState("");
+
+  const pick = () => {
+    if (!disabled) inputRef.current?.click();
+  };
+
+  const handleFiles = (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    onFile(file);
+  };
+
+  return (
+    <div style={{ flex: "1 1 200px", maxWidth: 220 }}>
+      <label className="lbl">{label}</label>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        disabled={disabled}
+        style={{ display: "none" }}
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={pick}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!disabled) setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          if (!disabled) handleFiles(e.dataTransfer.files);
+        }}
+        style={{
+          display: "block",
+          width: "100%",
+          padding: 0,
+          border: `1.5px dashed ${dragOver ? "var(--brand)" : imageUrl ? "var(--line)" : "var(--line)"}`,
+          borderRadius: 10,
+          background: dragOver ? "var(--brand-50)" : "#fff",
+          cursor: disabled ? "not-allowed" : "pointer",
+          textAlign: "left",
+          overflow: "hidden",
+          boxShadow: dragOver ? "0 0 0 2px var(--brand-50)" : undefined,
+        }}
+      >
+        <div style={{ width: "100%", height: 168, background: "var(--surface-2)", position: "relative", display: "grid", placeItems: "center" }}>
+          {imageUrl ? (
+            <div style={{ width: "100%", height: "100%" }}>
+              <TintedGarment src={imageUrl} hex={tintHex} />
+            </div>
+          ) : (
+            <div style={{ textAlign: "center", color: "var(--ink-3)", padding: "0 16px" }}>
+              <div style={{ color: "var(--brand)", display: "grid", placeItems: "center", marginBottom: 8 }}>
+                <UploadIcon />
+              </div>
+              <div style={{ fontWeight: 600, fontSize: 13, color: "var(--ink-2)" }}>Upload image</div>
+              <div style={{ fontSize: 11.5, marginTop: 4, lineHeight: 1.45 }}>Click or drag &amp; drop</div>
+            </div>
+          )}
+          {imageUrl && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "rgba(0,0,0,0.45)",
+                color: "#fff",
+                display: "grid",
+                placeItems: "center",
+                opacity: disabled ? 0.6 : hover ? 1 : 0,
+                transition: "opacity 0.15s",
+                fontSize: 12,
+                fontWeight: 600,
+                gap: 6,
+              }}
+              className="master-upload-replace"
+            >
+              <UploadIcon />
+              Replace image
+            </div>
+          )}
+        </div>
+        <div style={{ padding: "10px 12px", borderTop: "1px solid var(--line)", background: "#fff" }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-2)" }}>
+            {imageUrl ? "Change file" : "Choose file"}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2, lineHeight: 1.4 }}>{hint}</div>
+          {fileName && <div style={{ fontSize: 11, color: "var(--brand-d)", marginTop: 4, wordBreak: "break-all" }}>{fileName}</div>}
+        </div>
+      </button>
+    </div>
+  );
+}
 
 export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; productId?: string }) {
   const navigate = useNavigate();
@@ -336,22 +468,30 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
             <p className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
               Upload a neutral (white) pair. They recolour to each variant's colour automatically.
             </p>
-            <div className="row" style={{ gap: 18, flexWrap: "wrap", marginBottom: 22 }}>
-              <div>
-                <label className="lbl">Base image — print areas &amp; production</label>
-                <div style={{ width: 140, height: 140, borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface-2)", overflow: "hidden", marginBottom: 8 }}>
-                  <TintedGarment src={product?.baseImageUrl} />
-                </div>
-                <input type="file" accept="image/png,image/webp,image/jpeg" disabled={busy} onChange={(e) => uploadMaster(e.target.files?.[0], "base")} />
-              </div>
-              <div>
-                <label className="lbl">Mask image (transparent PNG)</label>
-                <div style={{ width: 140, height: 140, borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface-2)", overflow: "hidden", marginBottom: 8 }}>
-                  <TintedGarment src={product?.maskImageUrl} hex={firstHex} />
-                </div>
-                <input type="file" accept="image/png" disabled={busy} onChange={(e) => uploadMaster(e.target.files?.[0], "mask")} />
-              </div>
+            <div className="row" style={{ gap: 18, flexWrap: "wrap", marginBottom: 22, alignItems: "flex-start" }}>
+              <MasterImageUpload
+                label="Base image — print areas & production"
+                hint="PNG, JPG or WebP · neutral white garment"
+                accept="image/png,image/webp,image/jpeg"
+                imageUrl={product?.baseImageUrl}
+                disabled={busy || !id}
+                onFile={(file) => uploadMaster(file, "base")}
+              />
+              <MasterImageUpload
+                label="Mask image (transparent PNG)"
+                hint="Transparent PNG · defines garment silhouette"
+                accept="image/png"
+                imageUrl={product?.maskImageUrl}
+                tintHex={firstHex}
+                disabled={busy || !id}
+                onFile={(file) => uploadMaster(file, "mask")}
+              />
             </div>
+            {!id && (
+              <p className="muted" style={{ fontSize: 12, marginTop: -8, marginBottom: 12 }}>
+                Save product details on step 1 before uploading images.
+              </p>
+            )}
             <div className="row" style={{ gap: 8, marginTop: 18 }}>
               <button type="button" className="btn btn-ghost" onClick={() => setStep(1)}>Back</button>
               <button type="button" className="btn btn-brand" onClick={() => setStep(3)}>Continue</button>

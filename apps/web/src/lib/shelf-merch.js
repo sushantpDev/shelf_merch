@@ -765,21 +765,18 @@ function swArtSetFile(file){
 function swArtUpload(){ document.getElementById('sw-art-inp')?.click(); }
 function swArtClear(){ S.flow.artwork=false; S.flow.artFile=null; S.flow.artSel=null; render(); }
 async function swGenerate(){
-  const f=S.flow; const s=S.shops.find(x=>x.id===f.shopId)||S.shops[0];
+  const f=S.flow;
   const catalog=getCatalogList();
   if(api.useMocks()){
-    const col={id:nid('c'),code:'C'+(100000000+Math.floor(Math.random()*899999999)),name:f.colName,created:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),by:S.user.name,status:'ready',shopId:s?s.id:'s1',preferredColors:[...(f.colColors||[])],artworkUrl:f.artFile?.preview||'',products:f.picked.map(i=>{const cp=catalog[i];return{id:cp?.id,g:cp?.g||'tee',brand:cp?.brand||'',nm:cp?.nm||'Product',printAreas:cp?.printAreas,imgUrl:cp?.imgUrl};})};
-    S.collections.push(col); if(s)s.collections.push(col.id);
-    if(f.shopId&&S.shops.find(x=>x.id===f.shopId)){ go('shopDetail',{flow:{shopId:f.shopId,shopTab:'Branded Swag'},nav:'shops'}); }
-    else go('swag');
+    const col={id:nid('c'),code:'C'+(100000000+Math.floor(Math.random()*899999999)),name:f.colName,created:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),by:S.user.name,status:'ready',shopId:'',preferredColors:[...(f.colColors||[])],artworkUrl:f.artFile?.preview||'',products:f.picked.map(i=>{const cp=catalog[i];return{id:cp?.id,g:cp?.g||'tee',brand:cp?.brand||'',nm:cp?.nm||'Product',printAreas:cp?.printAreas,imgUrl:cp?.imgUrl};})};
+    S.collections.push(col);
+    go('swag');
     toast('Collection "'+col.name+'" is design-ready!');
     return;
   }
-  if(!s?.id) { toast('Create a shop first'); return; }
   try{
     S.loading=true; render();
     const col=await api.createCollectionFlow({
-      shopId:s.id,
       name:f.colName||'New collection',
       pickedIndices:f.picked,
       catalog,
@@ -788,11 +785,9 @@ async function swGenerate(){
     });
     col.by=S.user.name;
     S.collections.push(col);
-    if(s) s.collections.push(col.id);
     S.loading=false;
-    if(f.shopId&&S.shops.find(x=>x.id===f.shopId)){ go('shopDetail',{flow:{shopId:f.shopId,shopTab:'Branded Swag'},nav:'shops'}); }
-    else go('swag');
-    toast('Collection "'+col.name+'" saved');
+    go('swag');
+    toast('Collection "'+col.name+'" saved — use Add to shop when you\'re ready');
   }catch(err){
     S.loading=false; render();
     toast(err.message||'Failed to save collection');

@@ -195,7 +195,7 @@ export async function createKitFlow(payload: {
 }
 
 export async function createCollectionFlow(payload: {
-  shopId: string;
+  shopId?: string;
   name: string;
   pickedIndices: number[];
   catalog: UiProduct[];

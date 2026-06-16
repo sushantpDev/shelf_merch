@@ -158,7 +158,7 @@ export async function linkCollectionToShopApi(collectionId: string, shopId: stri
 }
 
 export async function createCollectionApi(payload: {
-  shopId: string;
+  shopId?: string;
   name: string;
   pickedIndices: number[];
   catalog: UiProduct[];
@@ -173,14 +173,15 @@ export async function createCollectionApi(payload: {
   const catalogById = new Map(
     payload.catalog.filter((p) => p.id).map((p) => [p.id as string, p]),
   );
+  const body: Record<string, unknown> = {
+    name: payload.name,
+    productRefs,
+    preferredColors: payload.preferredColors || [],
+  };
+  if (payload.shopId) body.shopId = payload.shopId;
   const col = await apiFetch<Record<string, unknown>>("/collections", {
     method: "POST",
-    body: JSON.stringify({
-      shopId: payload.shopId,
-      name: payload.name,
-      productRefs,
-      preferredColors: payload.preferredColors || [],
-    }),
+    body: JSON.stringify(body),
   });
   let result = mapCollection(col, "", catalogById);
   if (payload.artwork) {
