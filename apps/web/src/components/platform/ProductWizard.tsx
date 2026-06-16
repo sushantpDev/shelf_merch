@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   addVariant,
@@ -17,6 +17,7 @@ import {
 import { PlatformError, PlatformPageHeader } from "./platform-ui";
 import { PrintAreaEditor } from "./PrintAreaEditor";
 import { TintedGarment } from "../store/TintedGarment";
+import { resolveColorHex } from "@/lib/colorMap";
 
 const STEPS = ["Details", "Variants", "Images", "Print areas", "Review"] as const;
 
@@ -49,6 +50,7 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
   const [variant, setVariant] = useState<ProductVariant>(emptyVariant);
   const [product, setProduct] = useState<PlatformProduct | null>(null);
   const [printAreas, setAreas] = useState<PrintArea[]>([]);
+  const [previewColor, setPreviewColor] = useState<string>("");
 
   useEffect(() => {
     listCategories().then(setCategories).catch(() => setCategories([]));
@@ -80,8 +82,34 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
   const set = <K extends keyof ProductInput>(k: K, v: ProductInput[K]) =>
     setDetails((d) => ({ ...d, [k]: v }));
 
+  // Distinct variant colours that drive the mask recolour preview. Each entry
+  // resolves a hex from the variant's own swatch, falling back to its name.
+  const colorSwatches = useMemo(() => {
+    const seen = new Map<string, { name: string; hex: string }>();
+    for (const v of product?.variants ?? []) {
+      const name = (v.color || "").trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.set(key, { name, hex: resolveColorHex(name, v.colorHex) });
+    }
+    return [...seen.values()];
+  }, [product?.variants]);
+
+  useEffect(() => {
+    if (!colorSwatches.length) {
+      setPreviewColor("");
+      return;
+    }
+    setPreviewColor((cur) =>
+      colorSwatches.some((c) => c.name === cur) ? cur : colorSwatches[0].name,
+    );
+  }, [colorSwatches]);
+
+  const activeSwatch =
+    colorSwatches.find((c) => c.name === previewColor) ?? colorSwatches[0];
   // First defined colour swatch — used to preview the mask tint in the wizard.
-  const firstHex = product?.variants?.find((v) => v.colorHex)?.colorHex;
+  const firstHex = activeSwatch?.hex;
 
   async function refresh() {
     if (!id) return;
@@ -352,6 +380,66 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
                 <input type="file" accept="image/png" disabled={busy} onChange={(e) => uploadMaster(e.target.files?.[0], "mask")} />
               </div>
             </div>
+
+            {product?.maskImageUrl && (
+              <div style={{ marginBottom: 22 }}>
+                <h3 style={{ marginBottom: 2 }}>Colour preview</h3>
+                <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
+                  The single mask recolours to each variant colour automatically. Pick a colour to inspect the runtime tint.
+                </p>
+                {colorSwatches.length === 0 ? (
+                  <p className="muted">Add variants with colours to preview the recoloured mask.</p>
+                ) : (
+                  <div className="row" style={{ gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ width: 200, height: 200, borderRadius: 10, border: "1px solid var(--line)", background: "var(--surface-2)", overflow: "hidden" }}>
+                        <TintedGarment src={product.maskImageUrl} hex={activeSwatch?.hex} />
+                      </div>
+                      {activeSwatch && (
+                        <div className="row" style={{ gap: 8, alignItems: "center", marginTop: 8 }}>
+                          <span style={{ width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--line)", background: activeSwatch.hex }} />
+                          <span style={{ fontWeight: 600, fontSize: 13 }}>{activeSwatch.name}</span>
+                          <span className="muted" style={{ fontSize: 12, fontFamily: "monospace" }}>{activeSwatch.hex}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="row" style={{ gap: 10, flexWrap: "wrap", flex: 1 }}>
+                      {colorSwatches.map((c) => {
+                        const selected = c.name === activeSwatch?.name;
+                        return (
+                          <button
+                            type="button"
+                            key={c.name}
+                            onClick={() => setPreviewColor(c.name)}
+                            title={`${c.name} · ${c.hex}`}
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              gap: 6,
+                              padding: 6,
+                              borderRadius: 8,
+                              cursor: "pointer",
+                              background: selected ? "var(--surface-2)" : "transparent",
+                              border: selected ? "2px solid var(--brand)" : "1px solid var(--line)",
+                            }}
+                          >
+                            <div style={{ width: 64, height: 64, borderRadius: 6, overflow: "hidden", background: "var(--surface-2)" }}>
+                              <TintedGarment src={product.maskImageUrl} hex={c.hex} />
+                            </div>
+                            <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, maxWidth: 72 }}>
+                              <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--line)", background: c.hex, flexShrink: 0 }} />
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="row" style={{ gap: 8, marginTop: 18 }}>
               <button type="button" className="btn btn-ghost" onClick={() => setStep(1)}>Back</button>
               <button type="button" className="btn btn-brand" onClick={() => setStep(3)}>Continue</button>
@@ -364,7 +452,6 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
             <h3 style={{ marginBottom: 12 }}>Design placeholders</h3>
             <PrintAreaEditor
               images={[product?.baseImageUrl, product?.maskImageUrl].filter(Boolean) as string[]}
-              colors={(product?.variants ?? []).filter((v) => v.colorHex).map((v) => ({ name: v.color || "", hex: v.colorHex || "" }))}
               value={printAreas}
               onChange={setAreas}
             />
