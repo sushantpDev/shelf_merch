@@ -266,11 +266,11 @@ function Shell(inner){
   </div>
   <div class="body">
     <aside class="sidebar scroll">
-      <div class="nav-home">${I.home}<span>Home</span></div>
       ${NAV.map(([k,l,ic])=>`<div class="nav-item ${S.nav===k?'on':''}" data-act="nav" data-arg="${k}">${ic}<span>${l}</span></div>`).join('')}
     </aside>
     <main class="main scroll"><div class="wrap fade-in">${inner}</div></main>
-  </div>`;
+  </div>
+  `;
 }
 function ViewSettings(){
   const tab=S.setTab||'workspace';
