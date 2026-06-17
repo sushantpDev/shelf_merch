@@ -302,6 +302,7 @@ type OrderItem = {
   qty?: number;
   unitPriceInr?: number;
   imageUrl?: string;
+  artworkUrl?: string;
   variant?: { size?: string; color?: string };
   product?: OrderItemProduct | null;
 };
@@ -316,14 +317,34 @@ function matchVariantHex(product: OrderItemProduct | null | undefined, variant?:
   return match?.colorHex;
 }
 
+/** Triggers a download of the artwork; falls back to opening it if blocked (CORS). */
+async function downloadArtwork(url: string, filename: string) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(href);
+  } catch {
+    window.open(url, "_blank");
+  }
+}
+
 function PrintAreaPreview({
   mockup,
   areas,
   tintHex,
+  artworkUrl,
 }: {
   mockup: string;
   areas: PrintArea[];
   tintHex?: string;
+  artworkUrl?: string;
 }) {
   const visible = areas.filter((a) => !a.mockupImageUrl || a.mockupImageUrl === mockup);
   return (
@@ -350,12 +371,17 @@ function PrintAreaPreview({
             top: `${a.box.yPct}%`,
             width: `${a.box.widthPct}%`,
             height: `${a.box.heightPct}%`,
-            border: "2px dashed rgba(46,160,103,.7)",
-            background: "rgba(46,160,103,.1)",
+            border: artworkUrl ? "1px solid rgba(46,160,103,.5)" : "2px dashed rgba(46,160,103,.7)",
+            background: artworkUrl ? "transparent" : "rgba(46,160,103,.1)",
             boxSizing: "border-box",
             pointerEvents: "none",
+            display: "grid",
+            placeItems: "center",
           }}
         >
+          {artworkUrl && (
+            <img src={artworkUrl} alt="Artwork" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+          )}
           <span
             style={{
               position: "absolute",
@@ -679,6 +705,7 @@ export function OrderFulfillmentPage({ orderId }: { orderId: string }) {
                 const product = item.product;
                 const variant = item.variant;
                 const tintHex = resolveColorHex(variant?.color, matchVariantHex(product, variant));
+                const artworkUrl = item.artworkUrl || product?.artworkUrl || "";
                 const printAreas = product?.printAreas ?? [];
                 const mockup =
                   printAreas[0]?.mockupImageUrl ||
@@ -691,14 +718,51 @@ export function OrderFulfillmentPage({ orderId }: { orderId: string }) {
                   <div key={idx} className="card" style={{ padding: 20, marginBottom: 20 }}>
                     <div style={{ marginBottom: 16 }}>
                       <div className="h1" style={{ fontSize: 16 }}>{item.name ?? product?.name ?? "Product"}</div>
-                      <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-                        SKU: {item.sku || "—"}
-                        {variant?.size ? ` · Size: ${variant.size}` : ""}
-                        {variant?.color ? ` · Color: ${variant.color}` : ""}
-                        {item.qty != null ? ` · Qty: ${item.qty}` : ""}
-                        {item.unitPriceInr != null ? ` · ${inr(item.unitPriceInr)} each` : ""}
+                      <div className="muted" style={{ fontSize: 13, marginTop: 4, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <span>SKU: {item.sku || "—"}</span>
+                        {variant?.size ? <span>· Size: <b>{variant.size}</b></span> : null}
+                        {variant?.color ? (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            · Color:
+                            <span style={{ width: 13, height: 13, borderRadius: 3, background: tintHex, border: "1px solid rgba(0,0,0,.2)", display: "inline-block" }} />
+                            <b>{variant.color}</b>
+                          </span>
+                        ) : null}
+                        {item.qty != null ? <span>· Qty: <b>{item.qty}</b></span> : null}
+                        {item.unitPriceInr != null ? <span>· {inr(item.unitPriceInr)} each</span> : null}
                       </div>
                     </div>
+
+                    {artworkUrl && (
+                      <div style={{ marginBottom: 20 }}>
+                        <div className="lbl" style={{ marginBottom: 8 }}>Artwork (to print)</div>
+                        <div className="row" style={{ gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+                          <div
+                            style={{
+                              width: 140,
+                              height: 140,
+                              flex: "none",
+                              background: "var(--surface-2)",
+                              border: "1px solid var(--line)",
+                              borderRadius: 10,
+                              display: "grid",
+                              placeItems: "center",
+                              overflow: "hidden",
+                              padding: 8,
+                            }}
+                          >
+                            <img src={artworkUrl} alt="Artwork" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-soft btn-sm"
+                            onClick={() => downloadArtwork(artworkUrl, `${item.sku || "artwork"}-design`)}
+                          >
+                            ↓ Download artwork
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     <div
                       style={{
@@ -733,9 +797,11 @@ export function OrderFulfillmentPage({ orderId }: { orderId: string }) {
 
                     {printAreas.length > 0 && mockup && (
                       <>
-                        <div className="lbl" style={{ marginBottom: 8 }}>Design — print areas</div>
+                        <div className="lbl" style={{ marginBottom: 8 }}>
+                          {artworkUrl ? "Reference mockup — artwork on print areas" : "Design — print areas"}
+                        </div>
                         <div style={{ maxWidth: 420, marginBottom: 16 }}>
-                          <PrintAreaPreview mockup={mockup} areas={printAreas} tintHex={tintHex} />
+                          <PrintAreaPreview mockup={mockup} areas={printAreas} tintHex={tintHex} artworkUrl={artworkUrl || undefined} />
                         </div>
                         <ul style={{ paddingLeft: 18, fontSize: 13, color: "var(--ink-2)", margin: 0 }}>
                           {printAreas.map((area, i) => (

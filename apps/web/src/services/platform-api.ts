@@ -55,6 +55,7 @@ export type OrderItemProduct = {
   imageUrls?: string[];
   printAreas?: PrintArea[];
   variants?: ProductVariant[];
+  artworkUrl?: string;
 };
 
 export function fetchPlatformOrder(id: string) {

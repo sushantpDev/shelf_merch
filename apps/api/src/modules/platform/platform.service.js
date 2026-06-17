@@ -5,6 +5,7 @@ import { Tenant } from '../tenants/tenant.model.js';
 import { Shipment, SHIPMENT_EXCEPTION_STATUSES } from '../shipments/shipment.model.js';
 import { SupportTicket } from '../support/supportTicket.model.js';
 import { CatalogProduct } from '../catalog/catalogProduct.model.js';
+import { Collection } from '../collections/collection.model.js';
 import { Invoice } from '../invoices/invoice.model.js';
 import { AuditLog } from '../auditLogs/auditLog.model.js';
 import { ProductionTask } from './productionTask.model.js';
@@ -79,7 +80,7 @@ export async function getPlatformOrderDetail(orderId) {
   const order = await getPlatformOrder(orderId);
   const [tenant, campaign, recipient, shipment, productionTask] = await Promise.all([
     Tenant.findOne({ _id: order.tenantId }).select('name slug status').lean(),
-    Campaign.findOne({ _id: order.campaignId, tenantId: order.tenantId }).select('name type').lean(),
+    Campaign.findOne({ _id: order.campaignId, tenantId: order.tenantId }).select('name type shopId').lean(),
     Recipient.findOne({ _id: order.recipientId, tenantId: order.tenantId })
       .select('name email phone redemptionStatus')
       .lean(),
@@ -102,11 +103,33 @@ export async function getPlatformOrderDetail(orderId) {
     : [];
   const productById = Object.fromEntries(catalogProducts.map((p) => [String(p._id), p]));
 
+  // Resolve the print artwork for each product from the campaign's shop
+  // collections (Collection.artworkUrl), so production has the design to print.
+  const artworkByProductId = {};
+  if (campaign?.shopId) {
+    const collections = await Collection.find({
+      shopId: campaign.shopId,
+      tenantId: order.tenantId,
+      status: { $ne: 'archived' },
+    })
+      .select('productRefs artworkUrl')
+      .lean();
+    for (const col of collections) {
+      if (!col.artworkUrl) continue;
+      for (const ref of col.productRefs ?? []) {
+        const pid = String(ref.catalogProductId);
+        if (!artworkByProductId[pid]) artworkByProductId[pid] = col.artworkUrl;
+      }
+    }
+  }
+
   const obj = order.toObject();
   const items = (obj.items ?? []).map((item) => {
     const product = item.catalogProductId ? productById[String(item.catalogProductId)] : null;
+    const artworkUrl = item.catalogProductId ? artworkByProductId[String(item.catalogProductId)] ?? '' : '';
     return {
       ...item,
+      artworkUrl,
       product: product
         ? {
             _id: product._id,
@@ -117,6 +140,7 @@ export async function getPlatformOrderDetail(orderId) {
             imageUrls: product.imageUrls ?? [],
             printAreas: product.printAreas ?? [],
             variants: product.variants ?? [],
+            artworkUrl,
           }
         : null,
     };
