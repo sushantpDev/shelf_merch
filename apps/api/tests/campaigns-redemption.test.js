@@ -282,6 +282,205 @@ describe('redemption portal (§11.1)', () => {
     expect(updated.redemptionStatus).toBe('order_created');
   });
 
+  it('kit flow: view kit → size for apparel only → accept order without credit check', async () => {
+    const bottle = await CatalogProduct.create({
+      sku: 'SM-BOTTLE-TEST',
+      name: 'Work Well Bottle',
+      category: 'Drinkware',
+      group: 'bottle',
+      basePriceInr: 320,
+      variants: [{ size: 'S', color: 'White', sku: 'BTL-S' }],
+      primaryImageUrl: '/uploads/platform/product/bottle.png',
+    });
+    const tee = await CatalogProduct.create({
+      sku: 'SM-HOODIE-TEST',
+      name: 'Forge Hoodie',
+      category: 'Apparel',
+      group: 'hoodie',
+      basePriceInr: 1200,
+      maskImageUrl: '/uploads/platform/product/hoodie-mask.png',
+    });
+    const jockey = await CatalogProduct.create({
+      sku: 'SM-TEE-JOCKEY',
+      name: 'Jockey',
+      category: 'Apparel',
+      group: 'tee',
+      basePriceInr: 500,
+      maskImageUrl: '/uploads/platform/product/tee-mask.png',
+    });
+    const kit = await Kit.create({
+      tenantId: tenant._id,
+      name: 'Welcome Kit',
+      artworkUrl: '/uploads/tenant/artwork/logo.png',
+      productRefs: [
+        { catalogProductId: bottle._id, name: 'Work Well Bottle', group: 'bottle' },
+        { catalogProductId: tee._id, name: 'Forge Hoodie', group: 'hoodie' },
+        { catalogProductId: jockey._id, name: 'Jockey', group: 'tee' },
+      ],
+      status: 'live',
+    });
+    const campaign = await Campaign.create({
+      tenantId: tenant._id,
+      entityId: entity._id,
+      name: 'Welcome Kit Send',
+      type: 'kit',
+      kitId: kit._id,
+      status: 'redemption_open',
+      recipientCount: 1,
+    });
+    const token = 'kitAcceptTokenRubixTest2026!!';
+    const recipient = await Recipient.create({
+      tenantId: tenant._id,
+      campaignId: campaign._id,
+      name: 'Alice',
+      email: 'alice@test.io',
+      phone: '+91 99999 99999',
+      creditAmount: 0,
+      redemptionToken: token,
+      redemptionStatus: 'verified',
+    });
+
+    const portal = await request(app).get(`/api/v1/redemptions/${token}`);
+    expect(portal.status).toBe(200);
+    expect(portal.body.campaign.type).toBe('kit');
+
+    const { signRedemptionSession } = await import('../src/modules/redemptions/redemptions.service.js');
+    const sessionToken = signRedemptionSession(recipient);
+
+    const kitView = await request(app)
+      .get(`/api/v1/redemptions/${token}/kit`)
+      .set('Authorization', `Bearer ${sessionToken}`);
+    expect(kitView.status).toBe(200);
+    expect(kitView.body.items).toHaveLength(3);
+    const bottleItem = kitView.body.items.find((i) => i.name === 'Work Well Bottle');
+    const hoodieItem = kitView.body.items.find((i) => i.name === 'Forge Hoodie');
+    const jockeyItem = kitView.body.items.find((i) => i.name === 'Jockey');
+    expect(bottleItem.requiresSize).toBe(false);
+    expect(bottleItem.requiresColor).toBe(false);
+    expect(bottleItem.imageUrl).toBe('/uploads/platform/product/bottle.png');
+    expect(bottleItem.artworkUrl).toBeTruthy();
+    expect(hoodieItem.requiresSize).toBe(true);
+    expect(hoodieItem.sizes).toContain('M');
+    expect(jockeyItem.requiresSize).toBe(true);
+    expect(jockeyItem.sizes).toContain('L');
+
+    const missingSize = await request(app)
+      .post(`/api/v1/redemptions/${token}/submit`)
+      .set('Authorization', `Bearer ${sessionToken}`)
+      .set('Idempotency-Key', 'kit-submit-missing-size')
+      .send({
+        items: [
+          { productId: String(bottle._id), qty: 1 },
+          { productId: String(tee._id), qty: 1 },
+          { productId: String(jockey._id), qty: 1 },
+        ],
+        shippingAddress: {
+          name: 'Alice',
+          phone: '+91 99999 99999',
+          line1: '123 Street',
+          city: 'Hyderabad',
+          state: 'Telangana',
+          pincode: '500001',
+        },
+      });
+    expect(missingSize.status).toBe(422);
+    expect(missingSize.body.error.code).toBe('SIZE_REQUIRED');
+
+    const submit = await request(app)
+      .post(`/api/v1/redemptions/${token}/submit`)
+      .set('Authorization', `Bearer ${sessionToken}`)
+      .set('Idempotency-Key', 'kit-submit-ok')
+      .send({
+        items: [
+          { productId: String(bottle._id), qty: 1 },
+          { productId: String(tee._id), qty: 1, variant: { size: 'M' } },
+          { productId: String(jockey._id), qty: 1, variant: { size: 'L' } },
+        ],
+        shippingAddress: {
+          name: 'Alice',
+          phone: '+91 99999 99999',
+          line1: '123 Street',
+          city: 'Hyderabad',
+          state: 'Telangana',
+          pincode: '500001',
+        },
+      });
+    expect(submit.status).toBe(201);
+    expect(submit.body.orderNumber).toMatch(/^SM-/);
+
+    const updated = await Recipient.findOne({ _id: recipient._id, tenantId: tenant._id });
+    expect(updated.redemptionStatus).toBe('order_created');
+    const order = await Order.findOne({ recipientId: recipient._id, tenantId: tenant._id });
+    expect(order.items).toHaveLength(3);
+    expect(order.items.find((i) => i.name === 'Forge Hoodie').variant.size).toBe('M');
+  });
+
+  it('kit submit validates against active kit items only (inactive refs ignored)', async () => {
+    const active = await CatalogProduct.create({
+      sku: 'SM-ACTIVE-KIT',
+      name: 'Active Mug',
+      category: 'Drinkware',
+      group: 'mug',
+      basePriceInr: 300,
+      status: 'active',
+    });
+    const inactive = await CatalogProduct.create({
+      sku: 'SM-INACTIVE-KIT',
+      name: 'Retired Item',
+      category: 'Apparel',
+      group: 'tee',
+      basePriceInr: 400,
+      status: 'archived',
+    });
+    const kit = await Kit.create({
+      tenantId: tenant._id,
+      name: 'Mixed Kit',
+      productRefs: [
+        { catalogProductId: active._id, name: 'Active Mug', group: 'mug' },
+        { catalogProductId: inactive._id, name: 'Retired Item', group: 'tee' },
+      ],
+      status: 'live',
+    });
+    const campaign = await Campaign.create({
+      tenantId: tenant._id,
+      entityId: entity._id,
+      name: 'Mixed kit send',
+      type: 'kit',
+      kitId: kit._id,
+      status: 'redemption_open',
+      recipientCount: 1,
+    });
+    const token = 'kitActiveOnlyTokenRubixTest26!!';
+    const recipient = await Recipient.create({
+      tenantId: tenant._id,
+      campaignId: campaign._id,
+      name: 'Bob',
+      email: 'bob@test.io',
+      creditAmount: 0,
+      redemptionToken: token,
+      redemptionStatus: 'verified',
+    });
+    const { signRedemptionSession } = await import('../src/modules/redemptions/redemptions.service.js');
+    const sessionToken = signRedemptionSession(recipient);
+
+    const submit = await request(app)
+      .post(`/api/v1/redemptions/${token}/submit`)
+      .set('Authorization', `Bearer ${sessionToken}`)
+      .set('Idempotency-Key', 'kit-active-only')
+      .send({
+        items: [{ productId: String(active._id), qty: 1 }],
+        shippingAddress: {
+          name: 'Bob',
+          phone: '+91 99999 99999',
+          line1: '123 Street',
+          city: 'Hyderabad',
+          state: 'Telangana',
+          pincode: '500001',
+        },
+      });
+    expect(submit.status).toBe(201);
+  });
+
   it('send-otp uses SMS channel for phone contacts (MSG91 stub in tests)', async () => {
     const campaign = await Campaign.create({
       tenantId: tenant._id,

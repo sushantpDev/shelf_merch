@@ -74,6 +74,15 @@ router.get(
   }),
 );
 
+router.get(
+  '/:token/kit',
+  validate({ params: tokenParams }),
+  requireRedemptionSession,
+  asyncHandler(async (req, res) => {
+    res.json(await redemptionsService.getKitContents(req.params.token));
+  }),
+);
+
 router.post(
   '/:token/submit',
   validate({ params: tokenParams }),

@@ -2,26 +2,38 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ApiError,
   getRedemptionCatalog,
+  getRedemptionKit,
   getRedemptionPortal,
   sendRedemptionOtp,
   submitRedemption,
   trackRedemption,
   verifyRedemptionOtp,
+  type KitRedemptionData,
 } from "@/services/api-bridge";
+import KitAcceptPortal from "./KitAcceptPortal";
 import { StoreBanner, type StoreShop } from "./StoreBanner";
 import StoreShell, { type StoreProduct, type CheckoutItem, type ShippingAddress } from "./store/StoreShell";
 import "@/styles/shelf-merch.css";
 
-type Step = "loading" | "portal" | "otp" | "shop" | "track" | "error";
+type Step = "loading" | "portal" | "otp" | "shop" | "kit" | "track" | "error";
 
 type Shop = StoreShop & { currencyMode?: "points" | "inr" | "priceless" };
 
 type PortalData = {
-  campaign: { name: string; message?: { body?: string }; shop?: Shop | null };
+  campaign: {
+    name: string;
+    type?: string;
+    message?: { body?: string };
+    shop?: Shop | null;
+  };
   recipient: { name: string; creditAmount: number };
   alreadyVerified?: boolean;
   sessionToken?: string;
 };
+
+function isKitCampaign(portal: PortalData | null) {
+  return portal?.campaign?.type === "kit" || portal?.campaign?.type === "items";
+}
 
 export default function RedemptionPortal({ token }: { token: string }) {
   const [step, setStep] = useState<Step>("loading");
@@ -31,7 +43,23 @@ export default function RedemptionPortal({ token }: { token: string }) {
   const [otp, setOtp] = useState("");
   const [sessionToken, setSessionToken] = useState("");
   const [products, setProducts] = useState<StoreProduct[]>([]);
+  const [kitData, setKitData] = useState<KitRedemptionData | null>(null);
   const [order, setOrder] = useState<{ orderNumber?: string; status?: string } | null>(null);
+
+  const enterRedemption = useCallback(
+    async (session: string, portalData: PortalData) => {
+      if (isKitCampaign(portalData)) {
+        const kit = await getRedemptionKit(token, session);
+        setKitData(kit);
+        setStep("kit");
+        return;
+      }
+      const catalog = (await getRedemptionCatalog(token, session)) as { products: StoreProduct[] };
+      setProducts(catalog.products || []);
+      setStep("shop");
+    },
+    [token],
+  );
 
   const loadPortal = useCallback(async () => {
     setStep("loading");
@@ -41,9 +69,7 @@ export default function RedemptionPortal({ token }: { token: string }) {
       setPortal(data);
       if (data.alreadyVerified && data.sessionToken) {
         setSessionToken(data.sessionToken);
-        const catalog = (await getRedemptionCatalog(token, data.sessionToken)) as { products: StoreProduct[] };
-        setProducts(catalog.products || []);
-        setStep("shop");
+        await enterRedemption(data.sessionToken, data);
         return;
       }
       setStep("portal");
@@ -57,7 +83,7 @@ export default function RedemptionPortal({ token }: { token: string }) {
       setError(e instanceof Error ? e.message : "Invalid redemption link");
       setStep("error");
     }
-  }, [token]);
+  }, [token, enterRedemption]);
 
   useEffect(() => {
     loadPortal();
@@ -78,9 +104,7 @@ export default function RedemptionPortal({ token }: { token: string }) {
     try {
       const res = await verifyRedemptionOtp(token, otp);
       setSessionToken(res.sessionToken);
-      const catalog = (await getRedemptionCatalog(token, res.sessionToken)) as { products: StoreProduct[] };
-      setProducts(catalog.products || []);
-      setStep("shop");
+      if (portal) await enterRedemption(res.sessionToken, portal);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Invalid OTP");
     }
@@ -136,7 +160,24 @@ export default function RedemptionPortal({ token }: { token: string }) {
     );
   }
 
-  // Verified — hand off to the full multi-page store.
+  if (step === "kit" && portal && kitData && sessionToken) {
+    return (
+      <KitAcceptPortal
+        token={token}
+        sessionToken={sessionToken}
+        kitData={kitData}
+        recipientName={portal.recipient.name}
+        campaignName={portal.campaign.name}
+        welcome={portal.campaign.message?.body}
+        onAccepted={(orderNumber) => {
+          setOrder({ orderNumber, status: "created" });
+          setStep("track");
+        }}
+      />
+    );
+  }
+
+  // Verified — hand off to the full multi-page store (points campaigns).
   if (step === "shop" && portal) {
     return (
       <StoreShell
@@ -152,19 +193,30 @@ export default function RedemptionPortal({ token }: { token: string }) {
     );
   }
 
-  // Gate: branded landing + OTP verification before entering the store.
+  const kitFlow = isKitCampaign(portal);
+
+  // Gate: branded landing + OTP verification before entering the store or kit accept flow.
   return (
     <div className="store" style={{ background: "var(--bg)" }}>
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "40px 24px" }}>
         {portal?.campaign.shop ? (
           <StoreBanner shop={portal.campaign.shop} eyebrow="Your reward store" />
         ) : (
-          <div className="eyebrow">Shelf Merch · Redeem your gift</div>
+          <div className="eyebrow">{kitFlow ? "Your gift kit" : "Shelf Merch · Redeem your gift"}</div>
         )}
         <h1 style={{ fontSize: 26, marginBottom: 8 }}>{portal?.campaign.name}</h1>
         <p className="muted" style={{ marginBottom: 24 }}>
-          Hi {portal?.recipient.name} — you have{" "}
-          <b>₹{portal?.recipient.creditAmount.toLocaleString("en-IN")}</b> to spend.
+          {kitFlow ? (
+            <>
+              Hi {portal?.recipient.name} — your team sent you a kit. Verify your email or phone to view
+              the items and accept your order.
+            </>
+          ) : (
+            <>
+              Hi {portal?.recipient.name} — you have{" "}
+              <b>₹{portal?.recipient.creditAmount.toLocaleString("en-IN")}</b> to spend.
+            </>
+          )}
         </p>
 
         {error && (
@@ -175,7 +227,9 @@ export default function RedemptionPortal({ token }: { token: string }) {
           <div className="card" style={{ padding: 24 }}>
             <p className="muted" style={{ marginBottom: 16 }}>
               {portal?.campaign.message?.body ||
-                "Verify your email or phone to enter the store and place your order."}
+                (kitFlow
+                  ? "Verify your email or phone to view your kit and confirm shipping."
+                  : "Verify your email or phone to enter the store and place your order.")}
             </p>
             <div className="field">
               <label className="lbl">Email or mobile</label>
@@ -205,7 +259,7 @@ export default function RedemptionPortal({ token }: { token: string }) {
               />
             </div>
             <button className="btn btn-brand btn-block" style={{ marginTop: 16 }} onClick={handleVerifyOtp}>
-              Verify & enter store
+              {kitFlow ? "Verify & view kit" : "Verify & enter store"}
             </button>
           </div>
         )}

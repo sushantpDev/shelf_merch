@@ -165,13 +165,48 @@ const GROUP_BY_CATEGORY: Record<string, string> = {
   Technology: "power",
   Office: "note",
   "Health & Wellness": "pillow",
+  "Food & Beverages": "bottle",
 };
+
+function isDrinkwareCatalogProduct(p: ApiProduct): boolean {
+  const g = String(p.group || GROUP_BY_CATEGORY[p.category] || "").toLowerCase();
+  const c = String(p.category || "").toLowerCase();
+  const n = String(p.name || "").toLowerCase();
+  return (
+    ["bottle", "mug", "tumbler", "drinkware"].includes(g) ||
+    /drink|bottle|mug|tumbler|beverage/.test(c) ||
+    /\b(bottle|mug|mugg|tumbler)\b/.test(n)
+  );
+}
+
+function firstResolvedMediaUrl(...urls: Array<string | undefined>): string | undefined {
+  for (const url of urls) {
+    const resolved = resolveMediaUrl(url);
+    if (resolved) return resolved;
+  }
+  return undefined;
+}
+
+/** Apparel cards use mask cutouts; drinkware uses product photos. */
+export function catalogProductImageUrl(p: ApiProduct): string | undefined {
+  const urls = Array.isArray(p.imageUrls) ? p.imageUrls : [];
+  if (isDrinkwareCatalogProduct(p)) {
+    return firstResolvedMediaUrl(
+      p.primaryImageUrl,
+      urls[0],
+      p.baseImageUrl,
+      urls[1],
+      p.maskImageUrl,
+    );
+  }
+  return firstResolvedMediaUrl(p.maskImageUrl, p.primaryImageUrl, p.baseImageUrl, urls[0]);
+}
 
 export function mapCatalogProduct(p: ApiProduct): UiProduct {
   const variantColors = Array.isArray(p.variants)
     ? [...new Set(p.variants.map((v: { color?: string }) => v.color).filter(Boolean) as string[])]
     : [];
-  const imgUrl = resolveMediaUrl(p.maskImageUrl || p.primaryImageUrl || p.imageUrls?.[0]);
+  const imgUrl = catalogProductImageUrl(p);
   const printAreas = Array.isArray(p.printAreas)
     ? (p.printAreas as UiPrintArea[]).filter((a) => a?.box?.widthPct > 0 && a?.box?.heightPct > 0)
     : undefined;
@@ -191,7 +226,10 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
 export function mapProductRef(ref: ApiProduct, catalogById?: Map<string, UiProduct>): UiProduct {
   const id = ref.catalogProductId ? String(ref.catalogProductId) : undefined;
   const fromCatalog = id && catalogById?.get(id);
-  const imgUrl = resolveMediaUrl(ref.imgUrl || ref.maskImageUrl || ref.primaryImageUrl || ref.imageUrls?.[0] || fromCatalog?.imgUrl);
+  const refImg = resolveMediaUrl(
+    ref.imgUrl || ref.maskImageUrl || ref.primaryImageUrl || ref.imageUrls?.[0],
+  );
+  const imgUrl = fromCatalog?.imgUrl || refImg;
   return {
     id,
     g: ref.group || fromCatalog?.g || "tee",

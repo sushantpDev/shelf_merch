@@ -95,6 +95,26 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
   const catalogById = new Map(
     catalogProducts.filter((p) => p.id).map((p) => [p.id as string, p]),
   );
+
+  // Collections may reference draft/archived catalog rows excluded from the tenant list.
+  const collectionCatalogIds = new Set<string>();
+  for (const col of collections as Array<{ productRefs?: Array<{ catalogProductId?: string }> }>) {
+    for (const ref of col.productRefs || []) {
+      const id = ref.catalogProductId ? String(ref.catalogProductId) : "";
+      if (id && !catalogById.has(id)) collectionCatalogIds.add(id);
+    }
+  }
+  await Promise.all(
+    [...collectionCatalogIds].map(async (id) => {
+      try {
+        const product = await apiFetch<unknown>(`/catalog/products/${id}`);
+        catalogById.set(id, mapCatalogProduct(product));
+      } catch {
+        // Linked catalog product was removed.
+      }
+    }),
+  );
+
   const mappedShops = shops.map((s) => mapShop(s as never));
   const mappedCollections = (collections as never[]).map((c) => {
     const creator = userById.get(String((c as { createdBy?: string }).createdBy));

@@ -387,6 +387,43 @@ export async function getRedemptionCatalog(token: string, sessionToken: string) 
   });
 }
 
+export type KitRedemptionItem = {
+  productId: string;
+  name: string;
+  brand: string;
+  group: string;
+  category?: string;
+  isDrinkware?: boolean;
+  imageUrl: string;
+  artworkUrl: string;
+  maskImageUrl?: string;
+  baseImageUrl?: string;
+  primaryImageUrl?: string;
+  imageUrls?: string[];
+  printAreas?: Array<{
+    key?: string;
+    label?: string;
+    mockupImageUrl?: string;
+    box: { xPct: number; yPct: number; widthPct: number; heightPct: number };
+  }>;
+  requiresSize: boolean;
+  requiresColor: boolean;
+  sizes: string[];
+  colors: string[];
+  qty: number;
+};
+
+export type KitRedemptionData = {
+  kit: { name: string; artworkUrl: string; packaging: string };
+  items: KitRedemptionItem[];
+};
+
+export async function getRedemptionKit(token: string, sessionToken: string) {
+  return publicFetch<KitRedemptionData>(`/redemptions/${token}/kit`, {
+    headers: { Authorization: `Bearer ${sessionToken}` },
+  });
+}
+
 export async function submitRedemption(
   token: string,
   sessionToken: string,

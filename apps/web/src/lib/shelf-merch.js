@@ -400,9 +400,10 @@ const Wizards={};
 
 /* ---------- CREATE KIT ---------- */
 const KIT_STEPS=['Name','Products','Branding','Packaging'];
+function ktFlowStep(f){ const n=Number(f?.step); return Number.isFinite(n)?Math.max(0,Math.min(3,Math.floor(n))):0; }
 function createKitStart(){ S.flow={exitTo:'kits',step:0,kitName:'Welcome Kit',picked:[0,2,3],logoFile:null,notes:'',pkg:'box'}; go('createKit'); }
 Wizards.createKit=function(){
-  const f=S.flow; const step=f.step;
+  const f=S.flow; const step=ktFlowStep(f); if(f.step!==step)f.step=step;
   let body='';
   if(step===0){
     body=`<div style="max-width:620px;margin:0 auto"><h1 style="font-size:26px;margin-bottom:6px">Name your kit</h1><p class="muted" style="margin-bottom:20px">A kit is a reusable bundle of products you can send to recipients at any time.</p>
@@ -422,7 +423,7 @@ Wizards.createKit=function(){
       <div class="note" style="margin-top:18px">Once published, this kit is reusable — send it to new recipients any time without rebuilding.</div></div>`;
   }
   const back=step>0?backLink('Back','ktBack',null,{mb:'0'}):backLink('Cancel','wzExit',null,{mb:'0'});
-  const next=step<3?`<button class="btn btn-dark" ${step===1&&!f.picked.length?'disabled':''} data-act="ktNext">Next</button>`:`<button class="btn btn-brand" data-act="kitPublish">Publish kit &amp; send</button>`;
+  const next=step<3?`<button type="button" class="btn btn-dark" ${step===1&&!f.picked.length?'disabled':''} data-act="ktNext">Next</button>`:`<button type="button" class="btn btn-brand" data-act="kitPublish">Publish kit &amp; send</button>`;
   return wzChrome('Create a kit',KIT_STEPS,step,body,back+next);
 };
 function ktPick(el){ const i=+el.dataset.arg; const a=S.flow.picked; const k=a.indexOf(i); if(k<0)a.push(i); else a.splice(k,1); render(); }
@@ -472,8 +473,20 @@ function ktLogoSetFile(file){
 function ktLogoUpload(){ document.getElementById('kt-logo-inp')?.click(); }
 function ktLogoClear(){ S.flow.logoFile=null; render(); }
 function ktPkg(el){ S.flow.pkg=el.dataset.arg; render(); }
-function ktBack(){ S.flow.step--; render(); }
-function ktNext(){ const f=S.flow; if(f.step===0)f.kitName=document.getElementById('kt-name').value||'New Kit'; if(f.step===2)f.notes=(document.getElementById('kt-notes')||{}).value||''; f.step++; render(); }
+function ktBack(){ S.flow.step=Math.max(ktFlowStep(S.flow)-1,0); render(); }
+let _ktNextLock=0;
+function ktNext(){
+  const now=Date.now();
+  if(now-_ktNextLock<280) return;
+  _ktNextLock=now;
+  const f=S.flow;
+  const step=ktFlowStep(f);
+  if(step===0) f.kitName=document.getElementById('kt-name')?.value||'New Kit';
+  if(step===1&&!f.picked?.length){ toast('Select at least one product',false); return; }
+  if(step===2) f.notes=(document.getElementById('kt-notes')||{}).value||'';
+  f.step=Math.min(step+1,3);
+  render();
+}
 async function kitPublish(){
   const f=S.flow;
   if(api.useMocks()){
@@ -632,8 +645,10 @@ function sendItemsStartFor(kitId, picked, artworkUrl){
     prevView:'landing'};
   go('sendItems');
 }
+function siFlowStep(f){ const n=Number(f?.step); return Number.isFinite(n)?Math.max(0,Math.min(3,Math.floor(n))):0; }
 Wizards.sendItems=function(){
-  const f=S.flow; const step=f.step; const k=S.kits.find(x=>x.id===f.kitId);
+  const f=S.flow; const step=siFlowStep(f); if(f.step!==step)f.step=step;
+  const k=S.kits.find(x=>x.id===f.kitId);
   let body='';
   if(step===0){
     const prods=f.picked.map(i=>getCatalogList()[i]);
@@ -675,11 +690,26 @@ Wizards.sendItems=function(){
           <button class="btn btn-brand btn-block btn-lg" style="margin-top:14px" data-act="sendItemsDo">Pay &amp; send</button></div></div>`;
   }
   const back=step>0?backLink('Back','siBack',null,{mb:'0'}):backLink('Save draft','wzExit',null,{mb:'0'});
-  const next=step<3?`<button class="btn btn-dark" data-act="siNext">Next</button>`:'<span></span>';
+  const next=step<3?`<button type="button" class="btn btn-dark" data-act="siNext">Next</button>`:'<span></span>';
   return wzChrome('Send Items',SI_STEPS,step,body,back+next);
 };
-function siBack(){ S.flow.step--; render(); }
-function siNext(){ const f=S.flow; if(f.step===2){ const n=document.getElementById('si-note'); if(n)f.note=n.value; const fr=document.getElementById('re-from'); if(fr)f.from=fr.value; const m=document.getElementById('re-msg'); if(m)f.msg=m.value; } f.step++; render(); }
+function siBack(){ S.flow.step=Math.max(siFlowStep(S.flow)-1,0); render(); }
+let _siNextLock=0;
+function siNext(){
+  const now=Date.now();
+  if(now-_siNextLock<280) return;
+  _siNextLock=now;
+  const f=S.flow;
+  const step=siFlowStep(f);
+  if(step===1&&!f.selRecips?.length){ toast('Select at least one recipient',false); return; }
+  if(step===2){
+    const n=document.getElementById('si-note'); if(n)f.note=n.value;
+    const fr=document.getElementById('re-from'); if(fr)f.from=fr.value;
+    const m=document.getElementById('re-msg'); if(m)f.msg=m.value;
+  }
+  f.step=Math.min(step+1,3);
+  render();
+}
 function siAddOpen(){
   const catalog=getCatalogList();
   if(!catalog.length){ toast('No products in catalog'); return; }
@@ -1609,8 +1639,10 @@ function productImg(p,opts={}){
   const url=catalogImgUrl(p);
   const ph=PG[p?.g]||PG.tee;
   const size=opts.width?`width:${opts.width};height:${opts.height||opts.width};`:`width:${opts.width||'64%'};height:${opts.height||'64%'};`;
-  if(url) return `<img src="${esc(url)}" alt="" style="${size}object-fit:contain" onerror="this.onerror=null;this.style.display='none'">`;
-  return ph;
+  if(!url) return ph;
+  const src=String(url).replace(/"/g,'&quot;');
+  const phHtml=ph.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+  return `<img src="${src}" alt="" style="${size}object-fit:contain" onerror="this.onerror=null;this.outerHTML='${phHtml}'">`;
 }
 function productHasPrintArea(p){
   return Boolean(pickPrintArea(enrichProduct(p))?.box?.widthPct);
@@ -2855,7 +2887,7 @@ const ACT = {
 const LIVE = { spRecalc:1, spMsg:1, reMsg:1, reNote:1, orgWLive:1, orgAllocLive:1, orgMgrLive:1 };  // input-driven
 const CHANGED = { schedSet:1, orgWChange:1, orgMgrRole:1 };              // change-driven
 
-document.addEventListener('click', function(e){
+function onShelfMerchClick(e){
   // backdrop click closes any open layer
   if(e.target.hasAttribute && e.target.hasAttribute('data-scrim')){ closeLayer(); return; }
   const t = e.target.closest('[data-act]');
@@ -2867,7 +2899,13 @@ document.addEventListener('click', function(e){
   if(t.tagName==='A') e.preventDefault();
   if(act==='shopEditOpen'||act==='swagView'||act==='swagCardMenu'||t.classList?.contains('swag-card-menu')) e.stopPropagation();
   fn(t, t.dataset.arg);
-});
+}
+
+if(typeof window!=='undefined'){
+  document.removeEventListener('click', window.__shelfMerchOnClick);
+  window.__shelfMerchOnClick=onShelfMerchClick;
+  document.addEventListener('click', window.__shelfMerchOnClick);
+}
 
 document.addEventListener('input', function(e){
   const t = e.target.closest('[data-act]');
