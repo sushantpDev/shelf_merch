@@ -120,6 +120,75 @@ describe('public storefront (no auth)', () => {
     expect(tee.preferredColors).toEqual(['Black', 'White']);
   });
 
+  it('includes products from collections linked via shopIds (not only primary shopId)', async () => {
+    const shopA = await Shop.create({ tenantId: tenant._id, name: 'Zeta Shop', status: 'live' });
+    const shopB = await Shop.create({ tenantId: tenant._id, name: 'Salesforce Shop', status: 'live' });
+    const bottle = await CatalogProduct.create({
+      sku: 'SM-BTL-1', name: 'Bottle', category: 'Drinkware', group: 'bottle', basePriceInr: 990,
+    });
+    const sweatshirt = await CatalogProduct.create({
+      sku: 'SM-SWT-1', name: 'Sweatshirt', category: 'Apparel', group: 'hoodie', basePriceInr: 1200,
+    });
+
+    await Collection.create({
+      tenantId: tenant._id,
+      shopId: shopA._id,
+      shopIds: [shopA._id, shopB._id],
+      code: 'C10',
+      name: 'Bottle design',
+      status: 'ready',
+      productRefs: [{ catalogProductId: bottle._id, name: 'Bottle', group: 'bottle' }],
+    });
+    await Collection.create({
+      tenantId: tenant._id,
+      shopId: shopA._id,
+      shopIds: [shopB._id],
+      code: 'C11',
+      name: 'Sweatshirt design',
+      status: 'ready',
+      productRefs: [{ catalogProductId: sweatshirt._id, name: 'Sweatshirt', group: 'hoodie' }],
+    });
+
+    const res = await request(app).get(`/api/v1/storefront/${shopB._id}`);
+    expect(res.status).toBe(200);
+    const names = res.body.products.map((p) => p.name).sort();
+    expect(names).toEqual(['Bottle', 'Sweatshirt']);
+  });
+
+  it('excludes products whose primary shopId matches but shopIds does not', async () => {
+    const shopA = await Shop.create({ tenantId: tenant._id, name: 'Zeta Shop', status: 'live' });
+    const shopB = await Shop.create({ tenantId: tenant._id, name: 'Salesforce Shop', status: 'live' });
+    const polo = await CatalogProduct.create({
+      sku: 'SM-PLO-1', name: 'polo', category: 'Apparel', group: 'polo', basePriceInr: 899,
+    });
+    const bottle = await CatalogProduct.create({
+      sku: 'SM-BTL-2', name: 'Bottle', category: 'Drinkware', group: 'bottle', basePriceInr: 990,
+    });
+
+    await Collection.create({
+      tenantId: tenant._id,
+      shopId: shopB._id,
+      shopIds: [shopA._id],
+      code: 'C20',
+      name: 'Polo design',
+      status: 'ready',
+      productRefs: [{ catalogProductId: polo._id, name: 'polo', group: 'polo' }],
+    });
+    await Collection.create({
+      tenantId: tenant._id,
+      shopId: shopA._id,
+      shopIds: [shopB._id],
+      code: 'C21',
+      name: 'Bottle design',
+      status: 'ready',
+      productRefs: [{ catalogProductId: bottle._id, name: 'Bottle', group: 'bottle' }],
+    });
+
+    const res = await request(app).get(`/api/v1/storefront/${shopB._id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.products.map((p) => p.name)).toEqual(['Bottle']);
+  });
+
   it('404s a draft shop so it stays private', async () => {
     const shop = await Shop.create({ tenantId: tenant._id, name: 'Draft Store', status: 'draft' });
     const res = await request(app).get(`/api/v1/storefront/${shop._id}`);

@@ -4,6 +4,7 @@ import { Recipient } from '../campaigns/recipient.model.js';
 import { Campaign } from '../campaigns/campaign.model.js';
 import { Shop } from '../shops/shop.model.js';
 import { Collection } from '../collections/collection.model.js';
+import { collectionsForShopFilter } from '../collections/collectionQueries.js';
 import { Kit } from '../kits/kit.model.js';
 import {
   effectiveProductGroup,
@@ -249,7 +250,7 @@ export async function getCatalog(token) {
   let shopCollections = [];
   if (campaign.shopId) {
     shopCollections = await Collection.find({
-      shopId: campaign.shopId,
+      ...collectionsForShopFilter(campaign.shopId),
       tenantId: recipient.tenantId,
       status: { $ne: 'archived' },
     })

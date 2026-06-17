@@ -1,5 +1,6 @@
 import { Shop } from '../shops/shop.model.js';
 import { Collection } from '../collections/collection.model.js';
+import { collectionsForShopFilter } from '../collections/collectionQueries.js';
 import { CatalogProduct } from '../catalog/catalogProduct.model.js';
 import { NotFoundError } from '../../utils/errors.js';
 
@@ -14,7 +15,7 @@ export async function getStorefront(shopId) {
   if (!shop || shop.status !== 'live') throw new NotFoundError('Shop not found');
 
   const collections = await Collection.find({
-    shopId: shop._id,
+    ...collectionsForShopFilter(shop._id),
     tenantId: shop.tenantId,
     status: { $ne: 'archived' },
   })

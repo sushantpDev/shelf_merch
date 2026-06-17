@@ -7,6 +7,7 @@ import { User } from '../src/modules/users/user.model.js';
 import { RoleAssignment } from '../src/modules/roles/roleAssignment.model.js';
 import { CatalogProduct } from '../src/modules/catalog/catalogProduct.model.js';
 import { Collection } from '../src/modules/collections/collection.model.js';
+import { Shop } from '../src/modules/shops/shop.model.js';
 import { signAccessToken } from '../src/modules/auth/auth.service.js';
 
 let app;
@@ -85,5 +86,40 @@ describe('collections archive / restore / delete', () => {
     expect(found).toBeNull();
     const deleted = await Collection.findOne({ _id: collection._id, tenantId: tenant._id }).setOptions({ includeDeleted: true });
     expect(deleted?.deletedAt).toBeTruthy();
+  });
+});
+
+describe('collection shop links', () => {
+  it('links one collection to multiple shops without creating duplicates', async () => {
+    const shopA = await Shop.create({ tenantId: tenant._id, name: 'Salesforce Shop', status: 'live' });
+    const shopB = await Shop.create({ tenantId: tenant._id, name: 'Zeta Shop', status: 'live' });
+
+    const linkA = await request(app)
+      .patch(`/api/v1/collections/${collection._id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ shopId: String(shopA._id) });
+    expect(linkA.status).toBe(200);
+    expect(linkA.body.shopIds.map(String)).toContain(String(shopA._id));
+
+    const linkB = await request(app)
+      .patch(`/api/v1/collections/${collection._id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ shopId: String(shopB._id) });
+    expect(linkB.status).toBe(200);
+    expect(linkB.body.shopIds.map(String)).toEqual(
+      expect.arrayContaining([String(shopA._id), String(shopB._id)]),
+    );
+
+    const count = await Collection.countDocuments({ tenantId: tenant._id, name: 'Employee Swag' });
+    expect(count).toBe(1);
+
+    const forA = await request(app)
+      .get(`/api/v1/collections?shopId=${shopA._id}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    const forB = await request(app)
+      .get(`/api/v1/collections?shopId=${shopB._id}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(forA.body.some((c) => String(c._id) === String(collection._id))).toBe(true);
+    expect(forB.body.some((c) => String(c._id) === String(collection._id))).toBe(true);
   });
 });

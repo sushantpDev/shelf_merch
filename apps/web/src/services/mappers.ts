@@ -77,6 +77,7 @@ export type UiCollection = {
   by: string;
   status: string;
   shopId: string;
+  shopIds: string[];
   artworkUrl?: string;
   preferredColors?: string[];
   products: UiProduct[];
@@ -291,6 +292,11 @@ export function mapKit(k: ApiProduct): UiKit {
 }
 
 export function mapCollection(c: ApiProduct, createdByName = "", catalogById?: Map<string, UiProduct>): UiCollection {
+  const shopIds = Array.isArray((c as { shopIds?: unknown[] }).shopIds)
+    ? (c as { shopIds: unknown[] }).shopIds.map(String)
+    : c.shopId
+      ? [String(c.shopId)]
+      : [];
   return {
     id: String(c._id),
     code: c.code || "",
@@ -298,7 +304,8 @@ export function mapCollection(c: ApiProduct, createdByName = "", catalogById?: M
     created: formatDate(c.createdAt),
     by: createdByName,
     status: c.status || "draft",
-    shopId: c.shopId ? String(c.shopId) : '',
+    shopId: shopIds[0] || (c.shopId ? String(c.shopId) : ""),
+    shopIds,
     artworkUrl: (c as { artworkUrl?: string }).artworkUrl || "",
     preferredColors: Array.isArray(c.preferredColors) ? c.preferredColors : [],
     products: (c.productRefs || []).map((ref: ApiProduct) => mapProductRef(ref, catalogById)),
