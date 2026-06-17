@@ -41,7 +41,12 @@ router.get(
   canRead,
   validate({ query: z.object({ shopId: objectId.optional() }) }),
   asyncHandler(async (req, res) => {
-    const filter = { tenantId: req.tenantId, ...(req.query.shopId ? { shopId: req.query.shopId } : {}) };
+    const filter = {
+      tenantId: req.tenantId,
+      ...(req.query.shopId
+        ? { $or: [{ shopId: req.query.shopId }, { shopIds: req.query.shopId }] }
+        : {}),
+    };
     res.json(await Collection.find(filter).sort({ createdAt: -1 }));
   }),
 );
@@ -61,6 +66,7 @@ router.post(
     const collection = await Collection.create({
       tenantId: req.tenantId,
       shopId,
+      shopIds: shopId ? [shopId] : [],
       code: `C${crypto.randomInt(100_000_000, 999_999_999)}`,
       name: req.body.name,
       productRefs: req.body.productRefs,
@@ -89,7 +95,13 @@ router.patch(
     if (req.body.shopId) {
       const shop = await Shop.findOne({ _id: req.body.shopId, tenantId: req.tenantId });
       if (!shop) throw new NotFoundError('Shop not found');
-      collection.shopId = shop._id;
+      const shopKey = String(shop._id);
+      let nextIds = [...(collection.shopIds || [])];
+      const linked = nextIds.map(String);
+      if (!linked.length && collection.shopId) nextIds = [collection.shopId];
+      if (!nextIds.map(String).includes(shopKey)) nextIds.push(shop._id);
+      collection.shopIds = nextIds;
+      if (!collection.shopId) collection.shopId = shop._id;
     }
     if (req.body.status) collection.status = req.body.status;
     await collection.save();

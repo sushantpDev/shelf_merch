@@ -1704,7 +1704,7 @@ function ViewShopDetail(){
 }
 function shopTabBody(s,tab){
   if(tab==='Branded Swag'){
-    const allCols=S.collections.filter(c=>c.shopId===s.id);
+    const allCols=S.collections.filter(c=>collectionLinkedToShop(c,s.id));
     const activeCols=allCols.filter(c=>c.status!=='archived');
     const archivedCols=allCols.filter(c=>c.status==='archived');
     const sub=S.flow.swSub||'Saved Designs';
@@ -1771,12 +1771,36 @@ function swagViewToggleHtml(view){
     <button type="button" class="view-toggle-btn ${view==='collection'?'on':''}" data-act="swagView" data-arg="collection" title="View by collection">${I.viewRows}</button>
   </div>`;
 }
+function collectionLinkedToShop(col, shopId){
+  if(!col||!shopId) return false;
+  const sid=String(shopId);
+  const linked=(col.shopIds||[]).map(String);
+  if(linked.length) return linked.includes(sid);
+  return col.shopId===sid;
+}
+function swagDesignKey(col,p){
+  return `${p.id||''}|${col.artworkUrl||''}|${p.nm}|${p.brand||''}`;
+}
+function swagProductEntries(cols){
+  const seen=new Set();
+  const entries=[];
+  for(const col of cols){
+    for(let i=0;i<(col.products?.length||0);i++){
+      const p=col.products[i];
+      const key=swagDesignKey(col,p);
+      if(seen.has(key)) continue;
+      seen.add(key);
+      entries.push({col,p,pIdx:i});
+    }
+  }
+  return entries;
+}
 function swagCollectionsForTab(tab,shopId){
-  let cols=S.collections.filter(c=>!shopId||c.shopId===shopId);
+  let cols=S.collections.filter(c=>!shopId||collectionLinkedToShop(c,shopId));
   if(tab==='Archived') return cols.filter(c=>c.status==='archived');
   return cols.filter(c=>c.status!=='archived');
 }
-function swagProductCount(cols){ return cols.reduce((n,c)=>n+(c.products?.length||0),0); }
+function swagProductCount(cols){ return swagProductEntries(cols).length; }
 function swagProductRef(arg){
   const [colId,pIdxStr]=String(arg).split(':');
   const col=S.collections.find(c=>c.id===colId);
@@ -1842,7 +1866,7 @@ function swagAddToShopPick(el,shopId){
 }
 function syncShopCollections(){
   for(const shop of S.shops){
-    shop.collections=S.collections.filter(c=>c.shopId===shop.id).map(c=>c.id);
+    shop.collections=S.collections.filter(c=>collectionLinkedToShop(c,shop.id)).map(c=>c.id);
   }
 }
 function catalogIndexForProduct(p,catalog){
@@ -1856,21 +1880,21 @@ async function swagAddToShopDo(){
   const shop=S.shops.find(s=>s.id===f.shopId);
   if(!ref||!shop){ closeLayer(); return; }
   const {col,p}=ref;
-  if(col.shopId===shop.id){
+  if(collectionLinkedToShop(col,shop.id)){
     closeLayer();
     delete S.flow.addToShop;
     toast('Product is already in this shop');
     render();
     return;
   }
-  // Only "move/link" when the source collection is not already tied to a shop.
-  // If it's already tied to another shop, copy instead so the product can exist
-  // in multiple shops.
-  const moveWholeCollection=!col.shopId&&col.products.length===1;
+  const linkCollection=col.products.length===1;
   try{
     if(api.useMocks()){
-      if(moveWholeCollection){
-        col.shopId=shop.id;
+      if(linkCollection){
+        col.shopIds=col.shopIds||[];
+        if(col.shopId&&!col.shopIds.includes(col.shopId)) col.shopIds.push(col.shopId);
+        if(!col.shopIds.includes(shop.id)) col.shopIds.push(shop.id);
+        if(!col.shopId) col.shopId=shop.id;
       }else{
         S.collections.push({
           id:nid('c'),
@@ -1880,6 +1904,7 @@ async function swagAddToShopDo(){
           by:S.user.name,
           status:col.status||'ready',
           shopId:shop.id,
+          shopIds:[shop.id],
           preferredColors:[...(col.preferredColors||[])],
           artworkUrl:col.artworkUrl||'',
           products:[{g:p.g,brand:p.brand||'',nm:p.nm,id:p.id}],
@@ -1894,7 +1919,7 @@ async function swagAddToShopDo(){
     }
     S.loading=true; render();
     const catalog=getCatalogList();
-    if(moveWholeCollection){
+    if(linkCollection){
       const updated=await api.linkCollectionToShopFlow(col.id,shop.id);
       updated.by=col.by||S.user.name;
       const idx=S.collections.findIndex(c=>c.id===col.id);
@@ -1935,7 +1960,7 @@ function swagDesignCard(col,p,pIdx){
   </div>`;
 }
 function swagProductGrid(cols){
-  const entries=cols.flatMap(c=>c.products.map((p,i)=>({col:c,p,pIdx:i})));
+  const entries=swagProductEntries(cols);
   if(!entries.length) return `<div class="card empty"><h3>No products yet</h3><p>Start designing to add branded products to your swag.</p></div>`;
   return `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${entries.map(({col,p,pIdx})=>swagDesignCard(col,p,pIdx)).join('')}</div>`;
 }

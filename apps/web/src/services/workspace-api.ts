@@ -123,7 +123,10 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
 
   for (const shop of mappedShops) {
     shop.collections = mappedCollections
-      .filter((c) => c.shopId === shop.id)
+      .filter((c) => {
+        const linked = c.shopIds?.length ? c.shopIds : c.shopId ? [c.shopId] : [];
+        return linked.includes(shop.id);
+      })
       .map((c) => c.id);
   }
 
