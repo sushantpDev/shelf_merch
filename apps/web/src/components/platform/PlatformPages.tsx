@@ -409,27 +409,81 @@ function PrintAreaPreview({
   );
 }
 
-function FulfillmentImage({ src, label }: { src?: string; label: string }) {
+/** Small rounded pill for order/line-item metadata. */
+function Chip({ children, mono }: { children: ReactNode; mono?: boolean }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        fontSize: 12,
+        fontWeight: 600,
+        color: "var(--ink-2)",
+        background: "var(--surface)",
+        border: "1px solid var(--line)",
+        borderRadius: 999,
+        padding: "3px 9px",
+        whiteSpace: "nowrap",
+        fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, monospace" : undefined,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** A labelled square asset tile used in the fulfilment image strip. */
+function FulfillmentTile({ label, children, footer }: { label: string; children: ReactNode; footer?: ReactNode }) {
   return (
     <div>
-      <div className="lbl" style={{ marginBottom: 8 }}>{label}</div>
+      <div className="lbl" style={{ marginBottom: 6, fontSize: 10.5, letterSpacing: ".05em" }}>{label}</div>
       <div
         style={{
           aspectRatio: "1 / 1",
           background: "var(--surface-2)",
           border: "1px solid var(--line)",
-          borderRadius: 10,
+          borderRadius: 8,
           overflow: "hidden",
+          display: "grid",
+          placeItems: "center",
         }}
       >
-        {src ? (
-          <img src={src} alt={label} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-        ) : (
-          <div className="muted" style={{ display: "grid", placeItems: "center", height: "100%", fontSize: 13 }}>
-            Not available
-          </div>
-        )}
+        {children}
       </div>
+      {footer && <div style={{ marginTop: 8 }}>{footer}</div>}
+    </div>
+  );
+}
+
+/** Production print spec: one row per print area. */
+function PrintSpecTable({ areas }: { areas: PrintArea[] }) {
+  return (
+    <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+      <table className="tbl" style={{ fontSize: 12.5, margin: 0 }}>
+        <thead>
+          <tr>
+            <th>Print area</th>
+            <th>Method</th>
+            <th>Max size</th>
+            <th>DPI</th>
+          </tr>
+        </thead>
+        <tbody>
+          {areas.map((a, i) => (
+            <tr key={a.key ?? i}>
+              <td style={{ fontWeight: 600 }}>{a.label}</td>
+              <td style={{ textTransform: "uppercase", letterSpacing: ".03em" }}>
+                {a.methods?.length ? a.methods.join(", ") : "—"}
+              </td>
+              <td style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                {a.maxWidthCm || a.maxHeightCm ? `${a.maxWidthCm ?? "—"}×${a.maxHeightCm ?? "—"} cm` : "—"}
+              </td>
+              <td style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{a.dpi ?? "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -597,6 +651,7 @@ export function OrderFulfillmentPage({ orderId }: { orderId: string }) {
   const reload = () => setReloadKey((k) => k + 1);
 
   const tenant = data?.tenant as { name?: string } | undefined;
+  const campaign = data?.campaign as { name?: string; type?: string } | undefined;
   const recipient = data?.recipient as { name?: string; email?: string; phone?: string } | undefined;
   const shipping = data?.shippingAddress as {
     name?: string;
@@ -626,7 +681,15 @@ export function OrderFulfillmentPage({ orderId }: { orderId: string }) {
         <>
           <PlatformPageHeader
             title={String(data.orderNumber ?? "Order")}
-            subtitle={tenant?.name ? `Tenant: ${tenant.name}` : "Order fulfillment"}
+            subtitle={
+              [
+                tenant?.name ? `Tenant: ${tenant.name}` : null,
+                campaign?.name ? `Campaign: ${campaign.name}` : null,
+                `${items.length} line item${items.length === 1 ? "" : "s"}`,
+              ]
+                .filter(Boolean)
+                .join("  ·  ") || "Order fulfillment"
+            }
             actions={<StatusTag status={String(data.status)} />}
           />
 
@@ -705,7 +768,9 @@ export function OrderFulfillmentPage({ orderId }: { orderId: string }) {
                 )}
               </div>
 
-              <div className="h1" style={{ fontSize: 16, marginBottom: 16 }}>Line items</div>
+              <div className="h1" style={{ fontSize: 16, marginBottom: 16 }}>
+                Production line items <span className="muted" style={{ fontWeight: 400 }}>({items.length})</span>
+              </div>
               {items.map((item, idx) => {
                 const product = item.product;
                 const variant = item.variant;
@@ -722,109 +787,89 @@ export function OrderFulfillmentPage({ orderId }: { orderId: string }) {
                     "",
                 );
 
+                const baseImg = product?.baseImageUrl ? resolveMediaUrl(product.baseImageUrl) : "";
                 return (
-                  <div key={idx} className="card" style={{ padding: 20, marginBottom: 20 }}>
-                    <div style={{ marginBottom: 16 }}>
-                      <div className="h1" style={{ fontSize: 16 }}>{item.name ?? product?.name ?? "Product"}</div>
-                      <div className="muted" style={{ fontSize: 13, marginTop: 4, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                        <span>SKU: {item.sku || "—"}</span>
-                        {variant?.size ? <span>· Size: <b>{variant.size}</b></span> : null}
-                        {variant?.color ? (
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                            · Color:
-                            <span style={{ width: 13, height: 13, borderRadius: 3, background: tintHex, border: "1px solid rgba(0,0,0,.2)", display: "inline-block" }} />
-                            <b>{variant.color}</b>
-                          </span>
-                        ) : null}
-                        {item.qty != null ? <span>· Qty: <b>{item.qty}</b></span> : null}
-                        {item.unitPriceInr != null ? <span>· {inr(item.unitPriceInr)} each</span> : null}
-                      </div>
-                    </div>
-
-                    {artworkUrl && (
-                      <div style={{ marginBottom: 20 }}>
-                        <div className="lbl" style={{ marginBottom: 8 }}>Artwork (to print)</div>
-                        <div className="row" style={{ gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-                          <div
-                            style={{
-                              width: 140,
-                              height: 140,
-                              flex: "none",
-                              background: "var(--surface-2)",
-                              border: "1px solid var(--line)",
-                              borderRadius: 10,
-                              display: "grid",
-                              placeItems: "center",
-                              overflow: "hidden",
-                              padding: 8,
-                            }}
-                          >
-                            <img src={artworkUrl} alt="Artwork" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
-                          </div>
-                          <button
-                            type="button"
-                            className="btn btn-soft btn-sm"
-                            onClick={() => downloadArtwork(artworkUrl, `${item.sku || "artwork"}-design`)}
-                          >
-                            ↓ Download artwork
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
+                  <div key={idx} className="card" style={{ padding: 0, marginBottom: 16, overflow: "hidden" }}>
+                    {/* Work-order header strip */}
                     <div
                       style={{
-                        display: "grid",
-                        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                        gap: 16,
-                        marginBottom: printAreas.length ? 20 : 0,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "12px 18px",
+                        borderBottom: "1px solid var(--line)",
+                        background: "var(--surface-2)",
+                        flexWrap: "wrap",
                       }}
                     >
-                      <FulfillmentImage src={product?.baseImageUrl} label="Base (internal / production)" />
-                      <div>
-                        <div className="lbl" style={{ marginBottom: 8 }}>
-                          Mask (customer, tinted)
-                        </div>
-                        <div
-                          style={{
-                            aspectRatio: "1 / 1",
-                            background: "var(--surface-2)",
-                            border: "1px solid var(--line)",
-                            borderRadius: 10,
-                            overflow: "hidden",
-                          }}
-                        >
-                          <TintedGarment
-                            src={product?.maskImageUrl}
-                            hex={tintHex}
-                            alt={`${variant?.color ?? "Garment"} mask`}
-                          />
-                        </div>
+                      <div style={{ fontWeight: 700, fontSize: 15, marginRight: 4 }}>
+                        {item.name ?? product?.name ?? "Product"}
                       </div>
+                      <Chip mono>{item.sku || "—"}</Chip>
+                      {variant?.size ? <Chip>Size {variant.size}</Chip> : null}
+                      {variant?.color ? (
+                        <Chip>
+                          <span style={{ width: 11, height: 11, borderRadius: 3, background: tintHex, border: "1px solid rgba(0,0,0,.2)" }} />
+                          {variant.color}
+                        </Chip>
+                      ) : null}
+                      <Chip>Qty {item.qty ?? 1}</Chip>
+                      {item.unitPriceInr != null ? (
+                        <div style={{ marginLeft: "auto", fontSize: 13, color: "var(--ink-2)" }}>
+                          {inr(item.unitPriceInr)} each
+                        </div>
+                      ) : null}
                     </div>
 
-                    {printAreas.length > 0 && mockup && (
-                      <>
-                        <div className="lbl" style={{ marginBottom: 8 }}>
-                          {artworkUrl ? "Reference mockup — artwork on print areas" : "Design — print areas"}
-                        </div>
-                        <div style={{ maxWidth: 420, marginBottom: 16 }}>
-                          <PrintAreaPreview mockup={mockup} areas={printAreas} tintHex={tintHex} artworkUrl={artworkUrl || undefined} />
-                        </div>
-                        <ul style={{ paddingLeft: 18, fontSize: 13, color: "var(--ink-2)", margin: 0 }}>
-                          {printAreas.map((area, i) => (
-                            <li key={area.key ?? i} style={{ marginBottom: 6 }}>
-                              <strong>{area.label}</strong>
-                              {area.methods?.length ? ` · ${area.methods.join(", ")}` : ""}
-                              {(area.maxWidthCm || area.maxHeightCm) && (
-                                <> · max {area.maxWidthCm ?? "—"}×{area.maxHeightCm ?? "—"} cm</>
-                              )}
-                              {area.dpi ? ` · ${area.dpi} DPI` : ""}
-                            </li>
-                          ))}
-                        </ul>
-                      </>
-                    )}
+                    {/* Asset strip + print spec */}
+                    <div style={{ padding: 18 }}>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+                          gap: 14,
+                          marginBottom: printAreas.length ? 16 : 0,
+                        }}
+                      >
+                        {artworkUrl && (
+                          <FulfillmentTile
+                            label="Artwork — to print"
+                            footer={
+                              <button
+                                type="button"
+                                className="btn btn-soft btn-sm"
+                                style={{ width: "100%" }}
+                                onClick={() => downloadArtwork(artworkUrl, `${item.sku || "artwork"}-design`)}
+                              >
+                                ↓ Download
+                              </button>
+                            }
+                          >
+                            <img src={artworkUrl} alt="Artwork" style={{ maxWidth: "82%", maxHeight: "82%", objectFit: "contain" }} />
+                          </FulfillmentTile>
+                        )}
+                        <FulfillmentTile label="Base — production">
+                          {baseImg ? (
+                            <img src={baseImg} alt="Base" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                          ) : (
+                            <span className="mut3" style={{ fontSize: 12 }}>Not available</span>
+                          )}
+                        </FulfillmentTile>
+                        <FulfillmentTile label="Mask — tinted">
+                          <TintedGarment src={product?.maskImageUrl} hex={tintHex} alt={`${variant?.color ?? "Garment"} mask`} />
+                        </FulfillmentTile>
+                        {printAreas.length > 0 && mockup && (
+                          <div>
+                            <div className="lbl" style={{ marginBottom: 6, fontSize: 10.5, letterSpacing: ".05em" }}>
+                              {artworkUrl ? "Reference mockup" : "Print areas"}
+                            </div>
+                            <PrintAreaPreview mockup={mockup} areas={printAreas} tintHex={tintHex} artworkUrl={artworkUrl || undefined} />
+                          </div>
+                        )}
+                      </div>
+
+                      {printAreas.length > 0 && <PrintSpecTable areas={printAreas} />}
+                    </div>
                   </div>
                 );
               })}
