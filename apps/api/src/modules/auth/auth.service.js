@@ -9,6 +9,13 @@ import { RoleAssignment } from '../roles/roleAssignment.model.js';
 import { RefreshToken } from './refreshToken.model.js';
 import { Tenant } from '../tenants/tenant.model.js';
 import { Wallet } from '../wallets/wallet.model.js';
+import {
+  createSession,
+  getSession,
+  isSessionStoreReady,
+  revokeAllUserSessions,
+  revokeSession,
+} from '../../services/session.service.js';
 import { ApiError, ConflictError, UnauthorizedError } from '../../utils/errors.js';
 
 const BCRYPT_ROUNDS = 12;
@@ -46,14 +53,27 @@ export function signImpersonationAccessToken(user, roleAssignment, impersonation
 
 async function issueRefreshToken(userId, { ip = '', userAgent = '' } = {}) {
   const token = crypto.randomBytes(48).toString('hex');
-  await RefreshToken.create({
-    userId,
-    tokenHash: sha256(token),
-    ip,
-    userAgent,
-    expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
-  });
+  const tokenHash = sha256(token);
+  if (await isSessionStoreReady()) {
+    await createSession({ userId, tokenHash, ip, userAgent });
+  } else {
+    await RefreshToken.create({
+      userId,
+      tokenHash,
+      ip,
+      userAgent,
+      expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
+    });
+  }
   return token;
+}
+
+async function revokeStoredRefreshToken(tokenHash, userId = null) {
+  if (await isSessionStoreReady()) {
+    const session = userId ? { userId: String(userId) } : await getSession(tokenHash);
+    await revokeSession({ tokenHash, userId: session?.userId ?? userId });
+  }
+  await RefreshToken.updateOne({ tokenHash, revokedAt: null }, { revokedAt: new Date() });
 }
 
 export async function getPrimaryRoleAssignment(userId) {
@@ -205,17 +225,27 @@ export async function login({ email, password, ip, userAgent }) {
 }
 
 export async function refresh({ refreshToken, ip, userAgent }) {
-  const stored = await RefreshToken.findOne({ tokenHash: sha256(refreshToken) });
-  if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
-    throw new UnauthorizedError('Invalid refresh token');
+  const tokenHash = sha256(refreshToken);
+  let userId = null;
+
+  if (await isSessionStoreReady()) {
+    const session = await getSession(tokenHash);
+    if (session) userId = session.userId;
   }
 
-  const user = await User.findOne({ _id: stored.userId });
+  if (!userId) {
+    const stored = await RefreshToken.findOne({ tokenHash });
+    if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+      throw new UnauthorizedError('Invalid refresh token');
+    }
+    userId = stored.userId;
+  }
+
+  const user = await User.findOne({ _id: userId });
   if (!user || user.status !== 'active') throw new UnauthorizedError('Invalid refresh token');
 
   // Rotate: revoke the old token, issue a new pair.
-  stored.revokedAt = new Date();
-  await stored.save();
+  await revokeStoredRefreshToken(tokenHash, userId);
 
   const roleAssignment = await getPrimaryRoleAssignment(user._id);
   return {
@@ -227,11 +257,12 @@ export async function refresh({ refreshToken, ip, userAgent }) {
 
 export async function logout({ refreshToken, everywhere = false, userId = null }) {
   if (everywhere && userId) {
+    if (await isSessionStoreReady()) await revokeAllUserSessions(userId);
     await RefreshToken.updateMany({ userId, revokedAt: null }, { revokedAt: new Date() });
     return;
   }
   if (refreshToken) {
-    await RefreshToken.updateOne({ tokenHash: sha256(refreshToken) }, { revokedAt: new Date() });
+    await revokeStoredRefreshToken(sha256(refreshToken));
   }
 }
 

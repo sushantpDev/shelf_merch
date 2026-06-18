@@ -6,6 +6,7 @@ import { Shipment, SHIPMENT_EXCEPTION_STATUSES } from '../shipments/shipment.mod
 import { SupportTicket } from '../support/supportTicket.model.js';
 import { CatalogProduct } from '../catalog/catalogProduct.model.js';
 import { Collection } from '../collections/collection.model.js';
+import { Kit } from '../kits/kit.model.js';
 import { Invoice } from '../invoices/invoice.model.js';
 import { AuditLog } from '../auditLogs/auditLog.model.js';
 import { ProductionTask } from './productionTask.model.js';
@@ -80,7 +81,7 @@ export async function getPlatformOrderDetail(orderId) {
   const order = await getPlatformOrder(orderId);
   const [tenant, campaign, recipient, shipment, productionTask] = await Promise.all([
     Tenant.findOne({ _id: order.tenantId }).select('name slug status').lean(),
-    Campaign.findOne({ _id: order.campaignId, tenantId: order.tenantId }).select('name type shopId').lean(),
+    Campaign.findOne({ _id: order.campaignId, tenantId: order.tenantId }).select('name type shopId kitId').lean(),
     Recipient.findOne({ _id: order.recipientId, tenantId: order.tenantId })
       .select('name email phone redemptionStatus')
       .lean(),
@@ -103,8 +104,7 @@ export async function getPlatformOrderDetail(orderId) {
     : [];
   const productById = Object.fromEntries(catalogProducts.map((p) => [String(p._id), p]));
 
-  // Resolve the print artwork for each product from the campaign's shop
-  // collections (Collection.artworkUrl), so production has the design to print.
+  // Resolve print artwork: shop collections (Collection.artworkUrl) or kit branding.
   const artworkByProductId = {};
   if (campaign?.shopId) {
     const collections = await Collection.find({
@@ -119,6 +119,18 @@ export async function getPlatformOrderDetail(orderId) {
       for (const ref of col.productRefs ?? []) {
         const pid = String(ref.catalogProductId);
         if (!artworkByProductId[pid]) artworkByProductId[pid] = col.artworkUrl;
+      }
+    }
+  }
+  if (campaign?.type === 'kit' && campaign?.kitId) {
+    const kit = await Kit.findOne({ _id: campaign.kitId, tenantId: order.tenantId })
+      .select('artworkUrl')
+      .lean();
+    if (kit?.artworkUrl) {
+      for (const item of order.items ?? []) {
+        if (item.catalogProductId) {
+          artworkByProductId[String(item.catalogProductId)] = kit.artworkUrl;
+        }
       }
     }
   }

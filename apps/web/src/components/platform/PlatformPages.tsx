@@ -60,6 +60,7 @@ import {
   type ProductVariant,
 } from "@/services/platform-api";
 import { resolveColorHex } from "@/lib/colorMap";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { TintedGarment } from "@/components/store/TintedGarment";
 import {
   DataTable,
@@ -346,7 +347,11 @@ function PrintAreaPreview({
   tintHex?: string;
   artworkUrl?: string;
 }) {
-  const visible = areas.filter((a) => !a.mockupImageUrl || a.mockupImageUrl === mockup);
+  const resolvedMockup = resolveMediaUrl(mockup);
+  const resolvedArtwork = artworkUrl ? resolveMediaUrl(artworkUrl) : "";
+  const visible = areas.filter(
+    (a) => !a.mockupImageUrl || resolveMediaUrl(a.mockupImageUrl) === resolvedMockup,
+  );
   return (
     <div
       style={{
@@ -371,16 +376,16 @@ function PrintAreaPreview({
             top: `${a.box.yPct}%`,
             width: `${a.box.widthPct}%`,
             height: `${a.box.heightPct}%`,
-            border: artworkUrl ? "1px solid rgba(46,160,103,.5)" : "2px dashed rgba(46,160,103,.7)",
-            background: artworkUrl ? "transparent" : "rgba(46,160,103,.1)",
+            border: resolvedArtwork ? "1px solid rgba(46,160,103,.5)" : "2px dashed rgba(46,160,103,.7)",
+            background: resolvedArtwork ? "transparent" : "rgba(46,160,103,.1)",
             boxSizing: "border-box",
             pointerEvents: "none",
             display: "grid",
             placeItems: "center",
           }}
         >
-          {artworkUrl && (
-            <img src={artworkUrl} alt="Artwork" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+          {resolvedArtwork && (
+            <img src={resolvedArtwork} alt="Artwork" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
           )}
           <span
             style={{
@@ -705,14 +710,17 @@ export function OrderFulfillmentPage({ orderId }: { orderId: string }) {
                 const product = item.product;
                 const variant = item.variant;
                 const tintHex = resolveColorHex(variant?.color, matchVariantHex(product, variant));
-                const artworkUrl = item.artworkUrl || product?.artworkUrl || "";
+                const rawArtworkUrl = item.artworkUrl || product?.artworkUrl || "";
+                const artworkUrl = rawArtworkUrl ? resolveMediaUrl(rawArtworkUrl) : "";
                 const printAreas = product?.printAreas ?? [];
-                const mockup =
+                const mockup = resolveMediaUrl(
                   printAreas[0]?.mockupImageUrl ||
-                  product?.primaryImageUrl ||
-                  product?.imageUrls?.[0] ||
-                  item.imageUrl ||
-                  "";
+                    product?.maskImageUrl ||
+                    product?.primaryImageUrl ||
+                    product?.imageUrls?.[0] ||
+                    item.imageUrl ||
+                    "",
+                );
 
                 return (
                   <div key={idx} className="card" style={{ padding: 20, marginBottom: 20 }}>
