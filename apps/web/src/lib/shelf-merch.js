@@ -212,6 +212,7 @@ function afterRender(){
   // focus first autofocus
   const a=document.querySelector('[autofocus]'); if(a)a.focus();
   bindCreateShopNameInput();
+  mountKonvaMockups();
 }
 function readCreateShopName(){
   const inp=document.getElementById('sh-name');
@@ -449,7 +450,9 @@ function kitBrandingPanel(f){
       <button class="btn ${hasLogo?'btn-ghost':'btn-dark'} btn-block" data-act="ktLogoUpload">${hasLogo?'Replace logo':'Add logo'}</button>
       <div class="field" style="margin-top:16px"><label class="lbl">Notes to design team</label><textarea class="inp" id="kt-notes" rows="4" placeholder="e.g. White logo on the chest, full-colour on mugs">${esc(f.notes||'')}</textarea></div></div>
     <div><div class="${hasLogo?'banner info':'banner'}" style="margin-bottom:16px">${hasLogo?'<div>Branding applied. Our team will share proofs within 2 business days.</div>':'<div>Add a logo to preview branded mockups for each item.</div>'}</div>
-      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">${prods.map(p=>pcard(p,{branded:hasLogo,artworkUrl:f.logoFile?.preview,act:'noop'})).join('')}</div></div></div>`;
+      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">${prods.map((p,idx)=>hasLogo
+        ? `<div class="pcard" data-act="noop">${swagMockupHost(enrichProduct(p),idx)}<div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div></div></div>`
+        : pcard(p,{branded:hasLogo,artworkUrl:f.logoFile?.preview,act:'noop'})).join('')}</div></div></div>`;
 }
 function kitArtworkInput(f){
   if(!f.logoFile?.file) return undefined;
@@ -900,14 +903,19 @@ Wizards.swagArtwork=function(){
       <div class="note" style="margin-top:12px">Use a high-quality file with a transparent background (300 DPI+) to prevent production delays. <span class="lnk" data-act="toast" data-arg="Guidelines opened">Learn more</span></div>
       <button class="btn btn-dark btn-block" style="margin-top:14px" ${atab==='device'&&!f.artwork?'':'disabled'} data-act="swArtUpload">Add artwork</button>
     </div>
-    <button class="btn btn-dark btn-block btn-lg" style="margin-top:14px" ${f.artwork?'':'disabled'} data-act="swGenerate">Generate designs</button></div>`;
+    <button class="btn btn-dark btn-block btn-lg" style="margin-top:14px" ${f.artwork?'':'disabled'} data-act="swGenerate">Generate designs</button>
+    ${f.artwork?'<button class="btn btn-ghost btn-block btn-sm" style="margin-top:8px" data-act="swResetArt">Reset placement on all products</button>':''}</div>`;
   const banner=f.artwork
     ? `<div style="margin-bottom:16px;background:var(--info-50);border:1px solid #CFE0F8;border-radius:var(--r-sm);overflow:hidden">
         <div style="padding:12px 14px;display:flex;gap:10px;align-items:flex-start;font-size:13px;color:#1A4A9E">${I.spark.replace('<svg ','<svg width="16" height="16" ')}<div>Artwork applied to all ${prods.length} products — all colour variants included.</div></div>
         <div style="background:#fff;padding:24px;display:grid;place-items:center;min-height:150px">${swArtImg(f,{maxH:'160px'})}</div></div>`
     : `<div class="banner" style="margin-bottom:16px;background:#eaf1fb;color:#1c2a52;border:none">Please add artwork before selecting your products. We've included all colour variants.</div>`;
-  const right=`<div>${banner}
-    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${prods.map(p=>{const ep=enrichProduct(p);const mock=productHasPrintArea(ep);return `<div class="pcard" style="position:relative">${f.artwork?'':'<div class="dots-btn">'+I.dots+'</div>'}<div class="img${mock?' img-mockup':''}">${productImg(ep,mock?{width:'100%',height:'100%'}:{})}${f.artwork?`${printAreaGuide(ep)}${productArtOverlay(ep,f.artFile?.preview)}`:''}</div><div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div></div></div>`;}).join('')}</div></div>`;
+  const editHint=f.artwork?`<div class="mut3" style="font-size:11.5px;margin:-4px 0 12px;display:flex;align-items:center;gap:6px">${I.spark.replace('<svg ','<svg width="13" height="13" ')}<span>Drag to move · corner handles to scale · top handle to rotate. Each product saves its own placement.</span></div>`:'';
+  const right=`<div>${banner}${editHint}
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${prods.map((p,idx)=>{const ep=enrichProduct(p);const mock=productHasPrintArea(ep);const inner=f.artwork
+        ? swagMockupHost(ep,idx)
+        : `<div class="img${mock?' img-mockup':''}">${productImg(ep,mock?{width:'100%',height:'100%'}:{})}</div>`;
+      return `<div class="pcard" style="position:relative">${f.artwork?'':'<div class="dots-btn">'+I.dots+'</div>'}${inner}<div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div></div></div>`;}).join('')}</div></div>`;
   const body=`<div style="display:grid;grid-template-columns:400px 1fr;gap:26px">${left}${right}</div>`;
   return wzChrome('Design swag',['Collection','Products','Artwork'],2,body,'');
 };
@@ -936,12 +944,174 @@ function swArtSetFile(file){
   reader.readAsDataURL(file);
 }
 function swArtUpload(){ document.getElementById('sw-art-inp')?.click(); }
-function swArtClear(){ S.flow.artwork=false; S.flow.artFile=null; S.flow.artSel=null; render(); }
+function swArtClear(){ S.flow.artwork=false; S.flow.artFile=null; S.flow.artSel=null; S.flow.artPlacements={}; render(); }
+function swResetArt(){ S.flow.artPlacements={}; render(); }
+
+/* ===================== KONVA MOCKUP CANVAS ===================== */
+// Interactive POD mockups for the swag-artwork step: the uploaded artwork is a
+// real Konva.Image the user can drag, scale and rotate on each product, inside
+// the product's print area. Placement is stored per product (as % of the square
+// stage, so it is resolution-independent) and reused when designs are generated.
+let __konvaLib=null;
+let __mockupStages=[];
+async function loadKonva(){
+  if(__konvaLib) return __konvaLib;
+  __konvaLib=(await import('konva')).default;
+  return __konvaLib;
+}
+function loadImageEl(src){
+  // No crossOrigin: this canvas is display-only (never pixel-read or exported),
+  // so a CORS-less remote product image should still render.
+  return new Promise((resolve,reject)=>{
+    if(!src){ reject(new Error('no src')); return; }
+    const im=new Image();
+    im.onload=()=>resolve(im);
+    im.onerror=reject;
+    im.src=src;
+  });
+}
+function swagMockupHost(ep,idx){
+  // Square host; the Konva stage is mounted into it after render. data-kidx maps
+  // back to S.flow.pickedProducts so the mount can derive image + print area.
+  return `<div class="img img-mockup" data-konva-mockup data-kidx="${idx}" style="position:relative;display:block;background:#fff;touch-action:none"></div>`;
+}
+function destroyMockupStages(){
+  for(const s of __mockupStages){ try{ s.destroy(); }catch{} }
+  __mockupStages=[];
+}
+// Resolve which products + artwork the live mockups should show for the
+// current view. Swag artwork and kit branding share the same interactive canvas.
+function mockupContext(){
+  const f=S.flow;
+  if(S.view==='swagArtwork'){
+    if(!f.artwork||!f.artFile?.preview) return null;
+    return { products:f.pickedProducts||[], artUrl:f.artFile.preview, store:(f.artPlacements=f.artPlacements||{}) };
+  }
+  if(S.view==='createKit'||S.view==='editKit'){
+    if(!f.logoFile?.preview) return null;
+    const catalog=getCatalogList();
+    const products=(f.picked||[]).map((i)=>catalog[i]).filter(Boolean);
+    return { products, artUrl:f.logoFile.preview, store:(f.kitPlacements=f.kitPlacements||{}) };
+  }
+  return null;
+}
+function mountKonvaMockups(){
+  // Always tear down previous stages (the DOM hosts are gone after a re-render).
+  destroyMockupStages();
+  const ctx=mockupContext();
+  if(!ctx) return;
+  document.querySelectorAll('[data-konva-mockup]').forEach((host)=>{
+    const idx=Number(host.dataset.kidx);
+    const prod=ctx.products[idx];
+    if(!prod) return;
+    mountOneMockup(host,enrichProduct(prod),idx,ctx).catch(()=>{
+      // Fallback: static overlay if Konva or an image fails to load.
+      const ep=enrichProduct(prod);
+      host.innerHTML=`${productImg(ep,{width:'100%',height:'100%'})}${printAreaGuide(ep)}${productArtOverlay(ep,ctx.artUrl)}`;
+    });
+  });
+}
+function mockupPlacementKey(prod,idx){ return prod?.id||('idx'+idx); }
+async function mountOneMockup(host,prod,idx,ctx){
+  const Konva=await loadKonva();
+  const size=host.clientWidth||host.offsetWidth;
+  if(!size){
+    // Host not laid out yet — retry once on the next frame, but never loop.
+    const tries=Number(host.dataset.kretry||0);
+    if(tries<3){ host.dataset.kretry=String(tries+1); requestAnimationFrame(()=>mountKonvaMockups()); }
+    return;
+  }
+  const [prodImg,artImg]=await Promise.all([
+    loadImageEl(resolveMediaSrc(catalogImgUrl(prod))).catch(()=>null),
+    loadImageEl(ctx.artUrl),
+  ]);
+
+  host.innerHTML='';
+  const stage=new Konva.Stage({container:host,width:size,height:size});
+  const layer=new Konva.Layer();
+  stage.add(layer);
+  __mockupStages.push(stage);
+
+  // Product background — drawn object-fit:contain so print-area % (defined on the
+  // square in the admin editor) line up with what staff configured.
+  if(prodImg){
+    const scale=Math.min(size/prodImg.naturalWidth,size/prodImg.naturalHeight);
+    const w=prodImg.naturalWidth*scale, h=prodImg.naturalHeight*scale;
+    layer.add(new Konva.Image({image:prodImg,x:(size-w)/2,y:(size-h)/2,width:w,height:h,listening:false}));
+  }
+
+  // Print area guide.
+  const area=pickPrintArea(prod);
+  const box=(area&&area.box&&area.box.widthPct)?area.box:{xPct:33,yPct:30,widthPct:34,heightPct:38};
+  const bx=box.xPct/100*size, by=box.yPct/100*size;
+  const bw=box.widthPct/100*size, bh=box.heightPct/100*size;
+  layer.add(new Konva.Rect({x:bx,y:by,width:bw,height:bh,stroke:'rgba(21,120,76,.55)',strokeWidth:1.5,dash:[5,4],listening:false}));
+
+  // Artwork node — origin at its centre so rotation pivots around the middle.
+  const aspect=(artImg.naturalHeight||1)/(artImg.naturalWidth||1);
+  const key=mockupPlacementKey(prod,idx);
+  let pl=ctx.store[key];
+  if(!pl){
+    const fitW=Math.min(bw*0.92,(bh*0.92)/aspect);
+    pl={xPct:(box.xPct+box.widthPct/2),yPct:(box.yPct+box.heightPct/2),wPct:(fitW/size*100),rot:0};
+    ctx.store[key]=pl;
+  }
+  const w0=pl.wPct/100*size, h0=w0*aspect;
+  const node=new Konva.Image({
+    image:artImg,
+    x:pl.xPct/100*size, y:pl.yPct/100*size,
+    width:w0, height:h0,
+    offsetX:w0/2, offsetY:h0/2,
+    rotation:pl.rot||0,
+    draggable:true,
+  });
+  layer.add(node);
+
+  const tr=new Konva.Transformer({
+    nodes:[node],
+    rotateEnabled:true,
+    keepRatio:true,
+    enabledAnchors:['top-left','top-right','bottom-left','bottom-right'],
+    rotationSnaps:[0,45,90,135,180,225,270,315],
+    anchorSize:9,
+    anchorStroke:'#15784C',
+    borderStroke:'#15784C',
+    boundBoxFunc:(o,n)=>(n.width<16||n.height<16?o:n),
+  });
+  layer.add(tr);
+
+  function commit(){
+    const nw=Math.max(16,node.width()*node.scaleX());
+    const nh=Math.max(16,node.height()*node.scaleY());
+    node.scaleX(1); node.scaleY(1);
+    node.width(nw); node.height(nh);
+    node.offsetX(nw/2); node.offsetY(nh/2);
+    ctx.store[key]={
+      xPct:node.x()/size*100,
+      yPct:node.y()/size*100,
+      wPct:nw/size*100,
+      rot:Math.round(node.rotation()),
+    };
+    tr.forceUpdate();
+    layer.batchDraw();
+  }
+  node.on('transformend',commit);
+  node.on('dragend',commit);
+  // Click empty stage to detach handles (visual only).
+  stage.on('mousedown touchstart',(e)=>{ if(e.target===stage) tr.nodes([]); else tr.nodes([node]); layer.batchDraw(); });
+  layer.draw();
+}
+function resolveMediaSrc(url){
+  if(!url) return '';
+  if(/^(https?:|data:|blob:)/i.test(url)) return url;
+  return url.startsWith('/')?url:`/${url}`;
+}
 async function swGenerate(){
   const f=S.flow;
   const catalog=getCatalogList();
   if(api.useMocks()){
-    const col={id:nid('c'),code:'C'+(100000000+Math.floor(Math.random()*899999999)),name:f.colName,created:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),by:S.user.name,status:'ready',shopId:'',preferredColors:[],artworkUrl:f.artFile?.preview||'',products:f.picked.map(i=>{const cp=catalog[i];return{id:cp?.id,g:cp?.g||'tee',brand:cp?.brand||'',nm:cp?.nm||'Product',printAreas:cp?.printAreas,imgUrl:cp?.imgUrl};})};
+    const placements=f.artPlacements||{};
+    const col={id:nid('c'),code:'C'+(100000000+Math.floor(Math.random()*899999999)),name:f.colName,created:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),by:S.user.name,status:'ready',shopId:'',preferredColors:[],artworkUrl:f.artFile?.preview||'',artPlacements:placements,products:f.picked.map((i,idx)=>{const cp=catalog[i];return{id:cp?.id,g:cp?.g||'tee',brand:cp?.brand||'',nm:cp?.nm||'Product',printAreas:cp?.printAreas,imgUrl:cp?.imgUrl,placement:placements[cp?.id||('idx'+idx)]||null};})};
     S.collections.push(col);
     go('swag');
     toast('Collection "'+col.name+'" is design-ready!');
@@ -3349,6 +3519,7 @@ const ACT = {
   swPick:(el)=>swPick(el),
   swArtUpload:()=>swArtUpload(),
   swArtClear:()=>swArtClear(),
+  swResetArt:()=>swResetArt(),
   swGenerate:()=>swGenerate(),
   swagTab:(el,a)=>swagTab(a),
   swagView:(el,a)=>swagView(a),
