@@ -66,6 +66,8 @@ export async function createCampaign({ tenantId, userId, data }) {
     entityId: data.entityId,
     name: data.name,
     type: data.type,
+    fulfillmentMode: data.fulfillmentMode,
+    singleLocation: data.singleLocation,
     catalogMode: data.catalogMode,
     selectedProductIds: data.selectedProductIds ?? [],
     kitId: data.kitId ?? null,
@@ -216,15 +218,41 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
 
   transitionState('campaign', campaign, 'launched', { userId: user.userId });
   transitionState('campaign', campaign, 'redemption_open', { userId: user.userId });
+
+  if (campaign.fulfillmentMode === 'surprise') {
+    if (!isFulfillment) {
+      throw new ApiError(422, 'Surprise fulfillment is only available for item and kit sends', 'SURPRISE_NOT_SUPPORTED');
+    }
+    const { createSurpriseOrdersForCampaign } = await import('../redemptions/redemptions.service.js');
+    await createSurpriseOrdersForCampaign({ tenantId, campaign });
+  }
+  if (campaign.fulfillmentMode === 'single') {
+    if (!isFulfillment) {
+      throw new ApiError(422, 'Single-location fulfillment is only available for item and kit sends', 'SINGLE_NOT_SUPPORTED');
+    }
+    const { createSingleLocationOrderForCampaign } = await import('../redemptions/redemptions.service.js');
+    await createSingleLocationOrderForCampaign({ tenantId, campaign });
+  }
+
   await campaign.save();
 
   const scheduleMode = campaign.schedule?.mode ?? 'now';
   const sendInvites = scheduleMode === 'now';
   const fromLabel = campaign.message?.from?.trim() || campaign.name;
+  const isSurprise = campaign.fulfillmentMode === 'surprise';
+  const isSingle = campaign.fulfillmentMode === 'single';
   const inviteBody =
     campaign.message?.body?.trim() ||
-    (isFulfillment ? 'Choose your gift using the link below.' : 'Redeem your gift using the link we sent.');
-  const inviteTitle = isFulfillment ? `${fromLabel} sent you a gift` : `You're invited: ${campaign.name}`;
+    (isSurprise
+      ? `${fromLabel} is sending you a surprise gift. No action is required from you.`
+      : isFulfillment
+        ? 'Choose your gift using the link below.'
+        : 'Redeem your gift using the link we sent.');
+  const inviteTitle = isSurprise
+    ? `You've received a gift from ${fromLabel}!`
+    : isFulfillment
+      ? `${fromLabel} sent you a gift`
+      : `You're invited: ${campaign.name}`;
 
   if (sendInvites) {
     const [tenant, kit] = await Promise.all([
@@ -233,25 +261,36 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
     ]);
     const companyName = tenant?.name || 'your company';
     const giftName = kit?.name || campaign.name;
-    const recipients = await Recipient.find({ tenantId, campaignId: campaign._id });
-    for (const r of recipients) {
+    if (isSingle) {
       await notify({
-        type: 'redemption_invite',
+        type: 'single_location_gift',
         tenantId,
-        email: r.email,
-        phone: r.phone || null,
-        title: inviteTitle,
-        body: inviteBody,
-        link: `/redeem/${r.redemptionToken}`,
-        meta: {
-          recipientName: r.name,
-          senderName: fromLabel,
-          message: inviteBody,
-          giftName,
-          companyName,
-          campaignType: campaign.type,
-        },
+        email: campaign.singleLocation.email,
+        title: `${companyName} is sending gifts to ${campaign.singleLocation.name}`,
+        body: `${campaign.recipientCount} gift${campaign.recipientCount === 1 ? '' : 's'} will be shipped to the provided address.`,
       });
+    } else {
+      const recipients = await Recipient.find({ tenantId, campaignId: campaign._id });
+      for (const r of recipients) {
+        await notify({
+          type: isSurprise ? 'surprise_gift' : 'redemption_invite',
+          tenantId,
+          email: r.email,
+          phone: r.phone || null,
+          title: inviteTitle,
+          body: inviteBody,
+          link: isSurprise ? '' : `/redeem/${r.redemptionToken}`,
+          meta: {
+            recipientName: r.name,
+            senderName: fromLabel,
+            message: inviteBody,
+            giftName,
+            companyName,
+            campaignType: campaign.type,
+            fulfillmentMode: campaign.fulfillmentMode,
+          },
+        });
+      }
     }
   }
 
@@ -264,7 +303,11 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
       tenantId,
       userId: entity.managerUserId,
       title: `Campaign launched: ${campaign.name}`,
-      body: `${campaign.recipientCount} recipients invited.`,
+      body: isSurprise
+        ? `${campaign.recipientCount} surprise gift orders created.`
+        : isSingle
+          ? `One delivery order created for ${campaign.recipientCount} recipients.`
+        : `${campaign.recipientCount} recipients invited.`,
       link: `/campaigns/${campaign._id}`,
     });
   }

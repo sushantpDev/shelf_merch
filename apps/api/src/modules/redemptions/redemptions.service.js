@@ -14,6 +14,7 @@ import {
 } from '../kits/kitProductOptions.js';
 import { CatalogProduct } from '../catalog/catalogProduct.model.js';
 import { Order, sanitizeOrderItems } from '../orders/order.model.js';
+import { Contact } from '../contacts/contact.model.js';
 import { transitionRedemption } from '../campaigns/campaigns.service.js';
 import { computeAmountBreakdown } from '../../services/pricing.service.js';
 import { env } from '../../config/env.js';
@@ -322,6 +323,207 @@ async function nextOrderNumber() {
   return `SM-${year}-${String(count + 1).padStart(6, '0')}`;
 }
 
+async function applyOrderInventory(order, campaign) {
+  try {
+    const { applyInventoryTransaction } = await import('../catalog/inventory.service.js');
+    for (const line of order.items) {
+      const product = await CatalogProduct.findById(line.catalogProductId);
+      if (product?.inventory?.mode !== 'physical') continue;
+      await applyInventoryTransaction({
+        productId: line.catalogProductId,
+        variantSku: line.sku,
+        type: 'reduce',
+        qty: line.qty,
+        reason: `Redemption order ${order.orderNumber}`,
+        relatedOrderId: order._id,
+        relatedCampaignId: campaign._id,
+        consumeReserved: product.inventory.reserved >= line.qty,
+      });
+    }
+  } catch {
+    // Stock drift is reconciled by catalog admins via /platform/inventory.
+  }
+}
+
+export async function createSurpriseOrdersForCampaign({ tenantId, campaign }) {
+  if (campaign.fulfillmentMode !== 'surprise' || !isKitFulfillment(campaign)) {
+    throw new ApiError(422, 'Campaign is not a surprise kit send', 'NOT_SURPRISE_CAMPAIGN');
+  }
+
+  const kit = await Kit.findOne({ _id: campaign.kitId, tenantId });
+  if (!kit) throw new NotFoundError('Kit not found');
+  const kitEntries = await loadActiveKitEntries(kit);
+  if (!kitEntries.length) throw new ApiError(422, 'Kit has no active products', 'KIT_EMPTY');
+
+  const recipients = await Recipient.find({ tenantId, campaignId: campaign._id });
+  const recipientContacts = [];
+  for (const recipient of recipients) {
+    const contact = recipient.contactId
+      ? await Contact.findOne({ _id: recipient.contactId, tenantId })
+      : await Contact.findOne({ email: recipient.email, tenantId });
+    const address = contact?.address;
+    if (!address?.line1 || !address.city || !address.state || !address.pincode) {
+      throw new ApiError(
+        422,
+        `Complete shipping address required for ${recipient.email}`,
+        'SURPRISE_ADDRESS_REQUIRED',
+      );
+    }
+    recipientContacts.push({ recipient, contact, address });
+  }
+
+  for (const { recipient, contact, address } of recipientContacts) {
+    const existing = await Order.findOne({ tenantId, recipientId: recipient._id });
+    if (existing) continue;
+    const lineItems = [];
+    for (const { ref, product: entryProduct } of kitEntries) {
+      const product = await CatalogProduct.findById(entryProduct._id).select('+costPriceInr');
+      if (!product) throw new NotFoundError(`Product ${entryProduct._id} not found`);
+      const options = resolveKitItemOptions(product, ref);
+      const variant = { size: options.sizes[0] || '', color: options.colors[0] || '' };
+      const selectedVariant = (product.variants || []).find(
+        (v) =>
+          (!variant.size || v.size === variant.size) &&
+          (!variant.color || v.color === variant.color),
+      );
+      lineItems.push({
+        catalogProductId: product._id,
+        name: product.name,
+        sku: selectedVariant?.sku || product.sku,
+        variant,
+        qty: 1,
+        unitPriceInr: product.basePriceInr,
+        costPriceInr: product.costPriceInr ?? 0,
+        gstRate: product.gstRate ?? 18,
+        hsnCode: product.hsnCode ?? '',
+        imageUrl:
+          kitProductImageUrl(product, ref) ||
+          product.maskImageUrl ||
+          product.primaryImageUrl ||
+          product.imageUrls?.[0] ||
+          '',
+      });
+    }
+
+    const order = await Order.create({
+      tenantId,
+      campaignId: campaign._id,
+      recipientId: recipient._id,
+      orderNumber: await nextOrderNumber(),
+      items: lineItems,
+      shippingAddress: {
+        name: recipient.name,
+        phone: recipient.phone || contact.phone || '',
+        line1: address.line1,
+        line2: address.line2 || '',
+        city: address.city,
+        state: address.state,
+        pincode: address.pincode,
+        country: address.country || 'IN',
+      },
+      amountBreakdown: computeAmountBreakdown(lineItems),
+      status: 'created',
+      statusHistory: [
+        { status: 'created', at: new Date(), actorUserId: null, note: 'Surprise gift auto-fulfillment' },
+      ],
+    });
+
+    transitionRedemption(recipient, 'order_created');
+    await recipient.save();
+    await applyOrderInventory(order, campaign);
+  }
+}
+
+export async function createSingleLocationOrderForCampaign({ tenantId, campaign }) {
+  if (campaign.fulfillmentMode !== 'single' || !isKitFulfillment(campaign)) {
+    throw new ApiError(422, 'Campaign is not a single-location kit send', 'NOT_SINGLE_LOCATION_CAMPAIGN');
+  }
+
+  const location = campaign.singleLocation;
+  if (
+    !location?.name ||
+    !location.email ||
+    !location.line1 ||
+    !location.city ||
+    !location.state ||
+    !location.pincode
+  ) {
+    throw new ApiError(422, 'Complete single-location delivery details are required', 'SINGLE_LOCATION_REQUIRED');
+  }
+
+  const recipients = await Recipient.find({ tenantId, campaignId: campaign._id });
+  if (!recipients.length) throw new ApiError(422, 'Select at least one recipient', 'NO_RECIPIENTS');
+
+  const existing = await Order.findOne({ tenantId, campaignId: campaign._id });
+  if (existing) return existing;
+
+  const kit = await Kit.findOne({ _id: campaign.kitId, tenantId });
+  if (!kit) throw new NotFoundError('Kit not found');
+  const kitEntries = await loadActiveKitEntries(kit);
+  if (!kitEntries.length) throw new ApiError(422, 'Kit has no active products', 'KIT_EMPTY');
+
+  const quantity = recipients.length;
+  const lineItems = [];
+  for (const { ref, product: entryProduct } of kitEntries) {
+    const product = await CatalogProduct.findById(entryProduct._id).select('+costPriceInr');
+    if (!product) throw new NotFoundError(`Product ${entryProduct._id} not found`);
+    const options = resolveKitItemOptions(product, ref);
+    const variant = { size: options.sizes[0] || '', color: options.colors[0] || '' };
+    const selectedVariant = (product.variants || []).find(
+      (v) =>
+        (!variant.size || v.size === variant.size) &&
+        (!variant.color || v.color === variant.color),
+    );
+    lineItems.push({
+      catalogProductId: product._id,
+      name: product.name,
+      sku: selectedVariant?.sku || product.sku,
+      variant,
+      qty: quantity,
+      unitPriceInr: product.basePriceInr,
+      costPriceInr: product.costPriceInr ?? 0,
+      gstRate: product.gstRate ?? 18,
+      hsnCode: product.hsnCode ?? '',
+      imageUrl:
+        kitProductImageUrl(product, ref) ||
+        product.maskImageUrl ||
+        product.primaryImageUrl ||
+        product.imageUrls?.[0] ||
+        '',
+    });
+  }
+
+  const order = await Order.create({
+    tenantId,
+    campaignId: campaign._id,
+    recipientId: recipients[0]._id,
+    orderNumber: await nextOrderNumber(),
+    items: lineItems,
+    shippingAddress: {
+      name: location.name,
+      phone: location.phone || '',
+      line1: location.line1,
+      line2: location.line2 || '',
+      city: location.city,
+      state: location.state,
+      pincode: location.pincode,
+      country: location.country || 'IN',
+    },
+    amountBreakdown: computeAmountBreakdown(lineItems),
+    status: 'created',
+    statusHistory: [
+      { status: 'created', at: new Date(), actorUserId: null, note: 'Single-location auto-fulfillment' },
+    ],
+  });
+
+  for (const recipient of recipients) {
+    transitionRedemption(recipient, 'order_created');
+    await recipient.save();
+  }
+  await applyOrderInventory(order, campaign);
+  return order;
+}
+
 /** §7.9 /submit — idempotent order creation from redemption. */
 export async function submitRedemption(token, { items, shippingAddress }) {
   const recipient = await Recipient.findOne({ redemptionToken: token }).setOptions({ skipTenantGuard: true });
@@ -425,25 +627,7 @@ export async function submitRedemption(token, { items, shippingAddress }) {
 
   // §3.2 reservation hook — redemption consumes stock. Best-effort: an
   // inventory bookkeeping error must never block a recipient's order.
-  try {
-    const { applyInventoryTransaction } = await import('../catalog/inventory.service.js');
-    for (const line of lineItems) {
-      const product = await CatalogProduct.findById(line.catalogProductId);
-      if (product?.inventory?.mode !== 'physical') continue;
-      await applyInventoryTransaction({
-        productId: line.catalogProductId,
-        variantSku: line.sku,
-        type: 'reduce',
-        qty: line.qty,
-        reason: `Redemption order ${order.orderNumber}`,
-        relatedOrderId: order._id,
-        relatedCampaignId: campaign._id,
-        consumeReserved: product.inventory.reserved >= line.qty,
-      });
-    }
-  } catch {
-    // Stock drift is reconciled by catalog admins via /platform/inventory.
-  }
+  await applyOrderInventory(order, campaign);
 
   return { orderNumber: order.orderNumber, estimatedDelivery: '7-10 business days', orderId: String(order._id) };
 }

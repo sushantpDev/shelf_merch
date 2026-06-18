@@ -3,6 +3,7 @@ import { env, emailConfigured } from '../config/env.js';
 import { logger } from '../config/logger.js';
 import { ApiError } from '../utils/errors.js';
 import { buildRedemptionInviteEmail } from './email-templates/redemptionInvite.template.js';
+import { buildSurpriseGiftEmail } from './email-templates/surpriseGift.template.js';
 
 let transporter;
 
@@ -112,6 +113,30 @@ export async function sendRedemptionInviteEmail({
     return await sendEmail({ to, subject, text, html });
   } catch (err) {
     logger.warn({ err, to, subject }, 'Redemption invite email send failed');
+    return { success: false, provider: 'smtp' };
+  }
+}
+
+export async function sendSurpriseGiftEmail({
+  to,
+  recipientName = '',
+  senderName = 'Your team',
+  message = '',
+  giftName = 'Your gift',
+  companyName = 'your company',
+}) {
+  const { subject, html, text } = buildSurpriseGiftEmail({
+    recipientName,
+    senderName,
+    message,
+    giftName,
+    companyName,
+  });
+
+  try {
+    return await sendEmail({ to, subject, text, html });
+  } catch (err) {
+    logger.warn({ err, to, subject }, 'Surprise gift email send failed');
     return { success: false, provider: 'smtp' };
   }
 }

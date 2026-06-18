@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildRedemptionInviteEmail } from '../src/services/email-templates/redemptionInvite.template.js';
+import { buildSurpriseGiftEmail } from '../src/services/email-templates/surpriseGift.template.js';
 
 describe('redemption invite email template', () => {
   it('renders branded kit invite with CTA and sender details', () => {
@@ -35,5 +36,26 @@ describe('redemption invite email template', () => {
     });
     expect(html).not.toContain('<script>');
     expect(html).toContain('&lt;script&gt;');
+  });
+});
+
+describe('surprise gift email template', () => {
+  it('informs the recipient without redemption actions or a link', () => {
+    const { subject, html, text } = buildSurpriseGiftEmail({
+      recipientName: 'Priya Sharma',
+      senderName: 'People Team, Rubix',
+      message: 'A little something from all of us.',
+      giftName: 'Welcome Kit',
+      companyName: 'Rubix',
+    });
+
+    expect(subject).toBe("You've received a gift from Rubix!");
+    expect(html).toContain('Rubix is sending');
+    expect(html).toContain('No action is required from you');
+    expect(html).not.toContain('Claim your gift');
+    expect(html).not.toContain('How to claim');
+    expect(html).not.toContain('Link expires');
+    expect(html).not.toContain('/redeem/');
+    expect(text).toContain('shipped automatically to your address on file');
   });
 });

@@ -58,7 +58,7 @@ const TRANSITIONS = {
     active: [],
   },
   redemption: {
-    invited: ['opened', 'expired'],
+    invited: ['opened', 'order_created', 'expired'],
     opened: ['verified', 'expired'],
     verified: ['redeemed', 'expired'],
     redeemed: ['order_created'],

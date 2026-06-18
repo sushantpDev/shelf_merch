@@ -8,6 +8,12 @@ export const DEFAULT_MAPPING = {
   phone: 'phone',
   department: 'department',
   employeeCode: 'employeeCode',
+  addressLine1: 'address',
+  addressLine2: 'addressLine2',
+  city: 'city',
+  state: 'state',
+  pincode: 'pincode',
+  country: 'country',
 };
 
 const importMappingSchema = new mongoose.Schema(
@@ -23,6 +29,12 @@ const importMappingSchema = new mongoose.Schema(
       phone: { type: String, default: DEFAULT_MAPPING.phone },
       department: { type: String, default: DEFAULT_MAPPING.department },
       employeeCode: { type: String, default: DEFAULT_MAPPING.employeeCode },
+      addressLine1: { type: String, default: DEFAULT_MAPPING.addressLine1 },
+      addressLine2: { type: String, default: DEFAULT_MAPPING.addressLine2 },
+      city: { type: String, default: DEFAULT_MAPPING.city },
+      state: { type: String, default: DEFAULT_MAPPING.state },
+      pincode: { type: String, default: DEFAULT_MAPPING.pincode },
+      country: { type: String, default: DEFAULT_MAPPING.country },
     },
     lastImportAt: { type: Date, default: null },
   },

@@ -30,12 +30,17 @@ import { mapCatalogProduct } from "./mappers";
 import {
   createContactsApi,
   createShopApi,
+  fetchContactsImportStatusApi,
   fetchWorkspaceSnapshot,
+  listContactsApi,
   publishShopApi,
+  updateContactApi,
   updateShopApi,
+  uploadContactsImportApi,
+  type ContactImportStatus,
   type WorkspaceSnapshot,
 } from "./workspace-api";
-import type { UiProduct } from "./mappers";
+import type { UiContact, UiProduct } from "./mappers";
 
 export { ApiError, getStoredUser, isAuthenticated, isPlatformUser };
 export type { AuthUser };
@@ -186,6 +191,44 @@ export async function addContactsFlow(emails: string[], role: string) {
   return createContactsApi(entries);
 }
 
+export async function updateContactFlow(
+  contactId: string,
+  payload: {
+    name: string;
+    email: string;
+    address: {
+      line1: string;
+      city: string;
+      state: string;
+      pincode: string;
+      country: string;
+    };
+  },
+): Promise<UiContact> {
+  return updateContactApi(contactId, payload);
+}
+
+export type { ContactImportStatus };
+
+export async function importContactsFlow(
+  file: File,
+  onStatus?: (status: ContactImportStatus) => void,
+): Promise<ContactImportStatus> {
+  const { importJobId } = await uploadContactsImportApi(file);
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    const status = await fetchContactsImportStatusApi(importJobId);
+    onStatus?.(status);
+    if (status.status === "done" || status.status === "failed") return status;
+    await new Promise((resolve) => setTimeout(resolve, 800));
+  }
+  throw new Error("Import is taking longer than expected. Please try again in a moment.");
+}
+
+export async function refreshContactsFlow(): Promise<UiContact[]> {
+  return listContactsApi();
+}
+
 export async function createKitFlow(payload: {
   name: string;
   pickedIndices: number[];
@@ -305,6 +348,18 @@ export async function launchKitCampaignFlow(payload: {
   entityId: string;
   kitId: string;
   name: string;
+  fulfillmentMode?: "redeem" | "surprise" | "single";
+  singleLocation?: {
+    name: string;
+    email: string;
+    phone?: string;
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    pincode: string;
+    country: string;
+  };
   message: { from: string; body: string };
   schedule?: { mode: "now" | "scheduled" | "self"; sendAt?: string | null; timezone?: string };
   contactIds: string[];
@@ -313,12 +368,14 @@ export async function launchKitCampaignFlow(payload: {
   const recipients = payload.contactIds
     .map((id) => payload.contacts.find((c) => c.id === id))
     .filter(Boolean)
-    .map((c) => ({ name: c!.name, email: c!.email, phone: c!.phone }));
+    .map((c) => ({ contactId: c!.id, name: c!.name, email: c!.email, phone: c!.phone }));
   if (!recipients.length) throw new Error("Select at least one recipient");
   return launchKitCampaignApi({
     entityId: payload.entityId,
     kitId: payload.kitId,
     name: payload.name,
+    fulfillmentMode: payload.fulfillmentMode,
+    singleLocation: payload.singleLocation,
     message: payload.message,
     schedule: payload.schedule,
     recipients,

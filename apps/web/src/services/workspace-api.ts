@@ -290,3 +290,50 @@ export async function createContactsApi(
   );
   return created.map(mapContact);
 }
+
+export async function updateContactApi(
+  contactId: string,
+  payload: {
+    name: string;
+    email: string;
+    address: {
+      line1: string;
+      city: string;
+      state: string;
+      pincode: string;
+      country: string;
+    };
+  },
+) {
+  const contact = await apiFetch<unknown>(`/contacts/${contactId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  return mapContact(contact as never);
+}
+
+export type ContactImportStatus = {
+  status: "queued" | "processing" | "done" | "failed";
+  totalRows: number;
+  validCount: number;
+  errorCount: number;
+  errors: Array<{ row: number; message: string }>;
+};
+
+export async function uploadContactsImportApi(file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  return apiFetch<{ importJobId: string; status: string }>("/contacts/import", {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function fetchContactsImportStatusApi(jobId: string) {
+  return apiFetch<ContactImportStatus>(`/contacts/import/${jobId}/status`);
+}
+
+export async function listContactsApi() {
+  const contacts = await apiFetch<unknown[]>("/contacts");
+  return contacts.map(mapContact);
+}

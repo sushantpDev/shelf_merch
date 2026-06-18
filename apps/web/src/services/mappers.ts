@@ -48,6 +48,10 @@ export type UiContact = {
   role: string;
   address: string;
   loc: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  country?: string;
 };
 
 export type UiKitProductRef = {
@@ -266,6 +270,10 @@ export function mapContact(c: ApiProduct): UiContact {
     role: c.role || "Member",
     address: addr.line1 || "",
     loc,
+    city: addr.city || "",
+    state: addr.state || "",
+    pincode: addr.pincode || "",
+    country: addr.country || "IN",
   };
 }
 

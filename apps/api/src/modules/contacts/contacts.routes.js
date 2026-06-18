@@ -74,15 +74,25 @@ router.patch(
   }),
 );
 
-// §7.7 — multipart CSV upload, processed by the csv-import worker.
+const ACCEPTED_IMPORT_EXT = /\.(csv|xlsx|xls)$/i;
+const ACCEPTED_IMPORT_MIME = new Set([
+  'text/csv',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/octet-stream',
+]);
+
+// §7.7 — multipart CSV/Excel upload, processed by the csv-import worker.
 router.post(
   '/import',
   canWrite,
   upload.single('file'),
   asyncHandler(async (req, res) => {
-    if (!req.file) throw new ApiError(400, 'CSV file is required (field name "file")', 'FILE_REQUIRED');
-    if (!/\.csv$/i.test(req.file.originalname) && req.file.mimetype !== 'text/csv') {
-      throw new ApiError(415, 'Only CSV files are accepted', 'UNSUPPORTED_FILE_TYPE');
+    if (!req.file) throw new ApiError(400, 'File is required (field name "file")', 'FILE_REQUIRED');
+    const extOk = ACCEPTED_IMPORT_EXT.test(req.file.originalname);
+    const mimeOk = ACCEPTED_IMPORT_MIME.has(req.file.mimetype);
+    if (!extOk && !mimeOk) {
+      throw new ApiError(415, 'Only CSV and Excel files (.csv, .xlsx, .xls) are accepted', 'UNSUPPORTED_FILE_TYPE');
     }
     const job = await ImportJob.create({
       tenantId: req.tenantId,

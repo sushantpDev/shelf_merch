@@ -14,6 +14,7 @@ import { Campaign } from '../src/modules/campaigns/campaign.model.js';
 import { Recipient } from '../src/modules/campaigns/recipient.model.js';
 import { Kit } from '../src/modules/kits/kit.model.js';
 import { Order } from '../src/modules/orders/order.model.js';
+import { Contact } from '../src/modules/contacts/contact.model.js';
 import { signAccessToken } from '../src/modules/auth/auth.service.js';
 import * as ledger from '../src/services/ledger.service.js';
 
@@ -178,6 +179,132 @@ describe('campaign lifecycle (§11.1)', () => {
 
     const updatedKit = await Kit.findOne({ _id: kit._id, tenantId: tenant._id });
     expect(updatedKit.lastSentAt).toBeTruthy();
+  });
+
+  it('surprise kit send creates an order from the saved contact address without redemption', async () => {
+    const kit = await Kit.create({
+      tenantId: tenant._id,
+      name: 'Surprise Kit',
+      productRefs: [{ catalogProductId: product._id, name: 'Test Tee', brand: '', group: 'tee' }],
+      status: 'live',
+    });
+    const contact = await Contact.create({
+      tenantId: tenant._id,
+      name: 'Alice',
+      email: 'alice@test.io',
+      address: {
+        line1: '123 Street',
+        city: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500001',
+        country: 'IN',
+      },
+    });
+
+    const created = await request(app)
+      .post('/api/v1/campaigns')
+      .set('Authorization', `Bearer ${managerToken}`)
+      .send({
+        entityId: String(entity._id),
+        name: 'Surprise onboarding kit',
+        type: 'kit',
+        fulfillmentMode: 'surprise',
+        kitId: String(kit._id),
+        message: { from: 'Rubix', body: 'A surprise is on the way!' },
+        schedule: { mode: 'now' },
+      });
+    const id = created.body._id;
+
+    await request(app)
+      .post(`/api/v1/campaigns/${id}/recipients/import`)
+      .set('Authorization', `Bearer ${managerToken}`)
+      .send({
+        recipients: [
+          {
+            contactId: String(contact._id),
+            name: contact.name,
+            email: contact.email,
+          },
+        ],
+      });
+
+    const launch = await request(app)
+      .post(`/api/v1/campaigns/${id}/launch`)
+      .set('Authorization', `Bearer ${managerToken}`)
+      .set('Idempotency-Key', `launch-surprise-${id}`);
+    expect(launch.status).toBe(200);
+    expect(launch.body.fulfillmentMode).toBe('surprise');
+
+    const recipient = await Recipient.findOne({ tenantId: tenant._id, campaignId: id });
+    expect(recipient.redemptionStatus).toBe('order_created');
+
+    const order = await Order.findOne({ tenantId: tenant._id, recipientId: recipient._id });
+    expect(order.shippingAddress.line1).toBe('123 Street');
+    expect(order.shippingAddress.pincode).toBe('500001');
+    expect(order.items).toHaveLength(1);
+    expect(order.items[0].variant.size).toBe('XS');
+
+    const portal = await request(app).get(`/api/v1/redemptions/${recipient.redemptionToken}`);
+    expect(portal.status).toBe(409);
+    expect(portal.body.error.code).toBe('ALREADY_REDEEMED');
+  });
+
+  it('single-location kit send creates one consolidated order at the entered address', async () => {
+    const kit = await Kit.create({
+      tenantId: tenant._id,
+      name: 'Office Kit',
+      productRefs: [{ catalogProductId: product._id, name: 'Test Tee', brand: '', group: 'tee' }],
+      status: 'live',
+    });
+
+    const created = await request(app)
+      .post('/api/v1/campaigns')
+      .set('Authorization', `Bearer ${managerToken}`)
+      .send({
+        entityId: String(entity._id),
+        name: 'Office delivery',
+        type: 'kit',
+        fulfillmentMode: 'single',
+        kitId: String(kit._id),
+        singleLocation: {
+          name: 'Rubix Hyderabad Office',
+          email: 'office@rubix.test',
+          phone: '+91 90000 00000',
+          line1: '1 Corporate Park',
+          city: 'Hyderabad',
+          state: 'Telangana',
+          pincode: '500081',
+          country: 'IN',
+        },
+        schedule: { mode: 'now' },
+      });
+    const id = created.body._id;
+
+    await request(app)
+      .post(`/api/v1/campaigns/${id}/recipients/import`)
+      .set('Authorization', `Bearer ${managerToken}`)
+      .send({
+        recipients: [
+          { name: 'Alice', email: 'alice@test.io' },
+          { name: 'Bob', email: 'bob@test.io' },
+        ],
+      });
+
+    const launch = await request(app)
+      .post(`/api/v1/campaigns/${id}/launch`)
+      .set('Authorization', `Bearer ${managerToken}`)
+      .set('Idempotency-Key', `launch-single-${id}`);
+    expect(launch.status).toBe(200);
+    expect(launch.body.fulfillmentMode).toBe('single');
+
+    const orders = await Order.find({ tenantId: tenant._id, campaignId: id });
+    expect(orders).toHaveLength(1);
+    expect(orders[0].shippingAddress.name).toBe('Rubix Hyderabad Office');
+    expect(orders[0].shippingAddress.line1).toBe('1 Corporate Park');
+    expect(orders[0].items[0].qty).toBe(2);
+
+    const recipients = await Recipient.find({ tenantId: tenant._id, campaignId: id });
+    expect(recipients.every((r) => r.redemptionStatus === 'order_created')).toBe(true);
   });
 });
 

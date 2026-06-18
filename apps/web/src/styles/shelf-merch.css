@@ -256,6 +256,15 @@ button.thumb{font:inherit;color:inherit}
 .banner{background:#FBF3DC;border:1px solid #F0E2B0;color:#7A5A00;border-radius:var(--r-sm);padding:12px 14px;font-size:13px;display:flex;gap:10px;align-items:flex-start}
 .banner.info{background:var(--info-50);border-color:#CFE0F8;color:#1A4A9E}
 .note{background:var(--brand-50);border:1px solid var(--brand-100);border-radius:var(--r-sm);padding:12px 14px;font-size:12.5px;color:var(--brand-700)}
+.ac-import-zone svg{width:20px;height:20px;display:block}
+.ac-import-zone .ac-import-icon{width:40px;height:40px;border-radius:10px;background:var(--brand-50);color:var(--brand);display:grid;place-items:center;margin:0 auto 10px}
+.ac-import-file-card{border:1px solid var(--brand);border-radius:var(--r-sm);padding:12px 14px;background:var(--brand-50);margin-top:12px}
+.ac-import-status{margin-top:12px;padding:12px 14px;border-radius:var(--r-sm);background:#fff;border:1px solid var(--line);font-size:13px}
+.ac-import-status.is-busy{background:var(--surface-2)}
+.ac-import-spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:ac-import-spin .7s linear infinite;flex-shrink:0}
+.ac-import-bar{height:100%;width:38%;background:var(--brand);border-radius:999px;animation:ac-import-bar 1.1s ease-in-out infinite}
+@keyframes ac-import-spin{to{transform:rotate(360deg)}}
+@keyframes ac-import-bar{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}
 .divider{height:1px;background:var(--line);margin:18px 0}
 .logo-chip{width:46px;height:46px;border-radius:12px;background:var(--brand-50);display:grid;place-items:center;border:1px solid var(--brand-100)}
 .shopbanner{height:120px;border-radius:var(--r);position:relative;overflow:hidden}

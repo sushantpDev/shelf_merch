@@ -639,6 +639,7 @@ function sendItemsStart(el){ const id=el&&el.dataset?el.dataset.arg:null; closeL
 function sendItemsStartFor(kitId, picked, artworkUrl){
   const k=S.kits.find(x=>x.id===kitId);
   S.flow={exitTo:'kits',step:0,kitId,picked,artworkUrl:artworkUrl||k?.artworkUrl||'',selRecips:S.contacts.slice(0,2).map(c=>c.id),mode:'redeem',
+    singleLocation:{name:'',email:'',phone:'',line1:'',line2:'',city:'',state:'',pincode:'',country:'IN'},
     note:'Welcome to the team — we are thrilled to have you!',pkg:'box',
     from:'People Team, '+S.account, when:'now',
     msg:"Your welcome kit is on its way! A little something from all of us — we're so glad you're here.",
@@ -659,7 +660,7 @@ Wizards.sendItems=function(){
         <div class="pcard" style="display:grid;place-items:center;border-style:dashed;cursor:pointer" data-act="siAddOpen"><div style="text-align:center;color:var(--brand)">${I.plus}<div style="font-weight:700;margin-top:6px">Add item</div></div></div></div>`;
   } else if(step===1){
     body=recipientPicker(f,"Who's receiving this?","Choose how recipients get their items, then pick people.",{modes:true});
-    if(f.mode==='surprise'){ const missing=S.contacts.filter(c=>f.selRecips.includes(c.id)&&!c.address);
+    if(f.mode==='surprise'){ const missing=S.contacts.filter(c=>f.selRecips.includes(c.id)&&(!c.address||!c.city||!c.state||!c.pincode));
       if(missing.length) body+=`<div class="banner" style="margin-top:14px">${I.truck.replace('width="24" height="24"','width="16" height="16"')}<div><b>${missing.length} recipient(s) missing a shipping address.</b> Surprise sends need addresses up front. <span class="lnk" data-act="contactEdit" data-arg="${missing[0].id}">Fix recipient information</span></div></div>`; }
   } else if(step===2){
     body=recipientExperience(f,{kind:'items'})+`
@@ -702,6 +703,25 @@ function siNext(){
   const f=S.flow;
   const step=siFlowStep(f);
   if(step===1&&!f.selRecips?.length){ toast('Select at least one recipient',false); return; }
+  if(step===1&&f.mode==='surprise'){
+    const missing=S.contacts.filter(c=>f.selRecips.includes(c.id)&&(!c.address||!c.city||!c.state||!c.pincode));
+    if(missing.length){ toast('Complete the shipping address for all surprise recipients',false); return; }
+  }
+  if(step===1&&f.mode==='single'){
+    const loc=f.singleLocation||(f.singleLocation={});
+    loc.name=(document.getElementById('sl-name')?.value||'').trim();
+    loc.email=(document.getElementById('sl-email')?.value||'').trim();
+    loc.phone=(document.getElementById('sl-phone')?.value||'').trim();
+    loc.line1=(document.getElementById('sl-line1')?.value||'').trim();
+    loc.line2=(document.getElementById('sl-line2')?.value||'').trim();
+    loc.city=(document.getElementById('sl-city')?.value||'').trim();
+    loc.state=(document.getElementById('sl-state')?.value||'').trim();
+    loc.pincode=(document.getElementById('sl-pincode')?.value||'').trim();
+    loc.country=document.getElementById('sl-country')?.value||'IN';
+    if(!loc.name||!loc.email.includes('@')||!loc.line1||!loc.city||!loc.state||!loc.pincode){
+      toast('Enter the location contact, email, and complete shipping address',false); return;
+    }
+  }
   if(step===2){
     const n=document.getElementById('si-note'); if(n)f.note=n.value;
     const fr=document.getElementById('re-from'); if(fr)f.from=fr.value;
@@ -782,6 +802,8 @@ async function sendItemsDo(){
       entityId:String(entityId),
       kitId:String(f.kitId),
       name:k?k.name:'Kit send',
+      fulfillmentMode:f.mode==='surprise'?'surprise':f.mode==='single'?'single':'redeem',
+      singleLocation:f.mode==='single'?f.singleLocation:undefined,
       message:{from:f.from||'',body:f.msg||''},
       schedule:siScheduleFromFlow(f),
       contactIds:f.selRecips,
@@ -945,10 +967,11 @@ async function swGenerate(){
 
 /* ---------- SEND POINTS ---------- */
 function sendPointsStart(el){
+  const returnState={view:S.view,nav:S.nav,flow:{...S.flow}};
   closeLayer();
   const shopId=(el&&el.dataset&&el.dataset.arg)||S.flow.shopId||(S.shops[0]&&S.shops[0].id);
   const defaultRecips=S.contacts.slice(0,2).map(c=>c.id);
-  S.flow={exitTo:shopId?'shopDetail':'shops', exitToNav:'shops', shopId, step:0, ppr:1500, recips:100, orderName:'Order R'+(200000000+Math.floor(Math.random()*99999999)), selRecips:defaultRecips, from:'People Team, '+S.account, msg:'Appreciate your turnaround completing the key project, which is critical to company revenue.', when:'now', prevView:'landing'};
+  S.flow={exitTo:shopId?'shopDetail':'shops', exitToNav:'shops',returnState,shopId,step:0,ppr:1500,recips:100,orderName:'Order R'+(200000000+Math.floor(Math.random()*99999999)),selRecips:defaultRecips,from:'People Team, '+S.account,msg:'Appreciate your turnaround completing the key project, which is critical to company revenue.',when:'now',prevView:'landing'};
   go('sendPoints');
 }
 const SP_STEPS=['Budget','Recipients','Message','Checkout'];
@@ -989,13 +1012,19 @@ Wizards.sendPoints=function(){
   }
   const back = step>0?backLink('Back','spBack',null,{mb:'0'}):'<span></span>';
   const next = step<3?`<button class="btn btn-dark" data-act="spNext">Next</button>`:'<span></span>';
-  return wzChrome('Send Points',SP_STEPS,step,body,back+next);
+  return wzChrome('Send Points',SP_STEPS,step,body,back+next,{headerLabel:'Back',headerAction:'spExit'});
 };
 function spRecalc(){ const ppr=+document.getElementById('sp-ppr').value||0; document.getElementById('sp-pts').value=(ppr/PT).toFixed(2);
   S.flow.ppr=ppr; S.flow.recips=+document.getElementById('sp-recips').value||0; }
 function spMsg(e){ S.flow.msg=e.target?e.target.value:''; const p=document.getElementById('sp-prev'); if(p)p.textContent=S.flow.msg; }
 function spWhen(el){ S.flow.when=el.dataset.arg; render(); }
 function spBack(){ if(S.flow.step===0){wzExit();return;} S.flow.step--; render(); }
+function spExit(){
+  const prev=S.flow.returnState;
+  if(!prev){ wzExit(); return; }
+  S.flow=prev.flow||{};
+  go(prev.view||'shops',{nav:prev.nav||S.nav});
+}
 function spNext(){ const f=S.flow;
   if(f.step===0){ f.ppr=+document.getElementById('sp-ppr').value||0; f.recips=+document.getElementById('sp-recips').value||0; f.orderName=document.getElementById('sp-name').value; }
   if(f.step===2){ const fr=document.getElementById('re-from'); if(fr)f.from=fr.value; const m=document.getElementById('re-msg'); if(m)f.msg=m.value; }
@@ -1060,8 +1089,23 @@ function recipientPicker(f,title,sub,opts={}){
     <td class="muted">${esc(c.email)}</td><td style="font-weight:600">${esc(c.name)}</td><td class="muted">${c.loc?esc(c.loc):'—'}</td></tr>`;}).join('');
   const modes = opts.modes? `<div class="grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:18px">
       ${[['redeem','Recipients redeem','Recipients choose size, colour & shipping address from a private link.'],['surprise','Surprise recipients','Enter recipient details up front so gifts ship without input.'],['single','Single location','Ship all units to one office, event venue or address.']].map(([k,t,d])=>`<div class="optcard ${(f.mode||'redeem')===k?'on':''}" data-act="recMode" data-arg="${k}"><div class="rd"></div><div><h4>${t}</h4><p>${d}</p></div></div>`).join('')}</div>`:'';
+  const loc=f.singleLocation||{};
+  const singleForm=f.mode==='single'?`<div class="card" style="padding:20px;margin-bottom:18px">
+      <h3 style="font-size:16px;margin-bottom:5px">Single delivery location</h3>
+      <p class="muted" style="font-size:12.5px;margin-bottom:16px">All selected recipients' gifts will ship together to this address. A notification will be sent to the email below.</p>
+      <div class="row"><div class="field" style="flex:1"><label class="lbl">Contact name</label><input class="inp" id="sl-name" data-act="singleLocLive" data-k="name" value="${esc(loc.name||'')}"></div>
+      <div class="field" style="flex:1"><label class="lbl">Notification email</label><input class="inp" id="sl-email" type="email" data-act="singleLocLive" data-k="email" value="${esc(loc.email||'')}"></div>
+      <div class="field" style="flex:1"><label class="lbl">Phone (optional)</label><input class="inp" id="sl-phone" data-act="singleLocLive" data-k="phone" value="${esc(loc.phone||'')}"></div></div>
+      <div class="field"><label class="lbl">Address</label><input class="inp" id="sl-line1" data-act="singleLocLive" data-k="line1" value="${esc(loc.line1||'')}"></div>
+      <div class="field"><label class="lbl">Address line 2 (optional)</label><input class="inp" id="sl-line2" data-act="singleLocLive" data-k="line2" value="${esc(loc.line2||'')}"></div>
+      <div class="row"><div class="field" style="flex:1"><label class="lbl">City</label><input class="inp" id="sl-city" data-act="singleLocLive" data-k="city" value="${esc(loc.city||'')}"></div>
+      <div class="field" style="flex:1"><label class="lbl">State</label><input class="inp" id="sl-state" data-act="singleLocLive" data-k="state" value="${esc(loc.state||'')}"></div>
+      <div class="field" style="flex:1"><label class="lbl">PIN / Postal code</label><input class="inp" id="sl-pincode" data-act="singleLocLive" data-k="pincode" value="${esc(loc.pincode||'')}"></div>
+      <div class="field" style="flex:1"><label class="lbl">Country</label><select class="inp" id="sl-country" data-act="singleLocLive" data-k="country"><option value="IN" ${(loc.country||'IN')==='IN'?'selected':''}>India</option><option value="AE" ${loc.country==='AE'?'selected':''}>UAE</option><option value="US" ${loc.country==='US'?'selected':''}>USA</option></select></div></div>
+    </div>`:'';
   return `<h1 style="font-size:24px;margin-bottom:4px">${title}</h1><p class="muted" style="margin-bottom:18px">${sub}</p>
     ${modes}
+    ${singleForm}
     <div class="card" style="padding:16px">
       <div class="row" style="gap:8px;margin-bottom:12px;align-items:center"><span class="tag tag-soft" style="background:var(--brand-50);color:var(--brand-d)">${f.selRecips.length} selected</span>
         <button class="btn btn-ghost btn-sm" data-act="recDeselect">Deselect all</button>
@@ -1072,6 +1116,7 @@ function recipientPicker(f,title,sub,opts={}){
 function recToggle(el){ const id=el.dataset.arg; const a=S.flow.selRecips; const i=a.indexOf(id); if(i<0)a.push(id); else a.splice(i,1); render(); }
 function recDeselect(){ S.flow.selRecips=[]; render(); }
 function recMode(el){ S.flow.mode=el.dataset.arg; render(); }
+function singleLocLive(el){ S.flow.singleLocation=S.flow.singleLocation||{}; S.flow.singleLocation[el.dataset.k]=el.value; }
 
 /* shared recipient-experience step: message editor + landing/email previews + scheduler */
 function recipientExperience(f,opts={}){
@@ -1266,11 +1311,11 @@ const DEMO_PRODUCTS=[
 ];
 
 /* wizard chrome */
-function wzChrome(title, steps, idx, body, foot){
+function wzChrome(title, steps, idx, body, foot, opts={}){
   return `<div style="height:100%;display:flex;flex-direction:column;background:var(--bg)">
     <div class="wzbar"><div class="title">${title}</div>
       <div class="wzsteps">${steps.map((s,i)=>`<div class="wzstep ${i<idx?'done':''} ${i===idx?'on':''}"><span class="b">${i<idx?'✓':i+1}</span>${s}</div>`).join('')}</div>
-      ${backLink('Save and exit','wzExit',null,{mb:'0'})}</div>
+      ${backLink(opts.headerLabel||'Save and exit',opts.headerAction||'wzExit',null,{mb:'0'})}</div>
     <div class="main scroll" style="flex:1"><div style="max-width:1080px;margin:0 auto;padding:34px" class="fade-in">${body}</div></div>
     ${foot?`<div class="wzfoot">${foot}</div>`:''}</div>`;
 }
@@ -2247,24 +2292,120 @@ function ViewContacts(){
 }
 function addContacts(){
   S.flow.addTab='manual';
+  S.flow.importFile=null;
+  S.flow.importPreview=null;
+  S.flow.importParsing=false;
+  S.flow.importBusy=false;
+  S.flow.importStage=null;
+  S.flow.importResult=null;
   renderAddContacts();
+}
+function acUploadIcon(){
+  return `<div class="ac-import-icon">${I.upload.replace('<svg ','<svg width="20" height="20" ')}</div>`;
+}
+function acImportCheckIcon(){
+  return I.check.replace('<svg ','<svg width="16" height="16" ');
+}
+function acImportSpinner(){
+  return '<span class="ac-import-spin" aria-hidden="true"></span>';
+}
+function acImportInstructions(){
+  return `<p class="muted" style="font-size:13px;margin-bottom:12px">Download the template, fill in employee details, and upload a CSV or Excel file. <span class="lnk" data-act="acDownloadTemplate">Download template</span></p>`;
+}
+function acImportStatusRow(iconHtml,label,sub,busy){
+  return `<div class="ac-import-status${busy?' is-busy':''}" style="margin-top:12px">
+    <div class="row" style="gap:10px;align-items:center">${iconHtml}<div><div style="font-weight:600">${label}</div>${sub?`<div class="mut3" style="font-size:11px;margin-top:2px">${sub}</div>`:''}</div></div>
+  </div>`;
+}
+function acImportFileExt(name){
+  const m=String(name||'').match(/\.([^.]+)$/i);
+  return m?m[1].toUpperCase():'FILE';
+}
+function acImportFileCard(file,preview,locked){
+  const ext=acImportFileExt(file.name);
+  const meta=preview?.sizeLabel||fmtFileSize(file.size);
+  const rows=preview?.rowCount!=null?` · ${preview.rowCount} row${preview.rowCount===1?'':'s'}`:'';
+  return `<div class="ac-import-file-card">
+    <div class="row" style="align-items:center;justify-content:space-between;gap:10px">
+      <div class="row" style="gap:10px;align-items:center;min-width:0">
+        <div style="width:36px;height:36px;border-radius:8px;background:#fff;border:1px solid var(--line);display:grid;place-items:center;font-size:9px;font-weight:800;color:var(--brand-d);letter-spacing:.02em;flex:none">${esc(ext)}</div>
+        <div style="min-width:0;text-align:left"><div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(file.name)}</div><div class="mut3" style="font-size:11px">${esc(meta)}${rows}</div></div>
+      </div>
+      ${locked?'':`<button type="button" class="xbtn" data-act="acImportClear" aria-label="Remove file">✕</button>`}
+    </div>
+  </div>`;
+}
+function acImportProgressPanel(){
+  const stage=S.flow.importStage||'uploading';
+  const stageLabel=stage==='uploading'?'Uploading file…':stage==='queued'?'Queued for processing…':stage==='processing'?'Validating and importing contacts…':'Finishing up…';
+  return `${acImportStatusRow(acImportSpinner(),stageLabel,'This usually takes a few seconds',true)}
+    <div style="height:4px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:10px"><div class="ac-import-bar"></div></div>`;
+}
+function renderAcImportPanel(){
+  const importFile=S.flow.importFile;
+  const preview=S.flow.importPreview;
+  const parsing=S.flow.importParsing;
+  const busy=S.flow.importBusy;
+  const result=S.flow.importResult;
+  const fileInput=`<input type="file" id="ac-import-inp" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none">`;
+
+  if(busy&&importFile){
+    return `${acImportInstructions()}${acImportFileCard(importFile,preview,true)}${acImportProgressPanel()}${fileInput}`;
+  }
+  if(importFile){
+    let panel=`${acImportInstructions()}${acImportFileCard(importFile,preview||{sizeLabel:fmtFileSize(importFile.size)},false)}`;
+    if(parsing){
+      panel+=acImportStatusRow(acImportSpinner(),'Reading file…','Checking format and counting rows',true);
+      return `${panel}${fileInput}`;
+    }
+    if(preview?.ready){
+      if(preview.rowCount!=null){
+        const warn=preview.hasEmail===false?'No email column found — import may fail':preview.hasName===false?'Name column missing — emails will be used as names':'';
+        panel+=acImportStatusRow(acImportCheckIcon(),`${preview.rowCount} contact row${preview.rowCount===1?'':'s'} ready to import`,warn,false);
+      }else if(preview.excel){
+        panel+=acImportStatusRow(acImportCheckIcon(),'Excel file ready','Rows will be validated when you import',false);
+      }
+    }else if(preview?.error){
+      panel+=`<div class="banner" style="margin-top:12px;font-size:12.5px">${esc(preview.error)}</div>`;
+    }
+    if(result){
+      panel+=`<div class="card" style="padding:12px 14px;margin-top:14px;font-size:13px">
+        <div style="font-weight:600;margin-bottom:6px">Import summary</div>
+        <div class="muted">${result.validCount} imported · ${result.errorCount} skipped</div>
+        ${result.errors?.length?`<div style="margin-top:8px;max-height:120px;overflow:auto;font-size:12px;color:var(--ink-2)">${result.errors.slice(0,5).map(e=>`Row ${e.row}: ${esc(e.message)}`).join('<br>')}${result.errors.length>5?`<br>…and ${result.errors.length-5} more`:''}</div>`:''}
+      </div>`;
+    }
+    panel+=`<button type="button" class="btn btn-ghost btn-sm" style="margin-top:12px" data-act="acImportPick">Replace file</button>`;
+    return `${panel}${fileInput}`;
+  }
+  return `${acImportInstructions()}
+    <div id="ac-import-drop" class="ac-import-zone" style="border:1.5px dashed var(--line);border-radius:var(--r-sm);padding:22px;text-align:center;color:var(--ink-2);background:#fff;cursor:pointer" data-act="acImportPick">
+      ${acUploadIcon()}
+      <div style="font-weight:600;font-size:13px">Drag and drop file</div>
+      <div class="mut3" style="font-size:11px;margin:6px 0">CSV, XLSX, or XLS · max 5 MB</div>
+      <button type="button" class="btn btn-soft btn-sm" data-act="acImportPick">Browse files</button>
+    </div>${fileInput}`;
 }
 function renderAddContacts(){
   const tab=S.flow.addTab;
+  const importFile=S.flow.importFile;
+  const importReady=!!(importFile&&S.flow.importPreview?.ready&&!S.flow.importParsing);
   const body = tab==='manual'
     ? `<label class="lbl">Enter emails (comma separated)</label>
        <textarea class="inp" id="ac-emails" rows="5" placeholder="Enter or paste emails separated by commas or line breaks" autofocus></textarea>
        <div class="card" style="padding:12px 14px;margin-top:14px;display:flex;justify-content:space-between;align-items:center"><span class="muted" style="font-size:13px">Add these contacts to workspace as:</span>
        <select class="inp" id="ac-role" style="width:auto;height:36px;padding:0 30px 0 12px"><option>Non-Member</option><option>Member</option><option>Sender</option><option>Admin</option></select></div>`
-    : `<p class="muted" style="font-size:13px;margin-bottom:12px">Download the CSV template, fill it out, and upload below. <span class="lnk" data-act="toast" data-arg="Template downloaded">Download template</span></p>
-       <div style="border:1.5px dashed var(--line);border-radius:var(--r);padding:30px;text-align:center;color:var(--ink-2)">Accepted file type: CSV<div style="margin-top:10px"><button class="btn btn-soft btn-sm" data-act="toast" data-arg="CSV attached">Search local device</button></div></div>
-       <label class="row" style="gap:9px;align-items:center;margin-top:14px;font-size:13px"><input type="checkbox"> Let CSV contacts overwrite existing contacts (excluding HRIS-synced)</label>`;
+    : renderAcImportPanel();
+  const submitLabel=tab==='csv'?(S.flow.importBusy?'Importing…':S.flow.importParsing?'Reading file…':'Import contacts'):'Add contacts';
+  const submitDisabled=tab==='csv'&&(S.flow.importBusy||S.flow.importParsing||!importReady);
   openModal(`<div class="modal-pad"><div class="modal-h"><h3>Add contacts</h3><button class="xbtn" data-act="closeLayer">✕</button></div>
-    <div class="tabs" style="max-width:240px;margin:12px 0 18px">${[['manual','Manually'],['csv','Upload CSV']].map(([k,l])=>`<button class="${tab===k?'on':''}" data-act="acTab" data-arg="${k}">${l}</button>`).join('')}</div>
+    <div class="tabs" style="max-width:280px;margin:12px 0 18px">${[['manual','Manually'],['csv','Upload file']].map(([k,l])=>`<button class="${tab===k?'on':''}" data-act="acTab" data-arg="${k}">${l}</button>`).join('')}</div>
     ${body}
-    <div class="row" style="margin-top:20px"><button class="btn btn-ghost btn-block" data-act="closeLayer">Cancel</button><button class="btn btn-brand btn-block" data-act="addContactsDo">Add contacts</button></div></div>`);
+    <div class="row" style="margin-top:20px"><button class="btn btn-ghost btn-block" data-act="closeLayer" ${S.flow.importBusy?'disabled':''}>Cancel</button><button class="btn btn-brand btn-block" data-act="addContactsDo" ${submitDisabled?'disabled':''}>${submitLabel}</button></div></div>`);
 }
 async function addContactsDo(){
+  const tab=S.flow.addTab||'manual';
+  if(tab==='csv') return addContactsImportDo();
   const ta=document.getElementById('ac-emails');
   const role=document.getElementById('ac-role')?document.getElementById('ac-role').value:'Member';
   const emails=ta?(ta.value.split(/[\s,]+/).filter(x=>x.includes('@'))):[];
@@ -2280,18 +2421,168 @@ async function addContactsDo(){
     closeLayer(); toast(`Added ${created.length} contact${created.length>1?'s':''}`); render();
   }catch(err){ toast(err.message||'Failed to add contacts'); }
 }
+function acImportPick(){ document.getElementById('ac-import-inp')?.click(); }
+async function parseImportPreview(file){
+  const ext=acImportFileExt(file.name);
+  await new Promise(r=>setTimeout(r,320));
+  if(/\.csv$/i.test(file.name)){
+    const text=await file.text();
+    const lines=text.split(/\r?\n/).filter(l=>l.trim());
+    const rowCount=Math.max(0,lines.length-1);
+    const headers=(lines[0]||'').toLowerCase();
+    return {
+      rowCount,
+      ext,
+      sizeLabel:fmtFileSize(file.size),
+      hasEmail:/email/.test(headers),
+      hasName:/\bname\b|full name/.test(headers),
+      ready:true,
+    };
+  }
+  return {
+    rowCount:null,
+    ext,
+    sizeLabel:fmtFileSize(file.size),
+    ready:true,
+    excel:true,
+  };
+}
+function acImportClear(){
+  S.flow.importFile=null;
+  S.flow.importPreview=null;
+  S.flow.importParsing=false;
+  S.flow.importResult=null;
+  S.flow.importStage=null;
+  renderAddContacts();
+}
+async function acImportSetFile(file){
+  if(!file) return;
+  const ok=/\.(csv|xlsx|xls)$/i.test(file.name);
+  if(!ok){ toast('Only CSV and Excel files are accepted',false); return; }
+  if(file.size>5*1024*1024){ toast('File must be 5 MB or smaller',false); return; }
+  S.flow.importFile=file;
+  S.flow.importPreview=null;
+  S.flow.importResult=null;
+  S.flow.importStage=null;
+  S.flow.importParsing=true;
+  renderAddContacts();
+  try{
+    S.flow.importPreview=await parseImportPreview(file);
+  }catch(err){
+    S.flow.importPreview={ready:false,error:err.message||'Could not read file'};
+  }
+  S.flow.importParsing=false;
+  renderAddContacts();
+}
+function acDownloadTemplate(){
+  const csv='name,email,phone,department,employeeCode,address,city,state,pincode,country\nJane Doe,jane@example.com,+91 98765 43210,Engineering,EMP001,"123 Main St",Bengaluru,Karnataka,560001,IN\n';
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='contacts-template.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+async function addContactsImportDo(){
+  const file=S.flow.importFile;
+  if(!file||!S.flow.importPreview?.ready){ toast('Choose a CSV or Excel file to import',false); return; }
+  S.flow.importBusy=true;
+  S.flow.importStage='uploading';
+  renderAddContacts();
+  try{
+    if(api.useMocks()){
+      S.flow.importStage='processing';
+      renderAddContacts();
+      await new Promise(r=>setTimeout(r,500));
+      const text=await file.text();
+      const lines=text.split(/\r?\n/).filter(Boolean);
+      const headers=lines[0].split(',').map(h=>h.trim().toLowerCase());
+      const emailIdx=headers.findIndex(h=>h.includes('email'));
+      const nameIdx=headers.findIndex(h=>h==='name'||h==='full name');
+      let added=0;
+      for(const line of lines.slice(1)){
+        const cols=line.split(',');
+        const email=(cols[emailIdx>=0?emailIdx:1]||'').trim();
+        const name=(cols[nameIdx>=0?nameIdx:0]||email.split('@')[0]||'').trim();
+        if(!email.includes('@')) continue;
+        if(S.contacts.some(c=>c.email===email)) continue;
+        S.contacts.push({id:nid('p'),email,name,role:'Member',address:'',loc:''});
+        added+=1;
+      }
+      S.flow.importResult={validCount:added,errorCount:Math.max(0,lines.length-1-added),errors:[]};
+      S.flow.importBusy=false;
+      S.flow.importStage=null;
+      renderAddContacts();
+      toast(`Imported ${added} contact${added===1?'':'s'}`);
+      return;
+    }
+    const result=await api.importContactsFlow(file,(status)=>{
+      S.flow.importStage=status.status;
+      renderAddContacts();
+    });
+    S.flow.importResult=result;
+    S.flow.importBusy=false;
+    S.flow.importStage=null;
+    if(result.status==='failed'){
+      renderAddContacts();
+      toast(result.errors?.[0]?.message||'Import failed',false);
+      return;
+    }
+    S.contacts=await api.refreshContactsFlow();
+    closeLayer();
+    S.flow.importFile=null;
+    S.flow.importPreview=null;
+    S.flow.importResult=null;
+    const msg=`Imported ${result.validCount} contact${result.validCount===1?'':'s'}`;
+    if(result.errorCount){
+      toast(`${msg} (${result.errorCount} row${result.errorCount===1?'':'s'} skipped)`);
+    }else{
+      toast(msg);
+    }
+    render();
+  }catch(err){
+    S.flow.importBusy=false;
+    S.flow.importStage=null;
+    renderAddContacts();
+    toast(err.message||'Import failed',false);
+  }
+}
 function contactEdit(id){ const c=S.contacts.find(x=>x.id===id);
   openModal(`<div class="modal-pad"><div class="modal-h"><h3>Fix recipient information</h3><button class="xbtn" data-act="closeLayer">✕</button></div>
     <p class="muted" style="font-size:13px;margin:6px 0 16px">Update this person's details so they can be added to orders. HRIS-synced fields will override manual entries.</p>
-    <div class="row"><div class="field" style="flex:1"><label class="lbl">First name</label><input class="inp" value="${esc(c.name.split(' ')[0]||'')}"></div>
-    <div class="field" style="flex:1"><label class="lbl">Last name</label><input class="inp" value="${esc(c.name.split(' ').slice(1).join(' '))}"></div></div>
-    <div class="row"><div class="field" style="flex:1"><label class="lbl">Email</label><input class="inp" value="${esc(c.email)}"></div>
-    <div class="field" style="flex:1"><label class="lbl">Country</label><select class="inp"><option>India</option><option>UAE</option><option>USA</option></select></div></div>
-    <div class="field"><label class="lbl">Address</label><input class="inp" value="${esc(c.address)}"></div>
-    <div class="row"><div class="field" style="flex:1"><label class="lbl">City</label><input class="inp" value="Hyderabad"></div>
-    <div class="field" style="flex:1"><label class="lbl">State</label><input class="inp" value="Telangana"></div>
-    <div class="field" style="flex:1"><label class="lbl">PIN</label><input class="inp" value="500089"></div></div>
-    <div class="row" style="margin-top:8px"><button class="btn btn-ghost btn-block" data-act="closeLayer">Cancel</button><button class="btn btn-brand btn-block" data-act="closeLayerToast" data-arg="Recipient details saved">Save</button></div></div>`); }
+    <div class="row"><div class="field" style="flex:1"><label class="lbl">First name</label><input class="inp" id="contact-first" value="${esc(c.name.split(' ')[0]||'')}"></div>
+    <div class="field" style="flex:1"><label class="lbl">Last name</label><input class="inp" id="contact-last" value="${esc(c.name.split(' ').slice(1).join(' '))}"></div></div>
+    <div class="row"><div class="field" style="flex:1"><label class="lbl">Email</label><input class="inp" id="contact-email" value="${esc(c.email)}"></div>
+    <div class="field" style="flex:1"><label class="lbl">Country</label><select class="inp" id="contact-country"><option value="IN" ${(c.country||'IN')==='IN'?'selected':''}>India</option><option value="AE" ${c.country==='AE'?'selected':''}>UAE</option><option value="US" ${c.country==='US'?'selected':''}>USA</option></select></div></div>
+    <div class="field"><label class="lbl">Address</label><input class="inp" id="contact-address" value="${esc(c.address)}"></div>
+    <div class="row"><div class="field" style="flex:1"><label class="lbl">City</label><input class="inp" id="contact-city" value="${esc(c.city||'')}"></div>
+    <div class="field" style="flex:1"><label class="lbl">State</label><input class="inp" id="contact-state" value="${esc(c.state||'')}"></div>
+    <div class="field" style="flex:1"><label class="lbl">PIN</label><input class="inp" id="contact-pin" value="${esc(c.pincode||'')}"></div></div>
+    <div class="row" style="margin-top:8px"><button class="btn btn-ghost btn-block" data-act="closeLayer">Cancel</button><button class="btn btn-brand btn-block" data-act="contactSave" data-arg="${c.id}">Save</button></div></div>`); }
+async function contactSave(id){
+  const current=S.contacts.find(x=>x.id===id);
+  if(!current) return;
+  const address={
+    line1:document.getElementById('contact-address').value.trim(),
+    city:document.getElementById('contact-city').value.trim(),
+    state:document.getElementById('contact-state').value.trim(),
+    pincode:document.getElementById('contact-pin').value.trim(),
+    country:document.getElementById('contact-country').value,
+  };
+  const payload={
+    name:[document.getElementById('contact-first').value.trim(),document.getElementById('contact-last').value.trim()].filter(Boolean).join(' '),
+    email:document.getElementById('contact-email').value.trim(),
+    address,
+  };
+  try{
+    const updated=api.useMocks()
+      ? {...current,...payload,address:address.line1,loc:[address.city,address.state,address.country].filter(Boolean).join(', '),city:address.city,state:address.state,pincode:address.pincode,country:address.country}
+      : await api.updateContactFlow(id,payload);
+    S.contacts[S.contacts.findIndex(x=>x.id===id)]=updated;
+    closeLayer(); toast('Recipient details saved'); render();
+  }catch(err){ toast(err.message||'Failed to save recipient details'); }
+}
 
 /* ===================== INTEGRATIONS ===================== */
 function ViewIntegrations(){
@@ -2844,7 +3135,23 @@ function swagTab(t){
 }
 function swagView(mode){ S.flow.swagView=mode; render(); }
 function catCat(c){ S.flow.catCat=c; render(); }
-function acTab(t){ S.flow.addTab=t; renderAddContacts(); }
+function acTab(t){ S.flow.addTab=t; if(t==='manual'){ S.flow.importFile=null; S.flow.importPreview=null; S.flow.importParsing=false; S.flow.importResult=null; S.flow.importStage=null; } renderAddContacts(); }
+
+function chooseKitToSend(){
+  const kits=(S.kits||[]).filter(k=>k.status==='live');
+  const rows=kits.map(k=>`<div class="card" style="padding:14px 16px;display:flex;align-items:center;gap:14px">
+      <div style="width:42px;height:42px;border-radius:10px;background:var(--brand-50);color:var(--brand);display:grid;place-items:center;flex:none">${I.box||I.gift||I.send}</div>
+      <div style="flex:1"><div style="font-weight:700">${esc(k.name)}</div><div class="muted" style="font-size:12px;margin-top:2px">${k.items||0} item${k.items===1?'':'s'} · ${esc(k.status||'live')}</div></div>
+      <button class="btn btn-dark btn-sm" data-act="sendItemsStart" data-arg="${k.id}">Select</button>
+    </div>`).join('');
+  openModal(`<div class="modal-pad" style="max-width:620px">
+    <div class="modal-h"><div><div class="eyebrow">Send a kit</div><h3>Choose a kit to send</h3></div><button class="xbtn" data-act="closeLayer">✕</button></div>
+    <p class="muted" style="font-size:13px;margin:6px 0 18px">Select one of your existing kits, or create a new kit.</p>
+    <div style="display:grid;gap:10px">${rows||'<div class="card empty" style="padding:24px"><h3>No kits available</h3><p>Create a kit before starting this send.</p></div>'}</div>
+    <button class="btn btn-brand btn-block" style="margin-top:16px" data-act="createKitFromSend"><span style="font-size:18px;line-height:1" aria-hidden="true">+</span>Create a new kit</button>
+  </div>`);
+}
+function createKitFromSend(){ closeLayer(); createKitStart(); }
 
 function sendGift(){
   openModal(`<div class="modal-pad">
@@ -2855,7 +3162,7 @@ function sendGift(){
         <div style="width:42px;height:42px;border-radius:12px;background:var(--brand-50);color:var(--brand);display:grid;place-items:center">${I.coin}</div>
         <div><h4 style="margin-bottom:2px">Send points</h4><p>Let recipients pick their own swag from your branded shop.</p></div>
       </div>
-      <div class="optcard" style="flex-direction:column;align-items:flex-start;gap:10px;cursor:pointer" data-act="sendItemsStart">
+      <div class="optcard" style="flex-direction:column;align-items:flex-start;gap:10px;cursor:pointer" data-act="chooseKitToSend">
         <div style="width:42px;height:42px;border-radius:12px;background:var(--brand-50);color:var(--brand);display:grid;place-items:center">${I.box||I.gift||I.send}</div>
         <div><h4 style="margin-bottom:2px">Send a kit</h4><p>Ship a ready-made bundle of branded items to addresses.</p></div>
       </div>
@@ -2885,6 +3192,8 @@ const ACT = {
   auth:()=>auth(),
   logout:()=>logout(),
   sendGift:()=>sendGift(),
+  chooseKitToSend:()=>chooseKitToSend(),
+  createKitFromSend:()=>createKitFromSend(),
   viewShop:(el,a)=>window.open('/shop/'+a,'_blank'),
   userMenu:()=>userMenu(),
   toast:(el,a)=>toast(a||'Done'),
@@ -2962,6 +3271,7 @@ const ACT = {
   spRecalc:()=>spRecalc(),
   spWhen:(el)=>spWhen(el),
   spBack:()=>spBack(),
+  spExit:()=>spExit(),
   spNext:()=>spNext(),
   sendPointsDo:()=>sendPointsDo(),
   recToggle:(el)=>recToggle(el),
@@ -2994,8 +3304,12 @@ const ACT = {
   // contacts
   addContacts:()=>addContacts(),
   acTab:(el,a)=>acTab(a),
+  acImportPick:()=>acImportPick(),
+  acImportClear:()=>acImportClear(),
+  acDownloadTemplate:()=>acDownloadTemplate(),
   addContactsDo:()=>addContactsDo(),
   contactEdit:(el,a)=>contactEdit(a),
+  contactSave:(el,a)=>contactSave(a),
   // wizards
   wzExit:()=>wzExit(),
   payPick:(el)=>payPick(el),
@@ -3013,8 +3327,8 @@ const ACT = {
   shopLogoTab:(el,a)=>shopLogoTab(a),
   shopLogoPrev:(el)=>shopLogoPrev(el),
 };
-const LIVE = { spRecalc:1, spMsg:1, reMsg:1, reNote:1, orgWLive:1, orgAllocLive:1, orgMgrLive:1 };  // input-driven
-const CHANGED = { schedSet:1, orgWChange:1, orgMgrRole:1 };              // change-driven
+const LIVE = { spRecalc:1, spMsg:1, reMsg:1, reNote:1, singleLocLive:1, orgWLive:1, orgAllocLive:1, orgMgrLive:1 };  // input-driven
+const CHANGED = { schedSet:1, singleLocLive:1, orgWChange:1, orgMgrRole:1 };              // change-driven
 
 function onShelfMerchClick(e){
   // backdrop click closes any open layer
@@ -3044,6 +3358,7 @@ document.addEventListener('input', function(e){
   else if(a==='spMsg') spMsg(e);
   else if(a==='reMsg') reMsg(e);
   else if(a==='reNote') reNote(e);
+  else if(a==='singleLocLive') singleLocLive(t);
   else if(a==='orgWLive') orgWLive(e);
   else if(a==='orgAllocLive') orgAllocLive(e);
   else if(a==='orgMgrLive') orgMgrLive(e);
@@ -3074,17 +3389,24 @@ document.addEventListener('change', function(e){
     e.target.value='';
     return;
   }
+  if(e.target.id==='ac-import-inp'){
+    const f=e.target.files?.[0];
+    if(f) acImportSetFile(f);
+    e.target.value='';
+    return;
+  }
   const t = e.target.closest('[data-act]');
   if(!t) return;
   const a=t.dataset.act;
   if(a==='schedSet') schedSet(t);
+  else if(a==='singleLocLive') singleLocLive(t);
   else if(a==='orgWChange') orgWChange(t);
   else if(a==='orgWLive') orgWLive(t);
   else if(a==='orgMgrRole') orgMgrRole(t);
 });
 
 document.addEventListener('dragover', function(e){
-  if(e.target.closest('#sh-logo-drop')||e.target.closest('#kt-logo-drop')||e.target.closest('#sw-art-drop')||e.target.closest('#shop-edit-logo-drop')) e.preventDefault();
+  if(e.target.closest('#sh-logo-drop')||e.target.closest('#kt-logo-drop')||e.target.closest('#sw-art-drop')||e.target.closest('#shop-edit-logo-drop')||e.target.closest('#ac-import-drop')) e.preventDefault();
 });
 
 document.addEventListener('drop', function(e){
@@ -3092,11 +3414,13 @@ document.addEventListener('drop', function(e){
   const kitLogoDrop=e.target.closest('#kt-logo-drop');
   const artDrop=e.target.closest('#sw-art-drop');
   const editLogoDrop=e.target.closest('#shop-edit-logo-drop');
-  if(!logoDrop&&!kitLogoDrop&&!artDrop&&!editLogoDrop) return;
+  const importDrop=e.target.closest('#ac-import-drop');
+  if(!logoDrop&&!kitLogoDrop&&!artDrop&&!editLogoDrop&&!importDrop) return;
   e.preventDefault();
   const f=e.dataTransfer?.files?.[0];
   if(!f) return;
-  if(editLogoDrop) shopEditSetLogoFile(f);
+  if(importDrop) acImportSetFile(f);
+  else if(editLogoDrop) shopEditSetLogoFile(f);
   else if(kitLogoDrop) ktLogoSetFile(f);
   else if(logoDrop) shopLogoSetFile(f);
   else swArtSetFile(f);

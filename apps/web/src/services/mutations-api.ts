@@ -294,9 +294,21 @@ export async function launchKitCampaignApi(payload: {
   entityId: string;
   kitId: string;
   name: string;
+  fulfillmentMode?: "redeem" | "surprise" | "single";
+  singleLocation?: {
+    name: string;
+    email: string;
+    phone?: string;
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    pincode: string;
+    country: string;
+  };
   message: { from: string; body: string };
   schedule?: { mode: "now" | "scheduled" | "self"; sendAt?: string | null; timezone?: string };
-  recipients: Array<{ name: string; email: string; phone?: string }>;
+  recipients: Array<{ contactId?: string; name: string; email: string; phone?: string }>;
 }) {
   const campaign = await apiFetch<Record<string, unknown>>("/campaigns", {
     method: "POST",
@@ -304,6 +316,8 @@ export async function launchKitCampaignApi(payload: {
       entityId: payload.entityId,
       name: payload.name,
       type: "kit",
+      fulfillmentMode: payload.fulfillmentMode ?? "redeem",
+      singleLocation: payload.singleLocation,
       kitId: payload.kitId,
       message: payload.message,
       schedule: payload.schedule ?? { mode: "now" },
@@ -315,6 +329,7 @@ export async function launchKitCampaignApi(payload: {
     method: "POST",
     body: JSON.stringify({
       recipients: payload.recipients.map((r) => ({
+        contactId: r.contactId,
         name: r.name,
         email: r.email,
         phone: r.phone || "",

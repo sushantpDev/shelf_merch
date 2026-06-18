@@ -5,6 +5,20 @@ export const createCampaignSchema = z.object({
   entityId: objectId,
   name: z.string().min(1),
   type: z.enum(['points', 'items', 'kit']),
+  fulfillmentMode: z.enum(['redeem', 'surprise', 'single']).optional().default('redeem'),
+  singleLocation: z
+    .object({
+      name: z.string().min(1),
+      email: z.string().email(),
+      phone: z.string().optional().default(''),
+      line1: z.string().min(1),
+      line2: z.string().optional().default(''),
+      city: z.string().min(1),
+      state: z.string().min(1),
+      pincode: z.string().min(1),
+      country: z.string().optional().default('IN'),
+    })
+    .optional(),
   catalogMode: z.enum(['full_store', 'selected_products']).optional().default('full_store'),
   selectedProductIds: z.array(objectId).optional().default([]),
   kitId: objectId.nullable().optional().default(null),

@@ -1,12 +1,101 @@
 import { parse } from 'csv-parse/sync';
+import * as XLSX from 'xlsx';
 import { Contact } from '../contacts/contact.model.js';
 import { ImportJob } from './importJob.model.js';
 import { ImportMapping, DEFAULT_MAPPING } from './importMapping.model.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const FIELD_ALIASES = {
+  name: ['name', 'full name', 'employee name', 'contact name', 'display name'],
+  email: ['email', 'email address', 'work email', 'e mail', 'mail'],
+  phone: ['phone', 'phone number', 'mobile', 'mobile number', 'contact number', 'cell'],
+  department: ['department', 'dept', 'team', 'division'],
+  employeeCode: ['employeecode', 'employee code', 'employee id', 'emp id', 'emp code', 'staff id'],
+  addressLine1: ['address', 'address line 1', 'address1', 'street', 'street address', 'home address', 'line1'],
+  addressLine2: ['address line 2', 'address2', 'line2', 'apt', 'suite', 'unit'],
+  city: ['city', 'town'],
+  state: ['state', 'province', 'region'],
+  pincode: ['pincode', 'pin code', 'zip', 'zip code', 'postal code', 'postcode'],
+  country: ['country', 'nation'],
+};
+
+function normalizeKey(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, ' ');
+}
+
+function isExcelFile(fileName) {
+  return /\.(xlsx|xls)$/i.test(fileName ?? '');
+}
+
+function parseImportRows(buffer, fileName) {
+  if (isExcelFile(fileName)) {
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!sheet) return [];
+    return XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+  }
+  return parse(buffer, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true,
+    bom: true,
+  });
+}
+
+function resolveColumns(headers, mapping) {
+  const byKey = new Map(headers.map((h) => [normalizeKey(h), h]));
+  const resolved = {};
+
+  for (const field of Object.keys(mapping)) {
+    const preferred = mapping[field];
+    if (preferred && byKey.has(normalizeKey(preferred))) {
+      resolved[field] = byKey.get(normalizeKey(preferred));
+      continue;
+    }
+    for (const alias of FIELD_ALIASES[field] ?? []) {
+      const col = byKey.get(alias);
+      if (col) {
+        resolved[field] = col;
+        break;
+      }
+    }
+  }
+
+  const first = byKey.get('first name') ?? byKey.get('firstname');
+  const last = byKey.get('last name') ?? byKey.get('lastname');
+  if (!resolved.name && first) {
+    resolved.nameParts = { first, last: last ?? '' };
+  }
+
+  return resolved;
+}
+
+function pickField(row, cols, field) {
+  if (field === 'name' && cols.nameParts) {
+    return [row[cols.nameParts.first], row[cols.nameParts.last]].filter(Boolean).join(' ').trim();
+  }
+  const col = cols[field];
+  if (!col) return '';
+  return String(row[col] ?? '').trim();
+}
+
+function buildAddress(row, cols) {
+  const line1 = pickField(row, cols, 'addressLine1');
+  const line2 = pickField(row, cols, 'addressLine2');
+  const city = pickField(row, cols, 'city');
+  const state = pickField(row, cols, 'state');
+  const pincode = pickField(row, cols, 'pincode');
+  const country = pickField(row, cols, 'country') || 'IN';
+  if (!line1 && !line2 && !city && !state && !pincode) return null;
+  return { line1, line2, city, state, pincode, country };
+}
+
 /**
- * §7.7 CSV import worker logic. Pure function of (tenantId, jobId) so it can
+ * §7.7 CSV/Excel import worker logic. Pure function of (tenantId, jobId) so it can
  * run from the BullMQ worker process or inline as a fallback.
  */
 export async function processCsvImport({ tenantId, jobId }) {
@@ -19,13 +108,9 @@ export async function processCsvImport({ tenantId, jobId }) {
   try {
     const mappingDoc = await ImportMapping.findOne({ tenantId, source: 'csv' });
     const mapping = mappingDoc?.mapping ?? DEFAULT_MAPPING;
-
-    const rows = parse(job.csv, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-      bom: true,
-    });
+    const rows = parseImportRows(job.csv, job.fileName);
+    const headers = rows.length ? Object.keys(rows[0]) : [];
+    const cols = resolveColumns(headers, mapping);
 
     const errors = [];
     const seenEmails = new Set();
@@ -33,8 +118,8 @@ export async function processCsvImport({ tenantId, jobId }) {
 
     for (const [index, row] of rows.entries()) {
       const rowNum = index + 2; // 1-based + header row
-      const name = row[mapping.name]?.trim();
-      const email = row[mapping.email]?.trim().toLowerCase();
+      const name = pickField(row, cols, 'name');
+      const email = pickField(row, cols, 'email').toLowerCase();
 
       if (!name) {
         errors.push({ row: rowNum, message: 'Missing name' });
@@ -50,16 +135,20 @@ export async function processCsvImport({ tenantId, jobId }) {
       }
       seenEmails.add(email);
 
+      const update = {
+        name,
+        phone: pickField(row, cols, 'phone'),
+        department: pickField(row, cols, 'department'),
+        employeeCode: pickField(row, cols, 'employeeCode'),
+        source: 'csv',
+      };
+      const address = buildAddress(row, cols);
+      if (address) update.address = address;
+
       await Contact.updateOne(
         { tenantId, email },
         {
-          $set: {
-            name,
-            phone: row[mapping.phone]?.trim() ?? '',
-            department: row[mapping.department]?.trim() ?? '',
-            employeeCode: row[mapping.employeeCode]?.trim() ?? '',
-            source: 'csv',
-          },
+          $set: update,
           $setOnInsert: { tenantId, email },
         },
         { upsert: true },

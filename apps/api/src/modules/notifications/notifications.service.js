@@ -3,7 +3,11 @@ import { getNotificationQueue } from '../../jobs/queues.js';
 import { ensureRedisReady } from '../../config/redis.js';
 import { logger } from '../../config/logger.js';
 import { sendSms } from '../../services/msg91.service.js';
-import { sendNotificationEmail, sendRedemptionInviteEmail } from '../../services/email.service.js';
+import {
+  sendNotificationEmail,
+  sendRedemptionInviteEmail,
+  sendSurpriseGiftEmail,
+} from '../../services/email.service.js';
 
 /**
  * §7.12 — delivery handler used by the notification worker.
@@ -26,7 +30,16 @@ export async function deliverNotification({
     await Notification.create({ tenantId, userId, type, title, body, link });
   }
   if (email) {
-    if (type === 'redemption_invite' && meta) {
+    if (type === 'surprise_gift' && meta) {
+      await sendSurpriseGiftEmail({
+        to: email,
+        recipientName: meta.recipientName ?? '',
+        senderName: meta.senderName ?? title,
+        message: meta.message ?? body,
+        giftName: meta.giftName ?? 'Your gift',
+        companyName: meta.companyName ?? 'your company',
+      });
+    } else if (type === 'redemption_invite' && meta) {
       await sendRedemptionInviteEmail({
         to: email,
         recipientName: meta.recipientName ?? '',
@@ -49,6 +62,13 @@ export async function deliverNotification({
 
 /** Enqueue, falling back to immediate delivery when Redis is down. */
 export async function notify(payload) {
+  if (payload.type === 'surprise_gift') {
+    await deliverNotification(payload).catch((err) =>
+      logger.error({ err }, 'Direct surprise gift notification delivery failed'),
+    );
+    return;
+  }
+
   try {
     if (!(await ensureRedisReady())) throw new Error('Redis not ready');
     await getNotificationQueue().add(payload.type, payload);
