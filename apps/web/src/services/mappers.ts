@@ -88,6 +88,7 @@ export type UiCollection = {
   artworkUrl?: string;
   preferredColors?: string[];
   products: UiProduct[];
+  isShopSpecific?: boolean;
 };
 
 export type UiOrder = {
@@ -323,6 +324,7 @@ export function mapCollection(c: ApiProduct, createdByName = "", catalogById?: M
     artworkUrl: (c as { artworkUrl?: string }).artworkUrl || "",
     preferredColors: Array.isArray(c.preferredColors) ? c.preferredColors : [],
     products: (c.productRefs || []).map((ref: ApiProduct) => mapProductRef(ref, catalogById)),
+    isShopSpecific: Boolean((c as { isShopSpecific?: boolean }).isShopSpecific),
   };
 }
 

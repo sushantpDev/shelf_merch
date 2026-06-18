@@ -46,17 +46,51 @@ describe('public storefront (no auth)', () => {
     expect(res.body.shop).toMatchObject({
       name: 'Uber Store', logoUrl: 'https://cdn.test/uber.png', bannerTheme: 'brand', currencyMode: 'points',
     });
-    const ids = res.body.products.map((p) => p._id);
+    const ids = res.body.products.map((p) => p.catalogProductId);
     expect(ids).toContain(String(curated._id));
     expect(ids).not.toContain(String(offShelf._id));
     expect(res.body.products).toHaveLength(1);
   });
 
-  it('falls back to the full active catalog when the shop has no collections', async () => {
+  it('lists the same catalog product once per collection listing (distinct artwork)', async () => {
+    const shop = await Shop.create({ tenantId: tenant._id, name: 'Zeta Store', status: 'live' });
+    const bottle = await CatalogProduct.create({
+      sku: 'SM-BTL-Z', name: 'Bottle', category: 'Drinkware', group: 'bottle', basePriceInr: 990,
+    });
+    await Collection.create({
+      tenantId: tenant._id,
+      shopId: shop._id,
+      code: 'CZ1',
+      name: 'BK Bottle',
+      status: 'ready',
+      artworkUrl: '/uploads/tenant/artwork/bk.png',
+      productRefs: [{ catalogProductId: bottle._id, name: 'Bottle', group: 'bottle' }],
+    });
+    await Collection.create({
+      tenantId: tenant._id,
+      shopId: shop._id,
+      code: 'CZ2',
+      name: 'SF Bottle',
+      status: 'ready',
+      artworkUrl: '/uploads/tenant/artwork/sf.png',
+      productRefs: [{ catalogProductId: bottle._id, name: 'Bottle', group: 'bottle' }],
+    });
+
+    const res = await request(app).get(`/api/v1/storefront/${shop._id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.products).toHaveLength(2);
+    expect(res.body.products.map((p) => p.artworkUrl).sort()).toEqual([
+      '/uploads/tenant/artwork/bk.png',
+      '/uploads/tenant/artwork/sf.png',
+    ]);
+    expect(res.body.products.every((p) => p.catalogProductId === String(bottle._id))).toBe(true);
+  });
+
+  it('returns an empty product list when the shop has no collections', async () => {
     const shop = await Shop.create({ tenantId: tenant._id, name: 'Empty Store', status: 'live' });
     const res = await request(app).get(`/api/v1/storefront/${shop._id}`);
     expect(res.status).toBe(200);
-    expect(res.body.products.length).toBe(2);
+    expect(res.body.products).toEqual([]);
   });
 
   it('returns the base/mask master images and variant colorHex for recolouring', async () => {
@@ -66,9 +100,13 @@ describe('public storefront (no auth)', () => {
     await curated.save();
 
     const shop = await Shop.create({ tenantId: tenant._id, name: 'Img Store', status: 'live' });
+    await Collection.create({
+      tenantId: tenant._id, shopId: shop._id, code: 'CIMG', name: 'Picks', status: 'ready',
+      productRefs: [{ catalogProductId: curated._id, brand: 'Uber', name: 'Welcome Tee', group: 'tee' }],
+    });
     const res = await request(app).get(`/api/v1/storefront/${shop._id}`);
     expect(res.status).toBe(200);
-    const tee = res.body.products.find((p) => p._id === String(curated._id));
+    const tee = res.body.products.find((p) => p.catalogProductId === String(curated._id));
     expect(tee.baseImageUrl).toBe('/uploads/platform/product/base.png');
     expect(tee.maskImageUrl).toBe('/uploads/platform/product/mask.png');
     expect(tee.variants[0]).toMatchObject({ color: 'Navy', colorHex: '#1e3a8a' });
@@ -96,7 +134,7 @@ describe('public storefront (no auth)', () => {
 
     const res = await request(app).get(`/api/v1/storefront/${shop._id}`);
     expect(res.status).toBe(200);
-    const tee = res.body.products.find((p) => p._id === String(curated._id));
+    const tee = res.body.products.find((p) => p.catalogProductId === String(curated._id));
     expect(tee.artworkUrl).toBe('/uploads/tenant/artwork/logo.png');
     expect(tee.printAreas).toHaveLength(1);
     expect(tee.printAreas[0].box).toMatchObject({ xPct: 30, yPct: 25, widthPct: 40, heightPct: 35 });
@@ -116,7 +154,7 @@ describe('public storefront (no auth)', () => {
 
     const res = await request(app).get(`/api/v1/storefront/${shop._id}`);
     expect(res.status).toBe(200);
-    const tee = res.body.products.find((p) => p._id === String(curated._id));
+    const tee = res.body.products.find((p) => p.catalogProductId === String(curated._id));
     expect(tee.preferredColors).toEqual(['Black', 'White']);
   });
 

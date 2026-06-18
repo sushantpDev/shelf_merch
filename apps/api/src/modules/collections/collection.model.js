@@ -24,6 +24,7 @@ const collectionSchema = new mongoose.Schema(
     productRefs: { type: [productRefSchema], default: [] },
     preferredColors: { type: [String], default: [] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    isShopSpecific: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

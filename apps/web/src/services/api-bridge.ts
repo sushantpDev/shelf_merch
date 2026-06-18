@@ -341,6 +341,7 @@ export async function addProductToShopFlow(payload: {
     catalog: payload.catalog,
     preferredColors: payload.collection.preferredColors || [],
     artworkUrl: payload.collection.artworkUrl || undefined,
+    isShopSpecific: true,
   });
 }
 

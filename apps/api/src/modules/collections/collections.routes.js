@@ -12,7 +12,8 @@ import { Collection } from './collection.model.js';
 import { Shop } from '../shops/shop.model.js';
 import { uploadFile } from '../../services/storage.service.js';
 import { writeAudit } from '../../services/audit.service.js';
-import { NotFoundError } from '../../utils/errors.js';
+import { NotFoundError, ApiError } from '../../utils/errors.js';
+import { collectionsForShopFilter } from './collectionQueries.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 const router = Router();
@@ -34,6 +35,7 @@ const createSchema = z.object({
   productRefs: z.array(productRef).min(1),
   preferredColors: z.array(z.string().min(1)).optional().default([]),
   artworkUrl: z.string().optional().default(''),
+  isShopSpecific: z.boolean().optional(),
 });
 
 router.get(
@@ -63,6 +65,19 @@ router.post(
       shopId = shop._id;
     }
     const artworkUrl = req.body.artworkUrl || '';
+    if (shopId && req.body.isShopSpecific && req.body.productRefs?.length) {
+      const catalogProductId = req.body.productRefs[0].catalogProductId;
+      const duplicate = await Collection.findOne({
+        ...collectionsForShopFilter(shopId),
+        tenantId: req.tenantId,
+        status: { $ne: 'archived' },
+        artworkUrl,
+        'productRefs.catalogProductId': catalogProductId,
+      });
+      if (duplicate) {
+        throw new ApiError(400, 'This product is already in this shop', 'PRODUCT_ALREADY_IN_SHOP');
+      }
+    }
     const collection = await Collection.create({
       tenantId: req.tenantId,
       shopId,
@@ -74,6 +89,7 @@ router.post(
       artworkUrl,
       status: artworkUrl ? 'ready' : 'draft',
       createdBy: req.user.userId,
+      isShopSpecific: req.body.isShopSpecific || false,
     });
     writeAudit({ req, action: 'collection.create', entityType: 'Collection', entityId: collection._id, after: collection.toObject() });
     res.status(201).json(collection);

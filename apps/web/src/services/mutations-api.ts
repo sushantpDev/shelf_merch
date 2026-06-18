@@ -218,6 +218,7 @@ export async function createCollectionApi(payload: {
   preferredColors?: string[];
   artworkUrl?: string;
   artwork?: ArtworkInput;
+  isShopSpecific?: boolean;
 }) {
   const productRefs = payload.pickedIndices.map((i) => {
     const p = payload.catalog[i];
@@ -234,6 +235,7 @@ export async function createCollectionApi(payload: {
   };
   if (payload.shopId) body.shopId = payload.shopId;
   if (payload.artworkUrl) body.artworkUrl = payload.artworkUrl;
+  if (payload.isShopSpecific) body.isShopSpecific = true;
   const col = await apiFetch<Record<string, unknown>>("/collections", {
     method: "POST",
     body: JSON.stringify(body),

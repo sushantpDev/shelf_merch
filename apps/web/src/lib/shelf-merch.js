@@ -1827,6 +1827,16 @@ function collectionLinkedToShop(col, shopId){
 function swagDesignKey(col,p){
   return `${p.id||''}|${col.artworkUrl||''}|${p.nm}|${p.brand||''}`;
 }
+function shopHasDesign(shopId,col,p){
+  const key=swagDesignKey(col,p);
+  const cols=S.collections.filter(c=>collectionLinkedToShop(c,shopId));
+  for(const shopCol of cols){
+    for(const prod of shopCol.products||[]){
+      if(swagDesignKey(shopCol,prod)===key) return true;
+    }
+  }
+  return false;
+}
 function swagProductEntries(cols){
   const seen=new Set();
   const entries=[];
@@ -1843,6 +1853,7 @@ function swagProductEntries(cols){
 }
 function swagCollectionsForTab(tab,shopId){
   let cols=S.collections.filter(c=>!shopId||collectionLinkedToShop(c,shopId));
+  if(!shopId) cols=cols.filter(c=>!c.isShopSpecific);
   if(tab==='Archived') return cols.filter(c=>c.status==='archived');
   return cols.filter(c=>c.status!=='archived');
 }
@@ -1926,10 +1937,10 @@ async function swagAddToShopDo(){
   const shop=S.shops.find(s=>s.id===f.shopId);
   if(!ref||!shop){ closeLayer(); return; }
   const {col,p}=ref;
-  if(collectionLinkedToShop(col,shop.id)){
+  if(shopHasDesign(shop.id,col,p)){
     closeLayer();
     delete S.flow.addToShop;
-    toast('Product is already in this shop');
+    toast('This product is already in this shop',false);
     render();
     return;
   }
@@ -1951,6 +1962,7 @@ async function swagAddToShopDo(){
           status:col.status||'ready',
           shopId:shop.id,
           shopIds:[shop.id],
+          isShopSpecific:true,
           preferredColors:[...(col.preferredColors||[])],
           artworkUrl:col.artworkUrl||'',
           products:[{g:p.g,brand:p.brand||'',nm:p.nm,id:p.id}],

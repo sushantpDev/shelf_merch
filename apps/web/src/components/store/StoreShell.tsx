@@ -598,7 +598,7 @@ export default function StoreShell({
                   <div className="sf-hstat-pill">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
                     <div>
-                      <div className="sf-hstat-pill-val">{products.length}+</div>
+                      <div className="sf-hstat-pill-val">{products.length}{products.length > 0 ? '+' : ''}</div>
                       <div className="sf-hstat-pill-label">Products</div>
                     </div>
                   </div>
@@ -668,10 +668,20 @@ export default function StoreShell({
             )}
 
             {/* All Products */}
-            <div className="sf-section-header">
-              <h2 className="sf-section-title">All Products</h2>
-            </div>
-            <PremiumProductGrid products={filteredBySearch.slice(0, 8)} onOpen={openProduct} fmt={fmt} totalProducts={products.length} />
+            {products.length > 0 ? (
+              <>
+                <div className="sf-section-header">
+                  <h2 className="sf-section-title">All Products</h2>
+                </div>
+                <PremiumProductGrid products={filteredBySearch.slice(0, 8)} onOpen={openProduct} fmt={fmt} totalProducts={products.length} />
+              </>
+            ) : (
+              <div className="sf-empty" style={{ marginTop: 24 }}>
+                <div className="sf-empty-icon">🛍️</div>
+                <h3>No products in this shop yet</h3>
+                <p>Check back soon — new rewards are on the way.</p>
+              </div>
+            )}
 
             {filteredBySearch.length > 8 && (
               <div style={{ textAlign: "center", padding: "8px 0 40px" }}>

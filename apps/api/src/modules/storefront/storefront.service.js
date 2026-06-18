@@ -6,9 +6,8 @@ import { NotFoundError } from '../../utils/errors.js';
 
 /**
  * Public, no-auth storefront for a live shop. Returns the shop's branding plus
- * the products curated into its (non-archived) collections — mirroring the
- * redemption store curation in redemptions.service.js#getCatalog. Only `live`
- * shops are exposed; drafts 404 so they stay private.
+ * one listing per collection product ref (same catalog SKU + different artwork
+ * are separate listings). Only `live` shops are exposed; drafts 404.
  */
 export async function getStorefront(shopId) {
   const shop = await Shop.findById(shopId).setOptions({ skipTenantGuard: true });
@@ -22,39 +21,49 @@ export async function getStorefront(shopId) {
     .setOptions({ skipTenantGuard: true })
     .select('productRefs artworkUrl preferredColors')
     .lean();
-  const ids = collections
-    .flatMap((c) => (c.productRefs || []).map((r) => r.catalogProductId))
-    .filter(Boolean);
 
-  const artworkByProductId = new Map();
-  const preferredColorsByProductId = new Map();
+  const catalogIds = new Set();
   for (const col of collections) {
     for (const ref of col.productRefs || []) {
-      const pid = ref.catalogProductId ? String(ref.catalogProductId) : '';
-      if (!pid) continue;
-      if (col.artworkUrl && !artworkByProductId.has(pid)) artworkByProductId.set(pid, col.artworkUrl);
-      if (col.preferredColors?.length && !preferredColorsByProductId.has(pid)) {
-        preferredColorsByProductId.set(pid, col.preferredColors);
-      }
+      if (ref.catalogProductId) catalogIds.add(String(ref.catalogProductId));
     }
   }
 
-  const filter = { status: 'active' };
-  // Fall back to the full active catalog when the shop has no curated products
-  // yet, so "View shop" is never an empty page.
-  if (ids.length) filter._id = { $in: ids };
-  const products = await CatalogProduct.find(filter)
-    .setOptions({ skipTenantGuard: true })
-    .select('name brand group category description basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas')
-    .sort({ name: 1 })
-    .lean()
-    .then((rows) =>
-      rows.map((p) => ({
-        ...p,
-        artworkUrl: artworkByProductId.get(String(p._id)) || '',
-        preferredColors: preferredColorsByProductId.get(String(p._id)) || [],
-      })),
-    );
+  const catalogById = new Map();
+  if (catalogIds.size) {
+    const rows = await CatalogProduct.find({
+      status: 'active',
+      _id: { $in: [...catalogIds] },
+    })
+      .setOptions({ skipTenantGuard: true })
+      .select('name brand group category description basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas')
+      .lean();
+    for (const row of rows) catalogById.set(String(row._id), row);
+  }
+
+  const products = [];
+  for (const col of collections) {
+    const collectionId = String(col._id);
+    for (const ref of col.productRefs || []) {
+      const catalogProductId = ref.catalogProductId ? String(ref.catalogProductId) : '';
+      if (!catalogProductId) continue;
+      const base = catalogById.get(catalogProductId);
+      if (!base) continue;
+      products.push({
+        ...base,
+        _id: `${collectionId}:${catalogProductId}`,
+        catalogProductId,
+        collectionId,
+        name: ref.name || base.name,
+        brand: ref.brand ?? base.brand,
+        group: ref.group ?? base.group,
+        artworkUrl: col.artworkUrl || '',
+        preferredColors: col.preferredColors || [],
+      });
+    }
+  }
+
+  products.sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
   return {
     shop: {
