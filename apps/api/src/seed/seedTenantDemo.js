@@ -92,7 +92,7 @@ export async function seedTenantDemo({
   const shopBlr = await Shop.create({
     tenantId: tenant._id,
     name: 'Rubix Bengaluru',
-    currencyMode: 'inr',
+    currencyMode: 'points',
     status: 'live',
     categories: ['Work Essentials', 'Merch', 'Wellness'],
   });

@@ -184,7 +184,7 @@ export default function RedemptionPortal({ token }: { token: string }) {
         shop={portal.campaign.shop || { name: portal.campaign.name }}
         products={products}
         mode="redeem"
-        currency={portal.campaign.shop?.currencyMode || "inr"}
+        currency={portal.campaign.shop?.currencyMode || "points"}
         creditInr={portal.recipient.creditAmount}
         recipientName={portal.recipient.name}
         welcome={portal.campaign.message?.body}
