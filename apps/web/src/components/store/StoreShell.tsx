@@ -231,23 +231,6 @@ function CategoryIcon({ category }: { category: string }) {
   );
 }
 
-/* ─── badge assignment (deterministic, cosmetic only) ─── */
-type BadgeType = "bestseller" | "new" | "limited" | "trending" | null;
-function assignBadge(index: number, total: number): BadgeType {
-  if (total <= 2) return null;
-  if (index === 0) return "bestseller";
-  if (index === 1) return "new";
-  if (index === total - 1) return "limited";
-  if (index === 2) return "trending";
-  return null;
-}
-const BADGE_LABELS: Record<string, string> = {
-  bestseller: "Bestseller",
-  new: "New Arrival",
-  limited: "Limited Stock",
-  trending: "Trending",
-};
-
 /* ─── SVG Icons (inline for zero dependencies) ─── */
 function ShelfMerchLogo() {
   return (
@@ -286,7 +269,7 @@ function HeartIcon() {
 
 function PointsIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor">
+    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" style={{ flex: "none" }}>
       <circle cx="12" cy="12" r="10" opacity=".15" /><path d="M12 2a10 10 0 1010 10A10 10 0 0012 2zm0 18a8 8 0 118-8 8 8 0 01-8 8z" /><path d="M15.09 11.41l-2.59-1.5V7a.5.5 0 00-1 0v3.18a.5.5 0 00.25.43l2.84 1.64a.5.5 0 00.5-.87z" />
     </svg>
   );
@@ -673,7 +656,7 @@ export default function StoreShell({
                 <div className="sf-section-header">
                   <h2 className="sf-section-title">All Products</h2>
                 </div>
-                <PremiumProductGrid products={filteredBySearch.slice(0, 8)} onOpen={openProduct} fmt={fmt} totalProducts={products.length} />
+                <PremiumProductGrid products={filteredBySearch.slice(0, 8)} onOpen={openProduct} fmt={fmt} />
               </>
             ) : (
               <div className="sf-empty" style={{ marginTop: 24 }}>
@@ -944,7 +927,7 @@ function ProductsPageWithFilters({
         onCategorySelect={onCategorySelect}
       />
       <div style={{ marginTop: 20 }}>
-        <PremiumProductGrid products={filtered} onOpen={onOpen} fmt={fmt} totalProducts={products.length} />
+        <PremiumProductGrid products={filtered} onOpen={onOpen} fmt={fmt} />
       </div>
     </>
   );
@@ -954,12 +937,10 @@ function PremiumProductGrid({
   products,
   onOpen,
   fmt,
-  totalProducts,
 }: {
   products: StoreProduct[];
   onOpen: (id: string) => void;
   fmt: (n: number) => string;
-  totalProducts: number;
 }) {
   if (products.length === 0) {
     return (
@@ -972,9 +953,8 @@ function PremiumProductGrid({
   }
   return (
     <div className="sf-product-grid sf-stagger">
-      {products.map((p, i) => {
+      {products.map((p) => {
         const colors = productColorOptions(p);
-        const badge = assignBadge(i, totalProducts);
         return (
           <button key={p._id} type="button" className="sf-pcard" onClick={() => onOpen(p._id)}>
             <div className="sf-pcard-img">
@@ -982,9 +962,6 @@ function PremiumProductGrid({
               <div className="sf-wishlist" onClick={(e) => { e.stopPropagation(); }}>
                 <HeartIcon />
               </div>
-              {badge && (
-                <span className={`sf-badge sf-badge-${badge}`}>{BADGE_LABELS[badge]}</span>
-              )}
             </div>
             <div className="sf-pcard-meta">
               <div className="sf-pcard-name">{p.name}</div>

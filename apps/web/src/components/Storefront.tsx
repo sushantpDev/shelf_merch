@@ -55,7 +55,7 @@ export default function Storefront({ shopId }: { shopId: string }) {
       shop={data.shop}
       products={data.products}
       mode="preview"
-      currency={data.shop.currencyMode as "points" | "inr" | "priceless"}
+      currency={(data.shop.currencyMode as "points" | "inr" | "priceless") || "points"}
     />
   );
 }
