@@ -892,8 +892,17 @@ Wizards.swagArtwork=function(){
       ? `<div class="grid" style="grid-template-columns:repeat(3,1fr);gap:8px">${prev.map((u,i)=>artPrevThumb(i,u,f.artSel===i)).join('')}</div>`
       : `<div style="border:1.5px dashed var(--line);border-radius:var(--r-sm);padding:22px;text-align:center;color:var(--ink-2);background:#fff"><div style="font-weight:600;font-size:13px">No previous uploads yet</div><div class="mut3" style="font-size:11px;margin-top:6px">Upload artwork from your device — it will appear here for reuse.</div></div>`;
   }
-  const left=`<div><h1 style="font-size:22px;margin-bottom:6px">Add artwork to your products</h1>
-    <p class="muted" style="font-size:13px;margin-bottom:16px">Upload your artwork and choose the products to apply it to. Edit your design any time. Items are created using DTF decoration.</p>
+  const summary=f.artwork?`<div class="card" style="padding:16px;margin-top:14px">
+      <div style="font-weight:700;font-size:13.5px;margin-bottom:6px">Design summary</div>
+      ${swSummaryRow('Products',prods.length+(prods.length===1?' item':' items'))}
+      ${swSummaryRow('Decoration','DTF transfer')}
+      ${swSummaryRow('Colour variants','All included')}
+      ${swSummaryRow('Artwork',esc(f.artFile?.name||'—'))}
+    </div>`:'';
+  const left=`<div class="sw-art-rail">
+    <div class="sw-eyebrow">Step 3 of 3 · Artwork</div>
+    <h1 style="font-size:22px;margin-bottom:6px">Add artwork to your products</h1>
+    <p class="muted" style="font-size:13px;margin-bottom:16px">Upload your artwork, then position it on each product. Edit your design any time. Items are created using DTF decoration.</p>
     <div class="card" style="padding:16px">
       <div style="font-weight:700;font-size:13.5px;margin-bottom:10px">Add new artwork</div>
       <div class="tabs" style="max-width:300px;margin-bottom:14px">
@@ -903,22 +912,28 @@ Wizards.swagArtwork=function(){
       <div class="note" style="margin-top:12px">Use a high-quality file with a transparent background (300 DPI+) to prevent production delays. <span class="lnk" data-act="toast" data-arg="Guidelines opened">Learn more</span></div>
       <button class="btn btn-dark btn-block" style="margin-top:14px" ${atab==='device'&&!f.artwork?'':'disabled'} data-act="swArtUpload">Add artwork</button>
     </div>
+    ${summary}
     <button class="btn btn-dark btn-block btn-lg" style="margin-top:14px" ${f.artwork?'':'disabled'} data-act="swGenerate">Generate designs</button>
     ${f.artwork?'<button class="btn btn-ghost btn-block btn-sm" style="margin-top:8px" data-act="swResetArt">Reset placement on all products</button>':''}</div>`;
-  const banner=f.artwork
-    ? `<div style="margin-bottom:16px;background:var(--info-50);border:1px solid #CFE0F8;border-radius:var(--r-sm);overflow:hidden">
-        <div style="padding:12px 14px;display:flex;gap:10px;align-items:flex-start;font-size:13px;color:#1A4A9E">${I.spark.replace('<svg ','<svg width="16" height="16" ')}<div>Artwork applied to all ${prods.length} products — all colour variants included.</div></div>
-        <div style="background:#fff;padding:24px;display:grid;place-items:center;min-height:150px">${swArtImg(f,{maxH:'160px'})}</div></div>`
-    : `<div class="banner" style="margin-bottom:16px;background:#eaf1fb;color:#1c2a52;border:none">Please add artwork before selecting your products. We've included all colour variants.</div>`;
-  const editHint=f.artwork?`<div class="mut3" style="font-size:11.5px;margin:-4px 0 12px;display:flex;align-items:center;gap:6px">${I.spark.replace('<svg ','<svg width="13" height="13" ')}<span>Drag to move · corner handles to scale · top handle to rotate. Each product saves its own placement.</span></div>`:'';
-  const right=`<div>${banner}${editHint}
-    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${prods.map((p,idx)=>{const ep=enrichProduct(p);const mock=productHasPrintArea(ep);const inner=f.artwork
+  const header=f.artwork
+    ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:6px;flex-wrap:wrap">
+        <div><div style="font-size:16px;font-weight:700">Your mockups</div>
+          <div class="mut3" style="font-size:12px;margin-top:2px">Drag to move · corner handles to scale · top handle to rotate. Each product keeps its own placement.</div></div>
+        <div class="row" style="gap:8px;align-items:center;font-size:12px;color:#1A6E45;background:var(--brand-50);border:1px solid var(--brand-100,#cfe9da);border-radius:999px;padding:5px 12px;font-weight:600">${I.check.replace('<svg ','<svg width="14" height="14" ')}Applied to all ${prods.length} products · all colour variants</div>
+      </div>`
+    : `<div class="banner" style="margin-bottom:16px;background:#eaf1fb;color:#1c2a52;border:none">Add your artwork on the left to preview it on every product — all colour variants are included.</div>`;
+  const right=`<div>${header}
+    <div class="sw-mockups">${prods.map((p,idx)=>{const ep=enrichProduct(p);const mock=productHasPrintArea(ep);const inner=f.artwork
         ? swagMockupHost(ep,idx)
         : `<div class="img${mock?' img-mockup':''}">${productImg(ep,mock?{width:'100%',height:'100%'}:{})}</div>`;
-      return `<div class="pcard" style="position:relative">${f.artwork?'':'<div class="dots-btn">'+I.dots+'</div>'}${inner}<div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div></div></div>`;}).join('')}</div></div>`;
-  const body=`<div style="display:grid;grid-template-columns:400px 1fr;gap:26px">${left}${right}</div>`;
+      const badge=f.artwork?`<div class="mockup-badge">${I.spark.replace('<svg ','<svg width="11" height="11" ')}Editable</div>`:'';
+      return `<div class="pcard mockup-card" style="position:relative">${f.artwork?'':'<div class="dots-btn">'+I.dots+'</div>'}${badge}${inner}<div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div></div></div>`;}).join('')}</div></div>`;
+  const body=`<div class="sw-art-layout">${left}${right}</div>`;
   return wzChrome('Design swag',['Collection','Products','Artwork'],2,body,'');
 };
+function swSummaryRow(k,v){
+  return `<div class="sw-summary-row"><span class="k">${esc(k)}</span><span class="v" title="${esc(v)}">${esc(v)}</span></div>`;
+}
 const ART_ACCEPT=/\.(svg|png|jpe?g|ai)$/i;
 const ART_MAX=5*1024*1024;
 function swArtImg(f,opts={}){
