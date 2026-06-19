@@ -468,23 +468,20 @@ export default function StoreShell({
       {/* ═══ TOP NAV ═══ */}
       <div className={`sf-topbar${scrolled ? " scrolled" : ""}`}>
         <div className="sf-topbar-inner">
-          <button type="button" className="sf-brand" onClick={() => setPage("home")}>
-            <div className="sf-brand-icon"><ShelfMerchLogo /></div>
-            <span className="sf-brand-name">Shelf Merch</span>
-          </button>
-
-          <div className="sf-brand-sep" />
-
-          <div className="sf-store-badge">
-            <div className="sf-store-badge-logo">
+          {/* Brand = the shop itself (Shelf Merch is credited in the footer) */}
+          <button type="button" className="sf-shopbrand" onClick={() => setPage("home")}>
+            <div className="sf-shopbrand-logo">
               {shop.logoUrl ? (
                 <img src={shop.logoUrl} alt={shop.name} />
               ) : (
-                <span style={{ fontWeight: 800, color: "#15784C", fontSize: 13 }}>{shop.name.charAt(0).toUpperCase()}</span>
+                <span>{shop.name.charAt(0).toUpperCase()}</span>
               )}
             </div>
-            <span>{shop.name} Rewards Store</span>
-          </div>
+            <span className="sf-shopbrand-text">
+              <span className="sf-shopbrand-name">{shop.name}</span>
+              <span className="sf-shopbrand-sub">Rewards store</span>
+            </span>
+          </button>
 
           <nav className="sf-nav">
             <button type="button" className={`sf-nav-link${page === "home" ? " active" : ""}`} onClick={() => setPage("home")}>Home</button>
