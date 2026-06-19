@@ -985,6 +985,93 @@ function loadImageEl(src){
     im.src=src;
   });
 }
+
+/* ---- POD realism: bake warp + fabric texture + sheen into the artwork ----
+ * The garment's own folds are blended live (multiply) on the Konva node; the
+ * effects below are intrinsic to the print itself (placement-independent) so we
+ * bake them once into an offscreen canvas built only from the artwork's own
+ * data-URL — no garment pixels are read, so there is never a CORS taint. */
+let __fabricTex=null;
+function getFabricTexture(){
+  if(__fabricTex) return __fabricTex;
+  const c=document.createElement('canvas'); c.width=c.height=128;
+  const x=c.getContext('2d');
+  const img=x.createImageData(128,128);
+  for(let i=0;i<img.data.length;i+=4){
+    const n=128+(Math.random()*44-22);           // soft grey grain
+    img.data[i]=img.data[i+1]=img.data[i+2]=n; img.data[i+3]=255;
+  }
+  x.putImageData(img,0,0);
+  x.globalAlpha=0.05; x.strokeStyle='#000';        // faint horizontal weave
+  for(let i=0;i<128;i+=3){ x.beginPath(); x.moveTo(0,i+0.5); x.lineTo(128,i+0.5); x.stroke(); }
+  x.globalAlpha=1;
+  __fabricTex=c; return c;
+}
+// Surface curvature by product family — cylindrical items curve the most.
+function warpAmountFor(g){
+  if(g==='mug'||g==='bottle'||g==='flask') return 1;
+  if(g==='cap'||g==='beanie') return 0.5;
+  return 0.3; // tee / hoodie / pillow / flat
+}
+// Cylinder mapping: source u in [0,1] -> destination u in [0,1]. Monotonic, so
+// adjacent strips stay edge-to-edge (seamless); edges compress as on a cylinder.
+function cylMapX(u,k){
+  const maxAng=k*0.85;
+  if(maxAng<1e-3) return u;
+  return 0.5+Math.sin((u-0.5)*2*maxAng)/Math.sin(maxAng)*0.5;
+}
+function buildRealisticArtwork(artImg,group){
+  try{
+    const maxDim=1100;
+    const nw=artImg.naturalWidth||artImg.width||0, nh=artImg.naturalHeight||artImg.height||0;
+    if(nw<2||nh<2) return artImg; // e.g. an SVG with no intrinsic size — skip baking
+    const s=Math.min(1,maxDim/Math.max(nw,nh));
+    const w=Math.max(1,Math.round(nw*s)), h=Math.max(1,Math.round(nh*s));
+    const base=document.createElement('canvas'); base.width=w; base.height=h;
+    const b=base.getContext('2d');
+
+    // 1) Warp — seamless cylinder curvature: the sides compress as the surface
+    //    curves away, plus a faint vertical drape. Monotonic mapping ⇒ no seams.
+    const k=warpAmountFor(group);
+    const amp=h*0.045*k;
+    if(k>0.05){
+      const strips=80;
+      for(let i=0;i<strips;i++){
+        const u0=i/strips, u1=(i+1)/strips, um=(i+0.5)/strips;
+        const dx0=cylMapX(u0,k)*w, dx1=cylMapX(u1,k)*w;
+        const bow=Math.sin(Math.PI*um);            // 0 at edges, 1 in the centre
+        const dy=amp*bow*0.5, dh=h-amp*bow;
+        b.drawImage(artImg, u0*nw,0,(u1-u0)*nw,nh, dx0-0.5,dy,(dx1-dx0)+1,dh);
+      }
+    } else {
+      b.drawImage(artImg,0,0,w,h);
+    }
+
+    // 2) Fabric texture — masked to the print, overlay-blended for a woven grain.
+    const tex=getFabricTexture();
+    const tc=document.createElement('canvas'); tc.width=w; tc.height=h;
+    const tx=tc.getContext('2d');
+    const pat=tx.createPattern(tex,'repeat'); tx.fillStyle=pat; tx.fillRect(0,0,w,h);
+    tx.globalCompositeOperation='destination-in'; tx.drawImage(base,0,0);
+    b.save(); b.globalCompositeOperation='overlay'; b.globalAlpha=0.18; b.drawImage(tc,0,0); b.restore();
+
+    // 3) Sheen — soft diagonal light + opposite shade, masked to the print, for
+    //    a printed-on-a-curved-surface highlight.
+    const lc=document.createElement('canvas'); lc.width=w; lc.height=h;
+    const lx=lc.getContext('2d');
+    const grad=lx.createLinearGradient(0,0,w,h);
+    grad.addColorStop(0,'rgba(255,255,255,0.40)');
+    grad.addColorStop(0.5,'rgba(255,255,255,0)');
+    grad.addColorStop(1,'rgba(0,0,0,0.26)');
+    lx.fillStyle=grad; lx.fillRect(0,0,w,h);
+    lx.globalCompositeOperation='destination-in'; lx.drawImage(base,0,0);
+    b.save(); b.globalCompositeOperation='overlay'; b.globalAlpha=0.5; b.drawImage(lc,0,0); b.restore();
+
+    return base;
+  }catch{
+    return artImg; // any failure → fall back to the flat artwork
+  }
+}
 function swagMockupHost(ep,idx){
   // Square host; the Konva stage is mounted into it after render. data-kidx maps
   // back to S.flow.pickedProducts so the mount can derive image + print area.
@@ -1072,13 +1159,19 @@ async function mountOneMockup(host,prod,idx,ctx){
     ctx.store[key]=pl;
   }
   const w0=pl.wPct/100*size, h0=w0*aspect;
+  // Bake warp + fabric texture + sheen into the print, then blend it onto the
+  // garment with `multiply` so the garment's folds and shadows show through —
+  // turning a flat sticker into ink that sits on the cloth.
+  const realArt=buildRealisticArtwork(artImg,prod?.g);
   const node=new Konva.Image({
-    image:artImg,
+    image:realArt,
     x:pl.xPct/100*size, y:pl.yPct/100*size,
     width:w0, height:h0,
     offsetX:w0/2, offsetY:h0/2,
     rotation:pl.rot||0,
     draggable:true,
+    globalCompositeOperation:'multiply',
+    opacity:0.96,
   });
   layer.add(node);
 
