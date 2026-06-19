@@ -623,6 +623,30 @@ button.thumb{font:inherit;color:inherit}
 }
 .sf-hero-btn-secondary:hover{background:rgba(255,255,255,.22);transform:translateY(-1px)}
 .sf-hero-btn svg{width:17px;height:17px}
+.sf-hero-welcome-logo{
+  width:22px;height:22px;border-radius:5px;object-fit:contain;
+  background:#fff;padding:2px;flex:none;
+}
+/* Light banner theme — the hero defaults assume white-on-dark, so flip the
+   decorative glows, pills and translucent surfaces to stay legible on light. */
+.sf-hero--light::before,.sf-hero--light::after{display:none}
+.sf-hero--light .sf-hero-welcome{
+  background:rgba(21,120,76,.08);border-color:rgba(21,120,76,.22);
+  color:#0E5536;box-shadow:none;
+}
+.sf-hero--light .sf-hero-sub{opacity:.72}
+.sf-hero--light .sf-hero-btn-secondary{
+  background:rgba(14,30,22,.05);color:#0E1E16;border-color:rgba(14,30,22,.18);
+  backdrop-filter:none;
+}
+.sf-hero--light .sf-hero-btn-secondary:hover{background:rgba(14,30,22,.1)}
+.sf-hero--light .sf-hstat-card,.sf-hero--light .sf-hstat-pill{
+  background:rgba(14,30,22,.04);border-color:rgba(14,30,22,.1);backdrop-filter:none;
+}
+.sf-hero--light .sf-hstat-pill:hover{background:rgba(14,30,22,.07)}
+.sf-hero--light .sf-hstat-label,.sf-hero--light .sf-hstat-sub,
+.sf-hero--light .sf-hstat-pill svg,.sf-hero--light .sf-hstat-pill-label{color:rgba(14,30,22,.55)}
+.sf-hero--light .sf-hstat-big,.sf-hero--light .sf-hstat-pill-val{color:#0E1E16}
 
 /* hero right — product collage spacer */
 .sf-hero-visual{
