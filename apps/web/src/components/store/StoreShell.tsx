@@ -493,7 +493,7 @@ export default function StoreShell({
             </button>
             <button type="button" className="sf-nav-link" onClick={() => setPage("products")}>How it works</button>
             {mode === "redeem" && (
-              <button type="button" className="sf-nav-link" onClick={() => setPage("cart")}>My Orders</button>
+              <button type="button" className={`sf-nav-link${page === "cart" || page === "checkout" ? " active" : ""}`} onClick={() => setPage("cart")}>My Orders</button>
             )}
           </nav>
 
@@ -680,7 +680,7 @@ export default function StoreShell({
 
             {filteredBySearch.length > 8 && (
               <div style={{ textAlign: "center", padding: "8px 0 40px" }}>
-                <button type="button" className="sf-hero-btn sf-hero-btn-secondary" style={{ background: "#0E1E16", color: "#fff", border: "none" }} onClick={() => setPage("products")}>
+                <button type="button" className="sf-hero-btn sf-hero-btn-primary" onClick={() => setPage("products")}>
                   View All Products <ArrowRightIcon />
                 </button>
               </div>
@@ -723,62 +723,61 @@ export default function StoreShell({
 
       {/* ────── CART ────── */}
       {page === "cart" && (
-        <div className="sf-content" style={{ paddingTop: 24, paddingBottom: 60, maxWidth: 720, margin: "0 auto" }}>
-          <h1 style={{ fontSize: 28, marginBottom: 20, fontFamily: "'Bricolage Grotesque','Inter',sans-serif", fontWeight: 700 }}>Your cart</h1>
+        <div className="sf-cart-container">
+          <h1 className="sf-cart-title">Your cart</h1>
           {cart.length === 0 ? (
             <div className="sf-empty">
               <div className="sf-empty-icon">🛒</div>
               <h3>Your cart is empty</h3>
               <p style={{ marginBottom: 20 }}>Browse our collection and add items you love.</p>
-              <button className="sf-hero-btn sf-hero-btn-primary" style={{ background: "#0E1E16", color: "#fff" }} onClick={() => setPage("products")}>Browse products</button>
+              <button className="sf-add-btn" onClick={() => setPage("products")}>Browse products</button>
             </div>
           ) : (
             <>
-              <div className="card" style={{ padding: 0, overflow: "hidden", borderRadius: 18 }}>
+              <div className="sf-cart-card">
                 {cart.map((l) => (
-                  <div key={l.key} className="row" style={{ alignItems: "center", gap: 14, padding: 16, borderBottom: "1px solid var(--line)" }}>
-                    <div style={{ width: 60, height: 60, flex: "none", background: "var(--surface-2)", borderRadius: 14, overflow: "hidden", display: "grid", placeItems: "center" }}>
-                      {l.image ? <img src={l.image} alt={l.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
+                  <div key={l.key} className="sf-cart-item">
+                    <div className="sf-cart-item-img">
+                      {l.image ? <img src={l.image} alt={l.name} /> : null}
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: 15 }}>{l.name}</div>
+                    <div className="sf-cart-item-info">
+                      <div className="sf-cart-item-name">{l.name}</div>
                       {l.variant && (
-                        <div className="mut3" style={{ fontSize: 12 }}>
+                        <div className="sf-cart-item-variant">
                           {[l.variant.color, l.variant.size].filter(Boolean).join(" · ")}
                         </div>
                       )}
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#15784C", marginTop: 2 }}>{fmt(l.priceInr)} each</div>
+                      <div className="sf-cart-item-price">{fmt(l.priceInr)} each</div>
                     </div>
                     <input
-                      className="inp"
+                      className="sf-cart-qty-input"
                       type="number"
                       min={0}
                       value={l.qty}
                       onChange={(e) => setLineQty(l.key, Math.max(0, Number(e.target.value)))}
-                      style={{ width: 72, height: 40, borderRadius: 12, textAlign: "center" }}
                     />
-                    <div style={{ width: 90, textAlign: "right", fontWeight: 700, fontSize: 15 }}>{fmt(l.priceInr * l.qty)}</div>
+                    <div className="sf-cart-item-total">{fmt(l.priceInr * l.qty)}</div>
                   </div>
                 ))}
               </div>
-              <div className="card" style={{ padding: 24, marginTop: 16, borderRadius: 18 }}>
-                <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 15 }}>Subtotal</span>
-                  <b style={{ fontSize: 18 }}>{fmt(cartTotalInr)}</b>
+              <div className="sf-summary-card">
+                <div className="sf-summary-row">
+                  <span>Subtotal</span>
+                  <b>{fmt(cartTotalInr)}</b>
                 </div>
                 {mode === "redeem" && creditInr != null && (
-                  <div className="row" style={{ justifyContent: "space-between", color: overBudget ? "var(--danger)" : "var(--ink-2)", fontSize: 14 }}>
-                    <span>Remaining after order</span>
-                    <span>{fmt(Math.max(0, creditInr - cartTotalInr))}</span>
+                  <div className="sf-summary-row" style={{ color: overBudget ? "var(--danger)" : "inherit" }}>
+                    <span>Remaining balance after order</span>
+                    <b>{fmt(Math.max(0, creditInr - cartTotalInr))}</b>
                   </div>
                 )}
                 {overBudget && (
-                  <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 8 }}>
+                  <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 8, fontWeight: 500 }}>
                     Your cart exceeds your balance. Remove an item or lower a quantity.
                   </p>
                 )}
                 {mode === "redeem" ? (
-                  <button className="sf-hero-btn sf-hero-btn-primary" style={{ background: "#15784C", color: "#fff", width: "100%", justifyContent: "center", marginTop: 16, height: 50 }} disabled={overBudget} onClick={() => setPage("checkout")}>
+                  <button className="sf-add-btn" style={{ width: "100%", marginTop: 16, height: 46 }} disabled={overBudget} onClick={() => setPage("checkout")}>
                     Proceed to checkout
                   </button>
                 ) : (
@@ -792,12 +791,12 @@ export default function StoreShell({
 
       {/* ────── CHECKOUT ────── */}
       {page === "checkout" && (
-        <div className="sf-content" style={{ paddingTop: 24, paddingBottom: 60, maxWidth: 620, margin: "0 auto" }}>
-          <button type="button" className="lnk" onClick={() => setPage("cart")} style={{ marginBottom: 16 }}>← Back to cart</button>
-          <h1 style={{ fontSize: 28, marginBottom: 20, fontFamily: "'Bricolage Grotesque','Inter',sans-serif", fontWeight: 700 }}>Checkout</h1>
-          {error && <div className="card" style={{ padding: 12, marginBottom: 16, color: "var(--danger)", borderRadius: 14 }}>{error}</div>}
-          <div className="card" style={{ padding: 24, borderRadius: 18 }}>
-            <h3 style={{ fontSize: 16, marginBottom: 16 }}>Shipping address</h3>
+        <div className="sf-cart-container">
+          <button type="button" className="sf-back-btn" onClick={() => setPage("cart")} style={{ marginBottom: 16 }}>← Back to cart</button>
+          <h1 className="sf-cart-title">Checkout</h1>
+          {error && <div className="sf-summary-card" style={{ padding: 14, marginBottom: 16, color: "var(--danger)" }}>{error}</div>}
+          <div className="sf-summary-card" style={{ marginBottom: 16 }}>
+            <h3 style={{ fontSize: 16, marginBottom: 16, fontWeight: 700 }}>Shipping Address</h3>
             <div className="row" style={{ gap: 12 }}>
               <input className="inp" placeholder="Full name" value={address.name} onChange={(e) => setAddress({ ...address, name: e.target.value })} style={{ borderRadius: 12 }} />
               <input className="inp" placeholder="Phone number" value={address.phone} onChange={(e) => setAddress({ ...address, phone: e.target.value })} style={{ borderRadius: 12 }} />
@@ -809,12 +808,12 @@ export default function StoreShell({
               <input className="inp" placeholder="PIN" value={address.pincode} onChange={(e) => setAddress({ ...address, pincode: e.target.value })} style={{ borderRadius: 12 }} />
             </div>
           </div>
-          <div className="card" style={{ padding: 24, marginTop: 16, borderRadius: 18 }}>
-            <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
-              <span className="muted">{cartCount} item(s)</span>
-              <b style={{ fontSize: 18 }}>{fmt(cartTotalInr)}</b>
+          <div className="sf-summary-card">
+            <div className="sf-summary-row" style={{ marginBottom: 16 }}>
+              <span>{cartCount} item(s)</span>
+              <b>{fmt(cartTotalInr)}</b>
             </div>
-            <button className="sf-hero-btn sf-hero-btn-primary" style={{ background: "#15784C", color: "#fff", width: "100%", justifyContent: "center", marginTop: 12, height: 50 }} disabled={placing || overBudget || cart.length === 0} onClick={placeOrder}>
+            <button className="sf-add-btn" style={{ width: "100%", height: 46 }} disabled={placing || overBudget || cart.length === 0} onClick={placeOrder}>
               {placing ? "Placing order…" : "Place order"}
             </button>
           </div>
@@ -1024,28 +1023,28 @@ function ProductDetail({ product, mode, fmt, onBack, onAdd }: {
 
   return (
     <>
-      <button type="button" className="lnk" onClick={onBack} style={{ marginBottom: 20, fontSize: 14 }}>← Back to products</button>
-      <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 36, alignItems: "start" }}>
-        <div className="pd-gallery">
-          <div style={{ aspectRatio: "1", borderRadius: 20, border: "1px solid #EFF2EF", position: "relative", overflow: "hidden", display: "grid", placeItems: "center", transition: "background .2s ease", background: previewBg }}>
-            <div className="pd-img-inner pd-img-mockup">
+      <button type="button" className="sf-back-btn" onClick={onBack} style={{ marginBottom: 20 }}>← Back to products</button>
+      <div className="sf-detail-grid">
+        <div className="sf-detail-gallery">
+          <div className="sf-detail-img-box" style={{ background: previewBg }}>
+            <div className="sf-detail-img-inner">
               <ArtworkMockup product={product} />
             </div>
           </div>
           {colorOptions.length > 0 && (
-            <div className="pd-colors" style={{ marginTop: 18 }}>
+            <div className="pd-colors" style={{ marginTop: 20 }}>
               <div className="lbl" style={{ marginBottom: 10 }}>Color preview</div>
               <ColorSwatches colors={colorOptions} selected={selColor} onSelect={setSelColor} />
             </div>
           )}
         </div>
         <div>
-          {product.brand && <div className="mut3" style={{ textTransform: "uppercase", letterSpacing: ".04em", fontSize: 12, marginBottom: 6 }}>{product.brand}</div>}
-          <h1 style={{ fontSize: 30, margin: "0 0 10px", fontFamily: "'Bricolage Grotesque','Inter',sans-serif" }}>{product.name}</h1>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 24, fontWeight: 700, color: "#15784C", marginBottom: 18 }}>
+          {product.brand && <div className="sf-detail-brand">{product.brand}</div>}
+          <h1 className="sf-detail-name">{product.name}</h1>
+          <div className="sf-detail-price">
             <PointsIcon /> {fmt(product.basePriceInr)}
           </div>
-          {product.description && <p className="muted" style={{ marginBottom: 22, lineHeight: 1.65 }}>{product.description}</p>}
+          {product.description && <p className="sf-detail-desc">{product.description}</p>}
 
           {colorOptions.length > 0 && (
             <div className="field">
@@ -1056,10 +1055,9 @@ function ProductDetail({ product, mode, fmt, onBack, onAdd }: {
                     key={c.name}
                     type="button"
                     onClick={() => setSelColor(i)}
-                    className={selColor === i ? "btn btn-dark btn-sm" : "btn btn-ghost btn-sm"}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6, borderRadius: 10 }}
+                    className={`sf-option-btn${selColor === i ? " active" : ""}`}
                   >
-                    <span style={{ width: 12, height: 12, borderRadius: 3, background: c.hex, border: "1px solid rgba(0,0,0,.2)" }} />
+                    <span className="sf-option-btn-swatch" style={{ background: c.hex }} />
                     {c.name}
                   </button>
                 ))}
@@ -1071,16 +1069,29 @@ function ProductDetail({ product, mode, fmt, onBack, onAdd }: {
               <label className="lbl">Size</label>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {sizes.map((s) => (
-                  <button key={s} type="button" onClick={() => setSize(s)} className={size === s ? "btn btn-dark btn-sm" : "btn btn-ghost btn-sm"} style={{ borderRadius: 10 }}>{s}</button>
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSize(s)}
+                    className={`sf-option-btn${size === s ? " active" : ""}`}
+                  >
+                    {s}
+                  </button>
                 ))}
               </div>
             </div>
           )}
 
           {mode === "redeem" ? (
-            <div className="row" style={{ gap: 12, marginTop: 22, alignItems: "center" }}>
-              <input className="inp" type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value)))} style={{ width: 80, borderRadius: 12, textAlign: "center" }} />
-              <button className="sf-hero-btn sf-hero-btn-primary" style={{ background: "#15784C", color: "#fff", height: 48 }} onClick={() => onAdd({ size, color: selectedColor?.name }, qty)}>
+            <div className="row" style={{ gap: 12, marginTop: 24, alignItems: "center" }}>
+              <input
+                className="sf-qty-input"
+                type="number"
+                min={1}
+                value={qty}
+                onChange={(e) => setQty(Math.max(1, Number(e.target.value)))}
+              />
+              <button className="sf-add-btn" onClick={() => onAdd({ size, color: selectedColor?.name }, qty)}>
                 <ShoppingBagIcon /> Add to cart
               </button>
             </div>
