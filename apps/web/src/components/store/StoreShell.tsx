@@ -378,6 +378,12 @@ export default function StoreShell({
     return `₹${inr.toLocaleString("en-IN")}`;
   }
 
+  // Drive the hero off the shop's chosen banner theme so each shop's top band
+  // matches its branding (default to the brand green when unset).
+  const heroThemeKey = shop.bannerTheme || "brand";
+  const heroTheme = BANNER_THEMES[heroThemeKey] || BANNER_THEMES.brand;
+  const heroIsLight = heroThemeKey === "light";
+
   function openProduct(id: string) {
     setActiveId(id);
     setPage("product");
@@ -538,11 +544,17 @@ export default function StoreShell({
         <>
           {/* Hero */}
           <div className="sf-hero-container">
-            <div className="sf-hero">
+            <div
+              className={`sf-hero${heroIsLight ? " sf-hero--light" : ""}`}
+              style={{ background: heroTheme.bg, color: heroTheme.text }}
+            >
               <div className="sf-hero-inner">
               {/* Left text block */}
               <div className="sf-hero-text sf-fade-in">
                 <div className="sf-hero-welcome">
+                  {shop.logoUrl && (
+                    <img src={shop.logoUrl} alt="" className="sf-hero-welcome-logo" />
+                  )}
                   {mode === "redeem"
                     ? `Welcome back, ${recipientName || "there"} 👋`
                     : `${shop.name} Rewards`}
