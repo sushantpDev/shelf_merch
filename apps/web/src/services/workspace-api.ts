@@ -29,6 +29,7 @@ export type WorkspaceSnapshot = {
   kits: UiKit[];
   collections: UiCollection[];
   catalogProducts: UiProduct[];
+  catalogTotal: number;
   campaigns: UiCampaign[];
   orders: UiOrder[];
   wallets: UiWallet[];
@@ -81,7 +82,7 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
     apiFetch<unknown[]>("/contacts"),
     apiFetch<unknown[]>("/kits"),
     apiFetch<unknown[]>("/collections"),
-    apiFetch<{ items: unknown[] }>("/catalog/products?limit=200"),
+    apiFetch<{ items: unknown[]; pagination?: { total?: number } }>("/catalog/products?limit=100"),
     apiFetch<unknown[]>("/campaigns").catch(() => []),
     apiFetch<{ items: unknown[] }>("/orders?limit=100"),
     apiFetch<unknown[]>("/wallets"),
@@ -92,6 +93,7 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
   const userById = usersMap(users);
   const owner = me ? { name: me.name, email: me.email } : undefined;
   const catalogProducts = (catalog.items || []).map(mapCatalogProduct);
+  const catalogTotal = catalog.pagination?.total ?? catalogProducts.length;
   const catalogById = new Map(
     catalogProducts.filter((p) => p.id).map((p) => [p.id as string, p]),
   );
@@ -200,6 +202,7 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
     kits: (kits as never[]).map(mapKit),
     collections: mappedCollections,
     catalogProducts,
+    catalogTotal,
     campaigns: (campaigns as never[]).map(mapCampaign),
     orders: (ordersPage.items || []).map((o) =>
       mapOrder(o, (o as { campaignName?: string }).campaignName || ""),

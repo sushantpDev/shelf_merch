@@ -113,9 +113,23 @@ export async function hydrateWorkspace(sessionUser?: AuthUser | null): Promise<W
 }
 
 /** Fresh catalog from DB — call when opening the Catalog page. */
-export async function refreshCatalogProducts(): Promise<UiProduct[]> {
-  const catalog = await apiFetch<{ items: unknown[] }>("/catalog/products?limit=200");
-  return (catalog.items || []).map((p) => mapCatalogProduct(p));
+export type CatalogProductsResult = {
+  items: UiProduct[];
+  total: number;
+};
+
+export async function refreshCatalogProducts(category?: string): Promise<CatalogProductsResult> {
+  const params = new URLSearchParams({ limit: "100" });
+  if (category) params.set("category", category);
+  const catalog = await apiFetch<{
+    items: unknown[];
+    pagination?: { total?: number };
+  }>(`/catalog/products?${params.toString()}`);
+  const items = (catalog.items || []).map((p) => mapCatalogProduct(p));
+  return {
+    items,
+    total: catalog.pagination?.total ?? items.length,
+  };
 }
 
 export { fetchPlatformDashboard } from "./platform-api";
@@ -138,6 +152,7 @@ export function applyWorkspaceToState(S: Record<string, unknown>, data: Workspac
   S.kits = data.kits;
   S.collections = data.collections;
   S.catalogProducts = data.catalogProducts;
+  S.catalogTotal = data.catalogTotal;
   S.campaigns = data.campaigns;
   S.orders = data.orders;
   S.wallets = data.wallets;
