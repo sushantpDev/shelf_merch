@@ -146,7 +146,20 @@ select.inp{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http
 .pcard .meta .nm{font-weight:600;margin-top:3px;font-size:13.5px}
 .pcard .meta .pr{margin-top:6px;font-weight:700;color:var(--brand-d)}
 .swatches{display:flex;gap:5px;margin-top:9px}
-.sw{width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,0,0,.12)}
+/* swag artwork step — design studio polish */
+.sw-art-layout{display:grid;grid-template-columns:380px 1fr;gap:28px;align-items:start}
+.sw-art-rail{position:sticky;top:0;align-self:start}
+.sw-eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--brand-d);margin-bottom:8px}
+.sw-mockups{display:grid;grid-template-columns:repeat(auto-fill,minmax(216px,1fr));gap:16px}
+.mockup-card{cursor:default}
+.mockup-card .img{cursor:grab}
+.mockup-card .img:active{cursor:grabbing}
+.mockup-badge{position:absolute;top:9px;left:9px;z-index:5;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:999px;padding:3px 9px;font-size:10px;font-weight:700;letter-spacing:.02em;color:var(--brand-d);pointer-events:none;box-shadow:var(--sh-1)}
+.sw-summary-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--line-2);font-size:12.5px}
+.sw-summary-row:first-of-type{border-top:0}
+.sw-summary-row .k{color:var(--ink-2)}
+.sw-summary-row .v{font-weight:600;color:var(--ink);text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:62%}
+@media (max-width:860px){.sw-art-layout{grid-template-columns:1fr}.sw-art-rail{position:static}}.sw{width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,0,0,.12)}
 
 /* product detail */
 .pd-page{background:var(--bg);margin:-30px -34px 0;padding:28px 34px 80px;min-height:calc(100vh - 64px)}
