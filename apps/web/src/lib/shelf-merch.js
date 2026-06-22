@@ -1232,7 +1232,7 @@ async function swGenerate(){
   const catalog=getCatalogList();
   if(api.useMocks()){
     const placements=f.artPlacements||{};
-    const col={id:nid('c'),code:'C'+(100000000+Math.floor(Math.random()*899999999)),name:f.colName,created:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),by:S.user.name,status:'ready',shopId:'',preferredColors:[],artworkUrl:f.artFile?.preview||'',artPlacements:placements,products:f.picked.map((i,idx)=>{const cp=catalog[i];return{id:cp?.id,g:cp?.g||'tee',brand:cp?.brand||'',nm:cp?.nm||'Product',printAreas:cp?.printAreas,imgUrl:cp?.imgUrl,placement:placements[cp?.id||('idx'+idx)]||null};})};
+    const col={id:nid('c'),code:'C'+(100000000+Math.floor(Math.random()*899999999)),name:f.colName,created:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),by:S.user.name,status:'ready',shopId:'',preferredColors:[],artworkUrl:f.artFile?.preview||'',artPlacements:placements,products:f.picked.map((i,idx)=>{const cp=catalog[i];return{id:cp?.id,g:cp?.g||'tee',brand:cp?.brand||'',nm:cp?.nm||'Product',printAreas:cp?.printAreas,imgUrl:cp?.imgUrl,maskImageUrl:cp?.maskImageUrl,placement:placements[cp?.id||('idx'+idx)]||null};})};
     S.collections.push(col);
     go('swag');
     toast('Collection "'+col.name+'" is design-ready!');
@@ -2020,7 +2020,7 @@ function pcard(p,opts={}){
   const mockup=opts.branded||productHasPrintArea(prod);
   const logo = opts.branded?productArtOverlay(prod,opts.artworkUrl):'';
   return `<div class="pcard" data-act="${opts.act||'noop'}" ${opts.arg?`data-arg="${opts.arg}"`:''}>
-    <div class="img${mockup?' img-mockup':''}">${productImg(prod,mockup?{width:'100%',height:'100%'}:{})}${logo}</div>
+    <div class="img${mockup?' img-mockup':''}">${productImg(prod,{...(mockup?{width:'100%',height:'100%'}:{}),...(opts.branded?{url:designImgUrl(prod)}:{})})}${logo}</div>
     <div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div>${opts.price?`<div class="pr">${opts.price}</div>`:''}${sw}</div></div>`;
 }
 
@@ -2344,7 +2344,7 @@ function swagDesignCard(col,p,pIdx){
   const arg=`${col.id}:${pIdx}`;
   const mock=productHasPrintArea(ep);
   return `<div class="pcard swag-design-card" data-act="productOpen" data-arg="${arg}">
-    <div class="img${mock?' img-mockup':''}">${productImg(ep,mock?{width:'100%',height:'100%'}:{})}
+    <div class="img${mock?' img-mockup':''}">${productImg(ep,{...(mock?{width:'100%',height:'100%'}:{}),url:designImgUrl(ep)})}
       ${productArtOverlay(ep,col.artworkUrl)}
       <div class="swag-card-actions">
         <button type="button" class="swag-card-menu" data-act="swagCardMenu" data-arg="${arg}">${I.dots}</button>
@@ -2564,7 +2564,7 @@ function ViewProductDetail(){
     <div class="pd-body">
       <div class="pd-gallery">
         <div class="pd-img" style="background:${imgBg}">
-          <div class="pd-img-inner pd-img-mockup">${productImg(ep,{width:'100%',height:'100%'})}
+          <div class="pd-img-inner pd-img-mockup">${productImg(ep,{width:'100%',height:'100%',...(isCatalog?{}:{url:designImgUrl(ep)})})}
             ${logo}
           </div>
           <button class="pd-zoom" data-act="toast" data-arg="Image zoom coming soon">${I.zoom}</button>
@@ -2674,7 +2674,7 @@ function kitOpen(id){ const k=S.kits.find(x=>x.id===id);
   const prods=kitProductLabels(k);
   const hasBrand=!!k.artworkUrl;
   const prodList=prods.length?`<div style="margin:12px 0 16px"><div class="mut3" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:10px">Included products</div>
-    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px">${prods.map(p=>{const ep=enrichProduct(p);const mock=hasBrand||productHasPrintArea(ep);return `<div class="pcard" data-act="noop"><div class="img${mock?' img-mockup':''}">${productImg(ep,mock?{width:'100%',height:'100%'}:{})}${hasBrand?productArtOverlay(ep,k.artworkUrl):''}</div></div>`;}).join('')}</div></div>`:'';
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px">${prods.map(p=>{const ep=enrichProduct(p);const mock=hasBrand||productHasPrintArea(ep);return `<div class="pcard" data-act="noop"><div class="img${mock?' img-mockup':''}">${productImg(ep,{...(mock?{width:'100%',height:'100%'}:{}),...(hasBrand?{url:designImgUrl(ep)}:{})})}${hasBrand?productArtOverlay(ep,k.artworkUrl):''}</div></div>`;}).join('')}</div></div>`:'';
   const artBlock=k.artworkUrl?`<div style="margin:12px 0 16px"><div class="mut3" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:8px">Kit artwork</div>
     <div class="row" style="gap:12px;align-items:center"><div class="logo-chip" style="width:48px;height:48px;overflow:hidden;padding:4px"><img src="${esc(k.artworkUrl)}" alt="" style="max-width:100%;max-height:100%;object-fit:contain"></div><span class="muted" style="font-size:13px">Branded across all items</span></div></div>`:'';
   openModal(`<div class="modal-pad" style="max-width:640px"><div class="modal-h"><div><div class="eyebrow">${k.status} · ${k.items} items</div><h3>${esc(k.name)}</h3></div><button class="xbtn" data-act="closeLayer">✕</button></div>
