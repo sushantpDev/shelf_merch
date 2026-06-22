@@ -24,6 +24,8 @@ export type StoreProduct = {
   maskImageUrl?: string;
   baseImageUrl?: string;
   artworkUrl?: string;
+  /** Pre-baked design mockup (mask + artwork flattened) — shown as-is when set. */
+  mockupUrl?: string;
   preferredColors?: string[];
   printAreas?: PrintArea[];
   variants?: Array<{ size?: string; color?: string; colorHex?: string; material?: string; sku?: string }>;
@@ -127,9 +129,13 @@ function printAreaWrapStyle(box?: PrintArea["box"]): CSSProperties {
 }
 
 function ArtworkMockup({ product, className, style }: { product: StoreProduct; className?: string; style?: CSSProperties }) {
-  const img = productImage(product);
-  const area = pickPrintArea(product);
   const overlay = product.artworkUrl;
+  const baked = product.mockupUrl;
+  // Designed products composite onto the transparent design mask (not the
+  // marketing photo) so the base is consistent with the swag designer all the
+  // way through to redemption. A pre-baked mockup, when present, is shown as-is.
+  const img = baked || (overlay ? product.maskImageUrl || productImage(product) : productImage(product));
+  const area = pickPrintArea(product);
 
   if (!img) {
     return (
@@ -147,7 +153,7 @@ function ArtworkMockup({ product, className, style }: { product: StoreProduct; c
         alt={product.name}
         style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
       />
-      {overlay && area && (
+      {!baked && overlay && area && (
         <div className="art-overlay" style={printAreaWrapStyle(area.box)}>
           <img className="art-overlay-img" src={overlay} alt="Artwork" />
         </div>
