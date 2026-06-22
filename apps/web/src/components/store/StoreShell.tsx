@@ -16,6 +16,8 @@ export type StoreProduct = {
   group?: string;
   category?: string;
   description?: string;
+  keyFeatures?: string;
+  sizeGuide?: string;
   basePriceInr: number;
   primaryImageUrl?: string;
   imageUrls?: string[];

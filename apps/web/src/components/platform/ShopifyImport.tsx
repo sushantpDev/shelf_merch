@@ -72,6 +72,7 @@ export function ShopifyImport() {
         <div className="card" style={{ padding: 22, maxWidth: 620, marginTop: 18 }}>
           <div className="row" style={{ gap: 24, marginBottom: 14 }}>
             <div><div className="muted" style={{ fontSize: 12 }}>Imported</div><div className="h1" style={{ fontSize: 22 }}>{summary.imported}</div></div>
+            <div><div className="muted" style={{ fontSize: 12 }}>Updated</div><div className="h1" style={{ fontSize: 22 }}>{summary.updated}</div></div>
             <div><div className="muted" style={{ fontSize: 12 }}>Skipped</div><div className="h1" style={{ fontSize: 22 }}>{summary.skipped}</div></div>
             <div><div className="muted" style={{ fontSize: 12 }}>Failed</div><div className="h1" style={{ fontSize: 22 }}>{summary.failed}</div></div>
           </div>

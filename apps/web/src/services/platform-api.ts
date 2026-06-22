@@ -344,6 +344,8 @@ export type PlatformProduct = {
   category: string;
   brand?: string;
   description?: string;
+  keyFeatures?: string;
+  sizeGuide?: string;
   status: string;
   sellingPriceInr: number;
   costPriceInr: number;
@@ -369,6 +371,8 @@ export type ProductInput = {
   costPriceInr?: number;
   brand?: string;
   description?: string;
+  keyFeatures?: string;
+  sizeGuide?: string;
   skuPrefix?: string;
   gstRate?: number;
   hsnCode?: string;
@@ -448,6 +452,7 @@ export type ShopifyImportSummary = {
   domain: string;
   total: number;
   imported: number;
+  updated: number;
   skipped: number;
   failed: number;
   items: { title: string; status: string; reason?: string }[];

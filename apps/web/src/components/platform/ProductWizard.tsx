@@ -29,6 +29,8 @@ const emptyDetails: ProductInput = {
   costPriceInr: 0,
   brand: "",
   description: "",
+  keyFeatures: "",
+  sizeGuide: "",
   gstRate: 18,
   hsnCode: "",
   moq: 1,
@@ -202,6 +204,8 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
           costPriceInr: p.costPriceInr,
           brand: p.brand ?? "",
           description: p.description ?? "",
+          keyFeatures: p.keyFeatures ?? "",
+          sizeGuide: p.sizeGuide ?? "",
           gstRate: p.gstRate ?? 18,
           hsnCode: p.hsnCode ?? "",
           moq: p.moq ?? 1,
@@ -432,7 +436,15 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
             </div>
             <div className="field">
               <label className="lbl">Description</label>
-              <textarea className="inp" rows={2} value={details.description} onChange={(e) => set("description", e.target.value)} />
+              <textarea className="inp" rows={4} value={details.description} onChange={(e) => set("description", e.target.value)} />
+            </div>
+            <div className="field">
+              <label className="lbl">Key features</label>
+              <textarea className="inp" rows={4} value={details.keyFeatures} onChange={(e) => set("keyFeatures", e.target.value)} />
+            </div>
+            <div className="field">
+              <label className="lbl">Size guide</label>
+              <textarea className="inp" rows={4} value={details.sizeGuide} onChange={(e) => set("sizeGuide", e.target.value)} />
             </div>
             <div className="row" style={{ gap: 14 }}>
               <div className="field" style={{ flex: 1 }}>

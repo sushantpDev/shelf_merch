@@ -27,6 +27,8 @@ const catalogProductSchema = new mongoose.Schema(
     brand: { type: String, default: '' },
     name: { type: String, required: true, trim: true },
     description: { type: String, default: '' },
+    keyFeatures: { type: String, default: '' },
+    sizeGuide: { type: String, default: '' },
     category: { type: String, required: true, index: true },
     group: { type: String, default: '' }, // icon group, e.g. "tee", "mug", "hoodie"
     // basePriceInr is the tenant-facing selling price (kept as the historical
