@@ -302,10 +302,22 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
     colorSwatches.find((c) => c.name === previewColor) ?? colorSwatches[0];
   // First defined colour swatch — used to preview the mask tint in the wizard.
   const firstHex = activeSwatch?.hex;
+  const legacyShopifyImageInMask =
+    product?.source?.provider === "shopify"
+    && !product.primaryImageUrl
+    && !product.imageUrls?.length
+    && /^https?:\/\//i.test(product.maskImageUrl || "");
   const marketingImageUrl = useMemo(() => {
-    const raw = product?.primaryImageUrl || product?.imageUrls?.[0];
+    const raw =
+      product?.primaryImageUrl
+      || product?.imageUrls?.[0]
+      || (legacyShopifyImageInMask ? product?.maskImageUrl : undefined);
     return raw ? resolveMediaUrl(raw) : undefined;
-  }, [product?.primaryImageUrl, product?.imageUrls]);
+  }, [legacyShopifyImageInMask, product?.primaryImageUrl, product?.imageUrls, product?.maskImageUrl]);
+  const productionMaskImageUrl =
+    product?.maskImageUrl && !legacyShopifyImageInMask
+      ? product.maskImageUrl
+      : undefined;
 
   async function refresh() {
     if (!id) return;
@@ -615,7 +627,7 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
                 label="Design & production mask"
                 hint="Transparent PNG · used for artwork, print areas and production"
                 accept="image/png"
-                imageUrl={product?.maskImageUrl ? resolveMediaUrl(product.maskImageUrl) : undefined}
+                imageUrl={productionMaskImageUrl ? resolveMediaUrl(productionMaskImageUrl) : undefined}
                 tintHex={firstHex}
                 disabled={busy || !id}
                 onFile={uploadMask}
@@ -629,7 +641,7 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
             )}
 
 
-            {product?.maskImageUrl && (
+            {productionMaskImageUrl && (
               <div style={{ marginBottom: 22 }}>
                 <h3 style={{ marginBottom: 2 }}>Colour preview</h3>
                 <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
@@ -641,7 +653,7 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
                   <div className="row" style={{ gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
                     <div>
                       <div style={{ width: 200, height: 200, borderRadius: 10, border: "1px solid var(--line)", background: "var(--surface-2)", overflow: "hidden" }}>
-                        <TintedGarment src={resolveMediaUrl(product.maskImageUrl)} hex={activeSwatch?.hex} />
+                        <TintedGarment src={resolveMediaUrl(productionMaskImageUrl)} hex={activeSwatch?.hex} />
                       </div>
                       {activeSwatch && (
                         <div className="row" style={{ gap: 8, alignItems: "center", marginTop: 8 }}>
@@ -673,7 +685,7 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
                             }}
                           >
                             <div style={{ width: 64, height: 64, borderRadius: 6, overflow: "hidden", background: "var(--surface-2)" }}>
-                              <TintedGarment src={resolveMediaUrl(product.maskImageUrl)} hex={c.hex} />
+                              <TintedGarment src={resolveMediaUrl(productionMaskImageUrl)} hex={c.hex} />
                             </div>
                             <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, maxWidth: 72 }}>
                               <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--line)", background: c.hex, flexShrink: 0 }} />
@@ -699,8 +711,8 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
           <>
             <h3 style={{ marginBottom: 12 }}>Design placeholders</h3>
             <PrintAreaEditor
-              images={[product?.maskImageUrl].filter(Boolean) as string[]}
-              maskImageUrl={product?.maskImageUrl}
+              images={[productionMaskImageUrl].filter(Boolean) as string[]}
+              maskImageUrl={productionMaskImageUrl}
               colors={colorSwatches}
               value={printAreas}
               onChange={setAreas}
@@ -718,7 +730,7 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
             <p className="muted" style={{ marginBottom: 6 }}>
               {product?.name} · {product?.sku} · {product?.variants?.length ?? 0} variants ·{" "}
               {marketingImageUrl ? "Shopify marketing image" : "no marketing image"} ·{" "}
-              {product?.maskImageUrl ? "production mask" : "no production mask"} · {printAreas.length} print areas
+              {productionMaskImageUrl ? "production mask" : "no production mask"} · {printAreas.length} print areas
             </p>
             {problems.length > 0 && (
               <ul style={{ color: "var(--danger)", margin: "10px 0", paddingLeft: 18 }}>

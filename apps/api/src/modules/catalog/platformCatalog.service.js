@@ -107,8 +107,13 @@ export async function publishProduct(productId) {
   }
   if (!(product.gstRate >= 0 && product.gstRate <= 28)) problems.push('gstRate must be set (0–28)');
   if (!product.hsnCode) problems.push('hsnCode is required');
-  if (!product.maskImageUrl && !product.imageUrls?.length) {
-    problems.push('Mask image is required');
+  const legacyShopifyImageInMask =
+    product.source?.provider === 'shopify'
+    && !product.primaryImageUrl
+    && !product.imageUrls?.length
+    && /^https?:\/\//i.test(product.maskImageUrl || '');
+  if (!product.maskImageUrl || legacyShopifyImageInMask) {
+    problems.push('Transparent design and production mask image is required');
   }
   if (problems.length) {
     throw new ApiError(422, 'Product is not ready to publish', 'PUBLISH_VALIDATION_FAILED', problems);
@@ -181,7 +186,20 @@ export async function addImages(productId, urls) {
 export async function setRoleImage(productId, role, url) {
   const product = await getProduct(productId);
   if (role === 'base') product.baseImageUrl = url;
-  else if (role === 'mask') product.maskImageUrl = url;
+  else if (role === 'mask') {
+    // Legacy Shopify imports stored the marketing photo in maskImageUrl.
+    // Preserve that photo in the marketing fields before replacing the mask.
+    if (
+      product.source?.provider === 'shopify'
+      && !product.primaryImageUrl
+      && !product.imageUrls?.length
+      && product.maskImageUrl
+    ) {
+      product.primaryImageUrl = product.maskImageUrl;
+      product.imageUrls = [product.maskImageUrl];
+    }
+    product.maskImageUrl = url;
+  }
   await product.save();
   return product;
 }

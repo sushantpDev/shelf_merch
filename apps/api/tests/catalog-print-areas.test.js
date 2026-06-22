@@ -112,4 +112,22 @@ describe('product variant colorHex + master image roles', () => {
     expect(reloaded.baseImageUrl).toBe('/uploads/platform/product/base.png');
     expect(reloaded.maskImageUrl).toBe('/uploads/platform/product/mask.png');
   });
+
+  it('keeps a legacy Shopify photo as marketing when a production mask is uploaded', async () => {
+    product.source = {
+      provider: 'shopify',
+      domain: 'example.myshopify.com',
+      externalId: '123',
+    };
+    product.maskImageUrl = 'https://cdn.shopify.com/legacy-product.jpg';
+    await product.save();
+
+    const { setRoleImage } = await import('../src/modules/catalog/platformCatalog.service.js');
+    await setRoleImage(product._id, 'mask', '/uploads/platform/product/production-mask.png');
+
+    const reloaded = await CatalogProduct.findById(product._id);
+    expect(reloaded.primaryImageUrl).toBe('https://cdn.shopify.com/legacy-product.jpg');
+    expect(reloaded.imageUrls).toEqual(['https://cdn.shopify.com/legacy-product.jpg']);
+    expect(reloaded.maskImageUrl).toBe('/uploads/platform/product/production-mask.png');
+  });
 });

@@ -25,8 +25,10 @@ export type UiProduct = {
   colors?: string[];
   /** Variant colour name → hex (from catalog variants). */
   colorHexByName?: Record<string, string>;
-  /** Resolved product photo URL (mask image). */
+  /** Resolved marketing/catalog photo URL. */
   imgUrl?: string;
+  /** Transparent design/production image used by artwork mockups. */
+  maskImageUrl?: string;
   /** Super-admin design zones — artwork is clipped to the first matching area. */
   printAreas?: UiPrintArea[];
 };
@@ -226,6 +228,7 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
     colors: variantColors,
     colorHexByName: Object.keys(colorHexByName).length ? colorHexByName : undefined,
     imgUrl,
+    maskImageUrl: resolveMediaUrl(p.maskImageUrl),
     printAreas: printAreas?.length ? printAreas : undefined,
   };
 }
@@ -247,6 +250,7 @@ export function mapProductRef(ref: ApiProduct, catalogById?: Map<string, UiProdu
     colors: fromCatalog?.colors,
     colorHexByName: fromCatalog?.colorHexByName,
     imgUrl,
+    maskImageUrl: resolveMediaUrl(ref.maskImageUrl) || fromCatalog?.maskImageUrl,
     printAreas: fromCatalog?.printAreas,
   };
 }

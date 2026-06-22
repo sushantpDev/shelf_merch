@@ -941,7 +941,7 @@ Wizards.swagArtwork=function(){
   const right=`<div>${header}
     <div class="sw-mockups">${prods.map((p,idx)=>{const ep=enrichProduct(p);const mock=productHasPrintArea(ep);const inner=f.artwork
         ? swagMockupHost(ep,idx)
-        : `<div class="img${mock?' img-mockup':''}">${productImg(ep,mock?{width:'100%',height:'100%'}:{})}</div>`;
+        : `<div class="img${mock?' img-mockup':''}">${productImg(ep,{...(mock?{width:'100%',height:'100%'}:{}),url:designImgUrl(ep)})}</div>`;
       const badge=f.artwork?`<div class="mockup-badge">${I.spark.replace('<svg ','<svg width="11" height="11" ')}Editable</div>`:'';
       return `<div class="pcard mockup-card" style="position:relative">${f.artwork?'':'<div class="dots-btn">'+I.dots+'</div>'}${badge}${inner}<div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div></div></div>`;}).join('')}</div></div>`;
   const body=`<div class="sw-art-layout">${left}${right}</div>`;
@@ -1089,9 +1089,14 @@ function buildRealisticArtwork(artImg,group){
   }
 }
 function swagMockupHost(ep,idx){
-  // Square host; the Konva stage is mounted into it after render. data-kidx maps
-  // back to S.flow.pickedProducts so the mount can derive image + print area.
-  return `<div class="img img-mockup" data-konva-mockup data-kidx="${idx}" style="position:relative;display:block;background:#fff;touch-action:none"></div>`;
+  // Keep the production mask as a normal DOM image. Konva mounts only the
+  // artwork/controls above it, so an async canvas render cannot replace the
+  // mask with the Shopify marketing image.
+  const maskSrc=resolveMediaSrc(designImgUrl(ep));
+  return `<div class="img img-mockup" style="position:relative;display:block;background:#fff;touch-action:none">
+    ${productImg(ep,{width:'100%',height:'100%',url:maskSrc})}
+    <div data-konva-mockup data-kidx="${idx}" style="position:absolute;inset:0"></div>
+  </div>`;
 }
 function destroyMockupStages(){
   for(const s of __mockupStages){ try{ s.destroy(); }catch{} }
@@ -1123,15 +1128,17 @@ function mountKonvaMockups(){
     const prod=ctx.products[idx];
     if(!prod) return;
     mountOneMockup(host,enrichProduct(prod),idx,ctx).catch(()=>{
-      // Fallback: static overlay if Konva or an image fails to load.
+      if(!host.isConnected) return;
+      // The mask is already rendered by the parent; fall back to static guides.
       const ep=enrichProduct(prod);
-      host.innerHTML=`${productImg(ep,{width:'100%',height:'100%'})}${printAreaGuide(ep)}${productArtOverlay(ep,ctx.artUrl)}`;
+      host.innerHTML=`${printAreaGuide(ep)}${productArtOverlay(ep,ctx.artUrl)}`;
     });
   });
 }
 function mockupPlacementKey(prod,idx){ return prod?.id||('idx'+idx); }
 async function mountOneMockup(host,prod,idx,ctx){
   const Konva=await loadKonva();
+  if(!host.isConnected) return;
   const size=host.clientWidth||host.offsetWidth;
   if(!size){
     // Host not laid out yet — retry once on the next frame, but never loop.
@@ -1139,24 +1146,14 @@ async function mountOneMockup(host,prod,idx,ctx){
     if(tries<3){ host.dataset.kretry=String(tries+1); requestAnimationFrame(()=>mountKonvaMockups()); }
     return;
   }
-  const [prodImg,artImg]=await Promise.all([
-    loadImageEl(resolveMediaSrc(catalogImgUrl(prod))).catch(()=>null),
-    loadImageEl(ctx.artUrl),
-  ]);
+  const artImg=await loadImageEl(ctx.artUrl);
 
+  if(!host.isConnected) return;
   host.innerHTML='';
   const stage=new Konva.Stage({container:host,width:size,height:size});
   const layer=new Konva.Layer();
   stage.add(layer);
   __mockupStages.push(stage);
-
-  // Product background — drawn object-fit:contain so print-area % (defined on the
-  // square in the admin editor) line up with what staff configured.
-  if(prodImg){
-    const scale=Math.min(size/prodImg.naturalWidth,size/prodImg.naturalHeight);
-    const w=prodImg.naturalWidth*scale, h=prodImg.naturalHeight*scale;
-    layer.add(new Konva.Image({image:prodImg,x:(size-w)/2,y:(size-h)/2,width:w,height:h,listening:false}));
-  }
 
   // Print area guide.
   const area=pickPrintArea(prod);
@@ -1938,6 +1935,7 @@ function enrichProduct(p){
     ...p,
     printAreas:p.printAreas?.length?p.printAreas:full.printAreas,
     imgUrl:p.imgUrl||full.imgUrl,
+    maskImageUrl:p.maskImageUrl||full.maskImageUrl,
     colors:p.colors?.length?p.colors:full.colors,
     colorHexByName:p.colorHexByName||full.colorHexByName,
     description:p.description||full.description,
@@ -1955,7 +1953,7 @@ function pickPrintArea(p){
   const areas=prod.printAreas;
   if(!areas?.length) return null;
   const full=catalogProductById(prod.id);
-  const maskUrl=full?.imgUrl||prod.imgUrl;
+  const maskUrl=full?.maskImageUrl||prod.maskImageUrl;
   if(maskUrl){
     const maskNorm=normMediaPath(maskUrl);
     const maskArea=areas.find(a=>normMediaPath(a.mockupImageUrl)===maskNorm);
@@ -1996,8 +1994,16 @@ function catalogImgUrl(p){
   if(p?.id) return getCatalogList().find(x=>x.id===p.id)?.imgUrl;
   return '';
 }
+function designImgUrl(p){
+  if(p?.maskImageUrl) return p.maskImageUrl;
+  if(p?.id){
+    const full=getCatalogList().find(x=>x.id===p.id);
+    if(full?.maskImageUrl) return full.maskImageUrl;
+  }
+  return '';
+}
 function productImg(p,opts={}){
-  const url=catalogImgUrl(p);
+  const url=opts.url||catalogImgUrl(p);
   const ph=PG[p?.g]||PG.tee;
   const size=opts.width?`width:${opts.width};height:${opts.height||opts.width};`:`width:${opts.width||'64%'};height:${opts.height||'64%'};`;
   if(!url) return ph;
