@@ -1227,12 +1227,60 @@ function resolveMediaSrc(url){
   if(/^(https?:|data:|blob:)/i.test(url)) return url;
   return url.startsWith('/')?url:`/${url}`;
 }
+// Flatten mask + placed artwork (with the realistic warp/texture/sheen + the
+// garment-fold multiply) into ONE PNG data URL, so a saved design is a single
+// image we fetch as-is instead of re-compositing the mockup on every render.
+async function bakeMockup(ep, artUrl, placement, size=1000){
+  if(!artUrl) return '';
+  try{
+    const maskUrl=resolveMediaSrc(designImgUrl(ep));
+    const [maskImg, artImg]=await Promise.all([
+      maskUrl?loadImageEl(maskUrl).catch(()=>null):Promise.resolve(null),
+      loadImageEl(artUrl),
+    ]);
+    const canvas=document.createElement('canvas'); canvas.width=size; canvas.height=size;
+    const ctx=canvas.getContext('2d');
+    if(maskImg){
+      const s=Math.min(size/maskImg.naturalWidth, size/maskImg.naturalHeight);
+      const w=maskImg.naturalWidth*s, h=maskImg.naturalHeight*s;
+      ctx.drawImage(maskImg,(size-w)/2,(size-h)/2,w,h);
+    }
+    const area=pickPrintArea(ep);
+    const box=(area&&area.box&&area.box.widthPct)?area.box:{xPct:33,yPct:30,widthPct:34,heightPct:38};
+    const aspect=(artImg.naturalHeight||1)/(artImg.naturalWidth||1);
+    let pl=placement;
+    if(!pl){
+      const bw=box.widthPct/100*size, bh=box.heightPct/100*size;
+      const fitW=Math.min(bw*0.92,(bh*0.92)/aspect);
+      pl={xPct:box.xPct+box.widthPct/2, yPct:box.yPct+box.heightPct/2, wPct:fitW/size*100, rot:0};
+    }
+    const realArt=buildRealisticArtwork(artImg, ep?.g);
+    const w0=pl.wPct/100*size, h0=w0*aspect;
+    ctx.save();
+    ctx.globalCompositeOperation='multiply';
+    ctx.globalAlpha=0.96;
+    ctx.translate(pl.xPct/100*size, pl.yPct/100*size);
+    ctx.rotate((pl.rot||0)*Math.PI/180);
+    ctx.drawImage(realArt, -w0/2, -h0/2, w0, h0);
+    ctx.restore();
+    return canvas.toDataURL('image/png');
+  }catch{
+    // Tainted canvas (CORS mask) or a load failure — fall back to live overlay.
+    return '';
+  }
+}
 async function swGenerate(){
   const f=S.flow;
   const catalog=getCatalogList();
+  const placements=f.artPlacements||{};
+  const artUrl=f.artFile?.preview||'';
+  // Bake each designed product to a single flattened mockup once, up front.
+  const baked=await Promise.all(f.picked.map((i,idx)=>{
+    const cp=catalog[i];
+    return bakeMockup(enrichProduct(cp), artUrl, placements[cp?.id||('idx'+idx)]||null);
+  }));
   if(api.useMocks()){
-    const placements=f.artPlacements||{};
-    const col={id:nid('c'),code:'C'+(100000000+Math.floor(Math.random()*899999999)),name:f.colName,created:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),by:S.user.name,status:'ready',shopId:'',preferredColors:[],artworkUrl:f.artFile?.preview||'',artPlacements:placements,products:f.picked.map((i,idx)=>{const cp=catalog[i];return{id:cp?.id,g:cp?.g||'tee',brand:cp?.brand||'',nm:cp?.nm||'Product',printAreas:cp?.printAreas,imgUrl:cp?.imgUrl,maskImageUrl:cp?.maskImageUrl,placement:placements[cp?.id||('idx'+idx)]||null};})};
+    const col={id:nid('c'),code:'C'+(100000000+Math.floor(Math.random()*899999999)),name:f.colName,created:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),by:S.user.name,status:'ready',shopId:'',preferredColors:[],artworkUrl:artUrl,artPlacements:placements,products:f.picked.map((i,idx)=>{const cp=catalog[i];return{id:cp?.id,g:cp?.g||'tee',brand:cp?.brand||'',nm:cp?.nm||'Product',printAreas:cp?.printAreas,imgUrl:cp?.imgUrl,maskImageUrl:cp?.maskImageUrl,placement:placements[cp?.id||('idx'+idx)]||null,mockupUrl:baked[idx]||''};})};
     S.collections.push(col);
     go('swag');
     toast('Collection "'+col.name+'" is design-ready!');
@@ -1247,6 +1295,8 @@ async function swGenerate(){
       artwork:f.artFile?{file:f.artFile.file,preview:f.artFile.preview,name:f.artFile.name}:undefined,
     });
     col.by=S.user.name;
+    // Attach the baked single-image mockups to the returned products (by index).
+    if(Array.isArray(col.products)) col.products.forEach((p,idx)=>{ if(baked[idx]) p.mockupUrl=baked[idx]; });
     S.collections.push(col);
     S.loading=false;
     go('swag');
@@ -1989,6 +2039,12 @@ function collectionArtOverlay(url){
   if(!url) return LOGO_DECO;
   return `<img class="art-overlay-img" src="${url}" alt="Artwork">`;
 }
+// A designed product renders as ONE baked image when available; otherwise it
+// composites the mask base + artwork overlay live (fallback for un-baked data).
+function designedMockupHtml(ep, artworkUrl, fill){
+  if(ep?.mockupUrl) return `<img src="${esc(ep.mockupUrl)}" alt="" style="width:100%;height:100%;object-fit:contain;display:block">`;
+  return `${productImg(ep,{...(fill?{width:'100%',height:'100%'}:{}),url:designImgUrl(ep)})}${productArtOverlay(ep,artworkUrl)}`;
+}
 function catalogImgUrl(p){
   if(p?.imgUrl) return p.imgUrl;
   if(p?.id) return getCatalogList().find(x=>x.id===p.id)?.imgUrl;
@@ -2018,9 +2074,9 @@ function pcard(p,opts={}){
   const sw = opts.swatches?`<div class="swatches">${['#1c1c1c','#2b4a8b','#9a9a9a','#7a4a25'].map(c=>`<span class="sw" style="background:${c}"></span>`).join('')}<span class="mut3" style="font-size:11px;align-self:center;margin-left:2px">+${opts.swatches}</span></div>`:'';
   const prod=enrichProduct(opts.product||p);
   const mockup=opts.branded||productHasPrintArea(prod);
-  const logo = opts.branded?productArtOverlay(prod,opts.artworkUrl):'';
+  const inner=opts.branded?designedMockupHtml(prod,opts.artworkUrl,mockup):productImg(prod,mockup?{width:'100%',height:'100%'}:{});
   return `<div class="pcard" data-act="${opts.act||'noop'}" ${opts.arg?`data-arg="${opts.arg}"`:''}>
-    <div class="img${mockup?' img-mockup':''}">${productImg(prod,{...(mockup?{width:'100%',height:'100%'}:{}),...(opts.branded?{url:designImgUrl(prod)}:{})})}${logo}</div>
+    <div class="img${mockup?' img-mockup':''}">${inner}</div>
     <div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div>${opts.price?`<div class="pr">${opts.price}</div>`:''}${sw}</div></div>`;
 }
 
@@ -2344,8 +2400,7 @@ function swagDesignCard(col,p,pIdx){
   const arg=`${col.id}:${pIdx}`;
   const mock=productHasPrintArea(ep);
   return `<div class="pcard swag-design-card" data-act="productOpen" data-arg="${arg}">
-    <div class="img${mock?' img-mockup':''}">${productImg(ep,{...(mock?{width:'100%',height:'100%'}:{}),url:designImgUrl(ep)})}
-      ${productArtOverlay(ep,col.artworkUrl)}
+    <div class="img${mock?' img-mockup':''}">${designedMockupHtml(ep,col.artworkUrl,mock)}
       <div class="swag-card-actions">
         <button type="button" class="swag-card-menu" data-act="swagCardMenu" data-arg="${arg}">${I.dots}</button>
       </div>
@@ -2539,7 +2594,6 @@ function ViewProductDetail(){
   const detailPanels=`${descriptionPanel}${featuresPanel}${sizePanel}`;
   const title=p.brand?`${esc(p.brand)} ${esc(p.nm)}`:esc(p.nm);
   const ep=enrichProduct(p);
-  const logo=isCatalog?'':productArtOverlay(ep,col.artworkUrl);
   const imgBg=colors[sel]||'#f4f6f4';
   const backLabel=isCatalog?'Back to catalog':S.flow.productBackView==='shopDetail'?'Back to shop':'Back to saved designs';
   const uniqueId=isCatalog?(p.id?String(p.id).slice(-8).toUpperCase():String(pIdx+1).padStart(8,'0')):productUniqueId(col,pIdx);
@@ -2564,8 +2618,7 @@ function ViewProductDetail(){
     <div class="pd-body">
       <div class="pd-gallery">
         <div class="pd-img" style="background:${imgBg}">
-          <div class="pd-img-inner pd-img-mockup">${productImg(ep,{width:'100%',height:'100%',...(isCatalog?{}:{url:designImgUrl(ep)})})}
-            ${logo}
+          <div class="pd-img-inner pd-img-mockup">${isCatalog?productImg(ep,{width:'100%',height:'100%'}):designedMockupHtml(ep,col.artworkUrl,true)}
           </div>
           <button class="pd-zoom" data-act="toast" data-arg="Image zoom coming soon">${I.zoom}</button>
         </div>
@@ -2674,7 +2727,7 @@ function kitOpen(id){ const k=S.kits.find(x=>x.id===id);
   const prods=kitProductLabels(k);
   const hasBrand=!!k.artworkUrl;
   const prodList=prods.length?`<div style="margin:12px 0 16px"><div class="mut3" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:10px">Included products</div>
-    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px">${prods.map(p=>{const ep=enrichProduct(p);const mock=hasBrand||productHasPrintArea(ep);return `<div class="pcard" data-act="noop"><div class="img${mock?' img-mockup':''}">${productImg(ep,{...(mock?{width:'100%',height:'100%'}:{}),...(hasBrand?{url:designImgUrl(ep)}:{})})}${hasBrand?productArtOverlay(ep,k.artworkUrl):''}</div></div>`;}).join('')}</div></div>`:'';
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px">${prods.map(p=>{const ep=enrichProduct(p);const mock=hasBrand||productHasPrintArea(ep);const inner=hasBrand?designedMockupHtml(ep,k.artworkUrl,mock):productImg(ep,mock?{width:'100%',height:'100%'}:{});return `<div class="pcard" data-act="noop"><div class="img${mock?' img-mockup':''}">${inner}</div></div>`;}).join('')}</div></div>`:'';
   const artBlock=k.artworkUrl?`<div style="margin:12px 0 16px"><div class="mut3" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:8px">Kit artwork</div>
     <div class="row" style="gap:12px;align-items:center"><div class="logo-chip" style="width:48px;height:48px;overflow:hidden;padding:4px"><img src="${esc(k.artworkUrl)}" alt="" style="max-width:100%;max-height:100%;object-fit:contain"></div><span class="muted" style="font-size:13px">Branded across all items</span></div></div>`:'';
   openModal(`<div class="modal-pad" style="max-width:640px"><div class="modal-h"><div><div class="eyebrow">${k.status} · ${k.items} items</div><h3>${esc(k.name)}</h3></div><button class="xbtn" data-act="closeLayer">✕</button></div>
