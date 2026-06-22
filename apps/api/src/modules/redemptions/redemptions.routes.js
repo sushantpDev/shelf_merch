@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { idempotency } from '../../middleware/idempotency.middleware.js';
+import { sendOtpRateLimit, verifyOtpRateLimit } from '../../middleware/rateLimit.middleware.js';
 import { objectId } from '../users/users.validation.js';
 import { ApiError } from '../../utils/errors.js';
 import { Recipient } from '../campaigns/recipient.model.js';
@@ -49,6 +50,7 @@ router.post(
     params: tokenParams,
     body: z.object({ contact: z.string().min(3) }),
   }),
+  sendOtpRateLimit,
   asyncHandler(async (req, res) => {
     res.json(await redemptionsService.sendOtp(req.params.token, req.body));
   }),
@@ -60,6 +62,7 @@ router.post(
     params: tokenParams,
     body: z.object({ code: z.string().length(6) }),
   }),
+  verifyOtpRateLimit,
   asyncHandler(async (req, res) => {
     res.json(await redemptionsService.verifyOtp(req.params.token, req.body));
   }),

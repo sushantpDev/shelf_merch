@@ -1,5 +1,5 @@
-import { IdempotencyKey } from '../modules/system/idempotencyKey.model.js';
 import { ApiError } from '../utils/errors.js';
+import { beginIdempotency, completeIdempotency, releaseIdempotency } from '../services/idempotency.service.js';
 
 /**
  * §3.5 — replayed Idempotency-Key returns the cached response instead of
@@ -18,31 +18,31 @@ export function idempotency({ required = false } = {}) {
 
     const scope = { key, tenantId: req.tenantId ?? null, userId: req.user?.userId ?? null };
 
-    const existing = await IdempotencyKey.findOne(scope);
-    if (existing) {
-      if (existing.response === null) {
-        return next(new ApiError(409, 'Request with this Idempotency-Key is still in progress', 'IDEMPOTENT_REPLAY_IN_FLIGHT'));
-      }
-      res.set('Idempotent-Replay', 'true');
-      return res.status(existing.statusCode).json(existing.response);
-    }
-
     try {
-      await IdempotencyKey.create({ ...scope, method: req.method, path: req.originalUrl });
-    } catch (err) {
-      if (err.code === 11000) {
-        return next(new ApiError(409, 'Duplicate request in flight', 'IDEMPOTENT_REPLAY_IN_FLIGHT'));
+      const result = await beginIdempotency(scope, {
+        method: req.method,
+        path: req.originalUrl,
+      });
+
+      if (result.action === 'replay') {
+        res.set('Idempotent-Replay', 'true');
+        return res.status(result.statusCode).json(result.response);
       }
+      if (result.action === 'in_flight') {
+        return next(
+          new ApiError(409, 'Request with this Idempotency-Key is still in progress', 'IDEMPOTENT_REPLAY_IN_FLIGHT'),
+        );
+      }
+    } catch (err) {
       return next(err);
     }
 
     const originalJson = res.json.bind(res);
     res.json = (payload) => {
-      // Cache only successful outcomes; failures may be retried with the same key.
       if (res.statusCode < 400) {
-        IdempotencyKey.updateOne(scope, { statusCode: res.statusCode, response: payload }).catch(() => {});
+        completeIdempotency(scope, { statusCode: res.statusCode, response: payload }).catch(() => {});
       } else {
-        IdempotencyKey.deleteOne(scope).catch(() => {});
+        releaseIdempotency(scope).catch(() => {});
       }
       return originalJson(payload);
     };
