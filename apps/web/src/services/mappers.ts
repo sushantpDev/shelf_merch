@@ -17,6 +17,9 @@ export type UiProduct = {
   g: string;
   brand: string;
   nm: string;
+  description?: string;
+  keyFeatures?: string;
+  sizeGuide?: string;
   price: string;
   sw: number;
   colors?: string[];
@@ -215,6 +218,9 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
     g: p.group || GROUP_BY_CATEGORY[p.category] || "tee",
     brand: p.brand || "",
     nm: p.name,
+    description: p.description || "",
+    keyFeatures: p.keyFeatures || "",
+    sizeGuide: p.sizeGuide || "",
     price: formatInr(p.basePriceInr ?? 0),
     sw: Array.isArray(p.variants) ? Math.max(p.variants.length, 2) : 4,
     colors: variantColors,
@@ -233,6 +239,9 @@ export function mapProductRef(ref: ApiProduct, catalogById?: Map<string, UiProdu
     g: ref.group || fromCatalog?.g || "tee",
     brand: ref.brand || fromCatalog?.brand || "",
     nm: ref.name,
+    description: ref.description || fromCatalog?.description || "",
+    keyFeatures: ref.keyFeatures || fromCatalog?.keyFeatures || "",
+    sizeGuide: ref.sizeGuide || fromCatalog?.sizeGuide || "",
     price: fromCatalog?.price || "",
     sw: fromCatalog?.sw ?? 4,
     colors: fromCatalog?.colors,

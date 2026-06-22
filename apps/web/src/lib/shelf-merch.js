@@ -1940,6 +1940,9 @@ function enrichProduct(p){
     imgUrl:p.imgUrl||full.imgUrl,
     colors:p.colors?.length?p.colors:full.colors,
     colorHexByName:p.colorHexByName||full.colorHexByName,
+    description:p.description||full.description,
+    keyFeatures:p.keyFeatures||full.keyFeatures,
+    sizeGuide:p.sizeGuide||full.sizeGuide,
   };
 }
 function normMediaPath(url){
@@ -2501,8 +2504,33 @@ function ViewProductDetail(){
   const colorNames=isCatalog?productColorNames(p):collectionProductColorNames(col,p);
   const colors=isCatalog?colorNames.map(name=>productColorHex(p,name)):collectionProductSwatches(col,p);
   const sel=Math.min(S.flow.selColor||0,colors.length-1);
-  const desc=productDescription(p);
+  const desc=isCatalog?String(p.description||''):productDescription(p);
   const short=desc.length>180&&!S.flow.descExpanded?desc.slice(0,180).trim()+'…':desc;
+  const keyFeatures=isCatalog?String(p.keyFeatures||''):'';
+  const sizeGuide=isCatalog?String(p.sizeGuide||''):'';
+  const detailText=value=>esc(value).replace(/\n/g,'<br>');
+  const detailTab=isCatalog?(S.flow.productDetailTab||'description'):'description';
+  const detailRows=value=>String(value||'').split('\n').map(line=>{
+    const split=line.indexOf(':');
+    return split>0?[line.slice(0,split).trim(),line.slice(split+1).trim()]:[line.trim(),''];
+  }).filter(([label,value])=>label||value);
+  const featureRows=detailRows(keyFeatures);
+  const sizeRows=detailRows(sizeGuide).filter(([label])=>!/^feature$/i.test(label));
+  const detailTabs=isCatalog?`<div class="pd-detail-tabs" role="tablist" aria-label="Product information">
+    ${[['description','Description'],['features','Key features'],['size','Size Guide']].map(([key,label])=>`<button type="button" class="${detailTab===key?'on':''}" role="tab" aria-selected="${detailTab===key?'true':'false'}" data-act="productDetailTab" data-arg="${key}">${label}</button>`).join('')}
+  </div>`:'';
+  const descriptionPanel=`<div class="pd-tab-panel pd-description-panel${detailTab==='description'?' on':''}" role="tabpanel" data-product-panel="description">
+      <p>${detailText(short)}</p>
+      ${desc.length>180?`<span class="lnk" data-act="productDescToggle">${S.flow.descExpanded?'See less':'See more'}</span>`:''}
+    </div>`;
+  const featuresPanel=`<div class="pd-tab-panel${detailTab==='features'?' on':''}" role="tabpanel" data-product-panel="features"><div class="pd-feature-card">
+        ${featureRows.map(([label,value])=>`<div class="pd-feature-row"><div>${esc(label)}</div><div>${detailText(value)}</div></div>`).join('')}
+      </div></div>`;
+  const sizePanel=`<div class="pd-tab-panel${detailTab==='size'?' on':''}" role="tabpanel" data-product-panel="size"><div class="pd-size-table">
+      <div class="pd-size-head"><div>Feature</div><div>Details</div></div>
+      ${sizeRows.map(([label,value])=>`<div class="pd-size-row"><div>${esc(label)}</div><div>${detailText(value)}</div></div>`).join('')}
+    </div></div>`;
+  const detailPanels=`${descriptionPanel}${featuresPanel}${sizePanel}`;
   const title=p.brand?`${esc(p.brand)} ${esc(p.nm)}`:esc(p.nm);
   const ep=enrichProduct(p);
   const logo=isCatalog?'':productArtOverlay(ep,col.artworkUrl);
@@ -2548,11 +2576,11 @@ function ViewProductDetail(){
             <tr><th>Notes</th><td class="muted">${notes}</td></tr>
           </tbody>
         </table>
-        <div class="pd-desc">
+        ${isCatalog?`${detailTabs}${detailPanels}`:`<div class="pd-desc">
           <div class="lbl" style="margin-bottom:10px">Product description</div>
-          <p>${short}</p>
+          <p>${detailText(short)}</p>
           ${desc.length>180?`<span class="lnk" data-act="productDescToggle">${S.flow.descExpanded?'See less':'See more'}</span>`:''}
-        </div>
+        </div>`}
       </div>
     </div>
   </div>`;
@@ -2577,13 +2605,13 @@ function catalogProductOpen(arg){
   if(!p){ toast('Product not found',false); return; }
   delete S.flow.colId;
   delete S.flow.pIdx;
-  go('productDetail',{nav:'catalog',flow:{...S.flow,productSource:'catalog',catalogProductId:p.id||null,catalogProductIndex:index,selColor:primaryColorSel(),descExpanded:false,productBackView:'catalog',productBackFlow:{catCat:S.flow.catCat||'All Products'}}});
+  go('productDetail',{nav:'catalog',flow:{...S.flow,productSource:'catalog',catalogProductId:p.id||null,catalogProductIndex:index,selColor:primaryColorSel(),descExpanded:false,productDetailTab:'description',productBackView:'catalog',productBackFlow:{catCat:S.flow.catCat||'All Products'}}});
 }
 function productBack(){
   const view=S.flow.productBackView||'swag';
   const extra=S.flow.productBackFlow||{};
   const flow={...S.flow,...extra};
-  delete flow.colId; delete flow.pIdx; delete flow.selColor; delete flow.descExpanded;
+  delete flow.colId; delete flow.pIdx; delete flow.selColor; delete flow.descExpanded; delete flow.productDetailTab;
   delete flow.productSource; delete flow.catalogProductId; delete flow.catalogProductIndex;
   delete flow.productBackView; delete flow.productBackFlow;
   go(view,{nav:S.nav,flow});
@@ -2601,6 +2629,19 @@ function productColor(el){
   if(image) image.style.background=el.dataset.color||el.style.backgroundColor||'#f4f6f4';
 }
 function productDescToggle(){ S.flow.descExpanded=!S.flow.descExpanded; render(); }
+function productDetailTab(tab){
+  if(!['description','features','size'].includes(tab)) return;
+  S.flow.productDetailTab=tab;
+  S.flow.descExpanded=false;
+  document.querySelectorAll('.pd-detail-tabs button').forEach(button=>{
+    const selected=button.dataset.arg===tab;
+    button.classList.toggle('on',selected);
+    button.setAttribute('aria-selected',selected?'true':'false');
+  });
+  document.querySelectorAll('[data-product-panel]').forEach(panel=>{
+    panel.classList.toggle('on',panel.dataset.productPanel===tab);
+  });
+}
 function productPurchase(){ toast('Checkout coming soon — payment will be available in a future update'); }
 
 /* ===================== KITS ===================== */
@@ -3750,6 +3791,7 @@ const ACT = {
   productBack:()=>productBack(),
   productColor:(el)=>productColor(el),
   productDescToggle:()=>productDescToggle(),
+  productDetailTab:(el,a)=>productDetailTab(a),
   productPurchase:()=>productPurchase(),
   catCat:(el,a)=>catCat(a),
   // send points
