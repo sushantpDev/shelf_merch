@@ -23,6 +23,8 @@ const createProductSchema = z.object({
   name: z.string().min(1),
   slug: z.string().optional(),
   description: z.string().optional().default(''),
+  keyFeatures: z.string().optional().default(''),
+  sizeGuide: z.string().optional().default(''),
   category: z.string().min(1),
   brand: z.string().optional().default(''),
   group: z.string().optional().default(''),
@@ -168,7 +170,13 @@ platformProductsRouter.post(
       req,
       action: 'catalog.import.shopify',
       entityType: 'CatalogProduct',
-      after: { domain: summary.domain, imported: summary.imported, skipped: summary.skipped, failed: summary.failed },
+      after: {
+        domain: summary.domain,
+        imported: summary.imported,
+        updated: summary.updated,
+        skipped: summary.skipped,
+        failed: summary.failed,
+      },
     });
     res.json(summary);
   }),

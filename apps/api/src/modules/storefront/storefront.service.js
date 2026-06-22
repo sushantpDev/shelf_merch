@@ -36,7 +36,7 @@ export async function getStorefront(shopId) {
       _id: { $in: [...catalogIds] },
     })
       .setOptions({ skipTenantGuard: true })
-      .select('name brand group category description basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas')
+      .select('name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas')
       .lean();
     for (const row of rows) catalogById.set(String(row._id), row);
   }
