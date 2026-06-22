@@ -362,6 +362,7 @@ export type PlatformProduct = {
   maskImageUrl?: string;
   printAreas: PrintArea[];
   inventory?: { available?: number; mode?: string };
+  source?: { provider?: string; domain?: string; externalId?: string; handle?: string };
 };
 
 export type ProductInput = {
@@ -414,7 +415,7 @@ export function updateVariant(id: string, variantId: string, patch: Partial<Prod
   });
 }
 
-/** Upload the recolourable master pair: role 'base' (internal) or 'mask' (customer). */
+/** Upload a production image. New products use role 'mask' for the transparent design PNG. */
 export function uploadProductImage(id: string, file: File, role: "base" | "mask") {
   const form = new FormData();
   form.append("images", file);

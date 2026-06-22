@@ -84,9 +84,9 @@ const catalogProductSchema = new mongoose.Schema(
     ],
     imageUrls: { type: [String], default: [] },
     primaryImageUrl: { type: String, default: '' },
-    // Neutral master pair recoloured per colour at display time (POD tint).
-    // baseImageUrl: internal — print-area definition + production.
-    // maskImageUrl: customer-facing transparent PNG garment cutout.
+    // Production imagery is separate from primaryImageUrl/imageUrls (marketing).
+    // baseImageUrl is retained for legacy records.
+    // maskImageUrl is the manually uploaded transparent PNG used for design/production.
     baseImageUrl: { type: String, default: '' },
     maskImageUrl: { type: String, default: '' },
     // §3.2 — available/reserved are derived from InventoryTransactions only.

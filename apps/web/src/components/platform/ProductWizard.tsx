@@ -172,6 +172,54 @@ function MasterImageUpload({
   );
 }
 
+function MarketingImageCard({ imageUrl }: { imageUrl?: string }) {
+  return (
+    <div style={{ flex: "1 1 200px", maxWidth: 220 }}>
+      <label className="lbl">Shopify marketing image</label>
+      <div style={{ overflow: "hidden", border: "1px solid var(--line)", borderRadius: 10, background: "#fff" }}>
+        <div style={{ width: "100%", height: 168, background: "var(--surface-2)", display: "grid", placeItems: "center" }}>
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt="Shopify product"
+              style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+            />
+          ) : (
+            <div className="muted" style={{ padding: 16, textAlign: "center", fontSize: 12, lineHeight: 1.5 }}>
+              No Shopify product image was imported.
+            </div>
+          )}
+        </div>
+        <div style={{ padding: "10px 12px", borderTop: "1px solid var(--line)" }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-2)" }}>Marketing only</div>
+          <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2, lineHeight: 1.4 }}>
+            Read-only Shopify image · not used for artwork or production
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+async function pngHasTransparency(file: File) {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return false;
+    context.drawImage(bitmap, 0, 0);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    for (let i = 3; i < pixels.length; i += 4) {
+      if (pixels[i] < 255) return true;
+    }
+    return false;
+  } finally {
+    bitmap.close();
+  }
+}
+
 export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; productId?: string }) {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
@@ -254,6 +302,10 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
     colorSwatches.find((c) => c.name === previewColor) ?? colorSwatches[0];
   // First defined colour swatch — used to preview the mask tint in the wizard.
   const firstHex = activeSwatch?.hex;
+  const marketingImageUrl = useMemo(() => {
+    const raw = product?.primaryImageUrl || product?.imageUrls?.[0];
+    return raw ? resolveMediaUrl(raw) : undefined;
+  }, [product?.primaryImageUrl, product?.imageUrls]);
 
   async function refresh() {
     if (!id) return;
@@ -299,12 +351,21 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
     }
   }
 
-  async function uploadMaster(file: File | undefined, role: "base" | "mask") {
+  async function uploadMask(file: File | undefined) {
     if (!id || !file) return;
+    const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+    if (!isPng) {
+      setError("Design mask must be a PNG file.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      await uploadProductImage(id, file, role);
+      if (!(await pngHasTransparency(file))) {
+        setError("Design mask must contain transparent pixels. Please upload a transparent PNG.");
+        return;
+      }
+      await uploadProductImage(id, file, "mask");
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
@@ -544,27 +605,20 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
 
         {step === 2 && (
           <>
-            <h3 style={{ marginBottom: 4 }}>Master images</h3>
+            <h3 style={{ marginBottom: 4 }}>Product images</h3>
             <p className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
-              Upload a neutral (white) pair. They recolour to each variant's colour automatically.
+              Marketing and production imagery are kept separate. Only the transparent design mask is used for artwork placement.
             </p>
             <div className="row" style={{ gap: 18, flexWrap: "wrap", marginBottom: 22, alignItems: "flex-start" }}>
+              <MarketingImageCard imageUrl={marketingImageUrl} />
               <MasterImageUpload
-                label="Base image — print areas & production"
-                hint="PNG, JPG or WebP · neutral white garment"
-                accept="image/png,image/webp,image/jpeg"
-                imageUrl={product?.baseImageUrl ? resolveMediaUrl(product.baseImageUrl) : undefined}
-                disabled={busy || !id}
-                onFile={(file) => uploadMaster(file, "base")}
-              />
-              <MasterImageUpload
-                label="Mask image (transparent PNG)"
-                hint="Transparent PNG · defines garment silhouette"
+                label="Design & production mask"
+                hint="Transparent PNG · used for artwork, print areas and production"
                 accept="image/png"
                 imageUrl={product?.maskImageUrl ? resolveMediaUrl(product.maskImageUrl) : undefined}
                 tintHex={firstHex}
                 disabled={busy || !id}
-                onFile={(file) => uploadMaster(file, "mask")}
+                onFile={uploadMask}
               />
             </div>
 
@@ -645,7 +699,7 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
           <>
             <h3 style={{ marginBottom: 12 }}>Design placeholders</h3>
             <PrintAreaEditor
-              images={[product?.baseImageUrl, product?.maskImageUrl].filter(Boolean) as string[]}
+              images={[product?.maskImageUrl].filter(Boolean) as string[]}
               maskImageUrl={product?.maskImageUrl}
               colors={colorSwatches}
               value={printAreas}
@@ -663,8 +717,8 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
             <h3 style={{ marginBottom: 12 }}>Review &amp; publish</h3>
             <p className="muted" style={{ marginBottom: 6 }}>
               {product?.name} · {product?.sku} · {product?.variants?.length ?? 0} variants ·{" "}
-              {product?.baseImageUrl ? "base image" : "no base image"} ·{" "}
-              {product?.maskImageUrl ? "mask image" : "no mask image"} · {printAreas.length} print areas
+              {marketingImageUrl ? "Shopify marketing image" : "no marketing image"} ·{" "}
+              {product?.maskImageUrl ? "production mask" : "no production mask"} · {printAreas.length} print areas
             </p>
             {problems.length > 0 && (
               <ul style={{ color: "var(--danger)", margin: "10px 0", paddingLeft: 18 }}>

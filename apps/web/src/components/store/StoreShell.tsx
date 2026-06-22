@@ -209,7 +209,7 @@ type CartLine = {
 };
 
 function productImage(p: StoreProduct) {
-  return p.maskImageUrl || p.primaryImageUrl || p.imageUrls?.[0] || "";
+  return p.primaryImageUrl || p.imageUrls?.[0] || p.maskImageUrl || "";
 }
 
 /* ─── category icon helper ─── */

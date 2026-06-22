@@ -209,7 +209,7 @@ function extractVariantColors(
 
 export function mapCatalogProduct(p: ApiProduct): UiProduct {
   const { colors: variantColors, colorHexByName } = extractVariantColors(p.variants);
-  const imgUrl = resolveMediaUrl(p.maskImageUrl || p.primaryImageUrl || p.imageUrls?.[0]);
+  const imgUrl = resolveMediaUrl(p.primaryImageUrl || p.imageUrls?.[0] || p.maskImageUrl);
   const printAreas = Array.isArray(p.printAreas)
     ? (p.printAreas as UiPrintArea[]).filter((a) => a?.box?.widthPct > 0 && a?.box?.heightPct > 0)
     : undefined;
@@ -233,7 +233,7 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
 export function mapProductRef(ref: ApiProduct, catalogById?: Map<string, UiProduct>): UiProduct {
   const id = ref.catalogProductId ? String(ref.catalogProductId) : undefined;
   const fromCatalog = id ? catalogById?.get(id) : undefined;
-  const imgUrl = resolveMediaUrl(ref.imgUrl || ref.maskImageUrl || ref.primaryImageUrl || ref.imageUrls?.[0] || fromCatalog?.imgUrl);
+  const imgUrl = resolveMediaUrl(ref.imgUrl || ref.primaryImageUrl || ref.imageUrls?.[0] || ref.maskImageUrl || fromCatalog?.imgUrl);
   return {
     id,
     g: ref.group || fromCatalog?.g || "tee",

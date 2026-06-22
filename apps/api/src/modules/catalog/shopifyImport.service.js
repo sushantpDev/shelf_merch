@@ -331,7 +331,8 @@ export function mapShopifyProduct(p, domain, metafields = []) {
     category: p.product_type || 'Imported',
     basePriceInr,
     variants,
-    maskImageUrl: p.image?.src || images[0] || '',
+    primaryImageUrl: p.image?.src || images[0] || '',
+    imageUrls: images,
     status: 'draft',
     // Imported products are fulfilled on demand, not warehoused — default to
     // made-to-order so they don't surface as "out of stock". A catalog admin
@@ -393,10 +394,21 @@ export async function importFromShopify({ domain, token }) {
       if (exists) {
         const contentChanged = ['description', 'keyFeatures', 'sizeGuide']
           .some((key) => String(exists[key] ?? '') !== String(mapped[key] ?? ''));
-        if (contentChanged) {
+        const imagesChanged =
+          String(exists.primaryImageUrl ?? '') !== String(mapped.primaryImageUrl ?? '')
+          || JSON.stringify(exists.imageUrls ?? []) !== JSON.stringify(mapped.imageUrls ?? []);
+        const legacyShopifyMask = [mapped.primaryImageUrl, ...mapped.imageUrls]
+          .filter(Boolean)
+          .includes(exists.maskImageUrl);
+        if (contentChanged || imagesChanged || legacyShopifyMask) {
           exists.description = mapped.description;
           exists.keyFeatures = mapped.keyFeatures;
           exists.sizeGuide = mapped.sizeGuide;
+          exists.primaryImageUrl = mapped.primaryImageUrl;
+          exists.imageUrls = mapped.imageUrls;
+          // Older imports stored the Shopify photo as the production mask.
+          // Clear only that legacy value; preserve a manually uploaded mask.
+          if (legacyShopifyMask) exists.maskImageUrl = '';
           await exists.save();
           updated += 1;
           items.push({ title: p.title, status: 'updated' });
