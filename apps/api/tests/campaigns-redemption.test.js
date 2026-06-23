@@ -409,6 +409,72 @@ describe('redemption portal (§11.1)', () => {
     expect(updated.redemptionStatus).toBe('order_created');
   });
 
+  it('store order item image is the baked design mockup, not the bare mask', async () => {
+    await Collection.create({
+      tenantId: tenant._id,
+      shopId: shop._id,
+      shopIds: [shop._id],
+      code: 'C900000001',
+      name: 'Mockup Collection',
+      status: 'ready',
+      artworkUrl: '/uploads/test/art.png',
+      productRefs: [
+        {
+          catalogProductId: product._id,
+          name: 'Test Tee',
+          brand: '',
+          group: 'tee',
+          mockupUrl: '/uploads/test/baked-mockup.png',
+        },
+      ],
+    });
+    const campaign = await Campaign.create({
+      tenantId: tenant._id,
+      entityId: entity._id,
+      name: 'Mockup Campaign',
+      type: 'points',
+      shopId: shop._id,
+      status: 'redemption_open',
+      creditsPerRecipient: 5000,
+      totalBudget: 5000,
+      recipientCount: 1,
+    });
+    const token = 'mockupOrderTokenRubixTest2026!!';
+    const recipient = await Recipient.create({
+      tenantId: tenant._id,
+      campaignId: campaign._id,
+      name: 'Bob',
+      email: 'bob@test.io',
+      phone: '+91 88888 88888',
+      creditAmount: 5000,
+      redemptionToken: token,
+      redemptionStatus: 'verified',
+    });
+
+    const { signRedemptionSession } = await import('../src/modules/redemptions/redemptions.service.js');
+    const sessionToken = signRedemptionSession(recipient);
+
+    const submit = await request(app)
+      .post(`/api/v1/redemptions/${token}/submit`)
+      .set('Authorization', `Bearer ${sessionToken}`)
+      .set('Idempotency-Key', 'mockup-submit-1')
+      .send({
+        items: [{ productId: String(product._id), qty: 1 }],
+        shippingAddress: {
+          name: 'Bob',
+          phone: '+91 88888 88888',
+          line1: '1 Road',
+          city: 'Hyderabad',
+          state: 'Telangana',
+          pincode: '500001',
+        },
+      });
+    expect(submit.status).toBe(201);
+
+    const order = await Order.findOne({ recipientId: recipient._id, tenantId: tenant._id });
+    expect(order.items[0].imageUrl).toBe('/uploads/test/baked-mockup.png');
+  });
+
   it('kit flow: view kit → size for apparel only → accept order without credit check', async () => {
     const bottle = await CatalogProduct.create({
       sku: 'SM-BOTTLE-TEST',
