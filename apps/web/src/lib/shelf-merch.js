@@ -1,6 +1,7 @@
 // Auto-extracted from shelf-merch.html — vanilla JS view engine.
 // Wrapped so it mounts exactly once into #app/#toast/#layer when called from React.
 import * as api from '../services/api-bridge.js';
+import collectionPreview from '../../assets/collection-preview.png';
 
 let __mounted = false;
 /** Survives Vite HMR so a hot reload does not reset authed state or re-run boot. */
@@ -226,7 +227,42 @@ function afterRender(){
   // focus first autofocus
   const a=document.querySelector('[autofocus]'); if(a)a.focus();
   bindCreateShopNameInput();
+  bindSwNameInput();
   mountKonvaMockups();
+}
+function bindSwNameInput(){
+  if(S.view!=='swagName') return;
+  const inp=document.getElementById('sw-name');
+  if(!inp) return;
+  
+  const updateFeedback = (val) => {
+    const prev=document.getElementById('sw-name-preview');
+    if(prev) prev.textContent=val||'New Collection';
+    
+    const charCountEl=document.getElementById('sw-name-char-count');
+    if(charCountEl) charCountEl.textContent=`${val.length}/32`;
+    
+    const msgEl=document.getElementById('sw-name-validation-msg');
+    if(msgEl) {
+      if(val.length === 0) {
+        msgEl.innerHTML = `<span style="color:var(--ink-3)">Name is required</span>`;
+      } else if(val.length < 4) {
+        msgEl.innerHTML = `<span style="color:var(--accent-d);font-weight:600">Too short</span>`;
+      } else {
+        msgEl.innerHTML = `<span style="color:var(--brand);font-weight:600">✓ Looks great!</span>`;
+      }
+    }
+  };
+
+  if(!inp.dataset.bound){
+    inp.dataset.bound='1';
+    inp.addEventListener('input',()=>{
+      S.flow.colName=inp.value;
+      updateFeedback(inp.value);
+    });
+  }
+  if(S.flow.colName!=null&&inp.value!==S.flow.colName) inp.value=S.flow.colName;
+  updateFeedback(inp.value || S.flow.colName || '');
 }
 function readCreateShopName(){
   const inp=document.getElementById('sh-name');
@@ -844,16 +880,101 @@ async function sendItemsDo(){
 function swagDesignerStart(el){
   closeLayer();
   const shopId=(el&&el.dataset&&el.dataset.arg)||S.flow.shopId||(S.shops[0]&&S.shops[0].id);
-  S.flow={exitTo:shopId?'shopDetail':'swag', shopId, colName:'New employee Swag', picked:[], artwork:false, exitToNav:shopId?'shops':'swag'};
+  S.flow={exitTo:shopId?'shopDetail':'swag', shopId, colName:'New Employee Swag', picked:[], artwork:false, exitToNav:shopId?'shops':'swag'};
   go('swagName');
 }
 Wizards.swagName=function(){
   const f=S.flow;
-  const body=`<div style="max-width:640px;margin:0 auto"><h1 style="font-size:26px;margin-bottom:6px">Name your collection</h1><p class="muted" style="margin-bottom:20px">Choose a name for your branded product collection.</p>
-    <div class="field"><label class="lbl">Collection name</label><input class="inp" id="sw-name" value="${esc(f.colName)}" autofocus></div></div>`;
+  const name=esc(f.colName||'New Employee Swag');
+  const examples=['Welcome Kit','Summer Swag','Team Essentials'];
+  const body=`<div class="sw-name-layout">
+    <div class="sw-form-card">
+      <div class="sw-eyebrow-badge">Step 1 of 3 · Setup</div>
+      <h1 style="font-size:28px;margin-bottom:10px;font-family:var(--disp);letter-spacing:-.03em;color:var(--ink)">Name your collection</h1>
+      <p class="muted" style="margin-bottom:24px;max-width:48ch;line-height:1.6;font-size:14px">Create a collection for your brand store. Give it a clear name so employees or customers can easily recognize it.</p>
+      
+      <div class="field" style="margin-bottom:20px">
+        <label class="lbl" style="font-weight:700;margin-bottom:8px">Collection name</label>
+        <div class="sw-name-input-container">
+          <input class="inp" id="sw-name" value="${name}" autofocus maxlength="32" placeholder="e.g. Welcome Kit">
+        </div>
+        <div class="row" style="justify-content:space-between;margin-top:8px;font-size:12px;gap:8px">
+          <span id="sw-name-validation-msg" class="mut3">Enter a collection name</span>
+          <span id="sw-name-char-count" class="mut3">0/32</span>
+        </div>
+      </div>
+      
+      <div class="sw-name-examples" style="margin-bottom:28px">
+        <div class="mut3" style="font-size:12px;margin-bottom:10px;font-weight:600;letter-spacing:.03em;text-transform:uppercase">Suggestions</div>
+        <div class="row" style="gap:8px;flex-wrap:wrap">${examples.map(ex=>`<button type="button" class="sw-name-chip" data-act="swNameExample" data-arg="${esc(ex)}">${esc(ex)}</button>`).join('')}</div>
+      </div>
+      
+      <div class="sw-name-tips">
+        <div class="row" style="gap:10px;align-items:center;font-weight:700;font-size:13.5px;margin-bottom:10px;color:var(--brand-700)">${I.bulb.replace('<svg ','<svg width="18" height="18" ')} Naming Best Practices</div>
+        <ul class="sw-name-tips-list">
+          <li>Use your campaign name, seasonal event, or department name</li>
+          <li>Keep it short, clear, and recognizable for recipients</li>
+          <li>Don't worry — you can easily change this name later</li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="sw-name-aside">
+      <div class="sw-name-preview-card">
+        <div style="font-weight:700;font-size:14px;margin-bottom:14px;color:var(--ink-2);letter-spacing:.03em;text-transform:uppercase">Collection Preview</div>
+        <div class="sw-name-preview-imgwrap">
+          <img src="${collectionPreview}" alt="Collection merchandise preview">
+          <div class="sw-name-preview-float">
+            <div class="sw-name-preview-icon">${I.shop.replace('<svg ','<svg width="18" height="18" ')}</div>
+            <div style="min-width:0;flex:1">
+              <div id="sw-name-preview" class="sw-name-preview-label">${name}</div>
+
+            </div>
+          </div>
+        </div>
+        
+      </div>
+      
+      <div class="sw-name-next-card">
+        <div style="font-weight:700;font-size:14px;margin-bottom:18px;color:var(--ink-2);letter-spacing:.03em;text-transform:uppercase">Next Steps</div>
+        <div class="sw-name-next-steps">
+          <div class="sw-name-next-step">
+            <div class="sw-name-next-icon">${I.box.replace('<svg ','<svg width="18" height="18" ')}</div>
+            <div>
+              <div style="font-weight:600;font-size:13.5px;color:var(--ink)">1. Choose products</div>
+              <div class="mut3" style="font-size:12px;margin-top:3px;line-height:1.4">Select apparel, bags, drinkware, or technology items from the catalog.</div>
+            </div>
+          </div>
+          <div class="sw-name-next-step">
+            <div class="sw-name-next-icon">${I.edit.replace('<svg ','<svg width="18" height="18" ')}</div>
+            <div>
+              <div style="font-weight:600;font-size:13.5px;color:var(--ink)">2. Add artwork</div>
+              <div class="mut3" style="font-size:12px;margin-top:3px;line-height:1.4">Position your logo and design elements directly on items in real-time.</div>
+            </div>
+          </div>
+          <div class="sw-name-next-step">
+            <div class="sw-name-next-icon">${I.shop.replace('<svg ','<svg width="18" height="18" ')}</div>
+            <div>
+              <div style="font-weight:600;font-size:13.5px;color:var(--ink)">3. Publish collection</div>
+              <div class="mut3" style="font-size:12px;margin-top:3px;line-height:1.4">Make it live instantly in your department or corporate merchandise store.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
   const foot=`${backLink('Back to my swag','wzExit',null,{mb:'0'})}<button class="btn btn-dark" data-act="swNameNext">Next</button>`;
   return wzChrome('Design swag',['Collection','Products','Artwork'],0,body,foot);
 };
+function swNameExample(el){
+  const name=el.dataset.arg||'';
+  S.flow.colName=name;
+  const inp=document.getElementById('sw-name');
+  if(inp){
+    inp.value=name;
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
 async function swNameNext(){
   S.flow.colName=document.getElementById('sw-name').value||'New Collection';
   if(!api.useMocks()&&api.isAuthenticated()){
@@ -866,21 +987,118 @@ async function swNameNext(){
   go('swagCatalog');
 }
 
+const CAT_MAP = {
+  'Apparel': ['tee', 'hoodie', 'cap'],
+  'Bags': ['pack', 'bag'],
+  'Drinkware': ['bottle', 'mug'],
+  'Technology': ['power'],
+  'Office': ['note']
+};
+
 Wizards.swagCatalog=function(){
-  const f=S.flow; const cats=['All Products','Apparel','Bags','Drinkware','Technology','Office'];
+  const f=S.flow;
+  const cats=['All Products','Apparel','Bags','Drinkware','Technology','Office'];
   const catalog=getCatalogList();
   const entries=catalog.map((p,i)=>({p,i}));
-  const body=`<h1 style="font-size:24px;margin-bottom:4px">Add products to your collection</h1><p class="muted" style="margin-bottom:16px">${catalog.length} products · pick the items you want to brand.</p>
-    <div class="tabs" style="margin-bottom:18px">${cats.map((c,i)=>`<button class="${i===0?'on':''}" data-act="noop">${c}</button>`).join('')}</div>
-    ${!entries.length?`<div class="card empty" style="padding:40px"><h3>No products in catalog</h3><p>Check back later or contact support if you expected products here.</p></div>`
-    :`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));padding-bottom:90px">${entries.map(({p,i})=>{const on=f.picked.includes(i);const ep=enrichProduct(p);const sw=productColorNames(ep).slice(0,4).map(c=>`<span class="sw" style="background:${productColorHex(ep,c)}" title="${esc(c)}"></span>`).join('');return `<div class="pcard" style="${on?'border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-50)':''}" data-act="swPick" data-arg="${i}"><div class="img">${productImg(p)}<div style="position:absolute;right:10px;bottom:10px;width:30px;height:30px;border-radius:50%;background:${on?'var(--brand)':'#fff'};color:${on?'#fff':'var(--brand)'};border:1px solid var(--brand);display:grid;place-items:center;font-weight:700">${on?'✓':'+'}</div></div><div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div><div class="pr">${p.price}</div>${sw?`<div class="swatches">${sw}</div>`:''}</div></div>`;}).join('')}</div>`}`;
-  const foot='';
-  const bar=`<div style="position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:14px 34px;display:flex;align-items:center;justify-content:space-between;z-index:30">
-    <div class="row" style="gap:10px;align-items:center"><b>${esc(f.colName)}</b><span class="tag tag-soft" style="background:var(--brand-50);color:var(--brand-d)">${f.picked.length} item${f.picked.length===1?'':'s'}</span></div>
-    <div class="row" style="gap:10px">${backLink('Back','go','swagName',{mb:'0'})}<button class="btn btn-dark" ${f.picked.length?'':'disabled'} data-act="go" data-arg="swagArtwork">Add artwork ${I.send.replace('width="24" height="24"','width="14" height="14"')}</button></div></div>`;
-  return wzChrome('Design swag',['Collection','Products','Artwork'],1,body+bar,foot);
+  
+  // Filter products by selected category
+  const currentCat = f.catFilter || 'All Products';
+  const filteredEntries = entries.filter(({p}) => {
+    if (currentCat === 'All Products') return true;
+    const groups = CAT_MAP[currentCat] || [];
+    return groups.includes(p.g);
+  });
+
+  const body=`<h1 style="font-size:24px;margin-bottom:6px;font-family:var(--disp);letter-spacing:-.02em;color:var(--ink)">Add products to your collection</h1>
+    <p class="muted" style="margin-bottom:20px;font-size:14px">${catalog.length} products total · Pick the items you want to brand and add to your collection.</p>
+    
+    <div class="tabs" style="margin-bottom:22px">
+      ${cats.map((c)=>`<button class="${currentCat===c?'on':''}" data-act="swCatSelect" data-arg="${esc(c)}">${esc(c)}</button>`).join('')}
+    </div>
+    
+    ${!filteredEntries.length
+      ?`<div class="card empty" style="padding:48px;border-radius:var(--r-lg)"><h3>No products in this category</h3><p class="muted" style="margin-top:6px">Try selecting a different tab or check back later.</p></div>`
+      :`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:20px;padding-bottom:20px">
+        ${filteredEntries.map(({p,i})=>{
+          const on=f.picked.includes(i);
+          const ep=enrichProduct(p);
+          const sw=productColorNames(ep).slice(0,6).map(c=>`<span class="sw" style="background:${productColorHex(ep,c)}" title="${esc(c)}"></span>`).join('');
+          return `<div class="pcard" style="${on?'border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-50);transform:scale(1.01)':''}" data-act="swPick" data-arg="${i}">
+            <div class="img">
+              ${productImg(p)}
+              <div class="sw-pick-badge" style="background:${on?'var(--brand)':'#fff'};color:${on?'#fff':'var(--brand)'}">${on?'✓':'+'}</div>
+            </div>
+            <div class="meta">
+              ${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}
+              <div class="nm" style="font-weight:600;font-size:14px;margin-top:4px">${esc(p.nm)}</div>
+              <div class="pr" style="font-weight:700;margin-top:8px">${p.price}</div>
+              ${sw?`<div class="swatches" style="margin-top:10px;gap:6px">${sw}</div>`:''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`
+    }`;
+
+  const foot=`<div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+    <div class="row" style="gap:12px;align-items:center">
+      <b style="font-size:15px;color:var(--ink)">${esc(f.colName)}</b>
+      <span class="tag tag-soft sw-picked-count" style="font-weight:700">${f.picked.length} item${f.picked.length===1?'':'s'}</span>
+    </div>
+    <div class="row" style="gap:12px;align-items:center">
+      ${backLink('Back','go','swagName',{mb:'0'})}
+      <button class="btn btn-dark sw-btn-next" ${f.picked.length?'':'disabled'} data-act="go" data-arg="swagArtwork">
+        Add artwork ${I.send.replace('width="24" height="24"','width="14" height="14"')}
+      </button>
+    </div>
+  </div>`;
+
+  return wzChrome('Design swag',['Collection','Products','Artwork'],1,body,foot);
 };
-function swPick(el){ const i=+el.dataset.arg; const a=S.flow.picked; const k=a.indexOf(i); if(k<0)a.push(i); else a.splice(k,1); S.flow.pickedProducts=S.flow.picked.map(idx=>getCatalogList()[idx]).filter(Boolean); render(); }
+
+function swCatSelect(el){
+  S.flow.catFilter = el.dataset.arg || 'All Products';
+  render();
+}
+
+function swPick(el){
+  const i=+el.dataset.arg;
+  const a=S.flow.picked;
+  const k=a.indexOf(i);
+  if(k<0) a.push(i); else a.splice(k,1);
+  S.flow.pickedProducts=S.flow.picked.map(idx=>getCatalogList()[idx]).filter(Boolean);
+  
+  const card=el.closest('.pcard');
+  if(card){
+    const on=a.includes(i);
+    card.style.borderColor=on?'var(--brand)':'';
+    card.style.boxShadow=on?'0 0 0 2px var(--brand-50)':'';
+    card.style.transform=on?'scale(1.01)':'';
+    const badge=card.querySelector('.sw-pick-badge');
+    if(badge){
+      badge.style.background=on?'var(--brand)':'#fff';
+      badge.style.color=on?'#fff':'var(--brand)';
+      badge.textContent=on?'✓':'+';
+    }
+    
+    // Update footer count
+    const countEl=document.querySelector('.sw-picked-count');
+    if(countEl) {
+      countEl.textContent=`${a.length} item${a.length===1?'':'s'}`;
+    }
+    
+    // Update footer button state
+    const nextBtn=document.querySelector('.sw-btn-next');
+    if(nextBtn) {
+      if(a.length > 0) {
+        nextBtn.removeAttribute('disabled');
+      } else {
+        nextBtn.setAttribute('disabled', 'true');
+      }
+    }
+  } else {
+    render();
+  }
+}
 
 Wizards.swagArtwork=function(){
   const f=S.flow;
@@ -894,59 +1112,97 @@ Wizards.swagArtwork=function(){
       const af=f.artFile;
       const artName=esc(af.name||'artwork');
       const artMeta=esc(af.ext&&af.size?af.ext+' · '+fmtFileSize(af.size):af.ext||'');
-      pickerBody=`<div class="row" style="align-items:center;justify-content:space-between;border:1px solid var(--brand);border-radius:var(--r-sm);padding:11px 13px;background:var(--brand-50)"><div class="row" style="gap:10px;align-items:center"><div class="logo-chip" style="width:36px;height:36px;overflow:hidden;padding:3px">${swArtImg(f)}</div><div><div style="font-weight:600;font-size:13px">${artName}</div><div class="mut3" style="font-size:11px">${artMeta}</div></div></div><button class="xbtn" data-act="swArtClear">✕</button></div>`;
+      pickerBody=`<div class="row" style="align-items:center;justify-content:space-between;border:1px solid var(--brand);border-radius:var(--r-sm);padding:12px 14px;background:var(--brand-50);margin-bottom:12px">
+        <div class="row" style="gap:10px;align-items:center">
+          <div class="logo-chip" style="width:36px;height:36px;overflow:hidden;padding:3px">${swArtImg(f)}</div>
+          <div>
+            <div style="font-weight:600;font-size:13px">${artName}</div>
+            <div class="mut3" style="font-size:11px">${artMeta}</div>
+          </div>
+        </div>
+        <button class="xbtn" data-act="swArtClear" title="Remove artwork">✕</button>
+      </div>`;
     } else {
-      pickerBody=`<div id="sw-art-drop" style="border:1.5px dashed var(--line);border-radius:var(--r-sm);padding:22px;text-align:center;color:var(--ink-2);background:#fff;cursor:pointer" data-act="swArtUpload">
+      pickerBody=`<div id="sw-art-drop" class="sw-art-dropzone" data-act="swArtUpload">
         <input type="file" id="sw-art-inp" accept=".svg,.png,.jpg,.jpeg,.ai,image/svg+xml,image/png,image/jpeg" style="display:none">
-        <div style="font-weight:600;font-size:13px">Drag and drop file</div>
-        <div class="mut3" style="font-size:11px;margin:6px 0">SVG, PNG, JPG, AI · 300 DPI+</div>
-        <button type="button" class="btn btn-soft btn-sm" data-act="swArtUpload">Search local device</button></div>`;
+        ${I.upload.replace('<svg ', '<svg width="24" height="24" ')}
+        <div style="font-weight:600;font-size:14px">Drag & drop your artwork file</div>
+        <div class="mut3" style="font-size:12px;margin:2px 0">Supports SVG, PNG, JPG, AI up to 5MB</div>
+        <button type="button" class="btn btn-soft btn-sm" style="margin-top:4px" data-act="swArtUpload">Browse local files</button>
+      </div>`;
     }
   } else {
     const prev=S.artUploads||[];
     pickerBody=prev.length
       ? `<div class="grid" style="grid-template-columns:repeat(3,1fr);gap:8px">${prev.map((u,i)=>artPrevThumb(i,u,f.artSel===i)).join('')}</div>`
-      : `<div style="border:1.5px dashed var(--line);border-radius:var(--r-sm);padding:22px;text-align:center;color:var(--ink-2);background:#fff"><div style="font-weight:600;font-size:13px">No previous uploads yet</div><div class="mut3" style="font-size:11px;margin-top:6px">Upload artwork from your device — it will appear here for reuse.</div></div>`;
+      : `<div style="border:1.5px dashed var(--line);border-radius:var(--r-sm);padding:24px 20px;text-align:center;color:var(--ink-2);background:#fff;display:flex;flex-direction:column;align-items:center;gap:6px">
+          <div style="font-weight:600;font-size:13.5px">No previous uploads yet</div>
+          <div class="mut3" style="font-size:12px;line-height:1.4">Uploaded files will automatically appear here for quick reuse.</div>
+        </div>`;
   }
-  const summary=f.artwork?`<div class="card" style="padding:16px;margin-top:14px">
-      <div style="font-weight:700;font-size:13.5px;margin-bottom:6px">Design summary</div>
+  
+  const summary=f.artwork?`<div class="card" style="padding:18px;background:var(--surface-2);border-radius:var(--r-sm)">
+      <div style="font-weight:700;font-size:13.5px;margin-bottom:8px;color:var(--ink-2);letter-spacing:.02em;text-transform:uppercase">Design summary</div>
       ${swSummaryRow('Products',prods.length+(prods.length===1?' item':' items'))}
       ${swSummaryRow('Decoration','DTF transfer')}
       ${swSummaryRow('Colour variants','All included')}
       ${swSummaryRow('Artwork',esc(f.artFile?.name||'—'))}
     </div>`:'';
+
   const left=`<div class="sw-art-rail">
-    <div class="sw-eyebrow">Step 3 of 3 · Artwork</div>
-    <h1 style="font-size:22px;margin-bottom:6px">Add artwork to your products</h1>
-    <p class="muted" style="font-size:13px;margin-bottom:16px">Upload your artwork, then position it on each product. Edit your design any time. Items are created using DTF decoration.</p>
-    <div class="card" style="padding:16px">
-      <div style="font-weight:700;font-size:13.5px;margin-bottom:10px">Add new artwork</div>
-      <div class="tabs" style="max-width:300px;margin-bottom:14px">
-        <button class="${atab==='device'?'on':''}" data-act="artTab" data-arg="device">Upload from device</button>
-        <button class="${atab==='prev'?'on':''}" data-act="artTab" data-arg="prev">Previous uploads</button></div>
+    <div class="sw-form-card">
+      <div class="sw-eyebrow-badge">Step 3 of 3 · Artwork</div>
+      <h1 style="font-size:26px;margin-bottom:10px;font-family:var(--disp);letter-spacing:-.02em;color:var(--ink)">Add artwork</h1>
+      <p class="muted" style="font-size:14px;margin-bottom:20px;line-height:1.55">Upload your company logo or design assets, then position it on each product. Adjust scaling and rotation directly on the mockups.</p>
+      
+      <div style="font-weight:700;font-size:13.5px;margin-bottom:10px;color:var(--ink-2)">Artwork Source</div>
+      <div class="tabs" style="margin-bottom:16px">
+        <button class="${atab=='device'?'on':''}" data-act="artTab" data-arg="device">Upload File</button>
+        <button class="${atab=='prev'?'on':''}" data-act="artTab" data-arg="prev">Library</button>
+      </div>
+      
       ${pickerBody}
-      <div class="note" style="margin-top:12px">Use a high-quality file with a transparent background (300 DPI+) to prevent production delays. <span class="lnk" data-act="toast" data-arg="Guidelines opened">Learn more</span></div>
-      <button class="btn btn-dark btn-block" style="margin-top:14px" ${atab==='device'&&!f.artwork?'':'disabled'} data-act="swArtUpload">Add artwork</button>
+      
+      
     </div>
+    
     ${summary}
-    <button class="btn btn-dark btn-block btn-lg" style="margin-top:14px" ${f.artwork?'':'disabled'} data-act="swGenerate">Generate designs</button>
-    ${f.artwork?'<button class="btn btn-ghost btn-block btn-sm" style="margin-top:8px" data-act="swResetArt">Reset placement on all products</button>':''}</div>`;
+    
+    ${f.artwork?'<button class="btn btn-ghost btn-block btn-sm" style="margin-top:2px" data-act="swResetArt">Reset placement on all products</button>':''}
+  </div>`;
+
   const header=f.artwork
-    ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:6px;flex-wrap:wrap">
+    ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:12px;flex-wrap:wrap">
         <div><div style="font-size:16px;font-weight:700">Your mockups</div>
           <div class="mut3" style="font-size:12px;margin-top:2px">Drag to move · corner handles to scale · top handle to rotate. Each product keeps its own placement.</div></div>
         <div class="row" style="gap:8px;align-items:center;font-size:12px;color:#1A6E45;background:var(--brand-50);border:1px solid var(--brand-100,#cfe9da);border-radius:999px;padding:5px 12px;font-weight:600">${I.check.replace('<svg ','<svg width="14" height="14" ')}Applied to all ${prods.length} products · all colour variants</div>
       </div>`
     : `<div class="banner" style="margin-bottom:16px;background:#eaf1fb;color:#1c2a52;border:none">Add your artwork on the left to preview it on every product — all colour variants are included.</div>`;
+
   const right=`<div>${header}
     <div class="sw-mockups">${prods.map((p,idx)=>{const ep=enrichProduct(p);const mock=productHasPrintArea(ep);const inner=f.artwork
         ? swagMockupHost(ep,idx)
         : `<div class="img${mock?' img-mockup':''}">${productImg(ep,{...(mock?{width:'100%',height:'100%'}:{}),url:designImgUrl(ep)})}</div>`;
       const badge=f.artwork?`<div class="mockup-badge">${I.spark.replace('<svg ','<svg width="11" height="11" ')}Editable</div>`:'';
       return `<div class="pcard mockup-card" style="position:relative">${f.artwork?'':'<div class="dots-btn">'+I.dots+'</div>'}${badge}${inner}<div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div></div></div>`;}).join('')}</div></div>`;
+
   const body=`<div class="sw-art-layout">${left}${right}</div>`;
-  return wzChrome('Design swag',['Collection','Products','Artwork'],2,body,'');
-};
+
+  const foot=`<div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+    <div class="row" style="gap:12px;align-items:center">
+      <b style="font-size:15px;color:var(--ink)">${esc(f.colName)}</b>
+      <span class="tag tag-soft" style="font-weight:700">${prods.length} item${prods.length===1?'':'s'} selected</span>
+    </div>
+    <div class="row" style="gap:12px;align-items:center">
+      ${backLink('Back to products','go','swagCatalog',{mb:'0'})}
+      <button class="btn btn-brand sw-btn-generate" ${f.artwork?'':'disabled'} data-act="swGenerate">
+        Generate designs ${I.spark.replace('<svg ','<svg width="14" height="14" ')}
+      </button>
+    </div>
+  </div>`;
+
+  return wzChrome('Design swag',['Collection','Products','Artwork'],2,body,foot);
+};;
 function swSummaryRow(k,v){
   return `<div class="sw-summary-row"><span class="k">${esc(k)}</span><span class="v" title="${esc(v)}">${esc(v)}</span></div>`;
 }
@@ -3831,7 +4087,9 @@ const ACT = {
   // swag designer
   swagDesignerStart:(el)=>swagDesignerStart(el),
   swNameNext:()=>swNameNext(),
+  swNameExample:(el)=>swNameExample(el),
   swPick:(el)=>swPick(el),
+  swCatSelect:(el)=>swCatSelect(el),
   swArtUpload:()=>swArtUpload(),
   swArtClear:()=>swArtClear(),
   swResetArt:()=>swResetArt(),

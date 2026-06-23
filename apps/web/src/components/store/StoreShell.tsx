@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { type StoreShop, BANNER_THEMES } from "../StoreBanner";
+import { type StoreShop } from "../StoreBanner";
 import { resolveColorHex } from "@/lib/colorMap";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import heroBanner from "/assets/hero-banner.png";
 
 type PrintArea = {
   key?: string;
@@ -223,27 +224,6 @@ function storeProductThumb(p: StoreProduct) {
   return resolveMediaUrl(p.mockupUrl) || productImage(p);
 }
 
-/* ─── category icon helper ─── */
-const CATEGORY_ICONS: Record<string, string> = {
-  all: "M4 6h16M4 12h16M4 18h16",
-  apparel: "M12 2L6 7v15h12V7l-6-5zM8 7h8",
-  drinkware: "M17 8h1a4 4 0 010 8h-1M3 8h14v9a4 4 0 01-4 4H7a4 4 0 01-4-4V8z",
-  bags: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0",
-  tech: "M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z",
-  accessories: "M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z",
-  office: "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zM22 6l-10 7L2 6",
-};
-
-function CategoryIcon({ category }: { category: string }) {
-  const key = category.toLowerCase();
-  const d = CATEGORY_ICONS[key] || CATEGORY_ICONS.all;
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d={d} />
-    </svg>
-  );
-}
-
 /* ─── SVG Icons (inline for zero dependencies) ─── */
 function ShelfMerchLogo() {
   return (
@@ -260,14 +240,6 @@ function SearchIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-    </svg>
-  );
-}
-
-function BellIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" />
     </svg>
   );
 }
@@ -304,10 +276,20 @@ function ShoppingBagIcon() {
   );
 }
 
-function GridIcon() {
+function GiftIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+      <rect x="3" y="8" width="18" height="13" rx="2" />
+      <path d="M12 8v13M3 12h18M12 8c-2-2.5-5-3-5 0s3 2 5 0 5-2.5 5 0-3-3-5 0" />
+    </svg>
+  );
+}
+
+function PlayCircleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M10 8l6 4-6 4V8z" fill="currentColor" stroke="none" />
     </svg>
   );
 }
@@ -361,6 +343,7 @@ export default function StoreShell({
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [scrolled, setScrolled] = useState(false);
   const trendingRef = useRef<HTMLDivElement>(null);
+  const catalogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     window.scrollTo({ top: 0 });
@@ -372,7 +355,6 @@ export default function StoreShell({
     return () => window.removeEventListener("scroll", handler);
   }, []);
 
-  const theme = BANNER_THEMES[shop.bannerTheme || "light"] || BANNER_THEMES.light;
   const active = products.find((p) => p._id === activeId) || null;
   const categories = useMemo(() => distinct(products.map((p) => p.category)), [products]);
   const cartCount = cart.reduce((n, l) => n + l.qty, 0);
@@ -391,15 +373,23 @@ export default function StoreShell({
     return `₹${inr.toLocaleString("en-IN")}`;
   }
 
-  // Drive the hero off the shop's chosen banner theme so each shop's top band
-  // matches its branding (default to the brand green when unset).
-  const heroThemeKey = shop.bannerTheme || "brand";
-  const heroTheme = BANNER_THEMES[heroThemeKey] || BANNER_THEMES.brand;
-  const heroIsLight = heroThemeKey === "light";
-
   function openProduct(id: string) {
     setActiveId(id);
     setPage("product");
+  }
+
+  function browseRewards() {
+    setPage("products");
+  }
+
+  function goHowItWorks() {
+    const scroll = () => catalogRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (page !== "home") {
+      setPage("home");
+      window.setTimeout(scroll, 80);
+    } else {
+      scroll();
+    }
   }
 
   function addToCart(p: StoreProduct, variant: { size?: string; color?: string }, qty: number) {
@@ -499,9 +489,9 @@ export default function StoreShell({
           <nav className="sf-nav">
             <button type="button" className={`sf-nav-link${page === "home" ? " active" : ""}`} onClick={() => setPage("home")}>Home</button>
             <button type="button" className={`sf-nav-link${page === "products" ? " active" : ""}`} onClick={() => setPage("products")}>
-              Categories <ChevronDown />
+             Products
             </button>
-            <button type="button" className="sf-nav-link" onClick={() => setPage("products")}>How it works</button>
+            <button type="button" className="sf-nav-link" onClick={goHowItWorks}>How it works</button>
             {mode === "redeem" && (
               <button type="button" className={`sf-nav-link${page === "cart" || page === "checkout" ? " active" : ""}`} onClick={() => setPage("cart")}>My Orders</button>
             )}
@@ -510,10 +500,6 @@ export default function StoreShell({
           <div className="sf-topbar-right">
             <button type="button" className="sf-icon-btn" title="Search" onClick={() => setPage("products")}>
               <SearchIcon />
-            </button>
-            <button type="button" className="sf-icon-btn" title="Notifications">
-              <BellIcon />
-              <span className="sf-badge-dot" />
             </button>
 
             {mode === "redeem" && creditInr != null && (
@@ -552,77 +538,29 @@ export default function StoreShell({
       {/* ────── HOME ────── */}
       {page === "home" && (
         <>
-          {/* Hero */}
-          <div className="sf-hero-container">
-            <div
-              className={`sf-hero${heroIsLight ? " sf-hero--light" : ""}`}
-              style={{ background: heroTheme.bg, color: heroTheme.text }}
-            >
-              <div className="sf-hero-inner">
-              {/* Left text block */}
-              <div className="sf-hero-text sf-fade-in">
-                <div className="sf-hero-welcome">
-                  {shop.logoUrl && (
-                    <img src={shop.logoUrl} alt="" className="sf-hero-welcome-logo" />
-                  )}
-                  {mode === "redeem"
-                    ? `Welcome back, ${recipientName || "there"} 👋`
-                    : `${shop.name} Rewards`}
-                </div>
-                <h1>Redeem your rewards.<br />Celebrate your success.</h1>
-                <p className="sf-hero-sub">
-                  {welcome || "Explore exclusive merchandise, handpicked for high performers like you."}
-                </p>
-                <div className="sf-hero-actions">
-                  <button type="button" className="sf-hero-btn sf-hero-btn-primary" onClick={() => setPage("products")}>
-                    <ShoppingBagIcon /> Browse Products
-                  </button>
-                  <button type="button" className="sf-hero-btn sf-hero-btn-secondary" onClick={() => setPage("products")}>
-                    <GridIcon /> View Categories
-                  </button>
-                </div>
+          {/* Hero banner */}
+          <div className="sf-hero-banner">
+            <img
+              src={heroBanner}
+              alt="Choose your reward — redeem exclusive merchandise for your achievement"
+              className="sf-hero-banner-img"
+            />
+            <div className="sf-hero-banner-overlay" aria-hidden="false">
+              <div className="sf-hero-banner-actions">
+                <button type="button" className="sf-hero-banner-btn sf-hero-banner-btn-primary" onClick={browseRewards}>
+                  <GiftIcon />
+                  Browse Rewards
+                </button>
+                <button type="button" className="sf-hero-banner-btn sf-hero-banner-btn-secondary" onClick={goHowItWorks}>
+                  <PlayCircleIcon />
+                  How it works
+                </button>
               </div>
-
-              {/* Hero right — Stats panel */}
-              <div className="sf-hero-stats sf-fade-in" style={{ animationDelay: ".15s" }}>
-                {/* Balance card */}
-                {mode === "redeem" && creditInr != null && (
-                  <div className="sf-hstat-card sf-hstat-balance">
-                    <div className="sf-hstat-label">Available Balance</div>
-                    <div className="sf-hstat-value-row">
-                      <div className="sf-hstat-icon">
-                        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="#fff"/></svg>
-                      </div>
-                      <span className="sf-hstat-big">{fmtRaw(creditInr)}</span>
-                    </div>
-                    <div className="sf-hstat-sub">{currency === "points" ? "Points to redeem" : "Credits available"}</div>
-                  </div>
-                )}
-                {/* Quick stat pills */}
-                <div className="sf-hstat-pills">
-                  <div className="sf-hstat-pill">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
-                    <div>
-                      <div className="sf-hstat-pill-val">{products.length}{products.length > 0 ? '+' : ''}</div>
-                      <div className="sf-hstat-pill-label">Products</div>
-                    </div>
-                  </div>
-                  <div className="sf-hstat-pill">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                    <div>
-                      <div className="sf-hstat-pill-val">{categories.length}</div>
-                      <div className="sf-hstat-pill-label">Categories</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
             </div>
-          </div>
           </div>
 
           {/* Search & Filter */}
-          <div className="sf-content">
+          <div className="sf-content" ref={catalogRef}>
             <div className="sf-search-section">
               <SearchFilterBar
                 categories={categories}
@@ -636,11 +574,14 @@ export default function StoreShell({
               />
             </div>
 
-            {/* Trending Rewards */}
-            {products.length > 0 && (
+            {/* Featured — horizontal scroll when enough products */}
+            {products.length > 4 && (
               <>
                 <div className="sf-section-header">
-                  <h2 className="sf-section-title">Trending Rewards</h2>
+                  <div className="sf-section-title-wrap">
+                    <h2 className="sf-section-title">Featured</h2>
+                    <p className="sf-section-subtitle">Popular picks from your catalog</p>
+                  </div>
                   <div className="sf-section-actions">
                     <button type="button" className="sf-view-all" onClick={() => setPage("products")}>
                       View all <ArrowRightIcon />
@@ -676,7 +617,10 @@ export default function StoreShell({
             {products.length > 0 ? (
               <>
                 <div className="sf-section-header">
-                  <h2 className="sf-section-title">All Products</h2>
+                  <div className="sf-section-title-wrap">
+                    <h2 className="sf-section-title">{products.length > 4 ? "All Products" : "Shop collection"}</h2>
+                    <p className="sf-section-subtitle">{products.length} reward{products.length !== 1 ? "s" : ""} available to redeem</p>
+                  </div>
                 </div>
                 <PremiumProductGrid products={filteredBySearch.slice(0, 8)} onOpen={openProduct} fmt={fmt} />
               </>
@@ -886,7 +830,7 @@ function SearchFilterBar({
           onChange={(e) => onSearch(e.target.value)}
         />
       </div>
-      <div className="sf-chip-row">
+      {/* <div className="sf-chip-row">
         {["All", ...categories].map((c) => (
           <button
             key={c}
@@ -894,11 +838,10 @@ function SearchFilterBar({
             className={`sf-category-chip${(selectedCategory || "All") === c ? " active" : ""}`}
             onClick={() => onCategorySelect(c)}
           >
-            <CategoryIcon category={c} />
             {c}
           </button>
         ))}
-      </div>
+      </div> */}
       <div className="sf-sort-wrap">
         <span className="sf-sort-label">Sort by:</span>
         <select className="sf-sort-select">
@@ -1041,12 +984,12 @@ function ProductDetail({ product, mode, fmt, onBack, onAdd }: {
               <ArtworkMockup product={product} />
             </div>
           </div>
-          {colorOptions.length > 0 && (
+          {/* {colorOptions.length > 0 && (
             <div className="pd-colors" style={{ marginTop: 20 }}>
               <div className="lbl" style={{ marginBottom: 10 }}>Color preview</div>
               <ColorSwatches colors={colorOptions} selected={selColor} onSelect={setSelColor} />
             </div>
-          )}
+          )} */}
         </div>
         <div>
           {product.brand && <div className="sf-detail-brand">{product.brand}</div>}

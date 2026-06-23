@@ -564,19 +564,27 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
               <table className="tbl" style={{ marginBottom: 14 }}>
                 <thead><tr><th>SKU</th><th>Size</th><th>Color</th><th>Stock</th></tr></thead>
                 <tbody>
-                  {product.variants.map((v) => (
-                    <tr key={v.sku}>
-                      <td>{v.sku}</td>
-                      <td>{v.size || "—"}</td>
-                      <td>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          {v.colorHex && <span style={{ width: 14, height: 14, borderRadius: 4, border: "1px solid var(--line)", background: v.colorHex }} />}
-                          {v.color || "—"}
-                        </span>
-                      </td>
-                      <td>{v.stock ?? 0}</td>
-                    </tr>
-                  ))}
+                  {product.variants.map((v) => {
+                    const hex = resolveColorHex(v.color, v.colorHex);
+                    return (
+                      <tr key={v.sku}>
+                        <td>{v.sku}</td>
+                        <td>{v.size || "—"}</td>
+                        <td>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            {!isPlaceholderColorHex(hex) && (
+                              <span
+                                title={hex}
+                                style={{ width: 14, height: 14, borderRadius: 4, border: "1px solid var(--line)", background: hex }}
+                              />
+                            )}
+                            {v.color || "—"}
+                          </span>
+                        </td>
+                        <td>{v.stock ?? 0}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             ) : (
