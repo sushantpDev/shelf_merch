@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { type StoreShop, BANNER_THEMES } from "../StoreBanner";
 import { resolveColorHex } from "@/lib/colorMap";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 type PrintArea = {
   key?: string;
@@ -129,12 +130,12 @@ function printAreaWrapStyle(box?: PrintArea["box"]): CSSProperties {
 }
 
 function ArtworkMockup({ product, className, style }: { product: StoreProduct; className?: string; style?: CSSProperties }) {
-  const overlay = product.artworkUrl;
-  const baked = product.mockupUrl;
+  const overlay = product.artworkUrl ? resolveMediaUrl(product.artworkUrl) : "";
+  const baked = product.mockupUrl ? resolveMediaUrl(product.mockupUrl) : "";
   // Designed products composite onto the transparent design mask (not the
   // marketing photo) so the base is consistent with the swag designer all the
   // way through to redemption. A pre-baked mockup, when present, is shown as-is.
-  const img = baked || (overlay ? product.maskImageUrl || productImage(product) : productImage(product));
+  const img = baked || (overlay ? resolveMediaUrl(product.maskImageUrl) || productImage(product) : productImage(product));
   const area = pickPrintArea(product);
 
   if (!img) {
@@ -215,7 +216,11 @@ type CartLine = {
 };
 
 function productImage(p: StoreProduct) {
-  return p.primaryImageUrl || p.imageUrls?.[0] || p.maskImageUrl || "";
+  return resolveMediaUrl(p.primaryImageUrl || p.imageUrls?.[0] || p.maskImageUrl || "");
+}
+
+function storeProductThumb(p: StoreProduct) {
+  return resolveMediaUrl(p.mockupUrl) || productImage(p);
 }
 
 /* ─── category icon helper ─── */
@@ -411,7 +416,7 @@ export default function StoreShell({
           priceInr: p.basePriceInr,
           qty,
           variant: variant.size || variant.color ? variant : undefined,
-          image: productImage(p),
+          image: storeProductThumb(p),
         },
       ];
     });

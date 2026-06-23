@@ -112,6 +112,31 @@ describe('public storefront (no auth)', () => {
     expect(tee.variants[0]).toMatchObject({ color: 'Navy', colorHex: '#1e3a8a' });
   });
 
+  it('returns saved mockupUrl on curated products when set on the collection ref', async () => {
+    const shop = await Shop.create({ tenantId: tenant._id, name: 'Baked Mockup Store', status: 'live' });
+    await Collection.create({
+      tenantId: tenant._id,
+      shopId: shop._id,
+      code: 'CMU',
+      name: 'Branded tee',
+      status: 'ready',
+      artworkUrl: '/uploads/tenant/artwork/logo.png',
+      productRefs: [{
+        catalogProductId: curated._id,
+        brand: 'Uber',
+        name: 'Welcome Tee',
+        group: 'tee',
+        mockupUrl: '/uploads/tenant/mockup/tee-branded.png',
+      }],
+    });
+
+    const res = await request(app).get(`/api/v1/storefront/${shop._id}`);
+    expect(res.status).toBe(200);
+    const tee = res.body.products.find((p) => p.catalogProductId === String(curated._id));
+    expect(tee.mockupUrl).toBe('/uploads/tenant/mockup/tee-branded.png');
+    expect(tee.artworkUrl).toBe('/uploads/tenant/artwork/logo.png');
+  });
+
   it('returns printAreas and collection artworkUrl on curated products', async () => {
     curated.printAreas = [{
       key: 'chest',

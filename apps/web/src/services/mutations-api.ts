@@ -184,6 +184,32 @@ export async function uploadCollectionArtworkApi(collectionId: string, file: Fil
   return mapCollection(col);
 }
 
+type MockupUploadItem = { catalogProductId: string; dataUrl: string };
+
+export async function uploadCollectionMockupsApi(
+  collectionId: string,
+  items: MockupUploadItem[],
+  catalogById?: Map<string, UiProduct>,
+) {
+  const meta: Array<{ catalogProductId: string }> = [];
+  const form = new FormData();
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (!item.dataUrl?.startsWith("data:")) continue;
+    const res = await fetch(item.dataUrl);
+    const blob = await res.blob();
+    form.append("mockups", new File([blob], `mockup-${i}.png`, { type: blob.type || "image/png" }));
+    meta.push({ catalogProductId: item.catalogProductId });
+  }
+  if (!meta.length) return null;
+  form.append("meta", JSON.stringify(meta));
+  const col = await apiFetch<Record<string, unknown>>(`/collections/${collectionId}/mockups`, {
+    method: "POST",
+    body: form,
+  });
+  return mapCollection(col, "", catalogById);
+}
+
 export async function linkCollectionToShopApi(collectionId: string, shopId: string) {
   const col = await apiFetch<Record<string, unknown>>(`/collections/${collectionId}`, {
     method: "PATCH",
@@ -218,6 +244,7 @@ export async function createCollectionApi(payload: {
   preferredColors?: string[];
   artworkUrl?: string;
   artwork?: ArtworkInput;
+  mockups?: MockupUploadItem[];
   isShopSpecific?: boolean;
 }) {
   const productRefs = payload.pickedIndices.map((i) => {
@@ -244,6 +271,10 @@ export async function createCollectionApi(payload: {
   if (payload.artwork) {
     const file = await artworkFileFromInput(payload.artwork);
     if (file) result = await uploadCollectionArtworkApi(result.id, file);
+  }
+  if (payload.mockups?.length) {
+    const withMockups = await uploadCollectionMockupsApi(result.id, payload.mockups, catalogById);
+    if (withMockups) result = withMockups;
   }
   return result;
 }

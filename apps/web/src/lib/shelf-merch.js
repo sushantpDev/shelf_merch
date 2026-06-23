@@ -1293,10 +1293,14 @@ async function swGenerate(){
       pickedIndices:f.picked,
       catalog,
       artwork:f.artFile?{file:f.artFile.file,preview:f.artFile.preview,name:f.artFile.name}:undefined,
+      mockups:f.picked.map((i,idx)=>{
+        const cp=catalog[i];
+        const id=cp?.id;
+        if(!id||!baked[idx]) return null;
+        return {catalogProductId:id,dataUrl:baked[idx]};
+      }).filter(Boolean),
     });
     col.by=S.user.name;
-    // Attach the baked single-image mockups to the returned products (by index).
-    if(Array.isArray(col.products)) col.products.forEach((p,idx)=>{ if(baked[idx]) p.mockupUrl=baked[idx]; });
     S.collections.push(col);
     S.loading=false;
     go('swag');

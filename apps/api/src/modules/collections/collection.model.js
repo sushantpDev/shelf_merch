@@ -8,6 +8,8 @@ const productRefSchema = new mongoose.Schema(
     brand: String,
     name: String,
     group: String,
+    /** Pre-baked design mockup (mask + artwork) — served to shop/storefront as-is. */
+    mockupUrl: { type: String, default: '' },
   },
   { _id: false },
 );

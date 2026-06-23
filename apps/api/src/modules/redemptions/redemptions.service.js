@@ -247,6 +247,7 @@ export async function getCatalog(token) {
   const { campaign } = await loadCampaignContext(recipient);
 
   const artworkByProductId = new Map();
+  const mockupByProductId = new Map();
   const preferredColorsByProductId = new Map();
   let shopCollections = [];
   if (campaign.shopId) {
@@ -262,6 +263,7 @@ export async function getCatalog(token) {
         const pid = ref.catalogProductId ? String(ref.catalogProductId) : '';
         if (!pid) continue;
         if (col.artworkUrl && !artworkByProductId.has(pid)) artworkByProductId.set(pid, col.artworkUrl);
+        if (ref.mockupUrl && !mockupByProductId.has(pid)) mockupByProductId.set(pid, ref.mockupUrl);
         if (col.preferredColors?.length && !preferredColorsByProductId.has(pid)) {
           preferredColorsByProductId.set(pid, col.preferredColors);
         }
@@ -291,6 +293,7 @@ export async function getCatalog(token) {
       rows.map((p) => ({
         ...p,
         artworkUrl: artworkByProductId.get(String(p._id)) || '',
+        mockupUrl: mockupByProductId.get(String(p._id)) || '',
         preferredColors: preferredColorsByProductId.get(String(p._id)) || [],
       })),
     );

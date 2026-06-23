@@ -185,4 +185,48 @@ router.post(
   }),
 );
 
+const mockupMetaItem = z.object({
+  catalogProductId: objectId,
+});
+
+// Upload pre-baked product mockups (one PNG per catalog product in the collection).
+router.post(
+  '/:id/mockups',
+  adminOnly,
+  validate({ params: z.object({ id: objectId }) }),
+  upload.array('mockups', 50),
+  asyncHandler(async (req, res) => {
+    const collection = await Collection.findOne({ _id: req.params.id, tenantId: req.tenantId });
+    if (!collection) throw new NotFoundError('Collection not found');
+    const files = req.files || [];
+    let meta;
+    try {
+      meta = mockupMetaItem.array().parse(JSON.parse(req.body.meta || '[]'));
+    } catch {
+      throw new ApiError(400, 'Invalid mockup metadata', 'MOCKUP_META_INVALID');
+    }
+    if (meta.length !== files.length) {
+      throw new ApiError(400, 'Mockup file count does not match metadata', 'MOCKUP_COUNT_MISMATCH');
+    }
+    for (let i = 0; i < files.length; i++) {
+      const { catalogProductId } = meta[i];
+      const { url } = await uploadFile({ tenantId: req.tenantId, kind: 'mockup', file: files[i] });
+      const ref = collection.productRefs.find(
+        (r) => String(r.catalogProductId) === String(catalogProductId),
+      );
+      if (ref) ref.mockupUrl = url;
+    }
+    collection.markModified('productRefs');
+    await collection.save();
+    writeAudit({
+      req,
+      action: 'collection.mockups',
+      entityType: 'Collection',
+      entityId: collection._id,
+      after: { mockupCount: files.length },
+    });
+    res.json(collection);
+  }),
+);
+
 export default router;

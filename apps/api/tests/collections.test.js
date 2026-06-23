@@ -123,3 +123,27 @@ describe('collection shop links', () => {
     expect(forB.body.some((c) => String(c._id) === String(collection._id))).toBe(true);
   });
 });
+
+describe('collection mockup uploads', () => {
+  it('stores mockupUrl on product refs via multipart upload', async () => {
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    const res = await request(app)
+      .post(`/api/v1/collections/${collection._id}/mockups`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .field('meta', JSON.stringify([{ catalogProductId: String(product._id) }]))
+      .attach('mockups', png, { filename: 'mockup.png', contentType: 'image/png' });
+    expect(res.status).toBe(200);
+    expect(res.body.productRefs[0].mockupUrl).toBeTruthy();
+
+    const shop = await Shop.create({ tenantId: tenant._id, name: 'Linked Shop', status: 'live' });
+    await Collection.updateOne(
+      { _id: collection._id, tenantId: tenant._id },
+      { $set: { shopId: shop._id, shopIds: [shop._id] } },
+    );
+    const storefront = await request(app).get(`/api/v1/storefront/${shop._id}`);
+    expect(storefront.body.products[0].mockupUrl).toBe(res.body.productRefs[0].mockupUrl);
+  });
+});
