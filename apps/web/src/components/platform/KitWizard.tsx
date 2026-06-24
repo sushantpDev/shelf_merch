@@ -182,6 +182,10 @@ export function KitWizard({ mode, kitId }: { mode: "create" | "edit"; kitId?: st
 
   const rules = details.rules ?? emptyDetails.rules!;
 
+  // Imported (e.g. Shopify) kits are curated, self-contained bundles — the item
+  // composition flow does not apply; their contents are fixed as imported.
+  const imported = !!kit?.source?.provider && kit.source.provider !== "manual";
+
   return (
     <>
       <PlatformPageHeader
@@ -204,7 +208,7 @@ export function KitWizard({ mode, kitId }: { mode: "create" | "edit"; kitId?: st
             disabled={!id && i > 0}
             onClick={() => id && setStep(i)}
           >
-            {i + 1}. {label}
+            {i + 1}. {imported && i === 1 ? "Bundle" : label}
           </button>
         ))}
       </div>
@@ -289,7 +293,24 @@ export function KitWizard({ mode, kitId }: { mode: "create" | "edit"; kitId?: st
           </>
         )}
 
-        {step === 1 && (
+        {step === 1 && imported && (
+          <>
+            <h3 style={{ marginBottom: 12 }}>Curated bundle</h3>
+            <div className="banner info" style={{ marginBottom: 14 }}>
+              This kit was imported from {kit?.source?.provider === "shopify" ? "Shopify" : "an external source"} as a
+              complete, pre-set bundle. Its contents are fixed — there are no individual products or variants to add here.
+            </div>
+            <p className="muted" style={{ marginBottom: 14 }}>
+              {kit?.description || "No description provided."}
+            </p>
+            <div className="row" style={{ gap: 8, marginTop: 18 }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setStep(0)}>Back</button>
+              <button type="button" className="btn btn-brand" onClick={() => setStep(2)}>Continue</button>
+            </div>
+          </>
+        )}
+
+        {step === 1 && !imported && (
           <>
             <h3 style={{ marginBottom: 12 }}>Kit items</h3>
             {kit?.items?.length ? (
@@ -364,7 +385,7 @@ export function KitWizard({ mode, kitId }: { mode: "create" | "edit"; kitId?: st
           <>
             <h3 style={{ marginBottom: 12 }}>Review &amp; publish</h3>
             <p className="muted" style={{ marginBottom: 6 }}>
-              {kit?.name} · {kit?.items?.length ?? 0} items · approx {inr(kit?.approxValueInr ?? 0)} · packaging {kit?.packaging}
+              {kit?.name} · {imported ? "curated bundle" : `${kit?.items?.length ?? 0} items`} · approx {inr(kit?.approxValueInr ?? 0)} · packaging {kit?.packaging}
             </p>
             {problems.length > 0 && (
               <ul style={{ color: "var(--danger)", margin: "10px 0", paddingLeft: 18 }}>

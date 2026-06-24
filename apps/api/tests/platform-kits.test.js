@@ -6,6 +6,7 @@ import { Tenant } from '../src/modules/tenants/tenant.model.js';
 import { User } from '../src/modules/users/user.model.js';
 import { RoleAssignment } from '../src/modules/roles/roleAssignment.model.js';
 import { CatalogProduct } from '../src/modules/catalog/catalogProduct.model.js';
+import { PlatformKit } from '../src/modules/kits/platformKit.model.js';
 import { signAccessToken } from '../src/modules/auth/auth.service.js';
 
 let app;
@@ -87,6 +88,20 @@ describe('platform kit creation (predefined curated kits)', () => {
     // Now publish succeeds.
     const publish = await request(app)
       .post(`/api/v1/platform/kits/${kitId}/publish`)
+      .set(auth(catalogToken));
+    expect(publish.status).toBe(200);
+    expect(publish.body.status).toBe('active');
+  });
+
+  it('publishes an imported (curated) kit without items', async () => {
+    const kit = await PlatformKit.create({
+      name: 'Welcome Aboard Employee Kit',
+      approxValueInr: 1200,
+      items: [],
+      source: { provider: 'shopify', externalId: '99001', domain: 'demo.myshopify.com' },
+    });
+    const publish = await request(app)
+      .post(`/api/v1/platform/kits/${kit._id}/publish`)
       .set(auth(catalogToken));
     expect(publish.status).toBe(200);
     expect(publish.body.status).toBe('active');

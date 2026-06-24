@@ -155,6 +155,8 @@ export type PlatformKit = {
   items: KitItem[];
   rules?: KitRules;
   status: string;
+  /** Provenance — imported (e.g. Shopify) kits are curated, self-contained bundles. */
+  source?: { provider?: string; domain?: string; externalId?: string; handle?: string };
 };
 
 export type KitInput = {

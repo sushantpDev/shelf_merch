@@ -2,7 +2,23 @@ import { describe, expect, it } from 'vitest';
 import {
   parseShopifyStorefrontTabs,
   isKitLikeShopifyProduct,
+  mapShopifyKit,
 } from '../src/modules/catalog/shopifyImport.service.js';
+
+describe('Shopify kit mapping (curated, self-contained)', () => {
+  it('imports a kit as an active, fixed-composition bundle with no items', () => {
+    const kit = mapShopifyKit(
+      { id: 42, handle: 'welcome-kit' },
+      'demo.myshopify.com',
+      { name: 'Welcome Kit', description: 'A kit', basePriceInr: 1200, imageUrls: ['/a.png'] },
+    );
+    expect(kit.status).toBe('active');
+    expect(kit.items).toEqual([]);
+    expect(kit.rules.fixedComposition).toBe(true);
+    expect(kit.source).toMatchObject({ provider: 'shopify', externalId: '42' });
+    expect(kit.approxValueInr).toBe(1200);
+  });
+});
 
 describe('Shopify kit classifier (sort kits from catalog products)', () => {
   it('treats a "Kit" title as a kit bundle', () => {

@@ -151,7 +151,10 @@ platformKitsRouter.post(
   validate({ params: idParam }),
   asyncHandler(async (req, res) => {
     const kit = await getKit(req.params.id);
-    if (!kit.items.length) {
+    // Imported (e.g. Shopify) kits are curated, self-contained bundles with no
+    // component items to compose — only manually-built kits need items.
+    const imported = kit.source?.provider && kit.source.provider !== 'manual';
+    if (!imported && !kit.items.length) {
       throw new ApiError(422, 'A kit needs at least one item before publishing', 'KIT_EMPTY');
     }
     kit.status = 'active';

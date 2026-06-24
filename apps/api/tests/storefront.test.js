@@ -54,14 +54,14 @@ describe('public storefront (no auth)', () => {
   });
 
   it('lists the same catalog product once per collection listing (distinct artwork)', async () => {
+    const bottle = await CatalogProduct.create({
+      sku: 'SM-BTL-Z', name: 'Bottle', category: 'Drinkware', group: 'bottle', basePriceInr: 990,
+    });
     const shop = await Shop.create({
       tenantId: tenant._id,
       name: 'Zeta Store',
       status: 'live',
       selectedCatalogProductIds: [bottle._id],
-    });
-    const bottle = await CatalogProduct.create({
-      sku: 'SM-BTL-Z', name: 'Bottle', category: 'Drinkware', group: 'bottle', basePriceInr: 990,
     });
     await Collection.create({
       tenantId: tenant._id,

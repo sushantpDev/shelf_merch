@@ -444,7 +444,12 @@ export function isKitLikeShopifyProduct(p = {}) {
   return false;
 }
 
-/** Map a Shopify product into PlatformKit draft fields (items composed later). */
+/**
+ * Map a Shopify product into PlatformKit fields. Shopify bundles are already
+ * curated, self-contained products — there are no component products/variants to
+ * compose — so they import as `active` with empty `items` and are marked
+ * fixed-composition. The Edit-kits item flow does not apply to them.
+ */
 export function mapShopifyKit(p, domain, mapped) {
   return {
     name: mapped.name,
@@ -453,7 +458,8 @@ export function mapShopifyKit(p, domain, mapped) {
     approxValueInr: mapped.basePriceInr || 0,
     imageUrls: mapped.imageUrls || [],
     items: [],
-    status: 'draft',
+    rules: { fixedComposition: true, customizationAllowed: true, minQtyPerRecipient: 1, maxQtyPerRecipient: 1 },
+    status: 'active',
     source: {
       provider: 'shopify',
       domain,
