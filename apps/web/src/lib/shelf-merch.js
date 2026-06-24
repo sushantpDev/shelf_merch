@@ -11,6 +11,8 @@ import newHireKitImg from '../../assets/new-hire-kit.png';
 import festiveGiftBoxImg from '../../assets/festive-gift-box.png';
 import workFromHomeKitImg from '../../assets/work-from-home-kit.png';
 import wellnessKitImg from '../../assets/wellness-kit.png';
+import megaphoneIllustration from '../../assets/megaphone_box.png'
+import swagBannerImg from '../../assets/swag-banner.png';
 
 let __mounted = false;
 /** Survives Vite HMR so a hot reload does not reset authed state or re-run boot. */
@@ -348,13 +350,13 @@ function ViewFor(v){
 
 /* ---------- shell ---------- */
 function Shell(inner){
+  // <button class="btn btn-dark" data-act="sendGift">${I.send}<span>Send Gift</span></button>
   return `
   <div class="topbar">
     <div class="brandmark">${I.logo}<span style="font-family:var(--disp);font-weight:800;font-size:18px;letter-spacing:-.02em">Shelf Merch</span></div>
     <div class="acct" data-act="toast" data-arg="Switch workspace"><div><div class="k">Account</div><div class="v">${esc(S.account)}</div></div>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#56655C" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></div>
     <div class="spacer"></div>
-    <button class="btn btn-dark" data-act="sendGift">${I.send}<span>Send Gift</span></button>
     <button class="iconbtn" data-act="toast" data-arg="Help & support">${I.help}</button>
     <div class="avatar" data-act="userMenu">${S.user.initials}</div>
   </div>
@@ -3110,9 +3112,11 @@ function ViewSwag(){
   const body=tab==='Archived'&&!cols.length
     ?`<div class="card empty"><div class="ic">${I.swag.replace('currentColor','#cdd6cf')}</div><h3>No archived designs</h3><p>Designs you archive will be stored here and can be restored any time.</p></div>`
     :swagDesignsBody(cols,view);
+  const heroBanner=`<div class="swag-hero-banner card" style="margin-bottom:24px;overflow:hidden;position:relative;padding:0;border-radius:var(--r);height:300px;background:var(--bg) url('${swagBannerImg}') center/cover no-repeat;border:none;box-shadow:var(--sh-1);"></div>`;
   return `<div class="page-h"><div><h1>Swag</h1><div class="sub">Your designed collections and the full catalog you can build from.</div></div>
     <div class="row" style="gap:8px"><button class="btn btn-ghost" data-act="swagDesignerStart">${I.plus}Start designing</button>
     <button class="btn btn-dark" data-act="nav" data-arg="catalog">Purchase swag</button></div></div>
+    ${heroBanner}
     ${toolbar}${body}`;
 }
 
@@ -4001,60 +4005,60 @@ function ViewCampaigns(){
   return campaignsDataView(list);
 }
 function campaignsEmptyState(){
-  const megaphoneIllustration=`<div class="camp-illustration">
-    <svg viewBox="0 0 200 180" fill="none" width="130" height="117">
-      <!-- Background elements/sparkles -->
-      <g opacity="0.8">
-        <!-- Sparkle left top -->
-        <path d="M35 55l1.5-3.5L40 50l-3.5-1.5L35 45l-1.5 3.5L30 50l3.5 1.5L35 55z" fill="#1E8E5C" opacity="0.6"/>
-        <!-- Sparkle right top -->
-        <path d="M165 40l1.5-3.5L170 35l-3.5-1.5L165 30l-1.5 3.5L160 35l3.5 1.5L165 40z" fill="#1E8E5C" opacity="0.6"/>
-        <!-- Small dots -->
-        <circle cx="45" cy="38" r="3" fill="#15784C" opacity="0.15"/>
-        <circle cx="158" cy="60" r="2.5" fill="#15784C" opacity="0.12"/>
-        <circle cx="162" cy="82" r="1.8" fill="#1E8E5C" opacity="0.15"/>
-        <circle cx="50" cy="90" r="2.5" fill="#1E8E5C" opacity="0.1"/>
-      </g>
+  // const megaphoneIllustration=`<div class="camp-illustration">
+  //   <svg viewBox="0 0 200 180" fill="none" width="130" height="117">
+  //     <!-- Background elements/sparkles -->
+  //     <g opacity="0.8">
+  //       <!-- Sparkle left top -->
+  //       <path d="M35 55l1.5-3.5L40 50l-3.5-1.5L35 45l-1.5 3.5L30 50l3.5 1.5L35 55z" fill="#1E8E5C" opacity="0.6"/>
+  //       <!-- Sparkle right top -->
+  //       <path d="M165 40l1.5-3.5L170 35l-3.5-1.5L165 30l-1.5 3.5L160 35l3.5 1.5L165 40z" fill="#1E8E5C" opacity="0.6"/>
+  //       <!-- Small dots -->
+  //       <circle cx="45" cy="38" r="3" fill="#15784C" opacity="0.15"/>
+  //       <circle cx="158" cy="60" r="2.5" fill="#15784C" opacity="0.12"/>
+  //       <circle cx="162" cy="82" r="1.8" fill="#1E8E5C" opacity="0.15"/>
+  //       <circle cx="50" cy="90" r="2.5" fill="#1E8E5C" opacity="0.1"/>
+  //     </g>
 
-      <!-- The Box (Open) -->
-      <g transform="translate(10, 0)">
-        <!-- Inside of the box (shadow) -->
-        <path d="M60 100l30-10 30 10v20l-30 10-30-10v-20z" fill="#E2E7E3"/>
-        <!-- Back flap -->
-        <path d="M60 100l30-15v15z" fill="#C4CDC7"/>
-        <path d="M120 100l-30-15v15z" fill="#C4CDC7"/>
-        <!-- Box left/right sides -->
-        <path d="M60 100l30 10v25l-30-10z" fill="#EAEFEA" stroke="#C4CDC7" stroke-width="1"/>
-        <path d="M90 110l30-10v25l-30 10z" fill="#DFE4DF" stroke="#C4CDC7" stroke-width="1"/>
-        <!-- Flaps -->
-        <!-- Left flap -->
-        <path d="M60 100l-18-12 18-5z" fill="#E2E7E3" stroke="#C4CDC7" stroke-width="1"/>
-        <!-- Right flap -->
-        <path d="M120 100l18-12-18-5z" fill="#E2E7E3" stroke="#C4CDC7" stroke-width="1"/>
-        <!-- Front flap -->
-        <path d="M90 110l-12 18-18-18z" fill="#EAEFEA" stroke="#C4CDC7" stroke-width="1"/>
-        <path d="M90 110l12 18 18-18z" fill="#DFE4DF" stroke="#C4CDC7" stroke-width="1"/>
-      </g>
+  //     <!-- The Box (Open) -->
+  //     <g transform="translate(10, 0)">
+  //       <!-- Inside of the box (shadow) -->
+  //       <path d="M60 100l30-10 30 10v20l-30 10-30-10v-20z" fill="#E2E7E3"/>
+  //       <!-- Back flap -->
+  //       <path d="M60 100l30-15v15z" fill="#C4CDC7"/>
+  //       <path d="M120 100l-30-15v15z" fill="#C4CDC7"/>
+  //       <!-- Box left/right sides -->
+  //       <path d="M60 100l30 10v25l-30-10z" fill="#EAEFEA" stroke="#C4CDC7" stroke-width="1"/>
+  //       <path d="M90 110l30-10v25l-30 10z" fill="#DFE4DF" stroke="#C4CDC7" stroke-width="1"/>
+  //       <!-- Flaps -->
+  //       <!-- Left flap -->
+  //       <path d="M60 100l-18-12 18-5z" fill="#E2E7E3" stroke="#C4CDC7" stroke-width="1"/>
+  //       <!-- Right flap -->
+  //       <path d="M120 100l18-12-18-5z" fill="#E2E7E3" stroke="#C4CDC7" stroke-width="1"/>
+  //       <!-- Front flap -->
+  //       <path d="M90 110l-12 18-18-18z" fill="#EAEFEA" stroke="#C4CDC7" stroke-width="1"/>
+  //       <path d="M90 110l12 18 18-18z" fill="#DFE4DF" stroke="#C4CDC7" stroke-width="1"/>
+  //     </g>
 
-      <!-- Megaphone (Floating out of the box) -->
-      <g transform="translate(90, 45) rotate(-15)">
-        <!-- Megaphone handle -->
-        <path d="M10 28l-4 8h5l2-8z" fill="#0E5536"/>
-        <!-- Megaphone body/cone -->
-        <path d="M10 20l25-10v28l-25-6z" fill="#15784C"/>
-        <!-- Inner shadow of cone -->
-        <path d="M10 20l25-10v8l-25 4z" fill="#0E5536" opacity="0.15"/>
-        <!-- Megaphone bell/opening -->
-        <ellipse cx="35" cy="24" rx="4" ry="14" fill="#EAF5EF" stroke="#15784C" stroke-width="2"/>
-        <path d="M35 15a2 8 0 0 1 0 18" fill="#15784C"/>
-        <!-- Megaphone back cap -->
-        <path d="M10 20c-2 0-3 2-3 4s1 4 3 4z" fill="#FFCB2D"/>
-        <!-- Sound waves -->
-        <path d="M46 14a15 15 0 0 1 0 20" stroke="#1E8E5C" stroke-width="2.5" stroke-linecap="round"/>
-        <path d="M52 9a22 22 0 0 1 0 30" stroke="#1E8E5C" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
-      </g>
-    </svg>
-  </div>`;
+  //     <!-- Megaphone (Floating out of the box) -->
+  //     <g transform="translate(90, 45) rotate(-15)">
+  //       <!-- Megaphone handle -->
+  //       <path d="M10 28l-4 8h5l2-8z" fill="#0E5536"/>
+  //       <!-- Megaphone body/cone -->
+  //       <path d="M10 20l25-10v28l-25-6z" fill="#15784C"/>
+  //       <!-- Inner shadow of cone -->
+  //       <path d="M10 20l25-10v8l-25 4z" fill="#0E5536" opacity="0.15"/>
+  //       <!-- Megaphone bell/opening -->
+  //       <ellipse cx="35" cy="24" rx="4" ry="14" fill="#EAF5EF" stroke="#15784C" stroke-width="2"/>
+  //       <path d="M35 15a2 8 0 0 1 0 18" fill="#15784C"/>
+  //       <!-- Megaphone back cap -->
+  //       <path d="M10 20c-2 0-3 2-3 4s1 4 3 4z" fill="#FFCB2D"/>
+  //       <!-- Sound waves -->
+  //       <path d="M46 14a15 15 0 0 1 0 20" stroke="#1E8E5C" stroke-width="2.5" stroke-linecap="round"/>
+  //       <path d="M52 9a22 22 0 0 1 0 30" stroke="#1E8E5C" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  //     </g>
+  //   </svg>
+  // </div>`;
   const waysCards=`<div class="camp-ways">
     <h2 class="camp-section-title">Ways to get started</h2>
     <div class="camp-ways-grid">
@@ -4111,7 +4115,8 @@ function campaignsEmptyState(){
   </div>`;
   return `<div class="page-h"><div><h1>Campaigns</h1><div class="sub">Launch points campaigns and track redemptions.</div></div>
     <button class="btn btn-dark" data-act="sendGift">Send Gift</button></div>
-    <div class="card camp-empty-card">${megaphoneIllustration}
+    <div class="card camp-empty-card">
+    <img src="${megaphoneIllustration}" alt="No campaigns yet" class="megaphone-illustration" style="width: 20%; height: auto; display: block;">
       <h3 class="camp-empty-title">No campaigns yet</h3>
       <p class="camp-empty-desc">Create a campaign from a shop or set a budget to send redemption invites.</p>
       <button class="btn btn-brand" style="margin-top:14px" data-act="sendGift">Create your first campaign</button>
