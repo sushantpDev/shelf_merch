@@ -455,7 +455,7 @@ export async function getRedemptionPortal(token: string) {
 }
 
 export type StorefrontData = {
-  shop: { id: string; name: string; logoUrl?: string; bannerTheme?: string; currencyMode: string };
+  shop: { id: string; name: string; logoUrl?: string; bannerTheme?: string; bannerPreset?: string; currencyMode: string };
   products: Array<{
     _id: string;
     name: string;
@@ -463,6 +463,8 @@ export type StorefrontData = {
     group?: string;
     category?: string;
     description?: string;
+    keyFeatures?: string;
+    sizeGuide?: string;
     basePriceInr: number;
     primaryImageUrl?: string;
     imageUrls?: string[];
