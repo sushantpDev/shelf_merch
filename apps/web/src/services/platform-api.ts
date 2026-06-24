@@ -449,6 +449,8 @@ export function listCategories() {
   return apiFetch<{ _id: string; name: string }[]>("/platform/categories");
 }
 
+export type ShopifyImportBreakdown = { imported: number; updated: number; skipped: number };
+
 export type ShopifyImportSummary = {
   domain: string;
   total: number;
@@ -456,7 +458,10 @@ export type ShopifyImportSummary = {
   updated: number;
   skipped: number;
   failed: number;
-  items: { title: string; status: string; reason?: string }[];
+  /** Sorted into catalog products vs kit bundles. */
+  products?: ShopifyImportBreakdown;
+  kits?: ShopifyImportBreakdown;
+  items: { title: string; status: string; reason?: string; kind?: "product" | "kit" }[];
 };
 
 export function importShopify(domain: string, accessToken: string) {
