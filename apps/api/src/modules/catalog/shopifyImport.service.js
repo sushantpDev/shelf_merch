@@ -469,8 +469,12 @@ export function mapShopifyKit(p, domain, mapped) {
   };
 }
 
-/** Import all products from a Shopify store; skip ones already imported. */
-export async function importFromShopify({ domain, token }) {
+/**
+ * Import products from a Shopify store; skip ones already imported.
+ * `only` sorts the import: 'products' brings in just catalog products, 'kits'
+ * brings in just kit bundles, 'all' (default) does both.
+ */
+export async function importFromShopify({ domain, token, only = 'all' }) {
   const host = normalizeDomain(domain);
   const products = await fetchShopifyProducts({ domain: host, token });
 
@@ -483,6 +487,12 @@ export async function importFromShopify({ domain, token }) {
   for (const p of products) {
     const externalId = String(p.id);
     try {
+      // Classify up front (from the product list alone) so a filtered import
+      // skips the per-product metafield/tab fetches it doesn't need.
+      const kitLike = isKitLikeShopifyProduct(p);
+      if (only === 'kits' && !kitLike) continue;
+      if (only === 'products' && kitLike) continue;
+
       const metafields = await fetchShopifyProductMetafields({
         domain: host,
         token,
@@ -508,7 +518,7 @@ export async function importFromShopify({ domain, token }) {
       }
 
       // Bundles/kits belong in the PlatformKit collection, not the catalog.
-      if (isKitLikeShopifyProduct(p)) {
+      if (kitLike) {
         const kitFields = mapShopifyKit(p, host, mapped);
         // A Shopify bundle previously imported as a single catalog product is
         // archived out of the catalog so it is not double-listed.
