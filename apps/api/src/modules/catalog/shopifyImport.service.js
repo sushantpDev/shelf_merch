@@ -425,9 +425,9 @@ const KIT_WORD_RE = /\b(kits?|bundles?|combos?|hampers?|gift\s*(set|box|pack)|we
 
 /**
  * Classify a Shopify product as a kit (bundle of items) vs a single catalog
- * product, so imports can be sorted into the right collection. Signals, in order
- * of confidence: product_type / tags, an enumerated "kit includes …" body, then
- * the title. A bare "set" in the title alone is not enough (e.g. "Tee Set" sizes).
+ * product, so imports can be sorted into the right collection. Signals: kit/
+ * bundle/set words in product_type / tags / title, an enumerated "kit includes …"
+ * body, or a title that lists multiple items ("Diary, Pen & Calendar").
  */
 export function isKitLikeShopifyProduct(p = {}) {
   const type = String(p.product_type || '');
@@ -439,8 +439,12 @@ export function isKitLikeShopifyProduct(p = {}) {
   if (/\b(kit|bundle|set|pack|combo|hamper)\b[^.]*\bincludes?\b/i.test(body)) return true;
   if (/\bincludes?\b[^.]*,[^.]*\b(and|&|,)\b/i.test(body) && KIT_WORD_RE.test(p.title || '')) return true;
 
-  // Strong title words (kit/bundle/combo/hamper/gift box) on their own qualify.
-  if (/\b(kits?|bundles?|combos?|hampers?|gift\s*(set|box|pack))\b/i.test(p.title || '')) return true;
+  const title = String(p.title || '');
+  // Bundle words in the title — kit / bundle / combo / hamper / set / gift box.
+  if (KIT_WORD_RE.test(title)) return true;
+  // An enumerated title listing multiple items with commas + "and"/"&"
+  // (e.g. "Wooden Diary, Pen & Lifetime Calendar") is a multi-item bundle.
+  if (/\w+\s*,\s*\w+[^,]*\s(?:&|and)\s+\w+/i.test(title)) return true;
   return false;
 }
 
