@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { CatalogProduct } from './catalogProduct.model.js';
+import { PlatformKit } from '../kits/platformKit.model.js';
 import { ApiError } from '../../utils/errors.js';
 
 const SHOPIFY_API_VERSION = '2024-10';
@@ -355,14 +356,57 @@ async function uniqueSku(base) {
   return sku;
 }
 
+// Words that mark a Shopify product as a bundle/kit rather than a single item.
+const KIT_WORD_RE = /\b(kits?|bundles?|combos?|hampers?|gift\s*(set|box|pack)|welcome\s*(kit|pack)|onboarding\s*(kit|pack)|sets?)\b/i;
+
+/**
+ * Classify a Shopify product as a kit (bundle of items) vs a single catalog
+ * product, so imports can be sorted into the right collection. Signals, in order
+ * of confidence: product_type / tags, an enumerated "kit includes …" body, then
+ * the title. A bare "set" in the title alone is not enough (e.g. "Tee Set" sizes).
+ */
+export function isKitLikeShopifyProduct(p = {}) {
+  const type = String(p.product_type || '');
+  const tags = Array.isArray(p.tags) ? p.tags.join(' ') : String(p.tags || '');
+  if (KIT_WORD_RE.test(type) || KIT_WORD_RE.test(tags)) return true;
+
+  const body = stripHtml(p.body_html || '');
+  // "This kit includes keychain, diary, bottle, pen" — an enumerated bundle.
+  if (/\b(kit|bundle|set|pack|combo|hamper)\b[^.]*\bincludes?\b/i.test(body)) return true;
+  if (/\bincludes?\b[^.]*,[^.]*\b(and|&|,)\b/i.test(body) && KIT_WORD_RE.test(p.title || '')) return true;
+
+  // Strong title words (kit/bundle/combo/hamper/gift box) on their own qualify.
+  if (/\b(kits?|bundles?|combos?|hampers?|gift\s*(set|box|pack))\b/i.test(p.title || '')) return true;
+  return false;
+}
+
+/** Map a Shopify product into PlatformKit draft fields (items composed later). */
+export function mapShopifyKit(p, domain, mapped) {
+  return {
+    name: mapped.name,
+    description: mapped.description || '',
+    packaging: 'box',
+    approxValueInr: mapped.basePriceInr || 0,
+    imageUrls: mapped.imageUrls || [],
+    items: [],
+    status: 'draft',
+    source: {
+      provider: 'shopify',
+      domain,
+      externalId: String(p.id),
+      handle: p.handle || '',
+    },
+  };
+}
+
 /** Import all products from a Shopify store; skip ones already imported. */
 export async function importFromShopify({ domain, token }) {
   const host = normalizeDomain(domain);
   const products = await fetchShopifyProducts({ domain: host, token });
 
-  let imported = 0;
-  let updated = 0;
-  let skipped = 0;
+  // Counts are tracked per kind so kits and catalog products are sorted apart.
+  const product = { imported: 0, updated: 0, skipped: 0 };
+  const kit = { imported: 0, updated: 0, skipped: 0 };
   let failed = 0;
   const items = [];
 
@@ -387,6 +431,45 @@ export async function importFromShopify({ domain, token }) {
           mapped.sizeGuide = stripHtml(p.body_html);
         }
       }
+
+      // Bundles/kits belong in the PlatformKit collection, not the catalog.
+      if (isKitLikeShopifyProduct(p)) {
+        const kitFields = mapShopifyKit(p, host, mapped);
+        // A Shopify bundle previously imported as a single catalog product is
+        // archived out of the catalog so it is not double-listed.
+        await CatalogProduct.updateOne(
+          { 'source.provider': 'shopify', 'source.externalId': externalId, status: { $ne: 'archived' } },
+          { $set: { status: 'archived' } },
+        );
+        const existingKit = await PlatformKit.findOne({
+          'source.provider': 'shopify',
+          'source.externalId': externalId,
+        });
+        if (existingKit) {
+          const changed =
+            existingKit.name !== kitFields.name
+            || String(existingKit.description ?? '') !== String(kitFields.description ?? '')
+            || JSON.stringify(existingKit.imageUrls ?? []) !== JSON.stringify(kitFields.imageUrls ?? []);
+          if (changed) {
+            existingKit.name = kitFields.name;
+            existingKit.description = kitFields.description;
+            existingKit.imageUrls = kitFields.imageUrls;
+            existingKit.approxValueInr = kitFields.approxValueInr;
+            await existingKit.save();
+            kit.updated += 1;
+            items.push({ title: p.title, status: 'updated', kind: 'kit' });
+          } else {
+            kit.skipped += 1;
+            items.push({ title: p.title, status: 'skipped', kind: 'kit' });
+          }
+        } else {
+          await PlatformKit.create(kitFields);
+          kit.imported += 1;
+          items.push({ title: p.title, status: 'imported', kind: 'kit' });
+        }
+        continue;
+      }
+
       const exists = await CatalogProduct.findOne({
         'source.provider': 'shopify',
         'source.externalId': externalId,
@@ -410,11 +493,11 @@ export async function importFromShopify({ domain, token }) {
           // Clear only that legacy value; preserve a manually uploaded mask.
           if (legacyShopifyMask) exists.maskImageUrl = '';
           await exists.save();
-          updated += 1;
-          items.push({ title: p.title, status: 'updated' });
+          product.updated += 1;
+          items.push({ title: p.title, status: 'updated', kind: 'product' });
         } else {
-          skipped += 1;
-          items.push({ title: p.title, status: 'skipped' });
+          product.skipped += 1;
+          items.push({ title: p.title, status: 'skipped', kind: 'product' });
         }
         continue;
       }
@@ -422,13 +505,24 @@ export async function importFromShopify({ domain, token }) {
         mapped.variants.find((v) => v.sku)?.sku || `SHOP-${externalId}`,
       );
       await CatalogProduct.create(mapped);
-      imported += 1;
-      items.push({ title: p.title, status: 'imported' });
+      product.imported += 1;
+      items.push({ title: p.title, status: 'imported', kind: 'product' });
     } catch (err) {
       failed += 1;
       items.push({ title: p?.title ?? externalId, status: 'failed', reason: err.message });
     }
   }
 
-  return { domain: host, total: products.length, imported, updated, skipped, failed, items };
+  return {
+    domain: host,
+    total: products.length,
+    // Grand totals (back-compat) plus the kit/product split.
+    imported: product.imported + kit.imported,
+    updated: product.updated + kit.updated,
+    skipped: product.skipped + kit.skipped,
+    failed,
+    products: product,
+    kits: kit,
+    items,
+  };
 }
