@@ -1,5 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { parseShopifyStorefrontTabs } from '../src/modules/catalog/shopifyImport.service.js';
+import {
+  parseShopifyStorefrontTabs,
+  isKitLikeShopifyProduct,
+} from '../src/modules/catalog/shopifyImport.service.js';
+
+describe('Shopify kit classifier (sort kits from catalog products)', () => {
+  it('treats a "Kit" title as a kit bundle', () => {
+    expect(isKitLikeShopifyProduct({ title: 'Welcome Aboard Employee Kit' })).toBe(true);
+  });
+  it('treats product_type / tags of kit|bundle as a kit', () => {
+    expect(isKitLikeShopifyProduct({ title: 'Onboarding Pack', product_type: 'Kit' })).toBe(true);
+    expect(isKitLikeShopifyProduct({ title: 'Combo', tags: ['gift', 'bundle'] })).toBe(true);
+  });
+  it('treats an enumerated "kit includes …" body as a kit', () => {
+    expect(
+      isKitLikeShopifyProduct({
+        title: 'New Joiner Box',
+        body_html: '<p>This kit includes a keychain, diary, bottle and pen.</p>',
+      }),
+    ).toBe(true);
+  });
+  it('keeps a single product as a catalog product', () => {
+    expect(isKitLikeShopifyProduct({ title: 'Classic Cotton Tee', product_type: 'Apparel' })).toBe(false);
+    // A bare "Set" in the title alone is not enough (e.g. a size set).
+    expect(isKitLikeShopifyProduct({ title: 'Coaster Set' })).toBe(false);
+    expect(isKitLikeShopifyProduct({ title: 'Stainless Bottle', body_html: '<p>Keeps drinks cold.</p>' })).toBe(false);
+  });
+});
 
 describe('Shopify storefront tab parser', () => {
   it('maps the three wanted tabs and ignores File Guidelines', () => {

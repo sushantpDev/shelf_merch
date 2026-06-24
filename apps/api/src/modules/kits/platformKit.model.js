@@ -28,8 +28,18 @@ const platformKitSchema = new mongoose.Schema(
       maxQtyPerRecipient: { type: Number, default: 1 },
     },
     status: { type: String, enum: ['draft', 'active', 'archived'], default: 'draft' },
+    // Provenance — set when a kit is created from an import (e.g. Shopify) so the
+    // same bundle is not re-created and can be reconciled on re-import.
+    source: {
+      provider: { type: String, default: 'manual' }, // 'manual' | 'shopify'
+      domain: { type: String, default: '' },
+      externalId: { type: String, default: '' },
+      handle: { type: String, default: '' },
+    },
   },
   { timestamps: true },
 );
+
+platformKitSchema.index({ 'source.provider': 1, 'source.externalId': 1 });
 
 export const PlatformKit = mongoose.model('PlatformKit', platformKitSchema);
