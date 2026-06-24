@@ -181,6 +181,12 @@ async function seed() {
     currencyMode: 'points',
     status: 'live',
     categories: ['Food & Beverages', 'Work Essentials', 'Merch'],
+    selectedCatalogProductIds: [
+      productByGroup.pack._id,
+      productByGroup.hoodie._id,
+      productByGroup.mug._id,
+      productByGroup.bottle._id,
+    ],
   });
 
   await Collection.create({

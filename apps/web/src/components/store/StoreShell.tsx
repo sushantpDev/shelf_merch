@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { type StoreShop } from "../StoreBanner";
 import { resolveColorHex } from "@/lib/colorMap";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
-import heroBanner from "/assets/hero-banner.png";
+import heroBanner from "../../../assets/hero-banner.png";
 
 type PrintArea = {
   key?: string;

@@ -3,6 +3,8 @@
 import * as api from '../services/api-bridge.js';
 import collectionPreview from '../../assets/collection-preview.png';
 import startDesigningImg from '../../assets/start_designing.png';
+import shopCatalogImg from '../../assets/shop-catalog.png';
+import sentGiftsEmptyImg from '../../assets/sent-gifts-empty.png';
 
 let __mounted = false;
 /** Survives Vite HMR so a hot reload does not reset authed state or re-run boot. */
@@ -89,7 +91,7 @@ function backLink(label,act,arg,opts={}){
 
 /* ---------- state ---------- */
 const defaultState = {
-  authed:false, view:'login', nav:'orders', loading:false,
+  authed:false, view:'login', nav:'orders', loading:false, loadingMessage:'',
   account:'Rubix', user:{name:'Chandra Sekhar', initials:'CS', email:'hr@rubix.net'},
   catalogProducts:[], catalogTotal:0, campaigns:[], primaryEntityId:null,
   flow:{}, // ephemeral wizard state
@@ -109,7 +111,7 @@ const defaultState = {
       activity:[{t:'Funds added', who:'Stripe · card', amt:6200, on:'18 May 2026'}]},
   ],
   shops:[
-    {id:'s1', name:'Rubix Dubai', currency:'Points', live:true, categories:['Food & Beverages','Work Essentials','Merch'], collections:['c1']},
+    {id:'s1', name:'Rubix Dubai', currency:'Points', live:true, categories:['Food & Beverages','Work Essentials','Merch'], collections:['c1'], selectedCatalogProductIds:[]},
   ],
   collections:[
     {id:'c1', code:'C343955972', name:'New employee Swag', created:'28 May 2026', by:'Jonna Madhavi', status:'ready', shopId:'s1',preferredColors:['Black','White'],
@@ -172,6 +174,26 @@ const NAV = [
 
 /* ---------- router ---------- */
 const APP = ()=>document.getElementById('app');
+function loadingHtml(message){
+  const label=esc(message||S.loadingMessage||'Loading workspace…');
+  return `<div class="sm-loading-screen" role="status" aria-live="polite"><div class="sm-loading-panel">
+    <div class="sm-loading-brand">${I.logo.replace('<svg ','<svg width="28" height="28" ')}<span>Shelf Merch</span></div>
+    <div class="sm-loading-spinner" aria-hidden="true"></div>
+    <p class="sm-loading-label">${label}</p>
+  </div></div>`;
+}
+function catalogLoadingHtml(){
+  return `<div class="sm-skeleton-grid" aria-busy="true" aria-label="Loading products">${[0,1,2,3,4,5,6,7].map(()=>`<div class="sm-skeleton-card"><div class="sm-skeleton-img"></div><div class="sm-skeleton-line"></div><div class="sm-skeleton-line short"></div></div>`).join('')}</div>`;
+}
+function appLoadingStart(message){
+  S.loadingMessage=message||'Please wait…';
+  S.loading=true;
+  render();
+}
+function appLoadingEnd(){
+  S.loading=false;
+  S.loadingMessage='';
+}
 function markSessionActive(){
   bootState.sessionAt=Date.now();
 }
@@ -216,7 +238,7 @@ async function setNav(n){
 
 function render(){
   syncAuthState();
-  if(S.loading){ APP().innerHTML = `<div class="auth"><div style="display:grid;place-items:center;min-height:60vh;color:var(--ink-2);font-size:15px">Loading…</div></div>`; return; }
+  if(S.loading){ APP().innerHTML = loadingHtml(); return; }
   if(!S.authed){ APP().innerHTML = S.view==='signup'?ViewSignup():ViewLogin(); return; }
   // full-screen wizard flows render without shell
   const full = ['createShop','shopBuilder','swagName','swagCatalog','swagArtwork','sendPoints','createKit','editKit','sendItems'];
@@ -554,7 +576,7 @@ async function kitPublish(){
     return;
   }
   try{
-    S.loading=true; render();
+    appLoadingStart('Publishing kit…');
     const created=await api.createKitFlow({
       name:f.kitName||'New Kit',
       pickedIndices:f.picked,
@@ -565,11 +587,11 @@ async function kitPublish(){
     });
     const k={...created,artworkUrl:created.artworkUrl||f.logoFile?.preview||''};
     S.kits.push(k);
-    S.loading=false;
+    appLoadingEnd();
     toast('Kit "'+k.name+'" saved to your workspace');
     sendItemsStartFor(k.id, f.picked.slice(), k.artworkUrl);
   }catch(err){
-    S.loading=false; render();
+    appLoadingEnd();
     toast(err.message||'Failed to save kit');
   }
 }
@@ -661,7 +683,7 @@ async function kitSaveEdit(){
     return;
   }
   try{
-    S.loading=true; render();
+    appLoadingStart('Saving kit…');
     const updated=await api.updateKitFlow({
       id:String(f.kitId),
       name:f.kitName,
@@ -674,11 +696,12 @@ async function kitSaveEdit(){
       ...updated,
       artworkUrl:updated.artworkUrl||f.logoFile?.preview||k.artworkUrl||'',
     });
-    S.loading=false;
+    appLoadingEnd();
     toast('Kit updated');
     go('kits');
   }catch(err){
-    S.loading=false; render();
+    appLoadingEnd();
+    render();
     toast(err.message||'Failed to update kit',false);
   }
 }
@@ -852,7 +875,7 @@ async function sendItemsDo(){
   if(!f.kitId){ toast('Kit not found — reload and try again'); return; }
   if(!f.selRecips.length){ toast('Select at least one recipient'); return; }
   try{
-    S.loading=true; render();
+    appLoadingStart('Placing order…');
     const campaign=await api.launchKitCampaignFlow({
       entityId:String(entityId),
       kitId:String(f.kitId),
@@ -867,11 +890,12 @@ async function sendItemsDo(){
     S.campaigns=(S.campaigns||[]);
     S.campaigns.unshift(campaign);
     await hydrateFromApi();
-    S.loading=false;
+    appLoadingEnd();
     finishUi();
     render();
   }catch(err){
-    S.loading=false; render();
+    appLoadingEnd();
+    render();
     toast(err.message||'Failed to send kit');
   }
 }
@@ -1544,7 +1568,7 @@ async function swGenerate(){
     return;
   }
   try{
-    S.loading=true; render();
+    appLoadingStart('Generating designs…');
     const col=await api.createCollectionFlow({
       name:f.colName||'New collection',
       pickedIndices:f.picked,
@@ -1559,11 +1583,12 @@ async function swGenerate(){
     });
     col.by=S.user.name;
     S.collections.push(col);
-    S.loading=false;
+    appLoadingEnd();
     go('swag');
     toast('Collection "'+col.name+'" saved — use Add to shop when you\'re ready');
   }catch(err){
-    S.loading=false; render();
+    appLoadingEnd();
+    render();
     toast(err.message||'Failed to save collection');
   }
 }
@@ -1636,19 +1661,32 @@ function spNext(){ const f=S.flow;
 async function sendPointsDo(){
   const f=S.flow;
   const finishUi=(g)=>{
-    S.flow.sentGifts=(S.flow.sentGifts||[]);
-    go('shopDetail',{flow:{shopId:f.shopId,shopTab:'Sent Gifts',sentGifts:[g]},nav:'shops'});
+    if(!S.sentGiftsByShop) S.sentGiftsByShop={};
+    const sid=String(f.shopId);
+    S.sentGiftsByShop[sid]=[...(S.sentGiftsByShop[sid]||[]), g];
+    go('shopDetail',{flow:{shopId:sid,shopTab:'Sent Gifts'},nav:'shops'});
     toast('Points sent to '+f.selRecips.length+' recipients! 🎉');
   };
   if(api.useMocks()){
-    finishUi({name:f.orderName,by:S.user.name,ppr:(f.ppr/PT),recips:f.selRecips.length});
+    finishUi({
+      id:nid('sg'),
+      name:f.orderName,
+      by:S.user.name,
+      ppr:(f.ppr/PT),
+      recips:f.selRecips.length,
+      sentAt:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),
+      shopId:String(f.shopId),
+      from:f.from||'',
+      message:f.msg||'',
+      status:'sent',
+    });
     return;
   }
   const entityId=S.primaryEntityId||(S.org.departments[0]&&S.org.departments[0].id);
   if(!entityId){ toast('No department budget found — complete wallet setup first'); return; }
   if(!f.shopId){ toast('Select a shop for this campaign'); return; }
+  appLoadingStart('Sending points…');
   try{
-    S.loading=true; render();
     const campaign=await api.launchPointsCampaignFlow({
       entityId:String(entityId),
       shopId:String(f.shopId),
@@ -1661,10 +1699,23 @@ async function sendPointsDo(){
     S.campaigns=(S.campaigns||[]);
     S.campaigns.unshift(campaign);
     await hydrateFromApi();
-    S.loading=false;
-    finishUi({name:f.orderName,by:S.user.name,ppr:(f.ppr/PT),recips:f.selRecips.length});
+    appLoadingEnd();
+    finishUi({
+      id:nid('sg'),
+      name:f.orderName||'Points campaign',
+      by:S.user.name,
+      ppr:(f.ppr/PT),
+      recips:f.selRecips.length,
+      sentAt:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),
+      shopId:String(f.shopId),
+      from:f.from||'',
+      message:f.msg||'',
+      status:'sent',
+      campaignId:campaign?.id,
+    });
   }catch(err){
-    S.loading=false; render();
+    appLoadingEnd();
+    render();
     toast(err.message||'Failed to launch campaign');
   }
 }
@@ -2152,9 +2203,13 @@ async function shopEditSave(){
     Object.assign(S.shops[idx],{logoUrl,bannerConfig});
   }else{
     try{
+      appLoadingStart('Saving shop…');
       const updated=await api.updateShopFlow(ed.shopId,{logoUrl,bannerConfig});
       S.shops[idx]={...S.shops[idx],...updated,logoUrl,bannerConfig};
+      appLoadingEnd();
     }catch(err){
+      appLoadingEnd();
+      render();
       toast(err.message||'Failed to save shop changes',false);
       return;
     }
@@ -2215,15 +2270,16 @@ async function shopPublish(){
     S.shops.push(s);
   } else {
     try{
-      S.loading=true; render();
+      appLoadingStart('Publishing shop…');
       s=await api.createShopFlow({name,currency,categories,logoUrl,bannerConfig});
       S.shops.push(s);
+      appLoadingEnd();
     }catch(err){
-      S.loading=false; render();
+      appLoadingEnd();
+      render();
       toast(err.message||'Failed to publish shop');
       return;
     }
-    S.loading=false;
   }
   go('shopDetail',{flow:{shopId:s.id,shopTab:'Branded Swag'},nav:'shops'});
   openModal(`<div class="modal-pad" style="text-align:center">
@@ -2364,7 +2420,7 @@ function ViewShops(){
   return `<div class="page-h"><div><h1>Shops</h1><div class="sub">Branded storefronts your recipients redeem points in.</div></div>
     <div class="row" style="gap:8px"><button class="btn btn-ghost" data-act="toast" data-arg="Browse templates">Browse templates</button>
     <button class="btn btn-brand" data-act="createShopStart">${I.plus}Create shop</button></div></div>
-    <div class="grid stagger" style="grid-template-columns:repeat(auto-fill,minmax(330px,1fr))">${cards}</div>`;
+    <div class="grid stagger" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">${cards}</div>`;
 }
 const SHOP_TABS=['Branded Swag','Shop Catalog','Sent Gifts','Layout','Settings','Reports'];
 function ViewShopDetail(){
@@ -2414,18 +2470,10 @@ function shopTabBody(s,tab){
     return `<div style="display:flex;gap:22px">${rail}<div style="flex:1">${content}</div></div>`;
   }
   if(tab==='Sent Gifts'){
-    return `<div class="card" style="padding:22px">
-      <div class="row" style="justify-content:space-between;margin-bottom:16px"><h3 style="font-size:17px">Sent gifts</h3>
-        <div class="search" style="width:300px">${I.search}<input placeholder="Search by order name or number" data-act="noop"></div></div>
-      <table class="tbl"><thead><tr><th>Gift name</th><th>Sent by</th><th>Budget/recipient</th><th>Status</th><th>Recipients</th><th></th></tr></thead>
-      <tbody>${(S.flow.sentGifts||[]).length?S.flow.sentGifts.map(g=>`<tr><td style="font-weight:600">${esc(g.name)}</td><td class="muted">${esc(g.by)}</td><td class="num">${pts(g.ppr)}</td><td><span class="tag tag-live"><span class="dot"></span>Sent</span></td><td>${g.recips}</td><td style="text-align:right"><span class="lnk">View</span></td></tr>`).join('')
-        :`<tr><td style="font-weight:600">Order R212828590</td><td class="muted">Jonna Madhavi</td><td class="num">742.21 Pts</td><td><span class="tag tag-warn"><span class="dot"></span>Incomplete</span></td><td>1 <span class="mut3">(99 seats left)</span></td><td style="text-align:right"><span class="lnk" data-act="sendPointsStart" data-arg="'+s.id+'">Finish sending</span></td></tr>`}</tbody></table>
-      <div style="margin-top:14px"><span class="lnk-muted" style="color:var(--danger)" data-act="toast" data-arg="Incomplete order deleted">🗑 Delete incomplete order</span></div></div>`;
+    return sentGiftsTabBody(s);
   }
   if(tab==='Shop Catalog'){
-    const ps=getCatalogList().slice(0,8);
-    return `<div class="banner" style="margin-bottom:16px">${I.spark.replace('width="24" height="24"','width="16" height="16"')}<div>These are the catalog products available to brand. Curate what your recipients see by creating designs in <b>Branded Swag → Start designing</b>.</div></div>
-      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${ps.map(p=>pcard(p,{price:p.price,swatches:p.sw})).join('')}</div>`;
+    return shopCatalogTabBody(s);
   }
   if(tab==='Reports'){
     return `<div class="grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
@@ -2435,14 +2483,253 @@ function shopTabBody(s,tab){
   return `<div class="card" style="padding:26px"><h3 style="font-size:17px;margin-bottom:8px">${tab}</h3><p class="muted">Configure ${tab.toLowerCase()} for ${esc(s.name)}. Banner, theme colours, custom domain and visibility live here.</p>
     <button class="btn btn-soft" style="margin-top:16px" data-act="toast" data-arg="${tab} saved">Edit ${tab.toLowerCase()}</button></div>`;
 }
-function swagEmptyDesigner(){
-  return `<div class="card" style="padding:40px;text-align:center;max-width:680px;margin:20px auto;box-shadow:var(--sh-1)">
-    <div style="margin-bottom:24px;border-radius:var(--r);overflow:hidden;background:var(--surface-2);border:1px solid var(--line);padding:24px;display:grid;place-items:center">
-      <img src="${startDesigningImg}" alt="Start designing" style="max-height:220px;max-width:100%;object-fit:contain">
+function catalogProductKey(p,index){ return p.id||`demo:${index}`; }
+function shopCatalogSelectedIds(shop){ return shop.selectedCatalogProductIds||[]; }
+function shopCatalogCategories(){
+  const cats=new Set(['All Products']);
+  getCatalogList().forEach(p=>{ if(p.category) cats.add(p.category); });
+  return [...cats];
+}
+function sentGiftsForShop(shopId){
+  if(!S.sentGiftsByShop) S.sentGiftsByShop={};
+  const sid=String(shopId);
+  if(S.flow.sentGifts?.length && !S.sentGiftsByShop[sid]?.length){
+    S.sentGiftsByShop[sid]=S.flow.sentGifts.map((g,i)=>({
+      ...g,
+      id:g.id||nid('sg'),
+      shopId:sid,
+      sentAt:g.sentAt||new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),
+    }));
+    delete S.flow.sentGifts;
+  }
+  return S.sentGiftsByShop[sid]||[];
+}
+function sentGiftOpen(el,id){
+  const shopId=S.flow.shopId;
+  const gift=sentGiftsForShop(shopId).find(g=>String(g.id)===String(id));
+  if(!gift) return;
+  const shop=(S.shops.find(x=>x.id===shopId)||{}).name||'shop';
+  const perRecip=pts(gift.ppr);
+  const totalPts=pts((gift.ppr||0)*(gift.recips||0));
+  openModal(`<div class="modal-pad" style="max-width:560px">
+    <div class="modal-h"><div><div class="eyebrow">Sent gift${gift.sentAt?` · ${esc(gift.sentAt)}`:''}</div><h3>${esc(gift.name)}</h3></div><button class="xbtn" data-act="closeLayer">✕</button></div>
+    <div style="margin-top:10px">
+      ${sumRow('Shop', esc(shop))}
+      ${sumRow('Sent by', esc(gift.by))}
+      ${sumRow('Budget / recipient', perRecip)}
+      ${sumRow('Recipients', String(gift.recips||0))}
+      ${sumRow('Total points sent', totalPts)}
+      ${gift.from?sumRow('From', esc(gift.from)):''}
     </div>
-    <h3 style="font-size:22px;font-family:var(--disp);margin-bottom:8px;color:var(--ink)">Create swag collections instantly</h3>
-    <p class="muted" style="margin:8px auto 20px;max-width:48ch;line-height:1.6;font-size:14px">Choose from our curated product catalog, upload your brand assets, and generate mockups in minutes — no design skills required.</p>
-    <button class="btn btn-dark btn-lg" style="padding:0 28px" data-act="swagDesignerStart">${I.plus}Start designing</button>
+    ${gift.message?`<div style="margin-top:16px"><div class="lbl" style="margin-bottom:6px">Message to recipients</div><p class="muted" style="font-size:13.5px;line-height:1.55">${esc(gift.message)}</p></div>`:''}
+    <div style="margin-top:18px"><span class="tag tag-live"><span class="dot"></span>Sent</span></div>
+  </div>`);
+}
+function sentGiftsTabBody(s){
+  const gifts=sentGiftsForShop(s.id);
+  if(!gifts.length){
+    return `<div class="card sent-gifts-empty">
+      <div class="sent-gifts-empty-inner">
+        <img src="${sentGiftsEmptyImg}" alt="" class="sent-gifts-empty-art">
+        <h3>You haven't sent any points</h3>
+        <p class="muted">Send points so recipients can redeem in <b>${esc(s.name)}</b>!</p>
+        <button class="btn btn-dark btn-lg" data-act="sendPointsStart" data-arg="${s.id}">Send points</button>
+      </div>
+    </div>`;
+  }
+  const rows=gifts.map(g=>`<tr data-act="sentGiftOpen" data-arg="${esc(g.id)}" style="cursor:pointer">
+    <td style="font-weight:600">${esc(g.name)}</td>
+    <td class="muted">${esc(g.by)}</td>
+    <td class="num">${pts(g.ppr)}</td>
+    <td><span class="tag tag-live"><span class="dot"></span>Sent</span></td>
+    <td>${g.recips}</td>
+    <td style="text-align:right"><span class="lnk">View</span></td>
+  </tr>`).join('');
+  return `<div class="card" style="padding:22px">
+    <div class="row" style="justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+      <h3 style="font-size:17px">Sent gifts</h3>
+      <div class="search" style="width:min(320px,100%)">${I.search}<input placeholder="Search by order name or number" data-act="noop"></div>
+    </div>
+    <table class="tbl"><thead><tr><th>Gift name</th><th>Sent by</th><th>Budget/recipient</th><th>Status</th><th>Recipients</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+function shopCatalogCategoryLabel(p){
+  return p.category||({tee:'Apparel',hoodie:'Apparel',mug:'Drinkware',bottle:'Drinkware',pack:'Merch',cap:'Merch',note:'Work Essentials',power:'Work Essentials',bag:'Merch',pillow:'Wellness'}[p.g]||'Merch');
+}
+function shopCatalogMatchesCategory(p,cat){
+  if(cat==='All Products') return true;
+  return shopCatalogCategoryLabel(p)===cat;
+}
+function shopCatalogFilteredProducts(ed){
+  const picked=ed.picked||new Set();
+  const q=(ed.search||'').trim().toLowerCase();
+  return getCatalogList().map((p,i)=>({p,i,key:catalogProductKey(p,i)})).filter(({p,i,key})=>{
+    if(ed.viewSelected&&!picked.has(key)) return false;
+    if(!shopCatalogMatchesCategory(p,ed.cat||'All Products')) return false;
+    if(q&&!`${p.nm} ${p.brand||''}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+function shopCatalogTabBody(s){
+  const selected=shopCatalogSelectedIds(s);
+  const total=getCatalogList().length;
+  const count=selected.length;
+  const warn=count===0?`<div class="banner" style="margin-top:18px;border-color:#f3c4cb;background:#fff5f6;color:#9b1c1c"><div><b>No products enabled.</b> Your live shop will show the banner only until you select catalog items in <b>Edit catalog</b>.</div></div>`:'';
+  return `<div class="card" style="padding:28px">
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,340px);gap:28px;align-items:center">
+      <div>
+        <h3 style="font-size:20px;margin-bottom:10px">Your Shop Catalog</h3>
+        <p class="muted" style="line-height:1.65;margin-bottom:8px">Choose which catalog products appear in your live shop. Only selected items are visible to recipients.</p>
+        <p class="muted" style="font-size:13px;line-height:1.55">Create branded designs in <b>Branded Swag</b> after enabling products here.</p>
+        <div class="row" style="gap:10px;margin-top:18px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-dark" data-act="shopCatalogEditOpen" data-arg="${s.id}">Edit catalog</button>
+          <span class="mut3" style="font-size:13px">${count} of ${total} products enabled</span>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;align-items:center">
+        <img src="${shopCatalogImg}" alt="Shop catalog product selection" style="max-width:100%;width:min(320px,100%);height:auto;object-fit:contain;display:block">
+      </div>
+    </div>${warn}</div>`;
+}
+function openCatalogEditor(html){
+  document.getElementById('layer').innerHTML=`<div class="scrim" data-scrim style="padding:16px"><div class="modal scroll" style="max-width:min(1140px,96vw);width:100%;max-height:94vh">${html}</div></div>`;
+}
+function renderShopCatalogModal(){
+  const ed=S.flow.shopCatalogEdit;
+  if(!ed) return;
+  const list=getCatalogList();
+  const total=list.length;
+  const picked=ed.picked instanceof Set?ed.picked:new Set(ed.picked||[]);
+  ed.picked=picked;
+  const count=picked.size;
+  const shop=S.shops.find(x=>x.id===ed.shopId);
+  const cats=shopCatalogCategories();
+  if(!cats.includes(ed.cat)) ed.cat='All Products';
+  const filtered=shopCatalogFilteredProducts(ed);
+  const catRail=cats.map(c=>{
+    const entries=list.map((p,i)=>({p,i,key:catalogProductKey(p,i)})).filter(({p})=>shopCatalogMatchesCategory(p,c));
+    const catSelected=entries.filter(({key})=>picked.has(key)).length;
+    return `<div class="item ${ed.cat===c?'on':''}" data-act="shopCatalogCat" data-arg="${esc(c)}">${esc(c)}<span class="ct">(${catSelected}/${entries.length})</span></div>`;
+  }).join('');
+  const grid=filtered.map(({p,key})=>{
+    const on=picked.has(key);
+    return `<div class="pcard" style="position:relative;cursor:pointer;${on?'border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-50)':''}" data-act="shopCatalogPick" data-arg="${esc(key)}">
+      <div style="position:absolute;top:10px;left:10px;z-index:2;width:20px;height:20px;border-radius:4px;background:${on?'var(--brand)':'#fff'};border:2px solid ${on?'var(--brand)':'var(--line)'};display:grid;place-items:center;color:#fff;font-size:12px;font-weight:700">${on?'✓':''}</div>
+      <div class="img">${productImg(p)}</div>
+      <div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div><div class="pr">${p.price||''}</div></div></div>`;
+  }).join('');
+  openCatalogEditor(`<div class="modal-pad">
+    <div class="modal-h"><div><h3>Edit catalog</h3><p class="muted" style="margin-top:4px;font-size:13px">Select products to show in <b>${esc(shop?.name||'shop')}</b></p></div>
+      <button class="xbtn" data-act="shopCatalogCancel">✕</button></div>
+    ${count===0?`<div class="banner" style="margin-top:12px;border-color:#f3c4cb;background:#fff5f6;color:#9b1c1c"><div>Your current selection shows no available products in your shop. Be sure to enable some before sending points.</div></div>`:''}
+    <div style="display:flex;gap:20px;margin-top:18px;min-height:380px">
+      <div class="subrail" style="width:210px;flex:none;max-height:58vh;overflow:auto">${catRail}</div>
+      <div style="flex:1;min-width:0">
+        <div class="row" style="gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <div class="search" style="flex:1;min-width:220px">${I.search}<input placeholder="Search products" value="${esc(ed.search||'')}" data-act="shopCatalogSearch"></div>
+          <button class="btn btn-ghost btn-sm" data-act="shopCatalogDeselectAll">Deselect all</button>
+          <button class="btn btn-ghost btn-sm" data-act="shopCatalogSelectAll">Select all</button>
+          <button class="btn btn-ghost btn-sm ${ed.viewSelected?'on':''}" data-act="shopCatalogViewSelected">${ed.viewSelected?'View all':'View selected'}</button>
+        </div>
+        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr));max-height:55vh;overflow:auto;padding-right:4px">${grid||'<p class="muted" style="padding:20px 0">No products match your filters.</p>'}</div>
+      </div>
+    </div>
+    <div class="row" style="justify-content:space-between;margin-top:22px;padding-top:16px;border-top:1px solid var(--line);align-items:center">
+      <span class="mut3">${count} of ${total} selected</span>
+      <div class="row" style="gap:10px"><button class="btn btn-ghost" data-act="shopCatalogCancel">Cancel</button>
+        <button class="btn btn-dark" data-act="shopCatalogSave">Save changes</button></div>
+    </div></div>`);
+}
+function shopCatalogEditOpen(el,shopId){
+  const shop=S.shops.find(x=>x.id===shopId);
+  if(!shop) return;
+  S.flow.shopCatalogEdit={
+    shopId,
+    picked:new Set(shopCatalogSelectedIds(shop)),
+    cat:'All Products',
+    search:'',
+    viewSelected:false,
+  };
+  renderShopCatalogModal();
+}
+function shopCatalogPick(el,key){
+  const ed=S.flow.shopCatalogEdit;
+  if(!ed) return;
+  const id=key||el.dataset.arg;
+  if(ed.picked.has(id)) ed.picked.delete(id); else ed.picked.add(id);
+  renderShopCatalogModal();
+}
+function shopCatalogCat(el,cat){ const ed=S.flow.shopCatalogEdit; if(!ed) return; ed.cat=cat; renderShopCatalogModal(); }
+function shopCatalogSearch(el){
+  const ed=S.flow.shopCatalogEdit;
+  if(!ed) return;
+  ed.search=el.value;
+  const start=el.selectionStart;
+  const end=el.selectionEnd;
+  renderShopCatalogModal();
+  const inp=document.querySelector('[data-act="shopCatalogSearch"]');
+  if(inp){ inp.focus(); inp.setSelectionRange(start,end); }
+}
+function shopCatalogSelectAll(){
+  const ed=S.flow.shopCatalogEdit;
+  if(!ed) return;
+  shopCatalogFilteredProducts({...ed,viewSelected:false}).forEach(({key})=>ed.picked.add(key));
+  renderShopCatalogModal();
+}
+function shopCatalogDeselectAll(){
+  const ed=S.flow.shopCatalogEdit;
+  if(!ed) return;
+  shopCatalogFilteredProducts(ed).forEach(({key})=>ed.picked.delete(key));
+  renderShopCatalogModal();
+}
+function shopCatalogViewSelected(){
+  const ed=S.flow.shopCatalogEdit;
+  if(!ed) return;
+  ed.viewSelected=!ed.viewSelected;
+  renderShopCatalogModal();
+}
+function shopCatalogCancel(){
+  delete S.flow.shopCatalogEdit;
+  closeLayer();
+}
+async function shopCatalogSave(){
+  const ed=S.flow.shopCatalogEdit;
+  if(!ed) return;
+  const idx=S.shops.findIndex(x=>x.id===ed.shopId);
+  if(idx<0){ shopCatalogCancel(); return; }
+  const ids=[...ed.picked].filter(id=>!String(id).startsWith('demo:'));
+  if(api.useMocks()){
+    S.shops[idx]={...S.shops[idx],selectedCatalogProductIds:[...ed.picked]};
+  }else{
+    try{
+      appLoadingStart('Saving catalog…');
+      const updated=await api.updateShopFlow(ed.shopId,{selectedCatalogProductIds:ids});
+      S.shops[idx]={...S.shops[idx],...updated,selectedCatalogProductIds:ids};
+      appLoadingEnd();
+    }catch(err){
+      appLoadingEnd();
+      render();
+      toast(err.message||'Failed to save catalog selection',false);
+      return;
+    }
+  }
+  delete S.flow.shopCatalogEdit;
+  closeLayer();
+  toast('Shop catalog updated');
+  render();
+}
+function swagEmptyDesigner(){
+  return `<div class="card swag-empty-designer" style="padding:32px">
+    <div class="swag-empty-designer-grid">
+      <div class="swag-empty-designer-copy">
+        <h3 style="font-size:22px;font-family:var(--disp);margin-bottom:10px;color:var(--ink)">Create swag collections instantly</h3>
+        <p class="muted" style="margin:0 0 22px;line-height:1.65;font-size:14px;max-width:52ch">Choose from our curated product catalog, upload your brand assets, and generate mockups in minutes — no design skills required.</p>
+        <button class="btn btn-dark btn-lg" style="padding:0 28px" data-act="swagDesignerStart">${I.plus}Start designing</button>
+      </div>
+      <div class="swag-empty-designer-art">
+        <img src="${startDesigningImg}" alt="Design your swag collection">
+      </div>
+    </div>
   </div>`;
 }
 function swagViewToggleHtml(view){
@@ -2630,7 +2917,7 @@ async function swagAddToShopDo(){
       render();
       return;
     }
-    S.loading=true; render();
+    appLoadingStart(collectionMode?'Adding collection to shop…':'Adding product to shop…');
     const catalog=getCatalogList();
     if(linkCollection){
       const updated=await api.linkCollectionToShopFlow(col.id,shop.id);
@@ -2644,13 +2931,13 @@ async function swagAddToShopDo(){
       S.collections.push(created);
     }
     syncShopCollections();
-    S.loading=false;
+    appLoadingEnd();
     closeLayer();
     delete S.flow.addToShop;
     toast(collectionMode?'Collection added to shop successfully!':'Product added to shop successfully!');
     render();
   }catch(err){
-    S.loading=false;
+    appLoadingEnd();
     render();
     toast(err.message||(collectionMode?'Failed to add collection to shop':'Failed to add product to shop'),false);
   }
@@ -2674,7 +2961,7 @@ function swagDesignCard(col,p,pIdx){
 function swagProductGrid(cols){
   const entries=swagProductEntries(cols);
   if(!entries.length) return `<div class="card empty"><h3>No products yet</h3><p>Start designing to add branded products to your swag.</p></div>`;
-  return `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${entries.map(({col,p,pIdx})=>swagDesignCard(col,p,pIdx)).join('')}</div>`;
+  return `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">${entries.map(({col,p,pIdx})=>swagDesignCard(col,p,pIdx)).join('')}</div>`;
 }
 function swagCollectionView(cols){
   if(!cols.length) return `<div class="card empty"><h3>No collections yet</h3><p>Create a collection to group your branded products together.</p></div>`;
@@ -3424,7 +3711,7 @@ function ViewCatalog(){
   const loading=S.flow.catalogLoading;
   return `<div class="page-h"><div><h1>Catalog</h1><div class="sub">${count} products from vetted suppliers, ready to brand and ship across India.</div></div></div>
   <div class="tabs" style="margin-bottom:20px">${cats.map(c=>`<button class="${c===t?'on':''}" data-act="catCat" data-arg="${c}">${c}</button>`).join('')}</div>
-  ${loading?'<div class="muted" style="padding:24px 0">Loading products...</div>':`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${list.map(p=>pcard(p,{price:p.price,swatches:p.sw,act:'catalogProductOpen',arg:String(catalog.indexOf(p))})).join('')}</div>`}`;
+  ${loading?catalogLoadingHtml():`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${list.map(p=>pcard(p,{price:p.price,swatches:p.sw,act:'catalogProductOpen',arg:String(catalog.indexOf(p))})).join('')}</div>`}`;
 }
 
 function campaignStatusTag(status){
@@ -3808,7 +4095,7 @@ async function orgFinish(){
   if(api.useMocks()){ S.org.done=true; closeLayer(); render(); return; }
   closeLayer();
   try{
-    S.loading=true; render();
+    appLoadingStart('Saving wallet setup…');
     const result=await api.syncOrgWizard(S.org);
     S.org.wallet.id=result.walletId;
     S.org.sentInvites=result.invites||[];
@@ -3820,7 +4107,8 @@ async function orgFinish(){
   }catch(err){
     toast(err.message||'Failed to save wallet setup');
   }finally{
-    S.loading=false; render();
+    appLoadingEnd();
+    render();
   }
 }
 
@@ -3920,7 +4208,7 @@ async function auth(){
     if(form.password.length<8){ toast('Password must be at least 8 characters'); return; }
   } else if(!form.email||!form.password){ toast('Enter email and password'); return; }
   const gen=++bootState.gen;
-  S.loading=true; render();
+  appLoadingStart(isSignup?'Creating your account…':'Signing you in…');
   try{
     const user=isSignup
       ? await api.register({ name:form.name, email:form.email, password:form.password, companyName:form.companyName })
@@ -3938,7 +4226,7 @@ async function auth(){
   }catch(err){
     if(gen===bootState.gen) toast(err.message||(isSignup?'Sign up failed':'Login failed'));
   }finally{
-    if(gen===bootState.gen){ S.loading=false; render(); }
+    if(gen===bootState.gen){ appLoadingEnd(); render(); }
   }
 }
 async function logout(){
@@ -4071,6 +4359,15 @@ const ACT = {
   // shops
   shopOpen:(el,a)=>shopOpen(a),
   shopTab:(el,a)=>shopTab(a),
+  shopCatalogEditOpen:(el,a)=>shopCatalogEditOpen(el,a),
+  shopCatalogPick:(el,a)=>shopCatalogPick(el,a),
+  shopCatalogCat:(el,a)=>shopCatalogCat(el,a),
+  shopCatalogSelectAll:()=>shopCatalogSelectAll(),
+  shopCatalogDeselectAll:()=>shopCatalogDeselectAll(),
+  shopCatalogViewSelected:()=>shopCatalogViewSelected(),
+  shopCatalogCancel:()=>shopCatalogCancel(),
+  shopCatalogSave:()=>shopCatalogSave(),
+  sentGiftOpen:(el,a)=>sentGiftOpen(el,a),
   createShopStart:()=>createShopStart(),
   shopCur:(el)=>shopCur(el),
   shopCreateBack:()=>shopCreateBack(),
@@ -4179,7 +4476,7 @@ const ACT = {
   shopLogoTab:(el,a)=>shopLogoTab(a),
   shopLogoPrev:(el)=>shopLogoPrev(el),
 };
-const LIVE = { spRecalc:1, spMsg:1, reMsg:1, reNote:1, singleLocLive:1, orgWLive:1, orgAllocLive:1, orgMgrLive:1, contactsSearch:1 };  // input-driven
+const LIVE = { spRecalc:1, spMsg:1, reMsg:1, reNote:1, singleLocLive:1, orgWLive:1, orgAllocLive:1, orgMgrLive:1, contactsSearch:1, shopCatalogSearch:1 };  // input-driven
 const CHANGED = { schedSet:1, singleLocLive:1, orgWChange:1, orgMgrRole:1 };              // change-driven
 
 function onShelfMerchClick(e){
@@ -4225,6 +4522,7 @@ document.addEventListener('input', function(e){
       inp.setSelectionRange(start, end);
     }
   }
+  else if(a==='shopCatalogSearch') shopCatalogSearch(t);
 });
 
 document.addEventListener('change', function(e){
@@ -4301,13 +4599,15 @@ async function init(){
   }
   if(S.authed && api.isAuthenticated()){
     markSessionActive();
+    render();
     return;
   }
   const gen=++bootState.gen;
-  S.loading=true; render();
+  appLoadingStart('Loading workspace…');
   const snapshot=await api.tryRestoreSession();
   if(gen!==bootState.gen||S.authed){
-    S.loading=false; render();
+    appLoadingEnd();
+    render();
     return;
   }
   if(snapshot==='platform'){
@@ -4320,12 +4620,14 @@ async function init(){
     S.authed=true; S.nav='orders'; S.view='orders';
   }else{
     if(gen!==bootState.gen||S.authed){
-      S.loading=false; render();
+      appLoadingEnd();
+      render();
       return;
     }
     S.authed=false; S.view='login';
   }
-  S.loading=false; render();
+  appLoadingEnd();
+  render();
 }
 init();
 }

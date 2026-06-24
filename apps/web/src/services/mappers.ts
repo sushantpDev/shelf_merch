@@ -43,6 +43,7 @@ export type UiShop = {
   live: boolean;
   categories: string[];
   collections: string[];
+  selectedCatalogProductIds: string[];
   logoUrl?: string;
   bannerConfig?: Record<string, unknown>;
   createdAt?: string;
@@ -274,6 +275,9 @@ export function mapShop(s: ApiProduct): UiShop {
     live: s.status === "live",
     categories: s.categories || [],
     collections: [],
+    selectedCatalogProductIds: Array.isArray(s.selectedCatalogProductIds)
+      ? s.selectedCatalogProductIds.map(String)
+      : [],
     logoUrl: s.logoUrl || "",
     bannerConfig: s.bannerConfig || {},
     createdAt: s.createdAt ? String(s.createdAt) : undefined,

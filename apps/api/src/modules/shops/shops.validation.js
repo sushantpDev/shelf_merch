@@ -16,6 +16,7 @@ export const updateShopSchema = z
     logoUrl: z.string(),
     bannerConfig: z.record(z.any()),
     categories: z.array(z.string().min(1)),
+    selectedCatalogProductIds: z.array(objectId).optional(),
   })
   .partial();
 

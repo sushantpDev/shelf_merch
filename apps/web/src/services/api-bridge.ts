@@ -192,7 +192,11 @@ export async function createShopFlow(payload: {
 
 export async function updateShopFlow(
   shopId: string,
-  payload: { logoUrl?: string; bannerConfig?: Record<string, unknown> },
+  payload: {
+    logoUrl?: string;
+    bannerConfig?: Record<string, unknown>;
+    selectedCatalogProductIds?: string[];
+  },
 ) {
   return updateShopApi(shopId, payload);
 }

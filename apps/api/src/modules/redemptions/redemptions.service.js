@@ -276,14 +276,15 @@ export async function getCatalog(token) {
     // Campaign explicitly hand-picked products — those win over the shop.
     filter._id = { $in: campaign.selectedProductIds };
   } else if (campaign.shopId) {
-    // Curated store: limit the catalog to products in the shop's collections so
-    // recipients see the branded store's selection, not the whole platform catalog.
-    const ids = shopCollections
-      .flatMap((c) => (c.productRefs || []).map((r) => r.catalogProductId))
-      .filter(Boolean);
-    // Fall back to the full active catalog when the shop has no curated products yet,
-    // so recipients are never stranded with an empty store.
-    if (ids.length) filter._id = { $in: ids };
+    const shop = await Shop.findById(campaign.shopId)
+      .select('selectedCatalogProductIds')
+      .setOptions({ skipTenantGuard: true })
+      .lean();
+    const shopSelected = (shop?.selectedCatalogProductIds || []).map(String);
+    if (!shopSelected.length) {
+      return { products: [] };
+    }
+    filter._id = { $in: shopSelected };
   }
   const products = await CatalogProduct.find(filter)
     .select('name brand group category description basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas')

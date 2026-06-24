@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getPublicStorefront, type StorefrontData } from "@/services/api-bridge";
 import StoreShell from "./store/StoreShell";
+import { LoadingState } from "./LoadingState";
 import "@/styles/shelf-merch.css";
 
 type State = "loading" | "ready" | "error";
@@ -30,11 +31,7 @@ export default function Storefront({ shopId }: { shopId: string }) {
   }, [shopId]);
 
   if (state === "loading") {
-    return (
-      <div className="auth">
-        <div style={{ display: "grid", placeItems: "center", minHeight: "60vh" }}>Loading shop…</div>
-      </div>
-    );
+    return <LoadingState message="Loading shop…" />;
   }
 
   if (state === "error" || !data) {

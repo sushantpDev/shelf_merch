@@ -473,15 +473,12 @@ export async function importFromShopify({ domain, token }) {
           exists.description = mapped.description;
           exists.keyFeatures = mapped.keyFeatures;
           exists.sizeGuide = mapped.sizeGuide;
-<<<<<<< Updated upstream
           exists.primaryImageUrl = mapped.primaryImageUrl;
           exists.imageUrls = mapped.imageUrls;
           // Older imports stored the Shopify photo as the production mask.
           // Clear only that legacy value; preserve a manually uploaded mask.
           if (legacyShopifyMask) exists.maskImageUrl = '';
-=======
           exists.category = mapped.category;
->>>>>>> Stashed changes
           await exists.save();
           updated += 1;
           items.push({ title: p.title, status: 'updated' });

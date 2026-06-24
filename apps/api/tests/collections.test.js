@@ -138,7 +138,12 @@ describe('collection mockup uploads', () => {
     expect(res.status).toBe(200);
     expect(res.body.productRefs[0].mockupUrl).toBeTruthy();
 
-    const shop = await Shop.create({ tenantId: tenant._id, name: 'Linked Shop', status: 'live' });
+    const shop = await Shop.create({
+      tenantId: tenant._id,
+      name: 'Linked Shop',
+      status: 'live',
+      selectedCatalogProductIds: [product._id],
+    });
     await Collection.updateOne(
       { _id: collection._id, tenantId: tenant._id },
       { $set: { shopId: shop._id, shopIds: [shop._id] } },

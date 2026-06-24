@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 // Shared in-memory state object surfaced from the engine (see src/lib/shelf-merch.js)
 import { mountShelfMerch } from "@/lib/shelf-merch";
+import { LoadingState } from "@/components/LoadingState";
+import "@/styles/shelf-merch.css";
 
 /**
  * Hosts the Shelf Merch view engine inside React. The engine renders
@@ -15,7 +17,9 @@ export default function ShelfMerchApp() {
 
   return (
     <>
-      <div id="app" />
+      <div id="app">
+        <LoadingState message="Loading workspace…" />
+      </div>
       <div id="toast" />
       <div id="layer" />
     </>

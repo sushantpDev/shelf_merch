@@ -9,6 +9,8 @@ const shopSchema = new mongoose.Schema(
     logoUrl: { type: String, default: '' },
     bannerConfig: { type: Object, default: () => ({}) },
     categories: { type: [String], default: [] },
+    /** Catalog products enabled for this shop's public storefront. Empty = no products visible. */
+    selectedCatalogProductIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'CatalogProduct' }],
     status: { type: String, enum: ['draft', 'live'], default: 'draft' },
   },
   { timestamps: true },

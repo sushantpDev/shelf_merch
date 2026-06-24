@@ -95,6 +95,11 @@ export async function seedTenantDemo({
     currencyMode: 'points',
     status: 'live',
     categories: ['Work Essentials', 'Merch', 'Wellness'],
+    selectedCatalogProductIds: [
+      productByGroup.note._id,
+      productByGroup.tee._id,
+      productByGroup.cap._id,
+    ],
   });
 
   await Collection.create({

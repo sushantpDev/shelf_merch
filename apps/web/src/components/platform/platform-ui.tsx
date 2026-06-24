@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { LoadingState } from "@/components/LoadingState";
 
 export function PlatformModal({
   title,
@@ -61,8 +62,8 @@ export function PlatformPageHeader({
   );
 }
 
-export function PlatformLoading() {
-  return <p className="muted">Loading…</p>;
+export function PlatformLoading({ message = "Loading workspace…" }: { message?: string }) {
+  return <LoadingState message={message} fullScreen={false} />;
 }
 
 export function PlatformError({ message }: { message: string }) {

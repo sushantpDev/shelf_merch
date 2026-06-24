@@ -11,6 +11,7 @@ import {
   type KitRedemptionData,
 } from "@/services/api-bridge";
 import KitAcceptPortal from "./KitAcceptPortal";
+import { LoadingState } from "./LoadingState";
 import { StoreBanner, type StoreShop } from "./StoreBanner";
 import StoreShell, { type StoreProduct, type CheckoutItem, type ShippingAddress } from "./store/StoreShell";
 import "@/styles/shelf-merch.css";
@@ -124,11 +125,7 @@ export default function RedemptionPortal({ token }: { token: string }) {
   );
 
   if (step === "loading") {
-    return (
-      <div className="auth">
-        <div style={{ display: "grid", placeItems: "center", minHeight: "60vh" }}>Loading…</div>
-      </div>
-    );
+    return <LoadingState message="Loading your gift…" />;
   }
 
   if (step === "error") {

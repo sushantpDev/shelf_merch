@@ -714,6 +714,7 @@ describe('redemption portal (§11.1)', () => {
       status: 'live',
       logoUrl: 'https://cdn.test/uber.png',
       bannerConfig: { theme: 'brand' },
+      selectedCatalogProductIds: [product._id],
     });
     // `product` (Test Tee) is curated into the shop; this second product is not.
     const offShelf = await CatalogProduct.create({

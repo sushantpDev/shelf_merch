@@ -35,6 +35,7 @@ describe('public storefront (no auth)', () => {
     const shop = await Shop.create({
       tenantId: tenant._id, name: 'Uber Store', status: 'live',
       logoUrl: 'https://cdn.test/uber.png', bannerConfig: { theme: 'brand' },
+      selectedCatalogProductIds: [curated._id],
     });
     await Collection.create({
       tenantId: tenant._id, shopId: shop._id, code: 'C1', name: 'Picks', status: 'ready',
@@ -53,7 +54,12 @@ describe('public storefront (no auth)', () => {
   });
 
   it('lists the same catalog product once per collection listing (distinct artwork)', async () => {
-    const shop = await Shop.create({ tenantId: tenant._id, name: 'Zeta Store', status: 'live' });
+    const shop = await Shop.create({
+      tenantId: tenant._id,
+      name: 'Zeta Store',
+      status: 'live',
+      selectedCatalogProductIds: [bottle._id],
+    });
     const bottle = await CatalogProduct.create({
       sku: 'SM-BTL-Z', name: 'Bottle', category: 'Drinkware', group: 'bottle', basePriceInr: 990,
     });
@@ -86,11 +92,33 @@ describe('public storefront (no auth)', () => {
     expect(res.body.products.every((p) => p.catalogProductId === String(bottle._id))).toBe(true);
   });
 
-  it('returns an empty product list when the shop has no collections', async () => {
+  it('returns an empty product list when no catalog products are selected', async () => {
     const shop = await Shop.create({ tenantId: tenant._id, name: 'Empty Store', status: 'live' });
+    await Collection.create({
+      tenantId: tenant._id, shopId: shop._id, code: 'C0', name: 'Picks', status: 'ready',
+      productRefs: [{ catalogProductId: curated._id, brand: 'Uber', name: 'Welcome Tee', group: 'tee' }],
+    });
     const res = await request(app).get(`/api/v1/storefront/${shop._id}`);
     expect(res.status).toBe(200);
     expect(res.body.products).toEqual([]);
+  });
+
+  it('returns a plain catalog listing for a selected product without a collection', async () => {
+    const shop = await Shop.create({
+      tenantId: tenant._id,
+      name: 'Plain Store',
+      status: 'live',
+      selectedCatalogProductIds: [curated._id],
+    });
+    const res = await request(app).get(`/api/v1/storefront/${shop._id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.products).toHaveLength(1);
+    expect(res.body.products[0]).toMatchObject({
+      catalogProductId: String(curated._id),
+      name: 'Welcome Tee',
+      collectionId: '',
+      artworkUrl: '',
+    });
   });
 
   it('returns the base/mask master images and variant colorHex for recolouring', async () => {
@@ -99,7 +127,12 @@ describe('public storefront (no auth)', () => {
     curated.variants = [{ color: 'Navy', colorHex: '#1e3a8a', size: 'M', sku: 'TEE-NVY-M' }];
     await curated.save();
 
-    const shop = await Shop.create({ tenantId: tenant._id, name: 'Img Store', status: 'live' });
+    const shop = await Shop.create({
+      tenantId: tenant._id,
+      name: 'Img Store',
+      status: 'live',
+      selectedCatalogProductIds: [curated._id],
+    });
     await Collection.create({
       tenantId: tenant._id, shopId: shop._id, code: 'CIMG', name: 'Picks', status: 'ready',
       productRefs: [{ catalogProductId: curated._id, brand: 'Uber', name: 'Welcome Tee', group: 'tee' }],
@@ -113,7 +146,12 @@ describe('public storefront (no auth)', () => {
   });
 
   it('returns saved mockupUrl on curated products when set on the collection ref', async () => {
-    const shop = await Shop.create({ tenantId: tenant._id, name: 'Baked Mockup Store', status: 'live' });
+    const shop = await Shop.create({
+      tenantId: tenant._id,
+      name: 'Baked Mockup Store',
+      status: 'live',
+      selectedCatalogProductIds: [curated._id],
+    });
     await Collection.create({
       tenantId: tenant._id,
       shopId: shop._id,
@@ -146,7 +184,12 @@ describe('public storefront (no auth)', () => {
     }];
     await curated.save();
 
-    const shop = await Shop.create({ tenantId: tenant._id, name: 'Mockup Store', status: 'live' });
+    const shop = await Shop.create({
+      tenantId: tenant._id,
+      name: 'Mockup Store',
+      status: 'live',
+      selectedCatalogProductIds: [curated._id],
+    });
     await Collection.create({
       tenantId: tenant._id,
       shopId: shop._id,
@@ -166,7 +209,12 @@ describe('public storefront (no auth)', () => {
   });
 
   it('returns collection preferredColors on curated products', async () => {
-    const shop = await Shop.create({ tenantId: tenant._id, name: 'Color Store', status: 'live' });
+    const shop = await Shop.create({
+      tenantId: tenant._id,
+      name: 'Color Store',
+      status: 'live',
+      selectedCatalogProductIds: [curated._id],
+    });
     await Collection.create({
       tenantId: tenant._id,
       shopId: shop._id,
@@ -185,12 +233,17 @@ describe('public storefront (no auth)', () => {
 
   it('includes products from collections linked via shopIds (not only primary shopId)', async () => {
     const shopA = await Shop.create({ tenantId: tenant._id, name: 'Zeta Shop', status: 'live' });
-    const shopB = await Shop.create({ tenantId: tenant._id, name: 'Salesforce Shop', status: 'live' });
     const bottle = await CatalogProduct.create({
       sku: 'SM-BTL-1', name: 'Bottle', category: 'Drinkware', group: 'bottle', basePriceInr: 990,
     });
     const sweatshirt = await CatalogProduct.create({
       sku: 'SM-SWT-1', name: 'Sweatshirt', category: 'Apparel', group: 'hoodie', basePriceInr: 1200,
+    });
+    const shopB = await Shop.create({
+      tenantId: tenant._id,
+      name: 'Salesforce Shop',
+      status: 'live',
+      selectedCatalogProductIds: [bottle._id, sweatshirt._id],
     });
 
     await Collection.create({
@@ -220,12 +273,17 @@ describe('public storefront (no auth)', () => {
 
   it('excludes products whose primary shopId matches but shopIds does not', async () => {
     const shopA = await Shop.create({ tenantId: tenant._id, name: 'Zeta Shop', status: 'live' });
-    const shopB = await Shop.create({ tenantId: tenant._id, name: 'Salesforce Shop', status: 'live' });
     const polo = await CatalogProduct.create({
       sku: 'SM-PLO-1', name: 'polo', category: 'Apparel', group: 'polo', basePriceInr: 899,
     });
     const bottle = await CatalogProduct.create({
       sku: 'SM-BTL-2', name: 'Bottle', category: 'Drinkware', group: 'bottle', basePriceInr: 990,
+    });
+    const shopB = await Shop.create({
+      tenantId: tenant._id,
+      name: 'Salesforce Shop',
+      status: 'live',
+      selectedCatalogProductIds: [bottle._id],
     });
 
     await Collection.create({
