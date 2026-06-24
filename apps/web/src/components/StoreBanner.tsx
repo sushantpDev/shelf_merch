@@ -1,4 +1,11 @@
-export type StoreShop = { name: string; logoUrl?: string; bannerTheme?: string };
+import { shopBannerPresetLabel, shopBannerPresetUrl } from "@/lib/shop-banners";
+
+export type StoreShop = {
+  name: string;
+  logoUrl?: string;
+  bannerTheme?: string;
+  bannerPreset?: string;
+};
 
 // Mirrors BANNER_THEMES in lib/shelf-merch.js so public surfaces match the
 // branding the admin picked in the shop builder.
@@ -11,6 +18,51 @@ export const BANNER_THEMES: Record<string, { bg: string; text: string }> = {
 };
 
 export function StoreBanner({ shop, eyebrow = "Welcome to" }: { shop: StoreShop; eyebrow?: string }) {
+  const presetUrl = shopBannerPresetUrl(shop.bannerPreset);
+  if (presetUrl) {
+    return (
+      <div
+        style={{
+          position: "relative",
+          borderRadius: 14,
+          marginBottom: 20,
+          overflow: "hidden",
+          border: "1px solid var(--line)",
+        }}
+      >
+        <img
+          src={presetUrl}
+          alt={shopBannerPresetLabel(shop.bannerPreset) || `${shop.name} banner`}
+          style={{ display: "block", width: "100%", height: "auto", aspectRatio: "4 / 1", objectFit: "cover" }}
+        />
+        {shop.logoUrl ? (
+          <div
+            style={{
+              position: "absolute",
+              left: 16,
+              bottom: 16,
+              width: 48,
+              height: 48,
+              background: "#fff",
+              borderRadius: 10,
+              display: "grid",
+              placeItems: "center",
+              overflow: "hidden",
+              padding: 4,
+              boxShadow: "0 2px 8px rgba(0,0,0,.18)",
+            }}
+          >
+            <img
+              src={shop.logoUrl}
+              alt={shop.name}
+              style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+            />
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   const theme = BANNER_THEMES[shop.bannerTheme || "light"] || BANNER_THEMES.light;
   const isLight = !shop.bannerTheme || shop.bannerTheme === "light";
   return (

@@ -31,7 +31,7 @@ function isKitFulfillment(campaign) {
 }
 
 const KIT_PRODUCT_SELECT =
-  'name brand group category description basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas';
+  'name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas';
 
 /** Active catalog rows for a kit — same list shown to recipients and validated on submit. */
 async function loadActiveKitEntries(kit) {
@@ -124,6 +124,7 @@ export async function getRedemptionPortal(token) {
         currencyMode: shop.currencyMode,
         logoUrl: shop.logoUrl || '',
         bannerTheme: shop.bannerConfig?.theme || 'light',
+        bannerPreset: shop.bannerConfig?.preset || '',
       }
     : null;
 
@@ -287,7 +288,7 @@ export async function getCatalog(token) {
     filter._id = { $in: shopSelected };
   }
   const products = await CatalogProduct.find(filter)
-    .select('name brand group category description basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas')
+    .select('name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas')
     .sort({ name: 1 })
     .lean()
     .then((rows) =>

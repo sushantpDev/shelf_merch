@@ -2124,28 +2124,52 @@ const BANNER_THEMES={
   blue:{bg:'linear-gradient(135deg,#2563C9,#1e40af)',text:'#fff',dots:true},
   purple:{bg:'linear-gradient(135deg,#7a3fb0,#5b21b6)',text:'#fff',dots:true},
 };
+const SHOP_BANNER_PRESETS=[
+  ['out-of-this-world','Out of This World'],['healthcare-heroes','Healthcare Heroes'],['happy-summer','Happy Summer'],
+  ['stellar-performance','Stellar Performance'],['snack-break','Snack Break'],['happy-pride','Happy Pride'],
+  ['welcome-team','Welcome to the Team'],['mothers-day',"Mother's Day"],['wellness-shop','Wellness Shop'],
+  ['exceptional-leader','Exceptional Leader'],['welcome','Welcome'],['work-from-anywhere','Work From Anywhere'],
+  ['earth-day','Earth Day'],['happy-birthday','Happy Birthday'],['merry-christmas','Merry Christmas'],
+  ['one-team','We Are One Team'],['admin-professionals-day','Admin Professionals Day'],
+  ['women-owned-businesses','Women-Owned Businesses'],['fathers-day',"Father's Day"],['team-spirit','Team Spirit'],
+  ['celebrate','Celebrate'],['gratitude','Gratitude'],['you-rock','You Rock'],['holiday-cheer','Holiday Cheer'],
+  ['festive-season','Festive Season'],['spring-forward','Spring Forward'],['autumn-vibes','Autumn Vibes'],
+  ['winter-wonder','Winter Wonder'],['shine-bright','Shine Bright'],['dream-big','Dream Big'],
+  ['make-it-happen','Make It Happen'],['together-we-rise','Together We Rise'],['innovation','Innovation'],
+  ['milestone','Milestone'],['shelfmerch-holiday','ShelfMerch Holiday'],
+];
 function shopBannerBase(t){ return t.bg.startsWith('linear-gradient')?t.bg:`linear-gradient(${t.bg},${t.bg})`; }
+function shopBannerPresetKey(src){ return src?.bannerPreset||src?.bannerConfig?.preset||''; }
 function shopBannerStyle(f){
+  const preset=shopBannerPresetKey(f);
+  if(preset) return `background-image:url(/shop-banners/${preset}.png);background-size:cover;background-position:center;`;
   const t=shopBannerCfg(f);
   if(t.dots) return `background-image:radial-gradient(rgba(255,255,255,.18) 1.4px,transparent 1.4px),${shopBannerBase(t)};background-size:14px 14px,auto;`;
   return `background:${t.bg};`;
 }
+function shopLogoUrl(src){ return src?.logoFile?.preview||src?.logoUrl||''; }
 function shopLogoImg(src){
-  const url=src?.logoFile?.preview||src?.logoUrl;
+  const url=shopLogoUrl(src);
   if(url) return `<img src="${url}" alt="Shop logo" style="max-width:100%;max-height:100%;object-fit:contain;display:block">`;
-  return LOGO_DECO;
+  return '';
+}
+function shopLogoOverlayHtml(src,opts={}){
+  const url=shopLogoUrl(src);
+  if(!url) return '';
+  const logo=opts.logoSize||48;
+  const logoPos=opts.layout==='center'
+    ?'left:50%;top:50%;transform:translate(-50%,-50%)'
+    :'left:18px;top:50%;transform:translateY(-50%)';
+  return `<div style="position:absolute;${logoPos};width:${logo}px;height:${logo}px;background:#fff;border-radius:12px;display:grid;place-items:center;overflow:hidden;padding:4px;z-index:1;box-shadow:0 2px 8px rgba(0,0,0,.12)">${shopLogoImg(src)}</div>`;
 }
 function shopThemeKey(src){ return src?.bannerTheme||src?.bannerConfig?.theme||'light'; }
 function shopBannerCfg(src){ return BANNER_THEMES[shopThemeKey(src)]||BANNER_THEMES.light; }
-function shopBannerClasses(src){ const t=shopBannerCfg(src); return 'shopbanner'+(t.dots?' shopbanner-merch':''); }
+function shopBannerClasses(src){ const t=shopBannerCfg(src); return 'shopbanner'+(shopBannerPresetKey(src)?'':'')+(t.dots&&!shopBannerPresetKey(src)?' shopbanner-merch':''); }
 function shopBannerHtml(src,opts={}){
-  const h=opts.height||96, logo=opts.logoSize||48, layout=opts.layout||'left', r=opts.radius??0;
-  const logoPos=layout==='center'
-    ?'left:50%;top:50%;transform:translate(-50%,-50%)'
-    :'left:18px;top:50%;transform:translateY(-50%)';
+  const h=opts.height||96, r=opts.radius??0;
   const extra=opts.extraStyle||'';
   return `<div class="${shopBannerClasses(src)}" style="height:${h}px;border-radius:${r}px;${shopBannerStyle(src)}${extra}">
-    <div style="position:absolute;${logoPos};width:${logo}px;height:${logo}px;background:#fff;border-radius:12px;display:grid;place-items:center;overflow:hidden;padding:4px;z-index:1;box-shadow:0 2px 8px rgba(0,0,0,.12)">${shopLogoImg(src)}</div>
+    ${shopLogoOverlayHtml(src,{logoSize:opts.logoSize||48,layout:opts.layout||'left'})}
     ${opts.menu&&opts.shopId?`<button type="button" class="shopbanner-menu" data-act="shopEditOpen" data-arg="${opts.shopId}">${I.dots}</button>`:opts.menu?`<button type="button" class="shopbanner-menu" data-act="shopEditOpen">${I.dots}</button>`:''}
   </div>`;
 }
@@ -2156,9 +2180,20 @@ function bannerThemePicker(cur,act){
       <div style="height:40px;border-radius:8px;${sw}"></div>
       <div style="font-size:12px;margin-top:8px;font-weight:600;text-transform:capitalize">${k}</div></button>`; }).join('');
 }
+function bannerPresetPicker(cur,act){
+  return SHOP_BANNER_PRESETS.map(([id,label])=>`<button type="button" class="optcard banner-preset-card ${cur===id?'on':''}" data-act="${act}" data-arg="${id}">
+    <img src="/shop-banners/${id}.png" alt="${esc(label)}" loading="lazy" class="banner-preset-thumb" width="160" height="52">
+    <span class="banner-preset-label">${esc(label)}</span></button>`).join('');
+}
+function shopBannerConfigFromFlow(src){
+  const preset=shopBannerPresetKey(src);
+  if(preset) return {preset,theme:shopThemeKey(src)||'light'};
+  const theme=shopThemeKey(src)||'light';
+  return theme==='light'?{}:{theme};
+}
 function shopEditPreview(ed){
   const s=S.shops.find(x=>x.id===ed.shopId)||{};
-  return shopBannerHtml({...s,bannerConfig:{theme:ed.bannerTheme||'light'},logoUrl:ed.logoFile?.preview||ed.logoUrl||''},{height:108,layout:'center',logoSize:48,radius:10});
+  return shopBannerHtml({...s,bannerConfig:shopBannerConfigFromFlow(ed),logoUrl:ed.logoFile?.preview||ed.logoUrl||''},{height:108,layout:'center',logoSize:48,radius:10});
 }
 function shopEditOpen(el,shopId){
   const s=S.shops.find(x=>x.id===shopId);
@@ -2166,6 +2201,7 @@ function shopEditOpen(el,shopId){
   S.flow.shopEdit={
     shopId,
     bannerTheme:shopThemeKey(s),
+    bannerPreset:shopBannerPresetKey(s),
     logoUrl:s.logoUrl||'',
     logoFile:s.logoUrl?{preview:s.logoUrl,name:'logo'}:null,
   };
@@ -2175,6 +2211,7 @@ function renderShopEditModal(){
   const ed=S.flow.shopEdit; if(!ed) return;
   const s=S.shops.find(x=>x.id===ed.shopId); if(!s) return;
   const cur=ed.bannerTheme||'light';
+  const curPreset=ed.bannerPreset||'';
   const hasLogo=!!(ed.logoFile?.preview||ed.logoUrl);
   const logoPicker=hasLogo
     ?`<div class="row" style="align-items:center;justify-content:space-between;border:1px solid var(--brand);border-radius:var(--r-sm);padding:12px 14px;background:var(--brand-50)"><div class="row" style="gap:10px;align-items:center"><div class="logo-chip" style="width:42px;height:42px;overflow:hidden;padding:4px">${shopLogoImg({logoUrl:ed.logoFile?.preview||ed.logoUrl})}</div><div><div style="font-weight:600;font-size:13px">${esc(ed.logoFile?.name||'Shop logo')}</div><div class="mut3" style="font-size:11px">PNG, SVG, WEBP or JPEG · max 5 MB</div></div></div><button type="button" class="xbtn" data-act="shopEditLogoClear">✕</button></div>
@@ -2184,16 +2221,43 @@ function renderShopEditModal(){
       <div style="font-weight:600">Upload shop logo</div>
       <div class="mut3" style="font-size:11.5px;margin:8px 0 12px">SVG, PNG, WEBP, JPEG · max 5 MB</div>
       <button type="button" class="btn btn-soft btn-sm" data-act="shopEditLogoUpload">Search local device</button></div>`;
-  openModal(`<div class="modal-pad" style="max-width:560px"><div class="modal-h"><div><h3>Edit shop look</h3><p class="muted" style="font-size:13px;margin-top:4px">Update the banner and logo for <b>${esc(s.name)}</b>.</p></div><button class="xbtn" data-act="closeLayer">✕</button></div>
-    <div style="margin:16px 0 20px;border-radius:var(--r);overflow:hidden;border:1px solid var(--line)">${shopEditPreview(ed)}</div>
-    <div class="lbl">Banner theme</div>
+  openModal(`<div class="modal-pad" style="max-width:560px"><div class="modal-h"><div><h3>Edit shop look</h3><p class="muted" style="font-size:13px;margin-top:4px">Update the banner and logo for <b>${esc(s.name)}</b>.</p></div><button type="button" class="xbtn" data-act="closeLayer">✕</button></div>
+    <div data-shop-edit-preview style="margin:16px 0 20px;border-radius:var(--r);overflow:hidden;border:1px solid var(--line)">${shopEditPreview(ed)}</div>
+    <div class="lbl">Banner image</div>
+    <p class="mut3" style="font-size:12px;margin:4px 0 8px">Pick a ready-made banner for your shop storefront.</p>
+    <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;max-height:220px;overflow:auto;padding-right:4px">${bannerPresetPicker(curPreset,'shopEditBannerPreset')}</div>
+    <div class="lbl" style="margin-top:18px">Solid color</div>
     <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px">${bannerThemePicker(cur,'shopEditBannerTheme')}</div>
     <div class="lbl" style="margin-top:18px">Shop logo</div>
     <div style="margin-top:8px">${logoPicker}</div>
     ${hasLogo?'<input type="file" id="shop-edit-logo-inp" accept=".svg,.png,.webp,.jpeg,.jpg,image/svg+xml,image/png,image/webp,image/jpeg" style="display:none">':''}
-    <div class="row" style="margin-top:22px"><button class="btn btn-ghost btn-block" data-act="closeLayer">Cancel</button><button class="btn btn-brand btn-block" data-act="shopEditSave">Save changes</button></div></div>`);
+    <div class="row" style="margin-top:22px"><button type="button" class="btn btn-ghost btn-block" data-act="closeLayer">Cancel</button><button type="button" class="btn btn-brand btn-block" data-act="shopEditSave">Save changes</button></div></div>`);
 }
-function shopEditBannerTheme(el,a){ if(!S.flow.shopEdit) return; S.flow.shopEdit.bannerTheme=a; renderShopEditModal(); }
+function syncShopEditBannerPicker(ed){
+  const layer=document.getElementById('layer');
+  if(!layer?.querySelector('[data-shop-edit-preview]')) return false;
+  const cur=ed.bannerTheme||'light';
+  const curPreset=ed.bannerPreset||'';
+  layer.querySelector('[data-shop-edit-preview]').innerHTML=shopEditPreview(ed);
+  layer.querySelectorAll('[data-act="shopEditBannerPreset"]').forEach(btn=>{
+    btn.classList.toggle('on', btn.dataset.arg===curPreset);
+  });
+  layer.querySelectorAll('[data-act="shopEditBannerTheme"]').forEach(btn=>{
+    btn.classList.toggle('on', btn.dataset.arg===cur);
+  });
+  return true;
+}
+function shopEditBannerTheme(el,a){
+  if(!S.flow.shopEdit) return;
+  S.flow.shopEdit.bannerTheme=a;
+  S.flow.shopEdit.bannerPreset='';
+  if(!syncShopEditBannerPicker(S.flow.shopEdit)) renderShopEditModal();
+}
+function shopEditBannerPreset(el,a){
+  if(!S.flow.shopEdit) return;
+  S.flow.shopEdit.bannerPreset=a;
+  if(!syncShopEditBannerPicker(S.flow.shopEdit)) renderShopEditModal();
+}
 function shopEditLogoUpload(){ document.getElementById('shop-edit-logo-inp')?.click(); }
 function shopEditSetLogoFile(file){
   if(!S.flow.shopEdit) return;
@@ -2217,7 +2281,7 @@ async function shopEditSave(){
   const idx=S.shops.findIndex(x=>x.id===ed.shopId);
   if(idx<0){ closeLayer(); return; }
   const logoUrl=ed.logoFile?.preview||ed.logoUrl||'';
-  const bannerConfig={theme:ed.bannerTheme||'light'};
+  const bannerConfig=shopBannerConfigFromFlow(ed);
   if(api.useMocks()){
     Object.assign(S.shops[idx],{logoUrl,bannerConfig});
   }else{
@@ -2245,18 +2309,64 @@ function shopCardMeta(s){
   const by=esc(s.createdBy||S.user.name);
   return `<div class="shop-card-meta"><span>Created: ${created}</span><span class="shop-card-sep">|</span><span>${by}</span><span class="shop-card-sep">|</span><span>${esc(s.currency)}</span></div>`;
 }
+function shopBuilderBannerTopHtml(f){
+  const bc=shopBannerCfg(f);
+  const hasPreset=!!shopBannerPresetKey(f);
+  const hasLogo=!!shopLogoUrl(f);
+  if(hasPreset){
+    return `<div style="position:relative;height:170px;${shopBannerStyle(f)}">
+      ${hasLogo?`<div style="position:absolute;left:24px;top:50%;transform:translateY(-50%);width:96px;height:96px;background:#fff;border-radius:16px;display:grid;place-items:center;overflow:hidden;padding:10px;box-shadow:0 2px 8px rgba(0,0,0,.12)">${shopLogoImg(f)}</div>`:''}
+      <button type="button" class="btn btn-soft btn-sm" style="position:absolute;top:16px;right:16px" data-act="shopBannerEdit">${I.edit}Edit banner</button></div>`;
+  }
+  return `<div style="height:170px;border-radius:0;display:flex;align-items:center;justify-content:center;gap:24px;${shopBannerStyle(f)}">
+    ${hasLogo?`<div style="width:96px;height:96px;background:#fff;border-radius:16px;display:grid;place-items:center;overflow:hidden;padding:10px">${shopLogoImg(f)}</div>`:''}
+    <div style="font-family:var(--disp);font-weight:800;font-size:40px;color:${bc.text}">${esc(f.shopName||'Your shop name')}</div>
+    <button type="button" class="btn btn-soft btn-sm" data-act="shopBannerEdit">${I.edit}Edit banner</button></div>`;
+}
+function syncShopBuilderBannerTop(){
+  const host=document.querySelector('[data-shop-builder-banner]');
+  if(!host||S.view!=='shopBuilder') return false;
+  host.innerHTML=shopBuilderBannerTopHtml(S.flow);
+  return true;
+}
+function syncShopBannerEditPicker(){
+  const layer=document.getElementById('layer');
+  if(!layer?.querySelector('[data-act="shopBannerPreset"]')) return false;
+  const cur=S.flow.bannerTheme||'light';
+  const curPreset=S.flow.bannerPreset||'';
+  layer.querySelectorAll('[data-act="shopBannerPreset"]').forEach(btn=>{
+    btn.classList.toggle('on', btn.dataset.arg===curPreset);
+  });
+  layer.querySelectorAll('[data-act="shopBannerTheme"]').forEach(btn=>{
+    btn.classList.toggle('on', btn.dataset.arg===cur);
+  });
+  syncShopBuilderBannerTop();
+  return true;
+}
 function shopBannerEdit(){
   const cur=S.flow.bannerTheme||'light';
-  openModal(`<div class="modal-pad"><div class="modal-h"><h3>Edit banner</h3><button class="xbtn" data-act="closeLayer">✕</button></div>
-    <p class="muted" style="font-size:13px;margin:6px 0 16px">Choose a banner style for your shop.</p>
-    <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px">${bannerThemePicker(cur,'shopBannerTheme')}</div></div>`);
+  const curPreset=S.flow.bannerPreset||'';
+  openModal(`<div class="modal-pad" style="max-width:640px"><div class="modal-h"><h3>Edit banner</h3><button type="button" class="xbtn" data-act="closeLayer">✕</button></div>
+    <p class="muted" style="font-size:13px;margin:6px 0 12px">Choose a banner image or solid color for your shop.</p>
+    <div class="lbl">Banner image</div>
+    <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;max-height:240px;overflow:auto;margin-top:8px;padding-right:4px">${bannerPresetPicker(curPreset,'shopBannerPreset')}</div>
+    <div class="lbl" style="margin-top:16px">Solid color</div>
+    <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px">${bannerThemePicker(cur,'shopBannerTheme')}</div></div>`);
 }
-function shopBannerTheme(el,a){ S.flow.bannerTheme=a; closeLayer(); render(); toast('Banner updated'); }
+function shopBannerTheme(el,a){
+  S.flow.bannerTheme=a;
+  S.flow.bannerPreset='';
+  if(!syncShopBannerEditPicker()){ closeLayer(); render(); }
+}
+function shopBannerPreset(el,a){
+  S.flow.bannerPreset=a;
+  S.flow.bannerTheme='light';
+  if(!syncShopBannerEditPicker()){ closeLayer(); render(); }
+}
 
 /* ---------- SHOP BUILDER ---------- */
 Wizards.shopBuilder=function(){
   const f=S.flow;
-  const bc=shopBannerCfg(f);
   const cats=[['Food & Beverages','mug'],['Work Essentials','note'],['Merch','tee'],['Life & Hobbies','cap'],['Wellness','bottle'],['Experiences','spark'],['Luxury','bag']];
   const sel=f.cats||['Food & Beverages','Work Essentials','Merch'];
   return `<div style="height:100%;display:flex;flex-direction:column;background:var(--bg)">
@@ -2265,10 +2375,7 @@ Wizards.shopBuilder=function(){
       <span style="font-family:var(--disp);font-weight:800;font-size:18px;font-style:italic">Shelf Merch</span>
       <button class="btn btn-ghost btn-sm" data-act="shopPublish">Save &amp; publish</button></div>
     <div class="main scroll" style="flex:1">
-      <div style="height:170px;border-radius:0;display:flex;align-items:center;justify-content:center;gap:24px;${shopBannerStyle(f)}">
-        <div style="width:96px;height:96px;background:#fff;border-radius:16px;display:grid;place-items:center;overflow:hidden;padding:10px">${shopLogoImg(f)}</div>
-        <div style="font-family:var(--disp);font-weight:800;font-size:40px;color:${bc.text}">${esc(f.shopName||'Your shop name')}</div>
-        <button class="btn btn-soft btn-sm" data-act="shopBannerEdit">${I.edit}Edit banner</button></div>
+      <div data-shop-builder-banner>${shopBuilderBannerTopHtml(f)}</div>
       <div style="max-width:1000px;margin:0 auto;padding:30px 24px" class="fade-in">
         <h2 style="font-size:22px;margin-bottom:6px">Choose categories for your shop</h2>
         <p class="muted" style="margin-bottom:20px">Pick categories for recipients to shop from. After saving, you can enable/disable individual products.</p>
@@ -2282,7 +2389,7 @@ async function shopPublish(){
   if(!name){ toast('Enter a shop name',false); go('createShop',{flow:{step:0}}); return; }
   const currency=S.flow.shopCur||'Points', categories=S.flow.cats||['Food & Beverages','Work Essentials','Merch'];
   const logoUrl=S.flow.logoFile?.preview||'';
-  const bannerConfig=S.flow.bannerTheme?{theme:S.flow.bannerTheme}:{};
+  const bannerConfig=shopBannerConfigFromFlow(S.flow);
   let s;
   if(api.useMocks()){
     s={id:nid('s'),name,currency,live:true,categories,collections:[],logoUrl,bannerConfig,createdAt:new Date().toISOString(),createdBy:S.user.name};
@@ -4853,8 +4960,10 @@ const ACT = {
   shopBuildGo:()=>shopBuildGo(),
   shopBannerEdit:()=>shopBannerEdit(),
   shopBannerTheme:(el,a)=>shopBannerTheme(el,a),
+  shopBannerPreset:(el,a)=>shopBannerPreset(el,a),
   shopEditOpen:(el,a)=>shopEditOpen(el,a),
   shopEditBannerTheme:(el,a)=>shopEditBannerTheme(el,a),
+  shopEditBannerPreset:(el,a)=>shopEditBannerPreset(el,a),
   shopEditLogoUpload:()=>shopEditLogoUpload(),
   shopEditLogoClear:()=>shopEditLogoClear(),
   shopEditSave:()=>shopEditSave(),
@@ -4965,7 +5074,7 @@ function onShelfMerchClick(e){
   if(LIVE[act] || CHANGED[act]) return;   // handled on input/change
   const fn = ACT[act];
   if(!fn){ return; }
-  if(t.tagName==='A') e.preventDefault();
+  if(t.tagName==='A'||t.tagName==='BUTTON') e.preventDefault();
   if(act==='shopEditOpen'||act==='swagView'||act==='swagCardMenu'||act==='collectionMenu'||t.classList?.contains('swag-card-menu')) e.stopPropagation();
   fn(t, t.dataset.arg);
 }

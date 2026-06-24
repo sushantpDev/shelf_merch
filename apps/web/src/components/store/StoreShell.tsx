@@ -952,6 +952,130 @@ function PremiumProductGrid({
   );
 }
 
+function parseDetailRows(value?: string): [string, string][] {
+  return String(value ?? "")
+    .split("\n")
+    .map((line) => {
+      const split = line.indexOf(":");
+      if (split > 0) return [line.slice(0, split).trim(), line.slice(split + 1).trim()] as [string, string];
+      const trimmed = line.trim();
+      return trimmed ? [trimmed, ""] : ["", ""];
+    })
+    .filter(([label, rowValue]) => label || rowValue);
+}
+
+function detailText(value: string) {
+  return value.split("\n").map((line, i, lines) => (
+    <span key={i}>
+      {line}
+      {i < lines.length - 1 ? <br /> : null}
+    </span>
+  ));
+}
+
+type ProductDetailTab = "description" | "features" | "size";
+
+function ProductInfoTabs({ product }: { product: StoreProduct }) {
+  const description = product.description?.trim() || "";
+  const keyFeatures = product.keyFeatures?.trim() || "";
+  const sizeGuide = product.sizeGuide?.trim() || "";
+  const tabs = useMemo(
+    () =>
+      (
+        [
+          { id: "description" as const, label: "Description", show: !!description },
+          { id: "features" as const, label: "Key features", show: !!keyFeatures },
+          { id: "size" as const, label: "Size Guide", show: !!sizeGuide },
+        ] as const
+      ).filter((tab) => tab.show),
+    [description, keyFeatures, sizeGuide],
+  );
+  const [activeTab, setActiveTab] = useState<ProductDetailTab>("description");
+  const [descExpanded, setDescExpanded] = useState(false);
+
+  useEffect(() => {
+    setActiveTab(tabs[0]?.id ?? "description");
+    setDescExpanded(false);
+  }, [product._id, tabs]);
+
+  if (!tabs.length) return null;
+
+  const shortDescription =
+    description.length > 180 && !descExpanded ? `${description.slice(0, 180).trim()}…` : description;
+  const featureRows = parseDetailRows(keyFeatures);
+  const sizeRows = parseDetailRows(sizeGuide).filter(([label]) => !/^feature$/i.test(label));
+  const useTabs = tabs.length > 1;
+  const currentTab = useTabs ? activeTab : tabs[0].id;
+
+  return (
+    <div className="sf-detail-info" style={{ marginBottom: 24 }}>
+      {useTabs ? (
+        <div className="pd-detail-tabs" role="tablist" aria-label="Product information">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={currentTab === tab.id ? "on" : ""}
+              role="tab"
+              aria-selected={currentTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <div
+        className={`pd-tab-panel pd-description-panel${currentTab === "description" ? " on" : ""}`}
+        role="tabpanel"
+        hidden={currentTab !== "description"}
+      >
+        <p className="sf-detail-desc" style={{ marginBottom: 8 }}>{detailText(shortDescription)}</p>
+        {description.length > 180 ? (
+          <button type="button" className="lnk" style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }} onClick={() => setDescExpanded((v) => !v)}>
+            {descExpanded ? "See less" : "See more"}
+          </button>
+        ) : null}
+      </div>
+
+      <div
+        className={`pd-tab-panel${currentTab === "features" ? " on" : ""}`}
+        role="tabpanel"
+        hidden={currentTab !== "features"}
+      >
+        <div className="pd-feature-card">
+          {featureRows.map(([label, value]) => (
+            <div key={`${label}-${value}`} className="pd-feature-row">
+              <div>{label}</div>
+              <div>{value ? detailText(value) : null}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div
+        className={`pd-tab-panel${currentTab === "size" ? " on" : ""}`}
+        role="tabpanel"
+        hidden={currentTab !== "size"}
+      >
+        <div className="pd-size-table">
+          <div className="pd-size-head">
+            <div>Feature</div>
+            <div>Details</div>
+          </div>
+          {sizeRows.map(([label, value]) => (
+            <div key={`${label}-${value}`} className="pd-size-row">
+              <div>{label}</div>
+              <div>{value ? detailText(value) : null}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProductDetail({ product, mode, fmt, onBack, onAdd }: {
   product: StoreProduct;
   mode: Mode;
@@ -997,7 +1121,7 @@ function ProductDetail({ product, mode, fmt, onBack, onAdd }: {
           <div className="sf-detail-price">
             <PointsIcon /> {fmt(product.basePriceInr)}
           </div>
-          {product.description && <p className="sf-detail-desc">{product.description}</p>}
+          <ProductInfoTabs product={product} />
 
           {colorOptions.length > 0 && (
             <div className="field">
