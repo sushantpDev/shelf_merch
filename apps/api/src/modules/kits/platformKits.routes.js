@@ -12,6 +12,7 @@ import { writeAudit } from '../../services/audit.service.js';
 import { ApiError, NotFoundError } from '../../utils/errors.js';
 import { PlatformKit } from './platformKit.model.js';
 import { CatalogProduct } from '../catalog/catalogProduct.model.js';
+import { importFromShopify } from '../catalog/shopifyImport.service.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
@@ -53,6 +54,24 @@ platformKitsRouter.use(authenticate, resolveTenant);
 
 const kitsRead = platformArea('kits', 'read');
 const kitsWrite = platformArea('kits', 'write');
+
+// Import only kit bundles from Shopify (catalog products are imported from the
+// Catalog page) — keeps kits and catalog products sorted into separate flows.
+platformKitsRouter.post(
+  '/import/shopify',
+  kitsWrite,
+  validate({ body: z.object({ domain: z.string().min(1), accessToken: z.string().min(1) }) }),
+  asyncHandler(async (req, res) => {
+    const summary = await importFromShopify({ domain: req.body.domain, token: req.body.accessToken, only: 'kits' });
+    writeAudit({
+      req,
+      action: 'kit.import.shopify',
+      entityType: 'PlatformKit',
+      after: { domain: summary.domain, kits: summary.kits, failed: summary.failed },
+    });
+    res.json(summary);
+  }),
+);
 
 platformKitsRouter.get(
   '/',

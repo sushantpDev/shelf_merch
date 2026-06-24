@@ -1207,9 +1207,14 @@ export function KitsPage() {
         subtitle="Platform-curated gift bundles."
         actions={
           canWrite ? (
-            <Link to="/platform/kits/new" className="btn btn-brand btn-sm">
-              + Create a kit
-            </Link>
+            <div className="row" style={{ gap: 8 }}>
+              <Link to="/platform/kits/import" className="btn btn-soft btn-sm">
+                Import from Shopify
+              </Link>
+              <Link to="/platform/kits/new" className="btn btn-brand btn-sm">
+                + Create a kit
+              </Link>
+            </div>
           ) : null
         }
       />

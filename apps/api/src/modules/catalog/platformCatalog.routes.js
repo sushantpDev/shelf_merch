@@ -164,7 +164,9 @@ platformProductsRouter.post(
     }),
   }),
   asyncHandler(async (req, res) => {
-    const summary = await importFromShopify({ domain: req.body.domain, token: req.body.accessToken });
+    // Catalog import brings in catalog products only — kit bundles are imported
+    // separately from the Kits page so the two stay sorted apart.
+    const summary = await importFromShopify({ domain: req.body.domain, token: req.body.accessToken, only: 'products' });
     // Audit the import — never the access token.
     writeAudit({
       req,

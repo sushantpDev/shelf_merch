@@ -473,6 +473,14 @@ export function importShopify(domain: string, accessToken: string) {
   });
 }
 
+/** Import only kit bundles from Shopify into the Kits collection. */
+export function importShopifyKits(domain: string, accessToken: string) {
+  return apiFetch<ShopifyImportSummary>("/platform/kits/import/shopify", {
+    method: "POST",
+    body: JSON.stringify({ domain, accessToken }),
+  });
+}
+
 // ---- Operations desk: status/action enums ----
 export const ORDER_STATUSES = [
   "created", "approved", "mockup_pending", "mockup_approved", "in_production",
