@@ -3,6 +3,7 @@ import { CatalogProduct } from './catalogProduct.model.js';
 import { ApiError } from '../../utils/errors.js';
 
 const SHOPIFY_API_VERSION = '2024-10';
+const SHOPIFY_GRAPHQL_API_VERSION = '2026-04';
 const MAX_PAGES = 20; // safety cap (~5000 products at limit=250)
 
 /** Strip protocol, trailing slash, and any /admin path → bare host. */
@@ -276,6 +277,69 @@ export async function fetchShopifyProductMetafields({ domain, token, productId }
   return body.metafields ?? [];
 }
 
+/** Fetch Shopify's standard taxonomy category and merchant classification. */
+export async function fetchShopifyProductCategory({ domain, token, productId }) {
+  const query = `
+    query ProductCategory($id: ID!) {
+      product(id: $id) {
+        productType
+        category {
+          name
+          fullName
+        }
+        collections(first: 20) {
+          nodes {
+            title
+            handle
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const res = await fetch(
+      `https://${domain}/admin/api/${SHOPIFY_GRAPHQL_API_VERSION}/graphql.json`,
+      {
+        method: 'POST',
+        headers: {
+          'X-Shopify-Access-Token': token,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query,
+          variables: { id: `gid://shopify/Product/${productId}` },
+        }),
+      },
+    );
+    if (!res.ok) return null;
+    const body = await res.json().catch(() => ({}));
+    if (body.errors?.length) return null;
+    return body.data?.product ?? null;
+  } catch {
+    // Category enrichment is optional; REST product_type remains the fallback.
+    return null;
+  }
+}
+
+function meaningfulCollectionTitle(collections = []) {
+  const generic = /^(all|all products|catalog|featured|new arrivals?|best sellers?|frontpage)$/i;
+  return collections
+    .map((collection) => String(collection?.title ?? '').trim())
+    .find((title) => title && !generic.test(title)) || '';
+}
+
+export function resolveShopifyCategory(product, categoryData) {
+  return String(
+    categoryData?.category?.name
+      || categoryData?.productType
+      || product?.product_type
+      || meaningfulCollectionTitle(categoryData?.collections?.nodes)
+      || 'Imported',
+  ).trim();
+}
+
 /** Public-page fallback for theme tabs that are not returned by Admin metafields. */
 export async function fetchShopifyStorefrontTabs({ domain, handle }) {
   if (!handle) return { description: '', keyFeatures: '', sizeGuide: '' };
@@ -298,7 +362,7 @@ export async function fetchShopifyStorefrontTabs({ domain, handle }) {
 }
 
 /** Map a Shopify product into CatalogProduct fields (status draft). */
-export function mapShopifyProduct(p, domain, metafields = []) {
+export function mapShopifyProduct(p, domain, metafields = [], categoryData = null) {
   const optionNames = (p.options ?? []).map((o) => String(o.name || '').toLowerCase());
   const optKey = (i) =>
     optionNames[i]?.includes('size') ? 'size'
@@ -328,7 +392,7 @@ export function mapShopifyProduct(p, domain, metafields = []) {
     name: p.title || 'Untitled product',
     ...content,
     brand: p.vendor || '',
-    category: p.product_type || 'Imported',
+    category: resolveShopifyCategory(p, categoryData),
     basePriceInr,
     variants,
     primaryImageUrl: p.image?.src || images[0] || '',
@@ -374,7 +438,12 @@ export async function importFromShopify({ domain, token }) {
         token,
         productId: externalId,
       });
-      const mapped = mapShopifyProduct(p, host, metafields);
+      const categoryData = await fetchShopifyProductCategory({
+        domain: host,
+        token,
+        productId: externalId,
+      });
+      const mapped = mapShopifyProduct(p, host, metafields, categoryData);
       if (!mapped.keyFeatures || mapped.description === stripHtml(p.body_html)) {
         const storefrontTabs = await fetchShopifyStorefrontTabs({
           domain: host,
@@ -392,7 +461,7 @@ export async function importFromShopify({ domain, token }) {
         'source.externalId': externalId,
       });
       if (exists) {
-        const contentChanged = ['description', 'keyFeatures', 'sizeGuide']
+        const contentChanged = ['description', 'keyFeatures', 'sizeGuide', 'category']
           .some((key) => String(exists[key] ?? '') !== String(mapped[key] ?? ''));
         const imagesChanged =
           String(exists.primaryImageUrl ?? '') !== String(mapped.primaryImageUrl ?? '')
@@ -404,11 +473,15 @@ export async function importFromShopify({ domain, token }) {
           exists.description = mapped.description;
           exists.keyFeatures = mapped.keyFeatures;
           exists.sizeGuide = mapped.sizeGuide;
+<<<<<<< Updated upstream
           exists.primaryImageUrl = mapped.primaryImageUrl;
           exists.imageUrls = mapped.imageUrls;
           // Older imports stored the Shopify photo as the production mask.
           // Clear only that legacy value; preserve a manually uploaded mask.
           if (legacyShopifyMask) exists.maskImageUrl = '';
+=======
+          exists.category = mapped.category;
+>>>>>>> Stashed changes
           await exists.save();
           updated += 1;
           items.push({ title: p.title, status: 'updated' });

@@ -4,7 +4,6 @@ import {
   addVariant,
   createProduct,
   getPlatformProduct,
-  listCategories,
   type PlatformProduct,
   type PrintArea,
   type ProductInput,
@@ -21,6 +20,14 @@ import { isPlaceholderColorHex, resolveColorHex } from "@/lib/colorMap";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 const STEPS = ["Details", "Variants", "Images", "Print areas", "Review"] as const;
+const MANUAL_CATEGORIES = [
+  "Apparel",
+  "Bags",
+  "Drinkware",
+  "Health & Wellness",
+  "Office",
+  "Technology",
+] as const;
 
 const emptyDetails: ProductInput = {
   name: "",
@@ -228,16 +235,19 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
   const [problems, setProblems] = useState<string[]>([]);
 
   const [id, setId] = useState<string | undefined>(productId);
-  const [categories, setCategories] = useState<{ _id: string; name: string }[]>([]);
   const [details, setDetails] = useState<ProductInput>(emptyDetails);
   const [variant, setVariant] = useState<ProductVariant>(emptyVariant);
   const [product, setProduct] = useState<PlatformProduct | null>(null);
   const [printAreas, setAreas] = useState<PrintArea[]>([]);
   const [previewColor, setPreviewColor] = useState<string>("");
-
-  useEffect(() => {
-    listCategories().then(setCategories).catch(() => setCategories([]));
-  }, []);
+  const categoryOptions = useMemo(
+    () =>
+      Array.from(new Set([
+        ...MANUAL_CATEGORIES,
+        ...(details.category ? [details.category] : []),
+      ])).sort((a, b) => a.localeCompare(b)),
+    [details.category],
+  );
 
   useEffect(() => {
     if (mode !== "edit" || !productId) return;
@@ -439,6 +449,8 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
     setError("");
     setProblems([]);
     try {
+      // Persist the latest manual category/details selection before publishing.
+      await updateProduct(id, { ...details, reason: "save details before publish" });
       if (printAreas.length) {
         await setPrintAreas(id, printAreas);
         await refresh();
@@ -494,17 +506,16 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
               </div>
               <div className="field" style={{ flex: 1 }}>
                 <label className="lbl">Category</label>
-                <input
+                <select
                   className="inp"
-                  list="cat-list"
                   value={details.category}
                   onChange={(e) => set("category", e.target.value)}
-                />
-                <datalist id="cat-list">
-                  {categories.map((c) => (
-                    <option key={c._id} value={c.name} />
+                >
+                  <option value="" disabled>Select a category</option>
+                  {categoryOptions.map((category) => (
+                    <option key={category} value={category}>{category}</option>
                   ))}
-                </datalist>
+                </select>
               </div>
             </div>
             <div className="field">

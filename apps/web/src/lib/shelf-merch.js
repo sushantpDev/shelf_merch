@@ -1887,7 +1887,7 @@ const PRODUCT_DESCRIPTIONS={
   pillow:'Memory foam neck pillow with washable cover. Lightweight and travel-ready for road warriors and remote teams.',
   bag:'Organic canvas tote with reinforced handles. Spacious main compartment for groceries, events, or conference swag.',
 };
-function productCategory(p){ return PRODUCT_CATEGORIES[p.g]||'Merch'; }
+function productCategory(p){ return p.category||PRODUCT_CATEGORIES[p.g]||'Merch'; }
 function productDescription(p){ return PRODUCT_DESCRIPTIONS[p.g]||'Premium branded merchandise ready for your collection. High-quality materials and professional decoration.'; }
 function productUniqueId(col,pIdx){ const base=(col.code||'').replace(/\D/g,'').slice(-6)||'100000'; return base+String(pIdx+1).padStart(2,'0'); }
 function resolveSavedProduct(colId,pIdx){

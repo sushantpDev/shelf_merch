@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { parseShopifyStorefrontTabs } from '../src/modules/catalog/shopifyImport.service.js';
+import {
+  parseShopifyStorefrontTabs,
+  resolveShopifyCategory,
+} from '../src/modules/catalog/shopifyImport.service.js';
 
 describe('Shopify storefront tab parser', () => {
   it('maps the three wanted tabs and ignores File Guidelines', () => {
@@ -26,5 +29,34 @@ describe('Shopify storefront tab parser', () => {
     expect(tabs.keyFeatures).toBe('Material: Cork\nBrand: 9Cork');
     expect(tabs.sizeGuide).toBe('Feature: Details');
     expect(JSON.stringify(tabs)).not.toContain('Do not import this');
+  });
+
+  it('prefers Shopify taxonomy, then product type, then collection title', () => {
+    expect(resolveShopifyCategory(
+      { product_type: 'Legacy type' },
+      {
+        category: { name: 'Drinkware', fullName: 'Home & Garden > Drinkware' },
+        productType: 'Bottles',
+        collections: { nodes: [{ title: 'Corporate Gifts' }] },
+      },
+    )).toBe('Drinkware');
+
+    expect(resolveShopifyCategory(
+      { product_type: '' },
+      {
+        category: null,
+        productType: 'Accessories',
+        collections: { nodes: [{ title: 'Corporate Gifts' }] },
+      },
+    )).toBe('Accessories');
+
+    expect(resolveShopifyCategory(
+      { product_type: '' },
+      {
+        category: null,
+        productType: '',
+        collections: { nodes: [{ title: 'All Products' }, { title: 'Employee Kits' }] },
+      },
+    )).toBe('Employee Kits');
   });
 });
