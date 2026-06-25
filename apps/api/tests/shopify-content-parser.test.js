@@ -36,10 +36,17 @@ describe('Shopify kit classifier (sort kits from catalog products)', () => {
       }),
     ).toBe(true);
   });
+  it('treats a "Set" title or an enumerated-item title as a kit bundle', () => {
+    expect(isKitLikeShopifyProduct({ title: 'Work Smart Set' })).toBe(true);
+    expect(isKitLikeShopifyProduct({ title: 'Wooden Set For Employee' })).toBe(true);
+    expect(isKitLikeShopifyProduct({ title: 'Wooden Diary, Pen & Lifetime Calendar' })).toBe(true);
+  });
   it('keeps a single product as a catalog product', () => {
     expect(isKitLikeShopifyProduct({ title: 'Classic Cotton Tee', product_type: 'Apparel' })).toBe(false);
-    // A bare "Set" in the title alone is not enough (e.g. a size set).
-    expect(isKitLikeShopifyProduct({ title: 'Coaster Set' })).toBe(false);
+    expect(isKitLikeShopifyProduct({ title: 'Work Well Stainless Bottle' })).toBe(false);
+    expect(isKitLikeShopifyProduct({ title: 'ZenCharge 3-in-1 Wireless Dock' })).toBe(false);
+    // "set" must be a whole word — not a substring (Headset / Sunset / Mindset).
+    expect(isKitLikeShopifyProduct({ title: 'Wireless Headset' })).toBe(false);
     expect(isKitLikeShopifyProduct({ title: 'Stainless Bottle', body_html: '<p>Keeps drinks cold.</p>' })).toBe(false);
   });
 });
