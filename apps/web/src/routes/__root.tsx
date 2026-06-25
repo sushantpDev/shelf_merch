@@ -1,5 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Outlet, Link, createRootRouteWithContext, useRouter } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { toast as sonnerToast } from "sonner";
+import { ChatWidget } from "@/components/ChatWidget";
+import { Toaster } from "@/components/ui/sonner";
+
+declare global {
+  interface Window {
+    __shelfMerchToast?: (msg: string, ok?: boolean) => void;
+  }
+}
 
 function NotFoundComponent() {
   return (
@@ -67,10 +77,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  useEffect(() => {
+    window.__shelfMerchToast = (msg: string, ok = true) => {
+      if (ok) sonnerToast.success(msg);
+      else sonnerToast.error(msg);
+    };
+    return () => {
+      delete window.__shelfMerchToast;
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <ChatWidget />
+      <Toaster />
     </QueryClientProvider>
   );
 }

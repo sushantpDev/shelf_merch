@@ -110,7 +110,11 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
     [...collectionCatalogIds].map(async (id) => {
       try {
         const product = await apiFetch<unknown>(`/catalog/products/${id}`);
-        catalogById.set(id, mapCatalogProduct(product));
+        const mapped = mapCatalogProduct(product);
+        catalogById.set(id, mapped);
+        if (!catalogProducts.some((p) => p.id === id)) {
+          catalogProducts.push(mapped);
+        }
       } catch {
         // Linked catalog product was removed.
       }

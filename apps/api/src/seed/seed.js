@@ -31,6 +31,7 @@ import {
 } from './demoReference.js';
 import { seedTenantDemo } from './seedTenantDemo.js';
 import { seedPlatformDemo } from './seedPlatformDemo.js';
+import { seedChatFlow } from './seedChatFlow.js';
 
 export { DEMO_REDEMPTION_TOKEN, DEMO_PASSWORD, PLATFORM_LOGINS, TENANT_LOGINS };
 
@@ -41,7 +42,7 @@ async function wipe() {
     'campaigns', 'recipients', 'orders', 'importjobs', 'importmappings', 'notifications',
     'idempotencykeys', 'shipments', 'supporttickets', 'vendors', 'productiontasks',
     'platformsettings', 'categories', 'inventorytransactions', 'platformkits',
-    'invoices', 'payments', 'creditnotes',
+    'invoices', 'payments', 'creditnotes', 'chatnodes', 'chatsessions',
   ];
   await Promise.all(cols.map((c) => mongoose.connection.collection(c).deleteMany({})));
 }
@@ -314,6 +315,8 @@ async function seed() {
     orders: tenantDemo.orders,
     products,
   });
+
+  await seedChatFlow();
 
   logger.info(
     {

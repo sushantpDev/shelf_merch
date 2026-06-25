@@ -23,6 +23,7 @@ import {
   archiveCollectionApi,
   restoreCollectionApi,
   deleteCollectionApi,
+  addProductToShopApi,
   syncOrgWizardApi,
 } from "./mutations-api";
 import type { UiCollection } from "./mappers";
@@ -44,6 +45,18 @@ import type { UiContact, UiProduct } from "./mappers";
 
 export { ApiError, getStoredUser, isAuthenticated, isPlatformUser };
 export type { AuthUser };
+
+export function runChatAction(action: string): boolean {
+  if (typeof window === "undefined") return false;
+  const run = (window as Window & { __shelfMerchRunAction?: (a: string) => void })
+    .__shelfMerchRunAction;
+  if (typeof run === "function") {
+    run(action);
+    return true;
+  }
+  window.dispatchEvent(new CustomEvent("sm:chat-action", { detail: { action } }));
+  return false;
+}
 
 export function useMocks(): boolean {
   return USE_MOCKS;
@@ -343,26 +356,7 @@ export async function addProductToShopFlow(payload: {
   product: UiProduct;
   catalog: UiProduct[];
 }) {
-  const catalogIndex = payload.product.id
-    ? payload.catalog.findIndex((p) => p.id === payload.product.id)
-    : payload.catalog.findIndex(
-        (p) =>
-          p.g === payload.product.g &&
-          p.nm === payload.product.nm &&
-          (p.brand || "") === (payload.product.brand || ""),
-      );
-  if (catalogIndex < 0) {
-    throw new Error("Could not match this product to the catalog");
-  }
-  return createCollectionApi({
-    shopId: payload.shopId,
-    name: payload.collection.name,
-    pickedIndices: [catalogIndex],
-    catalog: payload.catalog,
-    preferredColors: payload.collection.preferredColors || [],
-    artworkUrl: payload.collection.artworkUrl || undefined,
-    isShopSpecific: true,
-  });
+  return addProductToShopApi(payload);
 }
 
 export async function launchPointsCampaignFlow(payload: {

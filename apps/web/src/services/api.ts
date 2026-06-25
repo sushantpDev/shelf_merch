@@ -40,8 +40,15 @@ async function parseBody(res: Response): Promise<unknown> {
 
 function errorFromResponse(status: number, body: unknown): ApiError {
   if (body && typeof body === "object" && "error" in body) {
-    const err = (body as { error: { message?: string; code?: string } }).error;
-    return new ApiError(status, err.message || "Request failed", err.code || "API_ERROR", body);
+    const err = (body as {
+      error: { message?: string; code?: string; details?: Array<{ path?: string; message?: string }> };
+    }).error;
+    let message = err.message || "Request failed";
+    if (err.code === "VALIDATION_ERROR" && Array.isArray(err.details) && err.details.length) {
+      const first = err.details[0];
+      message = `${message}: ${first.path || "field"} — ${first.message || "invalid"}`;
+    }
+    return new ApiError(status, message, err.code || "API_ERROR", body);
   }
   return new ApiError(status, typeof body === "string" ? body : "Request failed");
 }

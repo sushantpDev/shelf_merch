@@ -230,6 +230,12 @@ function syncAuthState(){
   if(Date.now()-bootState.sessionAt<8000) return;
   S.authed=false; S.view='login';
 }
+const FULLSCREEN_FLOW_VIEWS=['createShop','shopBuilder','swagName','swagCatalog','swagArtwork','sendPoints','createKit','editKit','sendItems'];
+function notifyViewChange(){
+  if(typeof window!=='undefined'){
+    window.dispatchEvent(new CustomEvent('sm:view-change',{detail:{view:S.view,fullscreenFlow:FULLSCREEN_FLOW_VIEWS.includes(S.view)}}));
+  }
+}
 function go(view, opts={}){ S.view=view; if(opts.nav)S.nav=opts.nav; Object.assign(S.flow, opts.flow||{}); if(view==='contacts')S.flow.contactsSearch=''; window.scrollTo(0,0); render(); }
 async function setNav(n){
   S.nav=n; S.view=n; closeLayer();
@@ -259,13 +265,18 @@ async function setNav(n){
 
 function render(){
   syncAuthState();
-  if(S.loading){ APP().innerHTML = loadingHtml(); return; }
-  if(!S.authed){ APP().innerHTML = S.view==='signup'?ViewSignup():ViewLogin(); return; }
-  // full-screen wizard flows render without shell
-  const full = ['createShop','shopBuilder','swagName','swagCatalog','swagArtwork','sendPoints','createKit','editKit','sendItems'];
-  if(full.includes(S.view)){ APP().innerHTML = Wizards[S.view](); afterRender(); return; }
-  APP().innerHTML = Shell( ViewFor(S.view) );
-  afterRender();
+  if(S.loading){
+    APP().innerHTML = loadingHtml();
+  }else if(!S.authed){
+    APP().innerHTML = S.view==='signup'?ViewSignup():ViewLogin();
+  }else if(FULLSCREEN_FLOW_VIEWS.includes(S.view)){
+    APP().innerHTML = Wizards[S.view]();
+    afterRender();
+  }else{
+    APP().innerHTML = Shell( ViewFor(S.view) );
+    afterRender();
+  }
+  notifyViewChange();
 }
 function afterRender(){
   // focus first autofocus
@@ -432,6 +443,10 @@ function openDrawer(html){ document.getElementById('layer').innerHTML=`<div clas
 function closeLayer(){ document.getElementById('layer').innerHTML=''; }
 let _toastHide=null;
 function toast(msg,ok=true){
+  if(typeof window!=='undefined'&&window.__shelfMerchToast){
+    window.__shelfMerchToast(msg,ok);
+    return;
+  }
   const host=document.getElementById('toast');
   if(!host) return;
   clearTimeout(_toastHide);
@@ -445,6 +460,9 @@ function toast(msg,ok=true){
     e.classList.add('toast-out');
     setTimeout(()=>{ if(e.parentNode) e.remove(); },250);
   },3200);
+}
+function toastAfterPaint(msg,ok=true){
+  requestAnimationFrame(()=>{ requestAnimationFrame(()=>toast(msg,ok)); });
 }
 
 /* ---------- auth screens ---------- */
@@ -1585,7 +1603,7 @@ async function swGenerate(){
     const col={id:nid('c'),code:'C'+(100000000+Math.floor(Math.random()*899999999)),name:f.colName,created:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),by:S.user.name,status:'ready',shopId:'',preferredColors:[],artworkUrl:artUrl,artPlacements:placements,products:f.picked.map((i,idx)=>{const cp=catalog[i];return{id:cp?.id,g:cp?.g||'tee',brand:cp?.brand||'',nm:cp?.nm||'Product',printAreas:cp?.printAreas,imgUrl:cp?.imgUrl,maskImageUrl:cp?.maskImageUrl,placement:placements[cp?.id||('idx'+idx)]||null,mockupUrl:baked[idx]||''};})};
     S.collections.push(col);
     go('swag');
-    toast('Collection "'+col.name+'" is design-ready!');
+    toastAfterPaint('Collection "'+col.name+'" is design-ready!');
     return;
   }
   try{
@@ -1606,7 +1624,7 @@ async function swGenerate(){
     S.collections.push(col);
     appLoadingEnd();
     go('swag');
-    toast('Collection "'+col.name+'" saved — use Add to shop when you\'re ready');
+    toastAfterPaint('Collection "'+col.name+'" saved — use Add to shop when you\'re ready');
   }catch(err){
     appLoadingEnd();
     render();
@@ -2414,6 +2432,7 @@ async function shopPublish(){
     ${shopBannerHtml(s,{height:130,layout:'center',logoSize:62,radius:14,extraStyle:'margin-bottom:18px;'})}
     <h3>Let's take a tour of your shop!</h3><p class="muted" style="margin-top:6px">Your "${esc(s.name)}" shop is live. Add branded swag, then send points.</p>
     <div class="row" style="margin-top:18px"><button class="btn btn-ghost btn-block" data-act="closeLayer">Done</button><button class="btn btn-dark btn-block" data-act="swagDesignerStart">Take a tour · Design swag</button></div></div>`);
+  toastAfterPaint(`"${s.name}" shop published successfully!`);
 }
 
 
@@ -2871,11 +2890,14 @@ function swagDesignKey(col,p){
   return `${p.id||''}|${col.artworkUrl||''}|${p.nm}|${p.brand||''}`;
 }
 function shopHasDesign(shopId,col,p){
-  const key=swagDesignKey(col,p);
+  if(!p?.id) return false;
+  const catalogId=String(p.id);
+  const artwork=col.artworkUrl||'';
   const cols=S.collections.filter(c=>collectionLinkedToShop(c,shopId));
   for(const shopCol of cols){
+    if((shopCol.artworkUrl||'')!==artwork) continue;
     for(const prod of shopCol.products||[]){
-      if(swagDesignKey(shopCol,prod)===key) return true;
+      if(String(prod.id||'')===catalogId) return true;
     }
   }
   return false;
@@ -2997,7 +3019,14 @@ async function swagAddToShopDo(){
   const ref=collectionMode?null:swagProductRef(`${f.colId}:${f.pIdx}`);
   const shop=S.shops.find(s=>s.id===f.shopId);
   if(!col||!shop||!collectionMode&&!ref){ closeLayer(); return; }
-  const p=ref?.p;
+  const p=ref?enrichProduct(ref.p):null;
+  if(!collectionMode&&!p?.id){
+    closeLayer();
+    delete S.flow.addToShop;
+    toast('This product is missing a catalog link — refresh the page and try again',false);
+    render();
+    return;
+  }
   const duplicate=collectionMode
     ?collectionLinkedToShop(col,shop.id)||col.products.some(product=>shopHasDesign(shop.id,col,product))
     :shopHasDesign(shop.id,col,p);
@@ -3035,8 +3064,8 @@ async function swagAddToShopDo(){
       syncShopCollections();
       closeLayer();
       delete S.flow.addToShop;
-      toast(collectionMode?'Collection added to shop successfully!':'Product added to shop successfully!');
       render();
+      toastAfterPaint(collectionMode?'Collection added to shop successfully!':'Product added to shop successfully!');
       return;
     }
     appLoadingStart(collectionMode?'Adding collection to shop…':'Adding product to shop…');
@@ -3056,12 +3085,13 @@ async function swagAddToShopDo(){
     appLoadingEnd();
     closeLayer();
     delete S.flow.addToShop;
-    toast(collectionMode?'Collection added to shop successfully!':'Product added to shop successfully!');
     render();
+    toastAfterPaint(collectionMode?'Collection added to shop successfully!':'Product added to shop successfully!');
   }catch(err){
     appLoadingEnd();
     render();
-    toast(err.message||(collectionMode?'Failed to add collection to shop':'Failed to add product to shop'),false);
+    const msg=err instanceof Error?err.message:(collectionMode?'Failed to add collection to shop':'Failed to add product to shop');
+    toast(msg,false);
   }
 }
 function swagDesignCard(col,p,pIdx){
@@ -5084,10 +5114,26 @@ function onShelfMerchClick(e){
   fn(t, t.dataset.arg);
 }
 
+function runChatWidgetAction(action){
+  if(action==='create_shop') createShopStart();
+  else if(action==='create_kit') createKitStart();
+  else if(action==='view_shops'){ S.nav='shops'; go('shops'); }
+  else if(action==='view_kits'){ S.nav='kits'; go('kits'); }
+}
+
 if(typeof window!=='undefined'){
   document.removeEventListener('click', window.__shelfMerchOnClick);
   window.__shelfMerchOnClick=onShelfMerchClick;
   document.addEventListener('click', window.__shelfMerchOnClick);
+
+  window.__shelfMerchRunAction = runChatWidgetAction;
+
+  document.removeEventListener('sm:chat-action', window.__shelfMerchChatAction);
+  window.__shelfMerchChatAction = (e) => {
+    const action = e.detail?.action;
+    if(action) runChatWidgetAction(action);
+  };
+  document.addEventListener('sm:chat-action', window.__shelfMerchChatAction);
 }
 
 document.addEventListener('input', function(e){

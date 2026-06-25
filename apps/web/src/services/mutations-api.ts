@@ -99,7 +99,17 @@ function productRefFromUi(p: UiProduct) {
     brand: p.brand || "",
     name: p.nm,
     group: p.g || "tee",
+    ...(p.mockupUrl && /^https?:\/\//i.test(p.mockupUrl) ? { mockupUrl: p.mockupUrl } : {}),
   };
+}
+
+function remoteArtworkUrl(url?: string) {
+  if (!url) return "";
+  return /^https?:\/\//i.test(url) ? url : "";
+}
+
+function cleanPreferredColors(colors?: string[]) {
+  return (colors || []).filter((c) => typeof c === "string" && c.trim());
 }
 
 export async function createKitApi(payload: {
@@ -236,6 +246,51 @@ export async function deleteCollectionApi(collectionId: string) {
   await apiFetch(`/collections/${collectionId}`, { method: "DELETE" });
 }
 
+export async function addProductToShopApi(payload: {
+  shopId: string;
+  collection: { name: string; artworkUrl?: string; preferredColors?: string[] };
+  product: UiProduct;
+  catalog: UiProduct[];
+}) {
+  const catalogProduct =
+    payload.catalog.find((p) => p.id && p.id === payload.product.id) ||
+    payload.product;
+  if (!catalogProduct.id) {
+    throw new Error("Could not match this product to the catalog");
+  }
+
+  const productRef = productRefFromUi(catalogProduct);
+  const catalogById = new Map(
+    payload.catalog.filter((p) => p.id).map((p) => [p.id as string, p]),
+  );
+  const body = {
+    name: payload.collection.name,
+    productRefs: [productRef],
+    preferredColors: cleanPreferredColors(payload.collection.preferredColors),
+    shopId: payload.shopId,
+    artworkUrl: remoteArtworkUrl(payload.collection.artworkUrl),
+    isShopSpecific: true,
+  };
+
+  const col = await apiFetch<Record<string, unknown>>("/collections", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  let result = mapCollection(col, "", catalogById);
+
+  const mockup = payload.product.mockupUrl;
+  if (mockup?.startsWith("data:") && catalogProduct.id) {
+    const withMockups = await uploadCollectionMockupsApi(
+      result.id,
+      [{ catalogProductId: catalogProduct.id, dataUrl: mockup }],
+      catalogById,
+    );
+    if (withMockups) result = withMockups;
+  }
+
+  return result;
+}
+
 export async function createCollectionApi(payload: {
   shopId?: string;
   name: string;
@@ -258,10 +313,10 @@ export async function createCollectionApi(payload: {
   const body: Record<string, unknown> = {
     name: payload.name,
     productRefs,
-    preferredColors: payload.preferredColors || [],
+    preferredColors: cleanPreferredColors(payload.preferredColors),
   };
   if (payload.shopId) body.shopId = payload.shopId;
-  if (payload.artworkUrl) body.artworkUrl = payload.artworkUrl;
+  if (payload.artworkUrl) body.artworkUrl = remoteArtworkUrl(payload.artworkUrl);
   if (payload.isShopSpecific) body.isShopSpecific = true;
   const col = await apiFetch<Record<string, unknown>>("/collections", {
     method: "POST",

@@ -27,6 +27,7 @@ const productRef = z.object({
   brand: z.string().optional().default(''),
   name: z.string().min(1),
   group: z.string().optional().default(''),
+  mockupUrl: z.string().optional().default(''),
 });
 
 const createSchema = z.object({

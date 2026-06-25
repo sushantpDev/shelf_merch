@@ -12,6 +12,12 @@ const ACCESS_KEY = "sm_access";
 const REFRESH_KEY = "sm_refresh";
 const USER_KEY = "sm_user";
 
+function notifyAuthChange() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("sm:auth-change"));
+  }
+}
+
 export function getAccessToken(): string | null {
   return sessionStorage.getItem(ACCESS_KEY);
 }
@@ -38,12 +44,14 @@ export function setSession(tokens: {
   sessionStorage.setItem(ACCESS_KEY, tokens.accessToken);
   sessionStorage.setItem(REFRESH_KEY, tokens.refreshToken);
   sessionStorage.setItem(USER_KEY, JSON.stringify(tokens.user));
+  notifyAuthChange();
 }
 
 export function clearSession() {
   sessionStorage.removeItem(ACCESS_KEY);
   sessionStorage.removeItem(REFRESH_KEY);
   sessionStorage.removeItem(USER_KEY);
+  notifyAuthChange();
 }
 
 export function isAuthenticated(): boolean {

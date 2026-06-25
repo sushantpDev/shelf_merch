@@ -53,6 +53,7 @@ import {
 } from './modules/catalog/platformCatalog.routes.js';
 import { platformKitsRouter } from './modules/kits/platformKits.routes.js';
 import mediaRoutes from './modules/media/media.routes.js';
+import chatRoutes from './modules/chat/chat.routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -110,6 +111,7 @@ export function createApp() {
   api.use('/invoices', invoicesRoutes);
   api.use('/orders', ordersRoutes);
   api.use('/support-tickets', tenantSupportRouter);
+  api.use('/chat', chatRoutes);
   // Platform control plane (SUPER_ADMIN_FLOW) — /api/v1/platform/*
   api.use('/platform/dashboard', platformDashboardRouter);
   api.use('/platform/products', platformProductsRouter);
