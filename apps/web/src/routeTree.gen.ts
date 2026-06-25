@@ -10,9 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PlatformRouteImport } from './routes/platform'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlatformIndexRouteImport } from './routes/platform.index'
+import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as ShopIdRouteImport } from './routes/shop.$id'
 import { Route as RedeemTokenRouteImport } from './routes/redeem.$token'
 import { Route as PlatformTenantsRouteImport } from './routes/platform.tenants'
@@ -28,6 +30,8 @@ import { Route as PlatformFinanceRouteImport } from './routes/platform.finance'
 import { Route as PlatformDashboardRouteImport } from './routes/platform.dashboard'
 import { Route as PlatformCatalogRouteImport } from './routes/platform.catalog'
 import { Route as PlatformAuditRouteImport } from './routes/platform.audit'
+import { Route as AppSettingsRouteImport } from './routes/app.settings'
+import { Route as AppContactsRouteImport } from './routes/app.contacts'
 import { Route as PlatformOrdersIndexRouteImport } from './routes/platform.orders.index'
 import { Route as PlatformKitsIndexRouteImport } from './routes/platform.kits.index'
 import { Route as PlatformCatalogIndexRouteImport } from './routes/platform.catalog.index'
@@ -44,6 +48,11 @@ const PlatformRoute = PlatformRouteImport.update({
   path: '/platform',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AcceptInviteRoute = AcceptInviteRouteImport.update({
   id: '/accept-invite',
   path: '/accept-invite',
@@ -58,6 +67,11 @@ const PlatformIndexRoute = PlatformIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => PlatformRoute,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
 } as any)
 const ShopIdRoute = ShopIdRouteImport.update({
   id: '/shop/$id',
@@ -134,6 +148,16 @@ const PlatformAuditRoute = PlatformAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => PlatformRoute,
 } as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppContactsRoute = AppContactsRouteImport.update({
+  id: '/contacts',
+  path: '/contacts',
+  getParentRoute: () => AppRoute,
+} as any)
 const PlatformOrdersIndexRoute = PlatformOrdersIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -188,7 +212,10 @@ const PlatformCatalogIdRoute = PlatformCatalogIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accept-invite': typeof AcceptInviteRoute
+  '/app': typeof AppRouteWithChildren
   '/platform': typeof PlatformRouteWithChildren
+  '/app/contacts': typeof AppContactsRoute
+  '/app/settings': typeof AppSettingsRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/platform/catalog': typeof PlatformCatalogRouteWithChildren
   '/platform/dashboard': typeof PlatformDashboardRoute
@@ -204,6 +231,7 @@ export interface FileRoutesByFullPath {
   '/platform/tenants': typeof PlatformTenantsRoute
   '/redeem/$token': typeof RedeemTokenRoute
   '/shop/$id': typeof ShopIdRoute
+  '/app/': typeof AppIndexRoute
   '/platform/': typeof PlatformIndexRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
   '/platform/catalog/import': typeof PlatformCatalogImportRoute
@@ -219,6 +247,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accept-invite': typeof AcceptInviteRoute
+  '/app/contacts': typeof AppContactsRoute
+  '/app/settings': typeof AppSettingsRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/finance': typeof PlatformFinanceRoute
@@ -231,6 +261,7 @@ export interface FileRoutesByTo {
   '/platform/tenants': typeof PlatformTenantsRoute
   '/redeem/$token': typeof RedeemTokenRoute
   '/shop/$id': typeof ShopIdRoute
+  '/app': typeof AppIndexRoute
   '/platform': typeof PlatformIndexRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
   '/platform/catalog/import': typeof PlatformCatalogImportRoute
@@ -247,7 +278,10 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/accept-invite': typeof AcceptInviteRoute
+  '/app': typeof AppRouteWithChildren
   '/platform': typeof PlatformRouteWithChildren
+  '/app/contacts': typeof AppContactsRoute
+  '/app/settings': typeof AppSettingsRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/platform/catalog': typeof PlatformCatalogRouteWithChildren
   '/platform/dashboard': typeof PlatformDashboardRoute
@@ -263,6 +297,7 @@ export interface FileRoutesById {
   '/platform/tenants': typeof PlatformTenantsRoute
   '/redeem/$token': typeof RedeemTokenRoute
   '/shop/$id': typeof ShopIdRoute
+  '/app/': typeof AppIndexRoute
   '/platform/': typeof PlatformIndexRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
   '/platform/catalog/import': typeof PlatformCatalogImportRoute
@@ -280,7 +315,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/accept-invite'
+    | '/app'
     | '/platform'
+    | '/app/contacts'
+    | '/app/settings'
     | '/platform/audit'
     | '/platform/catalog'
     | '/platform/dashboard'
@@ -296,6 +334,7 @@ export interface FileRouteTypes {
     | '/platform/tenants'
     | '/redeem/$token'
     | '/shop/$id'
+    | '/app/'
     | '/platform/'
     | '/platform/catalog/$id'
     | '/platform/catalog/import'
@@ -311,6 +350,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/accept-invite'
+    | '/app/contacts'
+    | '/app/settings'
     | '/platform/audit'
     | '/platform/dashboard'
     | '/platform/finance'
@@ -323,6 +364,7 @@ export interface FileRouteTypes {
     | '/platform/tenants'
     | '/redeem/$token'
     | '/shop/$id'
+    | '/app'
     | '/platform'
     | '/platform/catalog/$id'
     | '/platform/catalog/import'
@@ -338,7 +380,10 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/accept-invite'
+    | '/app'
     | '/platform'
+    | '/app/contacts'
+    | '/app/settings'
     | '/platform/audit'
     | '/platform/catalog'
     | '/platform/dashboard'
@@ -354,6 +399,7 @@ export interface FileRouteTypes {
     | '/platform/tenants'
     | '/redeem/$token'
     | '/shop/$id'
+    | '/app/'
     | '/platform/'
     | '/platform/catalog/$id'
     | '/platform/catalog/import'
@@ -370,6 +416,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AcceptInviteRoute: typeof AcceptInviteRoute
+  AppRoute: typeof AppRouteWithChildren
   PlatformRoute: typeof PlatformRouteWithChildren
   RedeemTokenRoute: typeof RedeemTokenRoute
   ShopIdRoute: typeof ShopIdRoute
@@ -382,6 +429,13 @@ declare module '@tanstack/react-router' {
       path: '/platform'
       fullPath: '/platform'
       preLoaderRoute: typeof PlatformRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/accept-invite': {
@@ -404,6 +458,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/platform/'
       preLoaderRoute: typeof PlatformIndexRouteImport
       parentRoute: typeof PlatformRoute
+    }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
     }
     '/shop/$id': {
       id: '/shop/$id'
@@ -510,6 +571,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlatformAuditRouteImport
       parentRoute: typeof PlatformRoute
     }
+    '/app/settings': {
+      id: '/app/settings'
+      path: '/settings'
+      fullPath: '/app/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/contacts': {
+      id: '/app/contacts'
+      path: '/contacts'
+      fullPath: '/app/contacts'
+      preLoaderRoute: typeof AppContactsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/platform/orders/': {
       id: '/platform/orders/'
       path: '/'
@@ -582,6 +657,20 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AppRouteChildren {
+  AppContactsRoute: typeof AppContactsRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppIndexRoute: typeof AppIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppContactsRoute: AppContactsRoute,
+  AppSettingsRoute: AppSettingsRoute,
+  AppIndexRoute: AppIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 interface PlatformCatalogRouteChildren {
   PlatformCatalogIdRoute: typeof PlatformCatalogIdRoute
@@ -674,6 +763,7 @@ const PlatformRouteWithChildren = PlatformRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AcceptInviteRoute: AcceptInviteRoute,
+  AppRoute: AppRouteWithChildren,
   PlatformRoute: PlatformRouteWithChildren,
   RedeemTokenRoute: RedeemTokenRoute,
   ShopIdRoute: ShopIdRoute,

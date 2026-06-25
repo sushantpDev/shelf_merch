@@ -231,7 +231,10 @@ function syncAuthState(){
   S.authed=false; S.view='login';
 }
 function go(view, opts={}){ S.view=view; if(opts.nav)S.nav=opts.nav; Object.assign(S.flow, opts.flow||{}); if(view==='contacts')S.flow.contactsSearch=''; window.scrollTo(0,0); render(); }
+// Views migrated to the React app at /app/* — clicking them hands off to React.
+const MIGRATED_VIEWS = new Set(['settings','contacts']);
 async function setNav(n){
+  if(MIGRATED_VIEWS.has(n)){ window.location.assign('/app/'+n); return; }
   S.nav=n; S.view=n; closeLayer();
   if(n==='contacts'){ S.flow.contactsSearch=''; }
   render();
@@ -5244,6 +5247,13 @@ async function init(){
     api.applyWorkspaceToState(S,snapshot);
     markSessionActive();
     S.authed=true; S.nav='orders'; S.view='orders';
+    // Honour a deep-link from the React app (e.g. /?view=wallets); migrated
+    // views bounce straight to /app/*.
+    const deepView=new URLSearchParams(location.search).get('view');
+    if(deepView){
+      if(MIGRATED_VIEWS.has(deepView)){ window.location.replace('/app/'+deepView); return; }
+      S.nav=deepView; S.view=deepView;
+    }
   }else{
     if(gen!==bootState.gen||S.authed){
       appLoadingEnd();
