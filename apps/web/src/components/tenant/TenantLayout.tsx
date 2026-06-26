@@ -39,7 +39,7 @@ const NAV_SECTIONS: NavSection[] = [
       { key: "orders", label: "Orders", icon: Receipt, migrated: true },
       { key: "wallets", label: "Wallets", icon: Wallet, migrated: true },
       { key: "shops", label: "Shops", icon: Store, migrated: true },
-      { key: "swag", label: "Swag", icon: Shirt, migrated: false },
+      { key: "swag", label: "Swag", icon: Shirt, migrated: true },
       { key: "kits", label: "Kits", icon: Gift, migrated: false },
       { key: "campaigns", label: "Campaigns", icon: Megaphone, migrated: false },
     ],
@@ -70,11 +70,13 @@ const MIGRATED_APP_PATHS: Partial<
     | "/app/wallets"
     | "/app/catalog"
     | "/app/shops"
+    | "/app/swag"
   >
 > = {
   orders: "/app/orders",
   wallets: "/app/wallets",
   shops: "/app/shops",
+  swag: "/app/swag",
   contacts: "/app/contacts",
   settings: "/app/settings",
   catalog: "/app/catalog",
