@@ -1,6 +1,7 @@
 import { type Dispatch, useState } from "react";
 import { Briefcase, Coffee, Dumbbell, Gem, Pencil, Shirt, Sparkles, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FullscreenOverlay } from "@/components/tenant/FullscreenOverlay";
 import {
   BANNER_THEMES,
   SHOP_BANNER_PRESETS,
@@ -43,7 +44,7 @@ export function ShopBuilderStep({
   const hasPreset = Boolean(draft.bannerPreset);
 
   return (
-    <div className="sm-fullscreen" style={{ background: "var(--bg)" }}>
+    <FullscreenOverlay style={{ background: "var(--bg)" }}>
       <div
         style={{
           height: 60,
@@ -278,6 +279,6 @@ export function ShopBuilderStep({
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </FullscreenOverlay>
   );
 }

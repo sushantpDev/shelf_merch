@@ -2,6 +2,7 @@ import { useReducer, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { FullscreenOverlay } from "@/components/tenant/FullscreenOverlay";
 import { bannerConfigFromSource } from "./banner";
 import { useCreateShop } from "./hooks";
 import { ShopBuilderStep } from "./ShopBuilderStep";
@@ -117,7 +118,7 @@ export function CreateShopWizard() {
   }
 
   return (
-    <div className="sm-fullscreen" style={{ background: "#0E1E16" }}>
+    <FullscreenOverlay style={{ background: "#0E1E16" }}>
       <div style={{ flex: 1, display: "grid", placeItems: "center", padding: 24 }}>
         <div
           className="card"
@@ -307,6 +308,6 @@ export function CreateShopWizard() {
           </div>
         </div>
       </div>
-    </div>
+    </FullscreenOverlay>
   );
 }

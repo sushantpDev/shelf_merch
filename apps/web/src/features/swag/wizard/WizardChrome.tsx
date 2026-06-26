@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import type { ReactNode } from "react";
+import { FullscreenOverlay } from "@/components/tenant/FullscreenOverlay";
 
 /** Full-screen wizard shell: title bar + step indicator + scroll body + footer. */
 export function WizardChrome({
@@ -20,7 +21,7 @@ export function WizardChrome({
   children: ReactNode;
 }) {
   return (
-    <div className="sm-fullscreen" style={{ background: "var(--bg)" }}>
+    <FullscreenOverlay style={{ background: "var(--bg)" }}>
       <div className="wzbar">
         <div className="title">{title}</div>
         <div className="wzsteps">
@@ -49,6 +50,6 @@ export function WizardChrome({
         </div>
       </div>
       {footer && <div className="wzfoot">{footer}</div>}
-    </div>
+    </FullscreenOverlay>
   );
 }
