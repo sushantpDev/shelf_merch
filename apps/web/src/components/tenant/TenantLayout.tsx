@@ -60,21 +60,14 @@ const NAV_SECTIONS: NavSection[] = [
       { key: "catalog", label: "Catalog", icon: LayoutGrid, migrated: false },
     ],
   },
-=======
-const NAV: NavItem[] = [
-  { key: "orders", label: "Orders", icon: Receipt, migrated: true },
-  { key: "wallets", label: "Wallets", icon: Wallet, migrated: true },
-  { key: "shops", label: "Shops", icon: Store, migrated: false },
-  { key: "swag", label: "Swag", icon: Shirt, migrated: false },
-  { key: "kits", label: "Kits", icon: Gift, migrated: false },
-  { key: "campaigns", label: "Campaigns", icon: Megaphone, migrated: false },
-  { key: "contacts", label: "Contacts", icon: Users, migrated: true },
-  { key: "integrations", label: "Integrations", icon: Plug, migrated: false },
-  { key: "billing", label: "Billing", icon: CreditCard, migrated: false },
-  { key: "settings", label: "Settings", icon: Settings, migrated: true },
-  { key: "catalog", label: "Catalog", icon: LayoutGrid, migrated: true },
-
 ];
+
+const MIGRATED_APP_PATHS: Partial<
+  Record<string, "/app/contacts" | "/app/settings" | "/app/orders" | "/app/wallets" | "/app/catalog">
+> = {
+  contacts: "/app/contacts",
+  settings: "/app/settings",
+};
 
 function initialsOf(name: string) {
   return (
@@ -145,11 +138,14 @@ function SidebarNavItem({
   );
 
   if (item.migrated) {
-    return (
-      <Link to={`/app/${item.key}`} className={className}>
-        {inner}
-      </Link>
-    );
+    const to = MIGRATED_APP_PATHS[item.key];
+    if (to) {
+      return (
+        <Link to={to} className={className}>
+          {inner}
+        </Link>
+      );
+    }
   }
 
   return (
