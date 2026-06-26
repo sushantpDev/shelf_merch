@@ -39,12 +39,15 @@ export function idempotency({ required = false } = {}) {
 
     const originalJson = res.json.bind(res);
     res.json = (payload) => {
-      if (res.statusCode < 400) {
-        completeIdempotency(scope, { statusCode: res.statusCode, response: payload }).catch(() => {});
-      } else {
-        releaseIdempotency(scope).catch(() => {});
-      }
-      return originalJson(payload);
+      // Persist (or release) the idempotency record BEFORE flushing the
+      // response, so a replay that arrives the instant the caller receives
+      // this response reliably sees a completed key instead of a pending one.
+      const persist =
+        res.statusCode < 400
+          ? completeIdempotency(scope, { statusCode: res.statusCode, response: payload })
+          : releaseIdempotency(scope);
+      persist.catch(() => {}).finally(() => originalJson(payload));
+      return res;
     };
     next();
   };
