@@ -38,7 +38,7 @@ function formatWalletBalance(workspace: WorkspaceSnapshot | undefined) {
   const amount =
     workspace.org.active && workspace.org.wallet.amount != null
       ? workspace.org.wallet.amount
-      : workspace.wallets[0]?.balance ?? 0;
+      : (workspace.wallets[0]?.balance ?? 0);
   return `₹${Math.round(amount).toLocaleString("en-IN")}`;
 }
 
@@ -95,7 +95,7 @@ export default function TenantLayout() {
         </div>
         <div className="spacer" />
         <div className="topbar-right">
-          <a href="/?view=wallets" className="topbar-wallet" aria-label="Wallet balance">
+          <Link to="/app/wallets" className="topbar-wallet" aria-label="Wallet balance">
             <span className="topbar-wallet-icon">
               <img src={walletIconImg} alt="" className="topbar-wallet-img" aria-hidden="true" />
             </span>
@@ -106,7 +106,7 @@ export default function TenantLayout() {
                 <TopbarChevron />
               </span>
             </span>
-          </a>
+          </Link>
           <Link to="/app/settings" className="topbar-user" aria-label="Account menu">
             <span className="topbar-user-avatar">{initialsOf(userName)}</span>
             <span className="topbar-user-copy">

@@ -1,0 +1,289 @@
+import { useEffect, useRef, useState } from "react";
+import { Upload } from "lucide-react";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { UiShop } from "@/services/mappers";
+import {
+  BANNER_THEMES,
+  SHOP_BANNER_PRESETS,
+  ShopBanner,
+  bannerConfigFromSource,
+  bannerPresetKey,
+  bannerThemeKey,
+} from "./banner";
+import { useUpdateShop } from "./hooks";
+
+const LOGO_ACCEPT = /\.(svg|png|webp|jpe?g)$/i;
+const LOGO_MAX = 5 * 1024 * 1024;
+
+type EditorState = { theme: string; preset: string; logoUrl: string };
+
+export function BannerEditorDialog({
+  shop,
+  onOpenChange,
+}: {
+  shop: UiShop | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const updateShop = useUpdateShop();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [state, setState] = useState<EditorState>({ theme: "light", preset: "", logoUrl: "" });
+
+  useEffect(() => {
+    if (shop) {
+      setState({
+        theme: bannerThemeKey(shop),
+        preset: bannerPresetKey(shop),
+        logoUrl: shop.logoUrl || "",
+      });
+    }
+  }, [shop]);
+
+  function onPickLogo(file: File) {
+    if (!LOGO_ACCEPT.test(file.name)) {
+      toast.error("Accepted formats: SVG, PNG, WEBP, JPEG, JPG");
+      return;
+    }
+    if (file.size > LOGO_MAX) {
+      toast.error("File must be 5 MB or smaller");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setState((s) => ({ ...s, logoUrl: String(reader.result) }));
+    reader.readAsDataURL(file);
+  }
+
+  async function onSave() {
+    if (!shop) return;
+    try {
+      await updateShop.mutateAsync({
+        shopId: shop.id,
+        input: {
+          logoUrl: state.logoUrl,
+          bannerConfig: bannerConfigFromSource({
+            bannerTheme: state.theme,
+            bannerPreset: state.preset,
+          }),
+        },
+      });
+      toast.success("Shop look updated");
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save shop changes");
+    }
+  }
+
+  const previewSource = {
+    bannerTheme: state.theme,
+    bannerPreset: state.preset,
+    logoUrl: state.logoUrl,
+  };
+
+  return (
+    <Dialog open={shop !== null} onOpenChange={onOpenChange}>
+      <DialogContent className="sm-modal">
+        {shop && (
+          <div className="modal-pad">
+            <DialogHeader>
+              <DialogTitle>Edit shop look</DialogTitle>
+              <DialogDescription className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+                Update the banner and logo for <b>{shop.name}</b>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div
+              style={{
+                margin: "16px 0 20px",
+                borderRadius: "var(--r)",
+                overflow: "hidden",
+                border: "1px solid var(--line)",
+              }}
+            >
+              <ShopBanner
+                source={previewSource}
+                height={108}
+                layout="center"
+                logoSize={48}
+                radius={10}
+              />
+            </div>
+
+            <div className="lbl">Banner image</div>
+            <p className="mut3" style={{ fontSize: 12, margin: "4px 0 8px" }}>
+              Pick a ready-made banner for your shop storefront.
+            </p>
+            <div
+              className="grid"
+              style={{
+                gridTemplateColumns: "repeat(3,1fr)",
+                gap: 10,
+                maxHeight: 220,
+                overflow: "auto",
+                paddingRight: 4,
+              }}
+            >
+              {SHOP_BANNER_PRESETS.map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`optcard banner-preset-card ${state.preset === id ? "on" : ""}`}
+                  aria-pressed={state.preset === id}
+                  onClick={() => setState((s) => ({ ...s, preset: id }))}
+                >
+                  <img
+                    src={`/shop-banners/${id}.png`}
+                    alt={label}
+                    loading="lazy"
+                    className="banner-preset-thumb"
+                    width={160}
+                    height={52}
+                  />
+                  <span className="banner-preset-label">{label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="lbl" style={{ marginTop: 18 }}>
+              Solid color
+            </div>
+            <div
+              className="grid"
+              style={{ gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginTop: 8 }}
+            >
+              {Object.keys(BANNER_THEMES).map((k) => {
+                const t = BANNER_THEMES[k];
+                const swatch = t.dots
+                  ? {
+                      backgroundImage: `radial-gradient(rgba(255,255,255,.18) 1.4px,transparent 1.4px),${t.bg.startsWith("linear-gradient") ? t.bg : `linear-gradient(${t.bg},${t.bg})`}`,
+                      backgroundSize: "14px 14px,auto",
+                    }
+                  : { background: t.bg };
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    className={`optcard ${state.theme === k && !state.preset ? "on" : ""}`}
+                    style={{ padding: 12, textAlign: "center" }}
+                    aria-pressed={state.theme === k && !state.preset}
+                    onClick={() => setState((s) => ({ ...s, theme: k, preset: "" }))}
+                  >
+                    <div style={{ height: 40, borderRadius: 8, ...swatch }} />
+                    <div
+                      style={{
+                        fontSize: 12,
+                        marginTop: 8,
+                        fontWeight: 600,
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {k}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="lbl" style={{ marginTop: 18 }}>
+              Shop logo
+            </div>
+            <div style={{ marginTop: 8 }}>
+              {state.logoUrl ? (
+                <div
+                  className="row"
+                  style={{
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    border: "1px solid var(--brand)",
+                    borderRadius: "var(--r-sm)",
+                    padding: "12px 14px",
+                    background: "var(--brand-50)",
+                  }}
+                >
+                  <div className="row" style={{ gap: 10, alignItems: "center" }}>
+                    <div
+                      className="logo-chip"
+                      style={{ width: 42, height: 42, overflow: "hidden", padding: 4 }}
+                    >
+                      <img
+                        src={state.logoUrl}
+                        alt="Shop logo"
+                        style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                      />
+                    </div>
+                    <div className="mut3" style={{ fontSize: 11 }}>
+                      PNG, SVG, WEBP or JPEG · max 5 MB
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="xbtn"
+                    aria-label="Remove logo"
+                    onClick={() => setState((s) => ({ ...s, logoUrl: "" }))}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  style={{
+                    width: "100%",
+                    border: "1.5px dashed var(--line)",
+                    borderRadius: "var(--r-sm)",
+                    padding: 24,
+                    textAlign: "center",
+                    color: "var(--ink-2)",
+                    background: "#fff",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <Upload size={20} />
+                  <div style={{ fontWeight: 600, marginTop: 6 }}>Upload shop logo</div>
+                  <div className="mut3" style={{ fontSize: 11.5, marginTop: 6 }}>
+                    SVG, PNG, WEBP, JPEG · max 5 MB
+                  </div>
+                </button>
+              )}
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".svg,.png,.webp,.jpeg,.jpg,image/svg+xml,image/png,image/webp,image/jpeg"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) onPickLogo(f);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+
+            <div className="row" style={{ marginTop: 22 }}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-block"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-brand btn-block"
+                disabled={updateShop.isPending}
+                onClick={onSave}
+              >
+                {updateShop.isPending ? "Saving…" : "Save changes"}
+              </button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
