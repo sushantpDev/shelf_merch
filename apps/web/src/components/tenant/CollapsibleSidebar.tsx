@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type MouseEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type MouseEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
@@ -61,8 +69,8 @@ const NAV_ITEMS: SidebarNavItem[] = [
     href: "/app/wallets",
     internal: true,
   },
-  { key: "shops", label: "Shops", icon: Store, href: "/?view=shops" },
-  { key: "swag", label: "Swag", icon: Shirt, href: "/?view=swag" },
+  { key: "shops", label: "Shops", icon: Store, href: "/app/shops", internal: true },
+  { key: "swag", label: "Swag", icon: Shirt, href: "/app/swag", internal: true },
   { key: "kits", label: "Kits", icon: Gift, href: "/?view=kits" },
   { key: "campaigns", label: "Campaigns", icon: Megaphone, href: "/?view=campaigns" },
   {
@@ -98,11 +106,7 @@ function readExpandedPreference(): boolean {
   }
 }
 
-function isItemActive(
-  item: SidebarNavItem,
-  pathname: string,
-  legacyActiveKey?: string,
-): boolean {
+function isItemActive(item: SidebarNavItem, pathname: string, legacyActiveKey?: string): boolean {
   if (legacyActiveKey !== undefined) {
     if (item.internal || item.key === "home") return false;
     return item.key === legacyActiveKey;
@@ -142,7 +146,8 @@ function SidebarNavLink({
   const hoverHandlers = expanded
     ? {}
     : {
-        onMouseEnter: (event: MouseEvent<HTMLElement>) => onItemHover(item.label, event.currentTarget),
+        onMouseEnter: (event: MouseEvent<HTMLElement>) =>
+          onItemHover(item.label, event.currentTarget),
         onMouseLeave: onItemLeave,
         onFocus: (event: FocusEvent<HTMLElement>) => onItemHover(item.label, event.currentTarget),
         onBlur: onItemLeave,
@@ -156,11 +161,7 @@ function SidebarNavLink({
 
   if (legacyMode && !item.internal) {
     return (
-      <button
-        type="button"
-        {...linkProps}
-        onClick={() => window.__shelfMerchNavigate?.(item.key)}
-      >
+      <button type="button" {...linkProps} onClick={() => window.__shelfMerchNavigate?.(item.key)}>
         {content}
       </button>
     );
@@ -294,10 +295,7 @@ export function CollapsibleSidebar({ legacyActiveKey }: CollapsibleSidebarProps 
       {!expanded &&
         flyout &&
         createPortal(
-          <span
-            className="sidebar-rail__flyout"
-            style={{ top: flyout.top, left: flyout.left }}
-          >
+          <span className="sidebar-rail__flyout" style={{ top: flyout.top, left: flyout.left }}>
             {flyout.label}
           </span>,
           document.body,

@@ -8,67 +8,8 @@ import type { WorkspaceSnapshot } from "@/services/workspace-api";
 import walletIconImg from "../../../assets/wallet-icon.svg";
 import "@/styles/shelf-merch.css";
 
-type NavItem = {
-  key: string;
-  label: string;
-  icon: ComponentType<{ size?: number }>;
-  migrated: boolean;
-};
-
-type NavSection = {
-  label: string;
-  items: NavItem[];
-};
-
-const NAV_SECTIONS: NavSection[] = [
-  {
-    label: "Workspace",
-    items: [
-      { key: "orders", label: "Orders", icon: Receipt, migrated: true },
-      { key: "wallets", label: "Wallets", icon: Wallet, migrated: true },
-      { key: "shops", label: "Shops", icon: Store, migrated: true },
-      { key: "swag", label: "Swag", icon: Shirt, migrated: true },
-      { key: "kits", label: "Kits", icon: Gift, migrated: false },
-      { key: "campaigns", label: "Campaigns", icon: Megaphone, migrated: false },
-    ],
-  },
-  {
-    label: "People & tools",
-    items: [
-      { key: "contacts", label: "Contacts", icon: Users, migrated: true },
-      { key: "integrations", label: "Integrations", icon: Plug, migrated: false },
-    ],
-  },
-  {
-    label: "Admin",
-    items: [
-      { key: "billing", label: "Billing", icon: CreditCard, migrated: false },
-      { key: "settings", label: "Settings", icon: Settings, migrated: true },
-      { key: "catalog", label: "Catalog", icon: LayoutGrid, migrated: true },
-    ],
-  },
-];
-
-const MIGRATED_APP_PATHS: Partial<
-  Record<
-    string,
-    | "/app/contacts"
-    | "/app/settings"
-    | "/app/orders"
-    | "/app/wallets"
-    | "/app/catalog"
-    | "/app/shops"
-    | "/app/swag"
-  >
-> = {
-  orders: "/app/orders",
-  wallets: "/app/wallets",
-  shops: "/app/shops",
-  swag: "/app/swag",
-  contacts: "/app/contacts",
-  settings: "/app/settings",
-  catalog: "/app/catalog",
-};
+// The workspace navigation now lives in <CollapsibleSidebar/>; this layout only
+// renders the topbar + sidebar shell.
 
 function initialsOf(name: string) {
   return (
