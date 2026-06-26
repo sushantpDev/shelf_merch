@@ -30,8 +30,11 @@ import { Route as PlatformFinanceRouteImport } from './routes/platform.finance'
 import { Route as PlatformDashboardRouteImport } from './routes/platform.dashboard'
 import { Route as PlatformCatalogRouteImport } from './routes/platform.catalog'
 import { Route as PlatformAuditRouteImport } from './routes/platform.audit'
+import { Route as AppWalletsRouteImport } from './routes/app.wallets'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
+import { Route as AppOrdersRouteImport } from './routes/app.orders'
 import { Route as AppContactsRouteImport } from './routes/app.contacts'
+import { Route as AppCatalogRouteImport } from './routes/app.catalog'
 import { Route as PlatformOrdersIndexRouteImport } from './routes/platform.orders.index'
 import { Route as PlatformKitsIndexRouteImport } from './routes/platform.kits.index'
 import { Route as PlatformCatalogIndexRouteImport } from './routes/platform.catalog.index'
@@ -148,14 +151,29 @@ const PlatformAuditRoute = PlatformAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => PlatformRoute,
 } as any)
+const AppWalletsRoute = AppWalletsRouteImport.update({
+  id: '/wallets',
+  path: '/wallets',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
+const AppOrdersRoute = AppOrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppContactsRoute = AppContactsRouteImport.update({
   id: '/contacts',
   path: '/contacts',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCatalogRoute = AppCatalogRouteImport.update({
+  id: '/catalog',
+  path: '/catalog',
   getParentRoute: () => AppRoute,
 } as any)
 const PlatformOrdersIndexRoute = PlatformOrdersIndexRouteImport.update({
@@ -214,8 +232,11 @@ export interface FileRoutesByFullPath {
   '/accept-invite': typeof AcceptInviteRoute
   '/app': typeof AppRouteWithChildren
   '/platform': typeof PlatformRouteWithChildren
+  '/app/catalog': typeof AppCatalogRoute
   '/app/contacts': typeof AppContactsRoute
+  '/app/orders': typeof AppOrdersRoute
   '/app/settings': typeof AppSettingsRoute
+  '/app/wallets': typeof AppWalletsRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/platform/catalog': typeof PlatformCatalogRouteWithChildren
   '/platform/dashboard': typeof PlatformDashboardRoute
@@ -247,8 +268,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accept-invite': typeof AcceptInviteRoute
+  '/app/catalog': typeof AppCatalogRoute
   '/app/contacts': typeof AppContactsRoute
+  '/app/orders': typeof AppOrdersRoute
   '/app/settings': typeof AppSettingsRoute
+  '/app/wallets': typeof AppWalletsRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/finance': typeof PlatformFinanceRoute
@@ -280,8 +304,11 @@ export interface FileRoutesById {
   '/accept-invite': typeof AcceptInviteRoute
   '/app': typeof AppRouteWithChildren
   '/platform': typeof PlatformRouteWithChildren
+  '/app/catalog': typeof AppCatalogRoute
   '/app/contacts': typeof AppContactsRoute
+  '/app/orders': typeof AppOrdersRoute
   '/app/settings': typeof AppSettingsRoute
+  '/app/wallets': typeof AppWalletsRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/platform/catalog': typeof PlatformCatalogRouteWithChildren
   '/platform/dashboard': typeof PlatformDashboardRoute
@@ -317,8 +344,11 @@ export interface FileRouteTypes {
     | '/accept-invite'
     | '/app'
     | '/platform'
+    | '/app/catalog'
     | '/app/contacts'
+    | '/app/orders'
     | '/app/settings'
+    | '/app/wallets'
     | '/platform/audit'
     | '/platform/catalog'
     | '/platform/dashboard'
@@ -350,8 +380,11 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/accept-invite'
+    | '/app/catalog'
     | '/app/contacts'
+    | '/app/orders'
     | '/app/settings'
+    | '/app/wallets'
     | '/platform/audit'
     | '/platform/dashboard'
     | '/platform/finance'
@@ -382,8 +415,11 @@ export interface FileRouteTypes {
     | '/accept-invite'
     | '/app'
     | '/platform'
+    | '/app/catalog'
     | '/app/contacts'
+    | '/app/orders'
     | '/app/settings'
+    | '/app/wallets'
     | '/platform/audit'
     | '/platform/catalog'
     | '/platform/dashboard'
@@ -571,6 +607,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlatformAuditRouteImport
       parentRoute: typeof PlatformRoute
     }
+    '/app/wallets': {
+      id: '/app/wallets'
+      path: '/wallets'
+      fullPath: '/app/wallets'
+      preLoaderRoute: typeof AppWalletsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/settings': {
       id: '/app/settings'
       path: '/settings'
@@ -578,11 +621,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/orders': {
+      id: '/app/orders'
+      path: '/orders'
+      fullPath: '/app/orders'
+      preLoaderRoute: typeof AppOrdersRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/contacts': {
       id: '/app/contacts'
       path: '/contacts'
       fullPath: '/app/contacts'
       preLoaderRoute: typeof AppContactsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/catalog': {
+      id: '/app/catalog'
+      path: '/catalog'
+      fullPath: '/app/catalog'
+      preLoaderRoute: typeof AppCatalogRouteImport
       parentRoute: typeof AppRoute
     }
     '/platform/orders/': {
@@ -659,14 +716,20 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppCatalogRoute: typeof AppCatalogRoute
   AppContactsRoute: typeof AppContactsRoute
+  AppOrdersRoute: typeof AppOrdersRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppWalletsRoute: typeof AppWalletsRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppCatalogRoute: AppCatalogRoute,
   AppContactsRoute: AppContactsRoute,
+  AppOrdersRoute: AppOrdersRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppWalletsRoute: AppWalletsRoute,
   AppIndexRoute: AppIndexRoute,
 }
 

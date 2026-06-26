@@ -269,7 +269,7 @@ function notifyViewChange(){
 }
 function go(view, opts={}){ S.view=view; if(opts.nav)S.nav=opts.nav; Object.assign(S.flow, opts.flow||{}); if(view==='contacts')S.flow.contactsSearch=''; window.scrollTo(0,0); render(); }
 // Views migrated to the React app at /app/* — clicking them hands off to React.
-const MIGRATED_VIEWS = new Set(['settings','contacts']);
+const MIGRATED_VIEWS = new Set(['settings','contacts','wallets','orders','catalog']);
 async function setNav(n){
   if(MIGRATED_VIEWS.has(n)){ window.location.assign('/app/'+n); return; }
   S.nav=n; S.view=n; closeLayer();
@@ -322,6 +322,10 @@ function render(){
     APP().innerHTML = loadingHtml();
   }else if(!S.authed){
     APP().innerHTML = S.view==='signup'?ViewSignup():ViewLogin();
+  }else if(MIGRATED_VIEWS.has(S.view)){
+    // Authenticated landing/navigation onto a migrated view (e.g. post-login
+    // orders) hands off to the React app instead of rendering the legacy view.
+    window.location.assign('/app/'+S.view); return;
   }else if(FULLSCREEN_FLOW_VIEWS.includes(S.view)){
     APP().innerHTML = Wizards[S.view]();
     afterRender();
