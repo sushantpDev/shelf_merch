@@ -315,6 +315,7 @@ async function setNav(n){
     }
   }
 }
+if (typeof window !== 'undefined') window.__shelfMerchNavigate = (n) => { setNav(n); };
 
 function render(){
   syncAuthState();
@@ -353,9 +354,7 @@ function renderMain(){
   notifyViewChange();
 }
 function patchShellChrome(){
-  document.querySelectorAll('#app .sidebar .nav-item').forEach(el=>{
-    el.classList.toggle('on',el.dataset.arg===S.nav);
-  });
+  /* Sidebar active state is handled by React CollapsibleSidebar via sm:view-change. */
 }
 function afterRender(){
   // focus first autofocus
@@ -525,9 +524,7 @@ function Shell(inner){
     </div>
   </div>
   <div class="body">
-    <aside class="sidebar scroll">
-      ${sidebarNavHtml()}
-    </aside>
+    <div id="sidebar-root" class="sidebar-mount"></div>
     <main class="main scroll"><div class="wrap fade-in">${inner}</div></main>
   </div>
   `;

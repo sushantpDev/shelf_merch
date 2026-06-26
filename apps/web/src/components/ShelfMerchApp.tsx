@@ -2,6 +2,7 @@ import { useEffect } from "react";
 // Shared in-memory state object surfaced from the engine (see src/lib/shelf-merch.js)
 import { mountShelfMerch } from "@/lib/shelf-merch";
 import { LoadingState } from "@/components/LoadingState";
+import { LegacySidebarPortal } from "@/components/tenant/LegacySidebarPortal";
 import "@/styles/shelf-merch.css";
 
 /**
@@ -22,6 +23,7 @@ export default function ShelfMerchApp() {
       </div>
       <div id="toast" />
       <div id="layer" />
+      <LegacySidebarPortal />
     </>
   );
 }

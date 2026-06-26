@@ -1,19 +1,7 @@
-import { useEffect, type ComponentType } from "react";
-import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import {
-  CreditCard,
-  Gift,
-  LayoutGrid,
-  Megaphone,
-  Plug,
-  Receipt,
-  Settings,
-  Shirt,
-  Store,
-  Users,
-  Wallet,
-} from "lucide-react";
+import { useEffect } from "react";
+import { Link, Outlet } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
+import { CollapsibleSidebar } from "@/components/tenant/CollapsibleSidebar";
 import { getStoredUser, isAuthenticated } from "@/services/api-bridge";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import type { WorkspaceSnapshot } from "@/services/workspace-api";
@@ -133,37 +121,7 @@ function TopbarChevron() {
   );
 }
 
-function SidebarNavItem({ item, active }: { item: NavItem; active: boolean }) {
-  const className = `nav-item${active ? " on" : ""}`;
-  const inner = (
-    <>
-      <span className="nav-item-icon">
-        <item.icon size={17} />
-      </span>
-      <span className="nav-item-label">{item.label}</span>
-    </>
-  );
-
-  if (item.migrated) {
-    const to = MIGRATED_APP_PATHS[item.key];
-    if (to) {
-      return (
-        <Link to={to} className={className}>
-          {inner}
-        </Link>
-      );
-    }
-  }
-
-  return (
-    <a href={`/?view=${item.key}`} className={className}>
-      {inner}
-    </a>
-  );
-}
-
 export default function TenantLayout() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const user = getStoredUser();
   const { data: workspace } = useWorkspace();
 
@@ -223,23 +181,7 @@ export default function TenantLayout() {
       </header>
 
       <div className="body">
-        <nav className="sidebar scroll" aria-label="Workspace">
-          {NAV_SECTIONS.map((section) => (
-            <div key={section.label} className="sidebar-section">
-              <div className="nav-sec">{section.label}</div>
-              {section.items.map((item) => (
-                <SidebarNavItem
-                  key={item.key}
-                  item={item}
-                  active={
-                    pathname === `/app/${item.key}` ||
-                    (item.key === "orders" && pathname === "/app")
-                  }
-                />
-              ))}
-            </div>
-          ))}
-        </nav>
+        <CollapsibleSidebar />
 
         <main className="main scroll">
           <div className="wrap fade-in">
