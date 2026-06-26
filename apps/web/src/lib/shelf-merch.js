@@ -2,6 +2,9 @@
 // Wrapped so it mounts exactly once into #app/#toast/#layer when called from React.
 import * as api from '../services/api-bridge.js';
 import collectionPreview from '../../assets/collection-preview.png';
+import kitPreview from '../../assets/kit-preview.png';
+import kitPackagingNone from '../../assets/kit-packaging-none.png';
+import kitPackagingBox from '../../assets/kit-packaging-box.png';
 import startDesigningImg from '../../assets/start_designing.png';
 import shopCatalogImg from '../../assets/shop-catalog.png';
 import sentGiftsEmptyImg from '../../assets/sent-gifts-empty.png';
@@ -13,6 +16,18 @@ import workFromHomeKitImg from '../../assets/work-from-home-kit.png';
 import wellnessKitImg from '../../assets/wellness-kit.png';
 import megaphoneIllustration from '../../assets/megaphone_box.png'
 import swagBannerImg from '../../assets/swag-banner.png';
+import walletIconImg from "../../assets/wallet-icon.svg";
+import darwinboxIcon from '../../assets/integrations/darwinbox.jpg';
+import kekaIcon from '../../assets/integrations/keka.png';
+import bamboohrIcon from '../../assets/integrations/bamboohr.svg';
+import razorpayIcon from '../../assets/integrations/razorpay.svg';
+import shiprocketIcon from '../../assets/integrations/shiprocket.png';
+import slackIcon from '../../assets/integrations/slack.svg';
+import googleWorkspaceIcon from '../../assets/integrations/google-workspace.svg';
+import oktaIcon from '../../assets/integrations/okta.svg';
+import microsoftEntraIcon from '../../assets/integrations/microsoft-entra.svg';
+import auth0Icon from '../../assets/integrations/auth0.svg';
+import oneloginIcon from '../../assets/integrations/onelogin.svg';
 
 let __mounted = false;
 /** Survives Vite HMR so a hot reload does not reset authed state or re-run boot. */
@@ -29,6 +44,7 @@ export function mountShelfMerch() {
 /* ---------- icons ---------- */
 const I = {
   logo:`<svg viewBox="0 0 32 32" fill="none"><path d="M16 3 4 9l12 6 12-6-12-6Z" fill="#15784C"/><path d="M4 15l12 6 12-6" stroke="#0E5536" stroke-width="2.4" stroke-linejoin="round"/><path d="M4 21l12 6 12-6" stroke="#1E8E5C" stroke-width="2.4" stroke-linejoin="round"/></svg>`,
+  logoWhite:`<svg viewBox="0 0 32 32" fill="none"><path d="M16 3 4 9l12 6 12-6-12-6Z" fill="#fff"/><path d="M4 15l12 6 12-6" stroke="#fff" stroke-width="2.4" stroke-linejoin="round" opacity=".92"/><path d="M4 21l12 6 12-6" stroke="#fff" stroke-width="2.4" stroke-linejoin="round" opacity=".78"/></svg>`,
   home:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>`,
   orders:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h12"/></svg>`,
   wallet:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M16 12h2"/></svg>`,
@@ -186,12 +202,27 @@ if (typeof window !== 'undefined') window.__shelfMerchState = S;
 const nid = p => p+(++S.uid);
 
 /* ---------- nav config ---------- */
-const NAV = [
-  ['orders','Orders',I.orders],['wallets','Wallets',I.wallet],['shops','Shops',I.shop],
-  ['swag','Swag',I.swag],['kits','Kits',I.kit],['campaigns','Campaigns',I.camp],
-  ['contacts','Contacts',I.contacts],['integrations','Integrations',I.plug],
-  ['billing','Billing',I.bill],['settings','Settings',I.gear],['catalog','Catalog',I.cat],
+const NAV_SECTIONS = [
+  { label:'Workspace', items:[
+    ['orders','Orders',I.orders],['wallets','Wallets',I.wallet],['shops','Shops',I.shop],
+    ['swag','Swag',I.swag],['kits','Kits',I.kit],['campaigns','Campaigns',I.camp],
+  ]},
+  { label:'People & tools', items:[
+    ['contacts','Contacts',I.contacts],['integrations','Integrations',I.plug],
+  ]},
+  { label:'Admin', items:[
+    ['billing','Billing',I.bill],['settings','Settings',I.gear],['catalog','Catalog',I.cat],
+  ]},
 ];
+const NAV = NAV_SECTIONS.flatMap(s=>s.items);
+function sidebarNavHtml(){
+  return NAV_SECTIONS.map(sec=>`<div class="sidebar-section">
+    <div class="nav-sec">${sec.label}</div>
+    ${sec.items.map(([k,l,ic])=>`<div class="nav-item ${S.nav===k?'on':''}" data-act="nav" data-arg="${k}">
+      <span class="nav-item-icon">${ic}</span><span class="nav-item-label">${l}</span>
+    </div>`).join('')}
+  </div>`).join('');
+}
 
 /* ---------- router ---------- */
 const APP = ()=>document.getElementById('app');
@@ -243,6 +274,7 @@ async function setNav(n){
   if(MIGRATED_VIEWS.has(n)){ window.location.assign('/app/'+n); return; }
   S.nav=n; S.view=n; closeLayer();
   if(n==='contacts'){ S.flow.contactsSearch=''; }
+  if(n==='integrations'){ delete S.flow.integCategory; }
   render();
   if(n==='catalog'&&!api.useMocks()&&api.isAuthenticated()){
     const requestId=(S.flow.catalogRequestId||0)+1;
@@ -299,11 +331,34 @@ function render(){
   }
   notifyViewChange();
 }
+/** Re-render only the main content pane — keeps sidebar/topbar mounted for tab switches. */
+function renderMain(){
+  syncAuthState();
+  if(S.loading||!S.authed||FULLSCREEN_FLOW_VIEWS.includes(S.view)){
+    render();
+    return;
+  }
+  const wrap=document.querySelector('#app .main .wrap');
+  if(!wrap){
+    render();
+    return;
+  }
+  wrap.innerHTML=ViewFor(S.view);
+  patchShellChrome();
+  afterRender();
+  notifyViewChange();
+}
+function patchShellChrome(){
+  document.querySelectorAll('#app .sidebar .nav-item').forEach(el=>{
+    el.classList.toggle('on',el.dataset.arg===S.nav);
+  });
+}
 function afterRender(){
   // focus first autofocus
   const a=document.querySelector('[autofocus]'); if(a)a.focus();
   bindCreateShopNameInput();
   bindSwNameInput();
+  bindKtNameInput();
   mountKonvaMockups();
 }
 function bindSwNameInput(){
@@ -339,6 +394,44 @@ function bindSwNameInput(){
   }
   if(S.flow.colName!=null&&inp.value!==S.flow.colName) inp.value=S.flow.colName;
   updateFeedback(inp.value || S.flow.colName || '');
+}
+function bindKtNameInput(){
+  if(S.view!=='createKit'||ktFlowStep(S.flow)!==0) return;
+  const nameInp=document.getElementById('kt-name');
+  const descInp=document.getElementById('kt-desc');
+  if(!nameInp) return;
+
+  const updateFeedback=(val)=>{
+    const prev=document.getElementById('kt-name-preview');
+    if(prev) prev.textContent=val||'New Kit';
+    const charCountEl=document.getElementById('kt-name-char-count');
+    if(charCountEl) charCountEl.textContent=`${val.length}/32`;
+    const msgEl=document.getElementById('kt-name-validation-msg');
+    if(msgEl){
+      if(val.length===0){
+        msgEl.innerHTML=`<span style="color:var(--ink-3)">Name is required</span>`;
+      }else if(val.length<4){
+        msgEl.innerHTML=`<span style="color:var(--accent-d);font-weight:600">Too short</span>`;
+      }else{
+        msgEl.innerHTML=`<span style="color:var(--brand);font-weight:600">✓ Looks great!</span>`;
+      }
+    }
+  };
+
+  if(!nameInp.dataset.bound){
+    nameInp.dataset.bound='1';
+    nameInp.addEventListener('input',()=>{
+      S.flow.kitName=nameInp.value;
+      updateFeedback(nameInp.value);
+    });
+  }
+  if(descInp&&!descInp.dataset.bound){
+    descInp.dataset.bound='1';
+    descInp.addEventListener('input',()=>{ S.flow.kitDesc=descInp.value; });
+  }
+  if(S.flow.kitName!=null&&nameInp.value!==S.flow.kitName) nameInp.value=S.flow.kitName;
+  if(descInp&&S.flow.kitDesc!=null&&descInp.value!==S.flow.kitDesc) descInp.value=S.flow.kitDesc;
+  updateFeedback(nameInp.value||S.flow.kitName||'');
 }
 function readCreateShopName(){
   const inp=document.getElementById('sh-name');
@@ -381,20 +474,55 @@ function ViewFor(v){
 }
 
 /* ---------- shell ---------- */
+function topbarWalletIcon(){
+  return `<img src="${walletIconImg}" alt="" class="topbar-wallet-img" aria-hidden="true">`;
+}
+function topbarChevron(){
+  return `<svg class="topbar-chevron" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>`;
+}
+function topbarWalletAmount(){
+  if(S.user?.role==='entity_manager'){
+    const dept=(S.primaryEntityId&&orgDeptById(S.primaryEntityId))||S.org?.departments?.[0];
+    if(dept) return inr(Math.max(0,(dept.allocated||0)-(dept.spent||0)));
+  }
+  if(S.org?.active&&S.org?.wallet?.amount!=null) return inr(S.org.wallet.amount);
+  const w=S.wallets?.[0];
+  if(w) return cmoney(w.cur,w.balance);
+  return inr(0);
+}
+function truncTopbarName(name,max=16){
+  const n=String(name||'User').trim();
+  return n.length>max?n.slice(0,max-1)+'…':n;
+}
 function Shell(inner){
-  // <button class="btn btn-dark" data-act="sendGift">${I.send}<span>Send Gift</span></button>
+  const walletAmt=topbarWalletAmount();
+  const userName=esc(truncTopbarName(S.user?.name||'User'));
+  const accountSlug=esc(String(S.account||'workspace').toLowerCase());
   return `
   <div class="topbar">
     <div class="brandmark">${I.logo}<span style="font-family:var(--disp);font-weight:800;font-size:18px;letter-spacing:-.02em">Shelf Merch</span></div>
-    <div class="acct" data-act="toast" data-arg="Switch workspace"><div><div class="k">Account</div><div class="v">${esc(S.account)}</div></div>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#56655C" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></div>
     <div class="spacer"></div>
-    <button class="iconbtn" data-act="toast" data-arg="Help & support">${I.help}</button>
-    <div class="avatar" data-act="userMenu">${S.user.initials}</div>
+    <div class="topbar-right">
+      <button type="button" class="topbar-wallet" data-act="nav" data-arg="wallets" aria-label="Wallet balance">
+        <span class="topbar-wallet-icon">${topbarWalletIcon()}</span>
+        <span class="topbar-wallet-copy">
+          <span class="k">Wallet balance</span>
+          <span class="v">${walletAmt}${topbarChevron()}</span>
+        </span>
+      </button>
+      <button type="button" class="topbar-user" data-act="userMenu" aria-label="Account menu">
+        <span class="topbar-user-avatar">${esc(S.user?.initials||'U')}</span>
+        <span class="topbar-user-copy">
+          <span class="topbar-user-name">${userName}</span>
+          <span class="topbar-user-sub">${accountSlug}</span>
+        </span>
+        ${topbarChevron()}
+      </button>
+    </div>
   </div>
   <div class="body">
     <aside class="sidebar scroll">
-      ${NAV.map(([k,l,ic])=>`<div class="nav-item ${S.nav===k?'on':''}" data-act="nav" data-arg="${k}">${ic}<span>${l}</span></div>`).join('')}
+      ${sidebarNavHtml()}
     </aside>
     <main class="main scroll"><div class="wrap fade-in">${inner}</div></main>
   </div>
@@ -448,7 +576,7 @@ function ViewSSO(){
     <p class="muted" style="font-size:13.5px;margin-top:20px">For any further queries, please <span class="lnk" data-act="toast" data-arg="Support contacted">contact us</span>.</p>
   </div>`;
 }
-function setTab(a){ S.setTab=a; render(); }
+function setTab(a){ S.setTab=a; renderMain(); }
 function saveWorkspace(){ const n=document.getElementById('ws-name'); if(n)S.account=n.value||S.account; toast('Workspace settings saved'); render(); }
 
 function Stub(title,sub,icon){
@@ -459,7 +587,8 @@ function Stub(title,sub,icon){
 }
 
 /* ---------- layers: modal / drawer / toast ---------- */
-function openModal(html){ document.getElementById('layer').innerHTML=`<div class="scrim" data-scrim><div class="modal scroll">${html}</div></div>`; }
+function openModal(html,opts={}){ const wide=opts.wide?' modal-wide':''; document.getElementById('layer').innerHTML=`<div class="scrim" data-scrim><div class="modal scroll${wide}">${html}</div></div>`; }
+function openUserDropdown(html){ document.getElementById('layer').innerHTML=`<div class="user-menu-scrim" data-scrim><div class="user-menu-panel scroll">${html}</div></div>`; }
 function openDrawer(html){ document.getElementById('layer').innerHTML=`<div class="drawer-scrim" data-scrim></div><div class="drawer">${html}</div>`; }
 function closeLayer(){ document.getElementById('layer').innerHTML=''; }
 let _toastHide=null;
@@ -536,30 +665,132 @@ const Wizards={};
 /* ---------- CREATE KIT ---------- */
 const KIT_STEPS=['Name','Products','Branding','Packaging'];
 function ktFlowStep(f){ const n=Number(f?.step); return Number.isFinite(n)?Math.max(0,Math.min(3,Math.floor(n))):0; }
-function createKitStart(){ S.flow={exitTo:'kits',step:0,kitName:'Welcome Kit',picked:[0,2,3],logoFile:null,notes:'',pkg:'box'}; go('createKit'); }
+function createKitStart(){ S.flow={exitTo:'kits',step:0,kitName:'Welcome Kit',kitDesc:'',picked:[0,2,3],logoFile:null,logoTab:'device',notes:'',pkg:'box'}; go('createKit'); }
+function ktNameExample(el){
+  const name=el.dataset.arg||'';
+  S.flow.kitName=name;
+  const inp=document.getElementById('kt-name');
+  if(inp){
+    inp.value=name;
+    inp.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+}
 Wizards.createKit=function(){
   const f=S.flow; const step=ktFlowStep(f); if(f.step!==step)f.step=step;
   let body='';
   if(step===0){
-    body=`<div style="max-width:620px;margin:0 auto"><h1 style="font-size:26px;margin-bottom:6px">Name your kit</h1><p class="muted" style="margin-bottom:20px">A kit is a reusable bundle of products you can send to recipients at any time.</p>
-      <div class="field"><label class="lbl">Kit name</label><input class="inp" id="kt-name" value="${esc(f.kitName)}" autofocus></div>
-      <div class="field"><label class="lbl">Internal description (optional)</label><textarea class="inp" rows="3" placeholder="e.g. Standard onboarding kit for new joiners">${''}</textarea></div></div>`;
+    const name=esc(f.kitName||'Welcome Kit');
+    const desc=esc(f.kitDesc||'');
+    const examples=['Welcome Kit','New Hire Kit','Onboarding Box'];
+    body=`<div class="sw-name-layout">
+    <div class="sw-form-card">
+      <div class="sw-eyebrow-badge">Step 1 of 4 · Setup</div>
+      <h1 style="font-size:28px;margin-bottom:10px;font-family:var(--disp);letter-spacing:-.03em;color:var(--ink)">Name your kit</h1>
+      <p class="muted" style="margin-bottom:24px;max-width:48ch;line-height:1.6;font-size:14px">A kit is a reusable bundle of products you can send to recipients at any time. Give it a clear name your team will recognize.</p>
+
+      <div class="field" style="margin-bottom:20px">
+        <label class="lbl" style="font-weight:700;margin-bottom:8px">Kit name</label>
+        <div class="sw-name-input-container">
+          <input class="inp" id="kt-name" value="${name}" autofocus maxlength="32" placeholder="e.g. Welcome Kit">
+        </div>
+        <div class="row" style="justify-content:space-between;margin-top:8px;font-size:12px;gap:8px">
+          <span id="kt-name-validation-msg" class="mut3">Enter a kit name</span>
+          <span id="kt-name-char-count" class="mut3">0/32</span>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:20px">
+        <label class="lbl" style="font-weight:700;margin-bottom:8px">Internal description <span class="mut3" style="font-weight:500;text-transform:none;letter-spacing:0">(optional)</span></label>
+        <textarea class="inp" id="kt-desc" rows="3" placeholder="e.g. Standard onboarding kit for new joiners" style="resize:vertical;min-height:88px;padding:12px 16px;line-height:1.5">${desc}</textarea>
+      </div>
+
+      <div class="sw-name-examples" style="margin-bottom:28px">
+        <div class="mut3" style="font-size:12px;margin-bottom:10px;font-weight:600;letter-spacing:.03em;text-transform:uppercase">Suggestions</div>
+        <div class="row" style="gap:8px;flex-wrap:wrap">${examples.map(ex=>`<button type="button" class="sw-name-chip" data-act="ktNameExample" data-arg="${esc(ex)}">${esc(ex)}</button>`).join('')}</div>
+      </div>
+
+      <div class="sw-name-tips">
+        <div class="row" style="gap:10px;align-items:center;font-weight:700;font-size:13.5px;margin-bottom:10px;color:var(--brand-700)">${I.bulb.replace('<svg ','<svg width="18" height="18" ')} Naming Best Practices</div>
+        <ul class="sw-name-tips-list">
+          <li>Use campaign names, onboarding themes, or seasonal events</li>
+          <li>Keep it short and recognizable for recipients and your team</li>
+          <li>Don't worry — you can change the name or contents later</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="sw-name-aside">
+      <div class="sw-name-preview-card">
+        <div style="font-weight:700;font-size:14px;margin-bottom:14px;color:var(--ink-2);letter-spacing:.03em;text-transform:uppercase">Kit Preview</div>
+        <div class="sw-name-preview-imgwrap">
+          <img src="${kitPreview}" alt="Kit merchandise preview">
+          <div class="sw-name-preview-float">
+            <div class="sw-name-preview-icon">${I.kit.replace('<svg ','<svg width="18" height="18" ')}</div>
+            <div style="min-width:0;flex:1">
+              <div id="kt-name-preview" class="sw-name-preview-label">${name}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sw-name-next-card">
+        <div style="font-weight:700;font-size:14px;margin-bottom:18px;color:var(--ink-2);letter-spacing:.03em;text-transform:uppercase">Next Steps</div>
+        <div class="sw-name-next-steps">
+          <div class="sw-name-next-step">
+            <div class="sw-name-next-icon">${I.swag.replace('<svg ','<svg width="18" height="18" ')}</div>
+            <div>
+              <div style="font-weight:600;font-size:13.5px;color:var(--ink)">1. Choose products</div>
+              <div class="mut3" style="font-size:12px;margin-top:3px;line-height:1.4">Select apparel, drinkware, tech, and more from the catalog.</div>
+            </div>
+          </div>
+          <div class="sw-name-next-step">
+            <div class="sw-name-next-icon">${I.edit.replace('<svg ','<svg width="18" height="18" ')}</div>
+            <div>
+              <div style="font-weight:600;font-size:13.5px;color:var(--ink)">2. Brand your kit</div>
+              <div class="mut3" style="font-size:12px;margin-top:3px;line-height:1.4">Upload your logo and add notes for branded mockups on each item.</div>
+            </div>
+          </div>
+          <div class="sw-name-next-step">
+            <div class="sw-name-next-icon">${I.box.replace('<svg ','<svg width="18" height="18" ')}</div>
+            <div>
+              <div style="font-weight:600;font-size:13.5px;color:var(--ink)">3. Choose packaging</div>
+              <div class="mut3" style="font-size:12px;margin-top:3px;line-height:1.4">Pick standard mailers or premium branded boxes for delivery.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
   } else if(step===1){
     body=`<h1 style="font-size:24px;margin-bottom:4px">Choose products for "${esc(f.kitName)}"</h1><p class="muted" style="margin-bottom:18px">Select the items to include. You can brand them in the next step.</p>
       <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">${getCatalogList().map((p,i)=>{const on=f.picked.includes(i);return `<div class="pcard" style="${on?'border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-50)':''}" data-act="ktPick" data-arg="${i}"><div class="img">${productImg(p)}<div style="position:absolute;right:10px;bottom:10px;width:30px;height:30px;border-radius:50%;background:${on?'var(--brand)':'#fff'};color:${on?'#fff':'var(--brand)'};border:1px solid var(--brand);display:grid;place-items:center;font-weight:700">${on?'✓':'+'}</div></div><div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div><div class="pr">${p.price}</div></div></div>`;}).join('')}</div>`;
   } else if(step===2){
-    body=kitBrandingPanel(f);
+    body=kitBrandingPanel(f,{stepBadge:'Step 3 of 4 · Branding'});
   } else {
-    const pk=f.pkg;
-    body=`<div style="max-width:680px;margin:0 auto"><h1 style="font-size:24px;margin-bottom:6px">Choose packaging</h1><p class="muted" style="margin-bottom:18px">How should "${esc(f.kitName)}" arrive? Premium packaging is charged per kit.</p>
-      <div class="grid">
-        <div class="optcard ${pk==='none'?'on':''}" data-act="ktPkg" data-arg="none"><div class="rd"></div><div style="flex:1"><h4>No packaging</h4><p>Items ship in standard protective mailers.</p></div><b>Free</b></div>
-        <div class="optcard ${pk==='box'?'on':''}" data-act="ktPkg" data-arg="box"><div class="rd"></div><div style="flex:1"><h4>Premium shipping box</h4><p>Branded rigid box with crinkle-paper fill.</p></div><b>₹49 / kit</b></div></div>
-      <div class="note" style="margin-top:18px">Once published, this kit is reusable — send it to new recipients any time without rebuilding.</div></div>`;
+    body=kitPackagingPanel(f);
   }
-  const back=step>0?backLink('Back','ktBack',null,{mb:'0'}):backLink('Cancel','wzExit',null,{mb:'0'});
-  const next=step<3?`<button type="button" class="btn btn-dark" ${step===1&&!f.picked.length?'disabled':''} data-act="ktNext">Next</button>`:`<button type="button" class="btn btn-brand" data-act="kitPublish">Publish kit &amp; send</button>`;
-  return wzChrome('Create a kit',KIT_STEPS,step,body,back+next);
+  const back=step>0?backLink(step===2?'Back to products':step===3?'Back to branding':'Back',step===2?'ktBack':'ktBack',null,{mb:'0'}):backLink('Cancel','wzExit',null,{mb:'0'});
+  const next=step<3?`<button type="button" class="btn ${step===2?'btn-brand':'btn-dark'}" ${step===1&&!f.picked.length?'disabled':''} data-act="ktNext">${step===2?`Continue ${I.arrow.replace('<svg ','<svg width="14" height="14" ')}`:'Next'}</button>`:`<button type="button" class="btn btn-brand" data-act="kitPublish">Publish kit &amp; send</button>`;
+  const foot=step===2?`<div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+    <div class="row" style="gap:12px;align-items:center">
+      <b style="font-size:15px;color:var(--ink)">${esc(f.kitName)}</b>
+      <span class="tag tag-soft" style="font-weight:700">${f.picked.length} item${f.picked.length===1?'':'s'} selected</span>
+    </div>
+    <div class="row" style="gap:12px;align-items:center">
+      ${backLink('Back to products','ktBack',null,{mb:'0'})}
+      <button type="button" class="btn btn-brand" data-act="ktNext">Continue ${I.arrow.replace('<svg ','<svg width="14" height="14" ')}</button>
+    </div>
+  </div>`:step===3?`<div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+    <div class="row" style="gap:12px;align-items:center">
+      <b style="font-size:15px;color:var(--ink)">${esc(f.kitName)}</b>
+      <span class="tag tag-soft" style="font-weight:700">${f.picked.length} item${f.picked.length===1?'':'s'} · ${f.pkg==='none'?'Standard mailer':'Premium box'}</span>
+    </div>
+    <div class="row" style="gap:12px;align-items:center">
+      ${backLink('Back to branding','ktBack',null,{mb:'0'})}
+      <button type="button" class="btn btn-brand" data-act="kitPublish">Publish kit &amp; send</button>
+    </div>
+  </div>`:`${back}${next}`;
+  return wzChrome('Create a kit',KIT_STEPS,step,body,foot);
 };
 function ktPick(el){ const i=+el.dataset.arg; const a=S.flow.picked; const k=a.indexOf(i); if(k<0)a.push(i); else a.splice(k,1); render(); }
 function kitLogoImg(f){
@@ -567,25 +798,194 @@ function kitLogoImg(f){
   if(url) return `<img src="${url}" alt="Kit logo" style="max-width:100%;max-height:100%;object-fit:contain;display:block">`;
   return '';
 }
-function kitBrandingPanel(f){
-  const prods=f.picked.map(i=>getCatalogList()[i]).filter(Boolean);
+function kitBrandingPanel(f,opts={}){
+  const stepBadge=opts.stepBadge||'Step 3 of 4 · Branding';
+  const catalog=getCatalogList();
+  const prods=f.picked.map(i=>catalog[i]).filter(Boolean);
   const hasLogo=!!f.logoFile?.preview;
+  const ltab=f.logoTab||'device';
   const lf=f.logoFile||{};
   const logoName=esc(lf.name||'logo');
   const logoMeta=esc(lf.ext&&lf.size?lf.ext+' · '+fmtFileSize(lf.size):lf.ext||'');
-  const logoPicker=hasLogo
-    ?`<div class="row" style="align-items:center;justify-content:space-between;border:1px solid var(--brand);border-radius:var(--r-sm);padding:10px 12px;background:var(--brand-50);margin-bottom:12px"><div class="row" style="gap:10px;align-items:center"><div class="logo-chip" style="width:36px;height:36px;overflow:hidden;padding:3px">${kitLogoImg(f)}</div><div><div style="font-weight:600;font-size:13px">${logoName}</div><div class="mut3" style="font-size:11px">${logoMeta}</div></div></div><button type="button" class="xbtn" data-act="ktLogoClear">✕</button></div>`
-    :`<div id="kt-logo-drop" style="border:1.5px dashed var(--line);border-radius:var(--r);padding:24px;text-align:center;color:var(--ink-2);background:#fff;margin-bottom:12px;cursor:pointer" data-act="ktLogoUpload">${I.upload.replace('currentColor','#15784C')}<div style="margin-top:8px;font-weight:600">Upload logo</div><div class="mut3" style="font-size:11px;margin-top:6px">SVG, PNG, WEBP, JPEG · max 5 MB</div></div>`;
-  return `<div style="display:grid;grid-template-columns:380px 1fr;gap:26px">
-    <div><h1 style="font-size:22px;margin-bottom:6px">Brand your kit</h1><p class="muted" style="font-size:13px;margin-bottom:16px">Upload logos and leave notes for our design team. We'll mock up each item for approval.</p>
-      ${logoPicker}
-      <input type="file" id="kt-logo-inp" accept=".svg,.png,.webp,.jpeg,.jpg,image/svg+xml,image/png,image/webp,image/jpeg" style="display:none">
-      <button class="btn ${hasLogo?'btn-ghost':'btn-dark'} btn-block" data-act="ktLogoUpload">${hasLogo?'Replace logo':'Add logo'}</button>
-      <div class="field" style="margin-top:16px"><label class="lbl">Notes to design team</label><textarea class="inp" id="kt-notes" rows="4" placeholder="e.g. White logo on the chest, full-colour on mugs">${esc(f.notes||'')}</textarea></div></div>
-    <div><div class="${hasLogo?'banner info':'banner'}" style="margin-bottom:16px">${hasLogo?'<div>Branding applied. Our team will share proofs within 2 business days.</div>':'<div>Add a logo to preview branded mockups for each item.</div>'}</div>
-      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">${prods.map((p,idx)=>hasLogo
-        ? `<div class="pcard" data-act="noop">${swagMockupHost(enrichProduct(p),idx)}<div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div></div></div>`
-        : pcard(p,{branded:hasLogo,artworkUrl:f.logoFile?.preview,act:'noop'})).join('')}</div></div></div>`;
+
+  let pickerBody;
+  if(ltab==='device'){
+    if(hasLogo){
+      pickerBody=`<div class="row" style="align-items:center;justify-content:space-between;border:1px solid var(--brand);border-radius:var(--r-sm);padding:12px 14px;background:var(--brand-50);margin-bottom:12px">
+        <div class="row" style="gap:10px;align-items:center">
+          <div class="logo-chip" style="width:36px;height:36px;overflow:hidden;padding:3px">${kitLogoImg(f)}</div>
+          <div>
+            <div style="font-weight:600;font-size:13px">${logoName}</div>
+            <div class="mut3" style="font-size:11px">${logoMeta}</div>
+          </div>
+        </div>
+        <button type="button" class="xbtn" data-act="ktLogoClear" title="Remove logo">✕</button>
+      </div>`;
+    }else{
+      pickerBody=`<div id="kt-logo-drop" class="sw-art-dropzone" data-act="ktLogoUpload">
+        <input type="file" id="kt-logo-inp" accept=".svg,.png,.webp,.jpeg,.jpg,image/svg+xml,image/png,image/webp,image/jpeg" style="display:none">
+        ${I.upload.replace('<svg ','<svg width="24" height="24" ')}
+        <div style="font-weight:600;font-size:14px">Drag &amp; drop your artwork file</div>
+        <div class="mut3" style="font-size:12px;margin:2px 0">Supports SVG, PNG, WEBP, JPEG up to 5MB</div>
+        <button type="button" class="btn btn-soft btn-sm" style="margin-top:4px" data-act="ktLogoUpload">Browse local files</button>
+      </div>`;
+    }
+  }else{
+    const prev=S.logoUploads||[];
+    pickerBody=prev.length
+      ?`<div class="grid" style="grid-template-columns:repeat(3,1fr);gap:8px">${prev.map((u,i)=>logoPrevThumb(i,u,f.logoSel===i)).join('')}</div>`
+      :`<div style="border:1.5px dashed var(--line);border-radius:var(--r-sm);padding:24px 20px;text-align:center;color:var(--ink-2);background:#fff;display:flex;flex-direction:column;align-items:center;gap:6px">
+          <div style="font-weight:600;font-size:13.5px">No previous uploads yet</div>
+          <div class="mut3" style="font-size:12px;line-height:1.4">Uploaded logos will automatically appear here for quick reuse.</div>
+        </div>`;
+  }
+
+  const summary=hasLogo?`<div class="card" style="padding:18px;background:var(--surface-2);border-radius:var(--r-sm)">
+      <div style="font-weight:700;font-size:13.5px;margin-bottom:8px;color:var(--ink-2);letter-spacing:.02em;text-transform:uppercase">Kit summary</div>
+      ${swSummaryRow('Products',prods.length+(prods.length===1?' item':' items'))}
+      ${swSummaryRow('Decoration','Design team mockup')}
+      ${swSummaryRow('Colour variants','All included')}
+      ${swSummaryRow('Logo',logoName)}
+    </div>`:'';
+
+  const left=`<div class="sw-art-rail">
+    <div class="sw-form-card">
+      <div class="sw-eyebrow-badge">${stepBadge}</div>
+      <h1 style="font-size:26px;margin-bottom:10px;font-family:var(--disp);letter-spacing:-.02em;color:var(--ink)">Brand your kit</h1>
+      <p class="muted" style="font-size:14px;margin-bottom:20px;line-height:1.55">Upload your company logo or design assets, then position it on each product. Our team will mock up every item for approval.</p>
+
+      <div style="font-weight:700;font-size:13.5px;margin-bottom:10px;color:var(--ink-2)">Artwork Source</div>
+      <div class="tabs" style="margin-bottom:16px">
+        <button type="button" class="${ltab==='device'?'on':''}" data-act="ktLogoTab" data-arg="device">Upload File</button>
+        <button type="button" class="${ltab==='prev'?'on':''}" data-act="ktLogoTab" data-arg="prev">Library</button>
+      </div>
+
+      ${pickerBody}
+
+      <div class="field" style="margin-top:18px;margin-bottom:0">
+        <label class="lbl" style="font-weight:700">Notes to design team <span class="mut3" style="font-weight:500;text-transform:none;letter-spacing:0">(optional)</span></label>
+        <textarea class="inp" id="kt-notes" rows="3" placeholder="e.g. White logo on the chest, full-colour on mugs" style="resize:vertical;min-height:80px;padding:12px 16px;line-height:1.5;margin-top:8px">${esc(f.notes||'')}</textarea>
+      </div>
+    </div>
+
+    ${summary}
+
+    ${hasLogo?'<button type="button" class="btn btn-ghost btn-block btn-sm" style="margin-top:2px" data-act="ktResetLogo">Reset placement on all products</button>':''}
+  </div>`;
+
+  const header=hasLogo
+    ?`<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:12px;flex-wrap:wrap">
+        <div><div style="font-size:16px;font-weight:700">Your mockups</div>
+          <div class="mut3" style="font-size:12px;margin-top:2px">Drag to move · corner handles to scale · top handle to rotate. Each product keeps its own placement.</div></div>
+        <div class="row" style="gap:8px;align-items:center;font-size:12px;color:#1A6E45;background:var(--brand-50);border:1px solid var(--brand-100,#cfe9da);border-radius:999px;padding:5px 12px;font-weight:600">${I.check.replace('<svg ','<svg width="14" height="14" ')}Applied to all ${prods.length} products · all colour variants</div>
+      </div>`
+    :`<div class="banner" style="margin-bottom:16px;background:#eaf1fb;color:#1c2a52;border:none">Add your artwork on the left to preview it on every product — all colour variants are included.</div>`;
+
+  const right=`<div>${header}
+    <div class="sw-mockups">${prods.map((p,idx)=>{
+      const ep=enrichProduct(p);
+      const mock=productHasPrintArea(ep);
+      const inner=hasLogo
+        ?swagMockupHost(ep,idx)
+        :`<div class="img${mock?' img-mockup':''}">${productImg(ep,{...(mock?{width:'100%',height:'100%'}:{}),url:designImgUrl(ep)})}</div>`;
+      const badge=hasLogo?`<div class="mockup-badge">${I.spark.replace('<svg ','<svg width="11" height="11" ')}Editable</div>`:'';
+      return `<div class="pcard mockup-card" style="position:relative">${hasLogo?'':'<div class="dots-btn">'+I.dots+'</div>'}${badge}${inner}<div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div></div></div>`;
+    }).join('')}</div></div>`;
+
+  return `<div class="sw-art-layout">${left}${right}</div>`;
+}
+function logoPrevThumb(i,u,sel){
+  const ph=u.preview?`<img src="${u.preview}" alt="" style="width:100%;height:100%;object-fit:contain;display:block">`:LOGO_DECO;
+  return `<div class="thumb ${sel?'on':''}" data-act="ktLogoPick" data-arg="${i}"><div class="ph">${ph}</div></div>`;
+}
+function ktLogoTab(a){ S.flow.logoTab=a; render(); }
+function ktLogoPick(el){
+  const i=+el.dataset.arg;
+  const u=(S.logoUploads||[])[i];
+  if(!u) return;
+  S.flow.logoSel=i;
+  S.flow.logoFile={name:u.name,size:u.size,ext:u.ext,preview:u.preview,file:u.file};
+  S.flow.logoTab='device';
+  render();
+}
+function ktResetLogo(){ S.flow.kitPlacements={}; render(); }
+function kitPackagingPreview(pk){ return pk==='none'?kitPackagingNone:kitPackagingBox; }
+function kitPackagingLabel(pk){ return pk==='none'?'Standard mailer':'Premium box'; }
+function kitPackagingPanel(f){
+  const pk=f.pkg==='none'?'none':'box';
+  if(f.pkg!==pk) f.pkg=pk;
+  const previewSrc=kitPackagingPreview(pk);
+  const pkgOption=(key,title,desc,price)=>{
+    const on=pk===key;
+    return `<button type="button" class="kt-pkg-option ${on?'on':''}" data-act="ktPkg" data-arg="${key}">
+      <div class="rd"></div>
+      <div class="kt-pkg-option-copy">
+        <h4>${title}</h4>
+        <p>${desc}</p>
+      </div>
+      <b class="kt-pkg-option-price">${price}</b>
+    </button>`;
+  };
+  return `<div class="kt-pkg-layout">
+    <div class="sw-form-card">
+      <div class="sw-eyebrow-badge">Step 4 of 4 · Packaging</div>
+      <h1 style="font-size:28px;margin-bottom:10px;font-family:var(--disp);letter-spacing:-.03em;color:var(--ink)">Choose packaging</h1>
+      <p class="muted" style="margin-bottom:24px;max-width:48ch;line-height:1.6;font-size:14px">How should "${esc(f.kitName)}" arrive? Premium packaging is charged per kit — recipients see the unboxing experience you choose.</p>
+
+      <div class="kt-pkg-options">
+        ${pkgOption('none','No packaging','Items ship in standard protective mailers.','Free')}
+        ${pkgOption('box','Premium shipping box','Branded rigid box with crinkle-paper fill.','₹49 / kit')}
+      </div>
+
+      <div class="sw-name-tips" style="margin-top:24px">
+        <div class="row" style="gap:10px;align-items:center;font-weight:700;font-size:13.5px;margin-bottom:10px;color:var(--brand-700)">${I.box.replace('<svg ','<svg width="18" height="18" ')} Reusable kit</div>
+        <p style="margin:0;font-size:13px;color:var(--ink-2);line-height:1.55">Once published, this kit is reusable — send it to new recipients any time without rebuilding.</p>
+      </div>
+    </div>
+
+    <div class="sw-name-aside">
+      <div class="sw-name-preview-card">
+        <div style="font-weight:700;font-size:14px;margin-bottom:14px;color:var(--ink-2);letter-spacing:.03em;text-transform:uppercase">Packaging Preview</div>
+        <div class="sw-name-preview-imgwrap kt-pkg-preview-wrap">
+          <img id="kt-pkg-preview" src="${previewSrc}" alt="${esc(kitPackagingLabel(pk))} preview">
+          <div class="sw-name-preview-float">
+            <div class="sw-name-preview-icon">${I.box.replace('<svg ','<svg width="18" height="18" ')}</div>
+            <div style="min-width:0;flex:1">
+              <div class="sw-name-preview-label">${esc(f.kitName)}</div>
+              <div class="mut3" style="font-size:11px;margin-top:2px" id="kt-pkg-preview-label">${esc(kitPackagingLabel(pk))}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sw-name-next-card">
+        <div style="font-weight:700;font-size:14px;margin-bottom:18px;color:var(--ink-2);letter-spacing:.03em;text-transform:uppercase">What&apos;s included</div>
+        <div class="sw-name-next-steps">
+          <div class="sw-name-next-step">
+            <div class="sw-name-next-icon">${I.swag.replace('<svg ','<svg width="18" height="18" ')}</div>
+            <div>
+              <div style="font-weight:600;font-size:13.5px;color:var(--ink)">${f.picked.length} branded product${f.picked.length===1?'':'s'}</div>
+              <div class="mut3" style="font-size:12px;margin-top:3px;line-height:1.4">Your selected items ship together in one shipment.</div>
+            </div>
+          </div>
+          <div class="sw-name-next-step">
+            <div class="sw-name-next-icon">${I.box.replace('<svg ','<svg width="18" height="18" ')}</div>
+            <div>
+              <div style="font-weight:600;font-size:13.5px;color:var(--ink)">${pk==='none'?'Protective mailer':'Premium branded box'}</div>
+              <div class="mut3" style="font-size:12px;margin-top:3px;line-height:1.4">${pk==='none'?'Lightweight poly mailer with your kit items inside.':'Rigid box with crinkle-paper fill and logo on the lid.'}</div>
+            </div>
+          </div>
+          <div class="sw-name-next-step">
+            <div class="sw-name-next-icon">${I.send.replace('<svg ','<svg width="18" height="18" ')}</div>
+            <div>
+              <div style="font-weight:600;font-size:13.5px;color:var(--ink)">Ready to send</div>
+              <div class="mut3" style="font-size:12px;margin-top:3px;line-height:1.4">Publish now and send this kit to recipients any time.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
 }
 function kitArtworkInput(f){
   if(!f.logoFile?.file) return undefined;
@@ -609,7 +1009,10 @@ function ktLogoSetFile(file){
 }
 function ktLogoUpload(){ document.getElementById('kt-logo-inp')?.click(); }
 function ktLogoClear(){ S.flow.logoFile=null; render(); }
-function ktPkg(el){ S.flow.pkg=el.dataset.arg; render(); }
+function ktPkg(el){
+  S.flow.pkg=el.dataset.arg==='none'?'none':'box';
+  render();
+}
 function ktBack(){ S.flow.step=Math.max(ktFlowStep(S.flow)-1,0); render(); }
 let _ktNextLock=0;
 function ktNext(){
@@ -618,7 +1021,11 @@ function ktNext(){
   _ktNextLock=now;
   const f=S.flow;
   const step=ktFlowStep(f);
-  if(step===0) f.kitName=document.getElementById('kt-name')?.value||'New Kit';
+  if(step===0){
+    f.kitName=document.getElementById('kt-name')?.value||'New Kit';
+    f.kitDesc=(document.getElementById('kt-desc')||{}).value||'';
+    if(f.kitName.trim().length<4){ toast('Kit name must be at least 4 characters',false); return; }
+  }
   if(step===1&&!f.picked?.length){ toast('Select at least one product',false); return; }
   if(step===2) f.notes=(document.getElementById('kt-notes')||{}).value||'';
   f.step=Math.min(step+1,3);
@@ -684,7 +1091,7 @@ function editKitStart(id){
   closeLayer();
   const k=S.kits.find(x=>x.id===id);
   if(!k){ toast('Kit not found'); return; }
-  S.flow={exitTo:'kits',kitId:id,kitName:k.name,picked:kitPickedIndices(k),step:0,logoFile:kitLogoFromKit(k),notes:k.designNotes||''};
+  S.flow={exitTo:'kits',kitId:id,kitName:k.name,picked:kitPickedIndices(k),step:0,logoFile:kitLogoFromKit(k),logoTab:'device',notes:k.designNotes||''};
   go('editKit');
 }
 const EDIT_KIT_STEPS=['Products','Branding'];
@@ -707,13 +1114,23 @@ Wizards.editKit=function(){
       <p class="muted" style="font-size:13px;margin-bottom:14px">Tap a product to add or remove it from this kit.</p>
       <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">${getCatalogList().map((p,i)=>{const on=f.picked.includes(i);return `<div class="pcard" style="${on?'border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-50)':''}" data-act="ekPick" data-arg="${i}"><div class="img">${productImg(p)}<div style="position:absolute;right:10px;bottom:10px;width:30px;height:30px;border-radius:50%;background:${on?'var(--brand)':'#fff'};color:${on?'#fff':'var(--brand)'};border:1px solid var(--brand);display:grid;place-items:center;font-weight:700">${on?'✓':'+'}</div></div><div class="meta">${p.brand?`<div class="brand">${esc(p.brand)}</div>`:''}<div class="nm">${esc(p.nm)}</div><div class="pr">${p.price}</div></div></div>`;}).join('')}</div></div>`;
   } else {
-    body=kitBrandingPanel(f);
+    body=kitBrandingPanel(f,{stepBadge:'Step 2 of 2 · Branding'});
   }
-  const back=step>0?backLink('Back','ekBack',null,{mb:'0'}):backLink('Cancel','wzExit',null,{mb:'0'});
+  const back=step>0?backLink(step===1?'Back to products':'Back','ekBack',null,{mb:'0'}):backLink('Cancel','wzExit',null,{mb:'0'});
   const next=step<1
     ?`<button class="btn btn-dark" ${!f.picked.length?'disabled':''} data-act="ekNext">Next</button>`
     :`<button class="btn btn-brand" data-act="kitSaveEdit">Save changes</button>`;
-  return wzChrome('Edit kit',EDIT_KIT_STEPS,step,body,back+next);
+  const foot=step===1?`<div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+    <div class="row" style="gap:12px;align-items:center">
+      <b style="font-size:15px;color:var(--ink)">${esc(f.kitName)}</b>
+      <span class="tag tag-soft" style="font-weight:700">${f.picked.length} item${f.picked.length===1?'':'s'} selected</span>
+    </div>
+    <div class="row" style="gap:12px;align-items:center">
+      ${backLink('Back to products','ekBack',null,{mb:'0'})}
+      <button type="button" class="btn btn-brand" data-act="kitSaveEdit">Save changes</button>
+    </div>
+  </div>`:`${back}${next}`;
+  return wzChrome('Edit kit',EDIT_KIT_STEPS,step,body,foot);
 };
 function ekBack(){ S.flow.step--; render(); }
 function ekNext(){
@@ -964,8 +1381,18 @@ async function sendItemsDo(){
 /* ---------- SWAG DESIGNER ---------- */
 function swagDesignerStart(el){
   closeLayer();
-  const shopId=(el&&el.dataset&&el.dataset.arg)||S.flow.shopId||(S.shops[0]&&S.shops[0].id);
-  S.flow={exitTo:shopId?'shopDetail':'swag', shopId, colName:'New Employee Swag', picked:[], artwork:false, exitToNav:shopId?'shops':'swag'};
+  const argShopId=el?.dataset?.arg||null;
+  const fromShop=S.view==='shopDetail';
+  const shopId=argShopId||(fromShop?S.flow.shopId:null);
+  const returnToShop=!!(argShopId||fromShop);
+  S.flow={
+    exitTo:returnToShop?'shopDetail':'swag',
+    exitToNav:returnToShop?'shops':'swag',
+    colName:'New Employee Swag',
+    picked:[],
+    artwork:false,
+    ...(returnToShop&&shopId?{shopId,shopTab:'Branded Swag'}:{}),
+  };
   go('swagName');
 }
 Wizards.swagName=function(){
@@ -2045,7 +2472,11 @@ function wzChrome(title, steps, idx, body, foot, opts={}){
     <div class="main scroll" style="flex:1"><div style="max-width:1080px;margin:0 auto;padding:34px" class="fade-in">${body}</div></div>
     ${foot?`<div class="wzfoot">${foot}</div>`:''}</div>`;
 }
-function wzExit(){ go(S.flow.exitTo||'shops'); }
+function wzExit(){
+  const dest=S.flow.exitTo||'shops';
+  const nav=S.flow.exitToNav;
+  go(dest, nav?{nav}:undefined);
+}
 
 /* split overlay (create shop steps) */
 function shopOverlay(rightHtml){
@@ -2207,9 +2638,17 @@ function shopThemeKey(src){ return src?.bannerTheme||src?.bannerConfig?.theme||'
 function shopBannerCfg(src){ return BANNER_THEMES[shopThemeKey(src)]||BANNER_THEMES.light; }
 function shopBannerClasses(src){ const t=shopBannerCfg(src); return 'shopbanner'+(shopBannerPresetKey(src)?'':'')+(t.dots&&!shopBannerPresetKey(src)?' shopbanner-merch':''); }
 function shopBannerHtml(src,opts={}){
-  const h=opts.height||96, r=opts.radius??0;
+  const h=opts.height||96;
+  const flush=!!opts.flush;
+  const useAspect=!!opts.aspect;
+  const r=flush?0:(opts.radius??0);
   const extra=opts.extraStyle||'';
-  return `<div class="${shopBannerClasses(src)}" style="height:${h}px;border-radius:${r}px;${shopBannerStyle(src)}${extra}">
+  const preset=shopBannerPresetKey(src);
+  const cls=shopBannerClasses(src)+(preset?' shopbanner-preset':'')+(flush?' shopbanner-flush':'')+(useAspect?' shopbanner-aspect':'');
+  const presetImg=preset?`<img src="/shop-banners/${preset}.png" alt="" class="shopbanner-img" loading="lazy" draggable="false">`:'';
+  const heightStyle=useAspect?'':`height:${opts.height||h}px;`;
+  return `<div class="${cls}" style="${heightStyle}border-radius:${r}px;${preset?'':shopBannerStyle(src)}${extra}">
+    ${presetImg}
     ${shopLogoOverlayHtml(src,{logoSize:opts.logoSize||48,layout:opts.layout||'left'})}
     ${opts.menu&&opts.shopId?`<button type="button" class="shopbanner-menu" data-act="shopEditOpen" data-arg="${opts.shopId}">${I.dots}</button>`:opts.menu?`<button type="button" class="shopbanner-menu" data-act="shopEditOpen">${I.dots}</button>`:''}
   </div>`;
@@ -2575,7 +3014,7 @@ function ViewShops(){
   }
   const cards=S.shops.map(s=>`
     <div class="card shop-card" data-act="shopOpen" data-arg="${s.id}">
-      ${shopBannerHtml(s,{height:132,layout:'center',menu:true,logoSize:52,shopId:s.id})}
+      ${shopBannerHtml(s,{layout:'center',menu:true,logoSize:56,shopId:s.id,flush:true,aspect:true})}
       <div class="shop-card-body">
         <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">
           <h3 style="font-size:17px">${esc(s.name)}</h3>
@@ -2588,7 +3027,7 @@ function ViewShops(){
   return `<div class="page-h"><div><h1>Shops</h1><div class="sub">Branded storefronts your recipients redeem points in.</div></div>
     <div class="row" style="gap:8px"><button class="btn btn-ghost" data-act="toast" data-arg="Browse templates">Browse templates</button>
     <button class="btn btn-brand" data-act="createShopStart">${I.plus}Create shop</button></div></div>
-    <div class="grid stagger" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">${cards}</div>`;
+    <div class="grid stagger shops-grid">${cards}</div>`;
 }
 const SHOP_TABS=['Branded Swag','Shop Catalog','Sent Gifts','Layout','Settings','Reports'];
 function ViewShopDetail(){
@@ -2596,12 +3035,12 @@ function ViewShopDetail(){
   const tab=S.flow.shopTab||'Branded Swag';
   return `
   ${backLink('Back to shops','nav','shops')}
-  <div class="row" style="align-items:center;gap:16px;margin-bottom:18px">
-    <div style="width:160px;flex:none">${shopBannerHtml(s,{height:84,layout:'center',logoSize:46,radius:10})}</div>
+  <div class="row shop-detail-head" style="align-items:center;gap:16px;margin-bottom:18px">
+    <div class="shop-detail-banner">${shopBannerHtml(s,{layout:'center',logoSize:48,radius:10,aspect:true})}</div>
     <div style="flex:1"><h1 style="font-size:26px">${esc(s.name)}</h1><div style="margin-top:6px">${s.live?'<span class="tag tag-live"><span class="dot"></span>Live</span>':''} ${s.live?`<span class="lnk" style="margin-left:8px" data-act="viewShop" data-arg="${s.id}">View shop</span>`:`<span class="mut3" style="margin-left:8px;font-size:13px">Publish to view shop</span>`}</div></div>
     <button class="btn btn-dark" data-act="sendPointsStart" data-arg="${s.id}">${I.coin}Send points</button>
   </div>
-  <div class="tabs" style="margin-bottom:22px">${SHOP_TABS.map(t=>`<button class="${t===tab?'on':''}" data-act="shopTab" data-arg="${t}">${t}</button>`).join('')}</div>
+  <div class="tabs" style="margin-bottom:22px">${SHOP_TABS.map(t=>`<button type="button" class="${t===tab?'on':''}" data-act="shopTab" data-arg="${t}">${t}</button>`).join('')}</div>
   ${shopTabBody(s,tab)}`;
 }
 function shopTabBody(s,tab){
@@ -2635,7 +3074,7 @@ function shopTabBody(s,tab){
         ?`<div class="card" style="padding:22px">${swagCollectionView(archivedCols)}</div>`
         :`<div class="card empty"><div class="ic">${I.swag.replace('currentColor','#cdd6cf')}</div><h3>No archived designs</h3><p>Designs you archive will be stored here and can be restored any time.</p></div>`;
     }
-    return `<div style="display:flex;gap:22px">${rail}<div style="flex:1">${content}</div></div>`;
+    return `<div style="display:flex;gap:22px">${rail}<div class="shop-swag-content" style="flex:1;min-width:0">${content}</div></div>`;
   }
   if(tab==='Sent Gifts'){
     return sentGiftsTabBody(s);
@@ -3134,7 +3573,7 @@ function swagDesignCard(col,p,pIdx){
 function swagProductGrid(cols){
   const entries=swagProductEntries(cols);
   if(!entries.length) return `<div class="card empty"><h3>No products yet</h3><p>Start designing to add branded products to your swag.</p></div>`;
-  return `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">${entries.map(({col,p,pIdx})=>swagDesignCard(col,p,pIdx)).join('')}</div>`;
+  return `<div class="grid swag-designs-grid">${entries.map(({col,p,pIdx})=>swagDesignCard(col,p,pIdx)).join('')}</div>`;
 }
 function swagCollectionView(cols){
   if(!cols.length) return `<div class="card empty"><h3>No collections yet</h3><p>Create a collection to group your branded products together.</p></div>`;
@@ -3252,7 +3691,7 @@ function collectionBlock(c){
         <button type="button" class="iconbtn" style="width:30px;height:30px" data-act="collectionMenu" data-arg="${c.id}">${I.dots}</button>
       </div>
     </div>
-    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">${c.products.map((p,i)=>swagDesignCard(c,p,i)).join('')}</div>
+    <div class="grid swag-designs-grid">${c.products.map((p,i)=>swagDesignCard(c,p,i)).join('')}</div>
   </div>`;
 }
 
@@ -3264,13 +3703,13 @@ function ViewSwag(){
   const count=swagProductCount(cols);
   const tabLabels={ 'All Products':`All Products (${count})`, 'Saved Designs':'Saved Designs', 'Archived':'Archived' };
   const toolbar=`<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:12px">
-    <div class="tabs" style="flex:1;min-width:280px;max-width:520px">${['All Products','Saved Designs','Archived'].map(t=>`<button class="${t===tab?'on':''}" data-act="swagTab" data-arg="${t}">${tabLabels[t]}</button>`).join('')}</div>
+    <div class="tabs" style="flex:1;min-width:280px;max-width:520px">${['All Products','Saved Designs','Archived'].map(t=>`<button type="button" class="${t===tab?'on':''}" data-act="swagTab" data-arg="${t}">${tabLabels[t]}</button>`).join('')}</div>
     ${swagViewToggleHtml(view)}
   </div>`;
   const body=tab==='Archived'&&!cols.length
     ?`<div class="card empty"><div class="ic">${I.swag.replace('currentColor','#cdd6cf')}</div><h3>No archived designs</h3><p>Designs you archive will be stored here and can be restored any time.</p></div>`
     :swagDesignsBody(cols,view);
-  const heroBanner=`<div class="swag-hero-banner card" style="margin-bottom:24px;overflow:hidden;position:relative;padding:0;border-radius:var(--r);height:300px;background:var(--bg) url('${swagBannerImg}') center/cover no-repeat;border:none;box-shadow:var(--sh-1);"></div>`;
+  const heroBanner=`<div class="swag-hero-banner" style="background-image:url('${swagBannerImg}')" role="img" aria-label="Build your swag collection"></div>`;
   return `<div class="page-h"><div><h1>Swag</h1><div class="sub">Your designed collections and the full catalog you can build from.</div></div>
     <div class="row" style="gap:8px"><button class="btn btn-ghost" data-act="swagDesignerStart">${I.plus}Start designing</button>
     <button class="btn btn-dark" data-act="nav" data-arg="catalog">Purchase swag</button></div></div>
@@ -4068,15 +4507,14 @@ async function addContactsImportDo(){
   }
 }
 function contactEdit(id){ const c=S.contacts.find(x=>x.id===id);
-  openModal(`<div class="modal-pad" style="max-width:640px"><div class="modal-h"><h3>Fix recipient information</h3><button class="xbtn" data-act="closeLayer">✕</button></div>
-    <p class="muted" style="font-size:13px;margin:6px 0 16px">Update this person's details so they can be added to orders. HRIS-synced fields will override manual entries.</p>
-    <div class="row"><div class="field" style="flex:1"><label class="lbl">First name</label><input class="inp" id="contact-first" value="${esc(c.name.split(' ')[0]||'')}"></div>
-    <div class="field" style="flex:1"><label class="lbl">Last name</label><input class="inp" id="contact-last" value="${esc(c.name.split(' ').slice(1).join(' '))}"></div></div>
-    <div class="row"><div class="field" style="flex:1"><label class="lbl">Email</label><input class="inp" id="contact-email" value="${esc(c.email)}"></div>
-    <div class="field" style="flex:1"><label class="lbl">Phone</label><input class="inp" id="contact-phone" value="${esc(c.phone||'')}"></div></div>
-    <div class="row"><div class="field" style="flex:1"><label class="lbl">Department</label><input class="inp" id="contact-dept" value="${esc(c.department||'')}"></div>
-    <div class="field" style="flex:1"><label class="lbl">Employee Code</label><input class="inp" id="contact-emp-code" value="${esc(c.employeeCode||'')}"></div></div>
-    <div class="row"><div class="field" style="flex:1"><label class="lbl">Role</label>
+  openModal(`<div class="modal-pad contact-form-modal" style="max-width:640px">
+    <div class="modal-h"><div><h3>Fix recipient information</h3><p class="muted" style="font-size:13px;margin-top:6px;line-height:1.55">Update this person's details so they can be added to orders. HRIS-synced fields will override manual entries.</p></div><button class="xbtn" data-act="closeLayer">✕</button></div>
+    <div class="contact-form">
+    <div class="contact-form-row"><div class="field"><label class="lbl">First name</label><input class="inp" id="contact-first" value="${esc(c.name.split(' ')[0]||'')}"></div>
+    <div class="field"><label class="lbl">Last name</label><input class="inp" id="contact-last" value="${esc(c.name.split(' ').slice(1).join(' '))}"></div></div>
+    <div class="contact-form-row"><div class="field"><label class="lbl">Email</label><input class="inp" id="contact-email" value="${esc(c.email)}"></div>
+    <div class="field"><label class="lbl">Phone</label><input class="inp" id="contact-phone" value="${esc(c.phone||'')}"></div></div>
+    <div class="contact-form-row"><div class="field"><label class="lbl">Role</label>
       <select class="inp" id="contact-role">
         <option value="Owner" ${c.role==='Owner'?'selected':''}>Owner</option>
         <option value="Admin" ${c.role==='Admin'?'selected':''}>Admin</option>
@@ -4085,12 +4523,15 @@ function contactEdit(id){ const c=S.contacts.find(x=>x.id===id);
         <option value="Non-Member" ${c.role==='Non-Member'?'selected':''}>Non-Member</option>
       </select>
     </div>
-    <div class="field" style="flex:1"><label class="lbl">Country</label><select class="inp" id="contact-country"><option value="IN" ${(c.country||'IN')==='IN'?'selected':''}>India</option><option value="AE" ${c.country==='AE'?'selected':''}>UAE</option><option value="US" ${c.country==='US'?'selected':''}>USA</option></select></div></div>
+    <div class="field"><label class="lbl">Department</label><input class="inp" id="contact-dept" value="${esc(c.department||'')}"></div></div>
+    <div class="contact-form-row"><div class="field"><label class="lbl">Employee Code</label><input class="inp" id="contact-emp-code" value="${esc(c.employeeCode||'')}"></div>
+    <div class="field"><label class="lbl">Country</label><select class="inp" id="contact-country"><option value="IN" ${(c.country||'IN')==='IN'?'selected':''}>India</option><option value="AE" ${c.country==='AE'?'selected':''}>UAE</option><option value="US" ${c.country==='US'?'selected':''}>USA</option></select></div></div>
     <div class="field"><label class="lbl">Address</label><input class="inp" id="contact-address" value="${esc(c.address)}"></div>
-    <div class="row"><div class="field" style="flex:1"><label class="lbl">City</label><input class="inp" id="contact-city" value="${esc(c.city||'')}"></div>
-    <div class="field" style="flex:1"><label class="lbl">State</label><input class="inp" id="contact-state" value="${esc(c.state||'')}"></div>
-    <div class="field" style="flex:1"><label class="lbl">PIN</label><input class="inp" id="contact-pin" value="${esc(c.pincode||'')}"></div></div>
-    <div class="row" style="margin-top:8px"><button class="btn btn-ghost btn-block" data-act="closeLayer">Cancel</button><button class="btn btn-brand btn-block" data-act="contactSave" data-arg="${c.id}">Save</button></div></div>`); }
+    <div class="contact-form-row contact-form-row--3"><div class="field"><label class="lbl">City</label><input class="inp" id="contact-city" value="${esc(c.city||'')}"></div>
+    <div class="field"><label class="lbl">State</label><input class="inp" id="contact-state" value="${esc(c.state||'')}"></div>
+    <div class="field contact-form-pin"><label class="lbl">PIN Code</label><input class="inp" id="contact-pin" value="${esc(c.pincode||'')}"></div></div>
+    <div class="contact-form-footer"><button type="button" class="btn btn-ghost" data-act="closeLayer">Cancel</button><button type="button" class="btn btn-brand" data-act="contactSave" data-arg="${c.id}">Save</button></div>
+    </div></div>`,{wide:true}); }
 async function contactSave(id){
   const current=S.contacts.find(x=>x.id===id);
   if(!current) return;
@@ -4120,14 +4561,88 @@ async function contactSave(id){
 }
 
 /* ===================== INTEGRATIONS ===================== */
+const INTEGRATIONS=[
+  {id:'darwinbox',name:'Darwinbox',category:'HRIS',desc:'Sync employees, birthdays & start dates',connected:true,icon:darwinboxIcon},
+  {id:'keka',name:'Keka',category:'HRIS',desc:'People data & org chart for automated gifting triggers',connected:false,icon:kekaIcon},
+  {id:'bamboohr',name:'BambooHR',category:'HRIS',desc:'Import employee records, departments & hire dates',connected:false,icon:bamboohrIcon},
+  {id:'okta',name:'Okta',category:'Identity',desc:'Single sign-on and user provisioning via Okta',connected:false,icon:oktaIcon},
+  {id:'microsoft-entra',name:'Microsoft Entra ID',category:'Identity',desc:'Sync users and groups from Azure AD / Entra',connected:false,icon:microsoftEntraIcon},
+  {id:'auth0',name:'Auth0',category:'Identity',desc:'Authenticate recipients and manage access policies',connected:false,icon:auth0Icon},
+  {id:'onelogin',name:'OneLogin',category:'Identity',desc:'SSO and directory sync for enterprise logins',connected:false,icon:oneloginIcon},
+  {id:'razorpay',name:'Razorpay',category:'Payments',desc:'Collect funds via UPI, cards, and netbanking',connected:true,icon:razorpayIcon},
+  {id:'shiprocket',name:'Shiprocket',category:'Logistics',desc:'Domestic & global fulfilment with live tracking',connected:true,icon:shiprocketIcon},
+  {id:'slack',name:'Slack',category:'Comms',desc:'Celebrate milestones and share redemption updates in channels',connected:false,icon:slackIcon},
+  {id:'google-workspace',name:'Google Workspace',category:'Directory',desc:'Provision recipients and sync org directory from Google',connected:false,icon:googleWorkspaceIcon},
+];
+const INTEG_CATEGORIES=[
+  {key:'HRIS',label:'HRIS',desc:'Employee records, hire dates & org structure'},
+  {key:'Identity',label:'Identity Provider (SSO)',desc:'Single sign-on, provisioning & access control'},
+  {key:'Payments',label:'Payments',desc:'Collect funds via UPI, cards & netbanking'},
+  {key:'Logistics',label:'Logistics',desc:'Domestic & global fulfilment with tracking'},
+  {key:'Comms',label:'Comms',desc:'Celebrate milestones in Slack & team channels'},
+  {key:'Directory',label:'Directory',desc:'Provision recipients from company directory'},
+];
+const INTEG_CHEVRON='<svg class="integ-cat-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>';
+function integCategoryMeta(key){
+  const apps=INTEGRATIONS.filter(i=>i.category===key);
+  const connected=apps.filter(i=>i.connected).length;
+  return {total:apps.length,connected};
+}
+function integCardsHtml(apps){
+  return apps.map((app)=>{
+    const on=app.connected;
+    return `<article class="integ-card${on?' integ-card--connected':''}">
+      <div class="integ-card-top">
+        <div class="integ-logo"><img src="${app.icon}" alt="${esc(app.name)} logo"></div>
+        ${on?'<span class="tag tag-live integ-status"><span class="dot"></span>Connected</span>':`<span class="integ-status integ-status-idle">Not connected</span>`}
+      </div>
+      <h3 class="integ-name">${esc(app.name)}</h3>
+      <p class="integ-desc">${esc(app.desc)}</p>
+      <button type="button" class="btn ${on?'btn-ghost':'btn-brand'} btn-sm btn-block integ-action" data-act="toast" data-arg="${on?app.name+' settings opened':('Connecting '+app.name+'…')}">${on?'Manage':'Connect'}</button>
+    </article>`;
+  }).join('');
+}
+function integOpenCategory(key){ S.flow.integCategory=key; renderMain(); }
+function integBack(){ delete S.flow.integCategory; renderMain(); }
 function ViewIntegrations(){
-  const apps=[['Darwinbox','HRIS','Sync employees, birthdays & start dates',true],['Keka','HRIS','People data & org chart',false],['Razorpay','Payments','Collect funds via UPI, cards, netbanking',true],['Shiprocket','Logistics','Domestic & global fulfilment tracking',true],['Slack','Comms','Celebrate milestones in channels',false],['Google Workspace','Directory','Provision recipients from Google',false]];
-  return `<div class="page-h"><div><h1>Integrations</h1><div class="sub">Connect HRIS, payments and logistics to automate gifting end-to-end.</div></div></div>
-  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">${apps.map(([n,t,d,on])=>`<div class="card" style="padding:18px">
-    <div class="row" style="justify-content:space-between;align-items:flex-start"><div class="logo-chip" style="font-family:var(--disp);font-weight:800;color:var(--brand-d)">${n[0]}</div>${on?'<span class="tag tag-live"><span class="dot"></span>Connected</span>':''}</div>
-    <h3 style="font-size:16px;margin-top:12px">${n}</h3><div class="mut3" style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-top:2px">${t}</div>
-    <p class="muted" style="font-size:13px;margin-top:8px">${d}</p>
-    <button class="btn ${on?'btn-ghost':'btn-soft'} btn-sm btn-block" style="margin-top:14px" data-act="toast" data-arg="${on?n+' settings':'Connecting '+n+'…'}">${on?'Manage':'Connect'}</button></div>`).join('')}</div>`;
+  const category=S.flow.integCategory||'';
+  const connected=INTEGRATIONS.filter(i=>i.connected).length;
+  const header=`<div class="page-h">
+      <div>
+        <h1>Integrations</h1>
+        <div class="sub">Connect HRIS, identity providers, payments and logistics to automate gifting end-to-end.</div>
+      </div>
+      <div class="integ-summary">
+        <span class="integ-summary-stat"><b>${connected}</b> connected</span>
+        <span class="integ-summary-dot">·</span>
+        <span class="integ-summary-stat"><b>${INTEGRATIONS.length-connected}</b> available</span>
+      </div>
+    </div>`;
+  if(!category){
+    const tiles=INTEG_CATEGORIES.map((cat)=>{
+      const {total,connected:catConnected}=integCategoryMeta(cat.key);
+      const meta=catConnected?`${catConnected} connected · ${total} integration${total===1?'':'s'}`:`${total} integration${total===1?'':'s'}`;
+      return `<button type="button" class="integ-cat-card" data-act="integOpenCategory" data-arg="${cat.key}">
+        <span class="integ-cat-card-copy">
+          <span class="integ-cat-card-label">${esc(cat.label)}</span>
+          <span class="integ-cat-card-desc">${esc(cat.desc)}</span>
+          <span class="integ-cat-card-meta">${meta}</span>
+        </span>
+        ${INTEG_CHEVRON}
+      </button>`;
+    }).join('');
+    return `${header}<div class="integ-cat-grid">${tiles}</div>`;
+  }
+  const catDef=INTEG_CATEGORIES.find(c=>c.key===category)||{label:category,desc:''};
+  const list=INTEGRATIONS.filter(i=>i.category===category);
+  const cards=integCardsHtml(list);
+  return `${header}
+    <div class="integ-detail-h">
+      ${backLink('All integrations','integBack')}
+      <h2>${esc(catDef.label)}</h2>
+      ${catDef.desc?`<div class="sub" style="margin-top:6px">${esc(catDef.desc)}</div>`:''}
+    </div>
+    <div class="integ-grid">${cards||`<div class="card empty" style="grid-column:1/-1;padding:40px"><h3>No integrations in this category yet</h3></div>`}</div>`;
 }
 
 /* ===================== CATALOG ===================== */
@@ -4139,7 +4654,7 @@ function ViewCatalog(){
   const count=api.useMocks()?list.length:(S.catalogTotal??list.length);
   const loading=S.flow.catalogLoading;
   return `<div class="page-h"><div><h1>Catalog</h1><div class="sub">${count} products from vetted suppliers, ready to brand and ship across India.</div></div></div>
-  <div class="tabs" style="margin-bottom:20px">${cats.map(c=>`<button class="${c===t?'on':''}" data-act="catCat" data-arg="${c}">${c}</button>`).join('')}</div>
+  <div class="tabs" style="margin-bottom:20px">${cats.map(c=>`<button type="button" class="${c===t?'on':''}" data-act="catCat" data-arg="${c}">${c}</button>`).join('')}</div>
   ${loading?catalogLoadingHtml():`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${list.map(p=>pcard(p,{price:p.price,swatches:p.sw,act:'catalogProductOpen',arg:String(catalog.indexOf(p))})).join('')}</div>`}`;
 }
 
@@ -4405,16 +4920,38 @@ function ViewOrders(){
       <div class="card empty"><div class="ic">${I.orders.replace('currentColor','#cdd6cf')}</div><h3>No orders yet</h3><p>Orders appear here when recipients redeem gifts or you send kits at scale.</p></div>`;
   }
   const rows = list.map(o=>`
-    <tr data-act="orderOpen" data-arg="${o.id}" style="cursor:pointer">
-      <td class="num">${o.date}</td>
-      <td style="font-weight:600">${esc(o.name)}</td>
-      <td>${statusTag(o.status)}</td>
-      <td class="num" style="font-weight:600">${inr(o.amount)}</td>
-      <td style="text-align:right"><span class="lnk">${o.track?'Tracking':'View'}</span></td>
+    <tr data-act="orderOpen" data-arg="${o.id}" class="orders-row">
+      <td class="orders-date">${esc(o.date)}</td>
+      <td class="orders-detail"><span class="orders-id">${esc(o.orderNumber||o.name)}</span></td>
+      <td class="orders-status">${statusTag(o.status)}</td>
+      <td class="orders-amount num">${inr(o.amount)}</td>
+      <td class="orders-action"><span class="lnk">${o.track?'Tracking':'View'}</span></td>
     </tr>`).join('');
   return `<div class="page-h"><div><h1>Orders</h1><div class="sub">Track every swag, kit and points order across your workspace.</div></div></div>
-  <div class="search" style="margin-bottom:18px">${I.search}<input placeholder="Search by order name or ID…" data-act="noop"></div>
-  <div class="card"><table class="tbl"><thead><tr><th>Date</th><th>Order details</th><th>Status</th><th>Amount</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  <div class="card orders-card">
+    <div class="orders-toolbar">
+      <div class="search orders-search">${I.search}<input placeholder="Search by order name or ID…" data-act="noop"></div>
+    </div>
+    <div class="orders-table-wrap">
+      <table class="tbl orders-table">
+        <colgroup>
+          <col class="orders-col-date">
+          <col class="orders-col-detail">
+          <col class="orders-col-status">
+          <col class="orders-col-amount">
+          <col class="orders-col-action">
+        </colgroup>
+        <thead><tr>
+          <th>Date</th>
+          <th>Order details</th>
+          <th>Status</th>
+          <th class="num">Amount</th>
+          <th class="orders-th-action" aria-label="Action"></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
 }
 function orderOpen(id){
   const o=S.orders.find(x=>x.id===id); if(!o)return;
@@ -4776,21 +5313,19 @@ function orgDone(){ const o=S.org.wallet; const invited=S.org.departments.filter
 
 /* ---------- small UI state handlers ---------- */
 function schedSet(el){ S.flow.sched=S.flow.sched||{}; S.flow.sched[el.dataset.k]=el.value; }
-function prevTab(a){ S.flow.prevView=a; render(); }
-function swSub(a){ S.flow.swSub=a; render(); }
+function prevTab(a){ S.flow.prevView=a; renderMain(); }
+function swSub(a){ S.flow.swSub=a; renderMain(); }
 function artTab(a){ S.flow.artTab=a; render(); }
 function artPrevThumb(i,u,sel){
   const ph=u.preview?`<img src="${u.preview}" alt="" style="width:100%;height:100%;object-fit:contain;display:block">`:LOGO_DECO;
-  const label=esc(u.ext&&u.size?u.ext+' · '+fmtFileSize(u.size):u.name||'artwork');
-  return `<div class="thumb ${sel?'on':''}" data-act="artPick" data-arg="${i}"><div class="ph">${ph}</div><div class="nm">${label}</div></div>`;
+  return `<div class="thumb ${sel?'on':''}" data-act="artPick" data-arg="${i}"><div class="ph">${ph}</div></div>`;
 }
 function artPick(el){ const i=+el.dataset.arg; const u=(S.artUploads||[])[i]; if(!u) return;
   S.flow.artwork=true; S.flow.artSel=i; S.flow.artFile={name:u.name,size:u.size,ext:u.ext,preview:u.preview,file:u.file}; render(); }
 function shopPrevThumb(i,u,sel){
   const src=u.preview||u.logoUrl||'';
   const ph=src?`<img src="${src}" alt="" style="width:100%;height:100%;object-fit:contain;display:block">`:LOGO_DECO;
-  const label=esc(u.ext&&u.size?u.ext+' · '+fmtFileSize(u.size):u.name||'logo');
-  return `<button type="button" class="thumb ${sel?'on':''}" data-act="shopLogoPrev" data-arg="${i}"><div class="ph">${ph}</div><div class="nm">${label}</div></button>`;
+  return `<button type="button" class="thumb ${sel?'on':''}" data-act="shopLogoPrev" data-arg="${i}"><div class="ph">${ph}</div></button>`;
 }
 function shopLogoTab(a){
   if(S.view!=='createShop') return;
@@ -4879,21 +5414,21 @@ async function logout(){
 }
 
 function shopOpen(id){ go('shopDetail',{flow:{shopId:id,shopTab:'Branded Swag'},nav:'shops'}); }
-function shopTab(t){ S.flow.shopTab=t; render(); }
+function shopTab(t){ S.flow.shopTab=t; renderMain(); }
 function swagTab(t){
   S.flow.swagTab=t;
   if(t==='All Products') S.flow.swagView='product';
-  render();
+  renderMain();
 }
-function swagView(mode){ S.flow.swagView=mode; render(); }
+function swagView(mode){ S.flow.swagView=mode; renderMain(); }
 async function catCat(c){
   const previousCategory=S.flow.catCat||'All Products';
   S.flow.catCat=c;
-  if(api.useMocks()||!api.isAuthenticated()){ render(); return; }
+  if(api.useMocks()||!api.isAuthenticated()){ renderMain(); return; }
   const requestId=(S.flow.catalogRequestId||0)+1;
   S.flow.catalogRequestId=requestId;
   S.flow.catalogLoading=true;
-  render();
+  renderMain();
   try{
     const catalog=await api.refreshCatalogProducts(c==='All Products'?undefined:c);
     if(S.flow.catalogRequestId!==requestId) return;
@@ -4907,7 +5442,7 @@ async function catCat(c){
   }finally{
     if(S.flow.catalogRequestId===requestId){
       S.flow.catalogLoading=false;
-      render();
+      renderMain();
     }
   }
 }
@@ -4947,17 +5482,35 @@ function sendGift(){
 }
 
 function userMenu(){
-  openModal(`<div class="modal-pad" style="max-width:380px">
-    <div class="row" style="gap:14px;align-items:center;margin-bottom:18px">
-      <div class="avatar" style="width:52px;height:52px;font-size:18px">${S.user.initials}</div>
-      <div><div style="font-weight:700;font-size:16px">${esc(S.user.name)}</div><div class="muted" style="font-size:13px">${esc(S.user.email||'')}</div>
-        <div style="margin-top:5px"><span class="tag tag-ready">People Admin · ${esc(S.account)}</span></div></div>
+  const account=esc(S.account||'Workspace');
+  const name=esc(S.user?.name||'User');
+  const email=esc(S.user?.email||'');
+  const globe=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.8 3.2 2.8 14.8 0 18M12 3c-2.8 3.2-2.8 14.8 0 18"/></svg>`;
+  const person=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M4 20a8 8 0 0 1 16 0"/></svg>`;
+  const check=I.check.replace('<svg ','<svg width="14" height="14" ');
+  openUserDropdown(`<div class="user-menu-head">
+      <div class="user-menu-name">${name}</div>
+      <div class="user-menu-email">${email}</div>
     </div>
-    <div style="border-top:1px solid var(--line);padding-top:8px">
-      ${[['Account settings','settings'],['Billing & invoices','billing']].map(([l,v])=>`<div class="nav-item" style="border-radius:var(--r-sm)" data-act="navClose" data-arg="${v}">${I.gear}<span>${l}</span></div>`).join('')}
-      <div class="nav-item" style="border-radius:var(--r-sm);color:var(--danger)" data-act="logout">${I.exit||I.back}<span>Log out</span></div>
+    <div class="user-menu-body">
+      <button type="button" class="user-menu-link" data-act="navClose" data-arg="settings">Account Settings</button>
+      <button type="button" class="user-menu-link" data-act="closeLayerToast" data-arg="Accessibility support — we will follow up by email">Accessibility Support</button>
+      <div class="user-menu-divider"></div>
+      <button type="button" class="user-menu-ws on" data-act="toast" data-arg="Already on ${account}">
+        <span class="user-menu-ws-icon">${globe}</span>
+        <span class="user-menu-ws-label">${account}</span>
+        <span class="user-menu-ws-meta">Default ${check}</span>
+      </button>
+      <button type="button" class="user-menu-ws" data-act="closeLayerToast" data-arg="Personal workspace — coming soon">
+        <span class="user-menu-ws-icon">${person}</span>
+        <span class="user-menu-ws-label">Personal Workspace</span>
+      </button>
+      <button type="button" class="user-menu-create" data-act="closeLayerToast" data-arg="Workspace creation — coming soon">+ Create new workspace</button>
     </div>
-  </div>`);
+    <div class="user-menu-foot">
+      <button type="button" class="user-menu-help" data-act="closeLayerToast" data-arg="Help center opened">${I.help.replace('<svg ','<svg width="16" height="16" ')}<span>Help Center</span></button>
+      <button type="button" class="user-menu-logout" data-act="logout">Log out</button>
+    </div>`);
 }
 
 /* ===================== EVENT DELEGATION ===================== */
@@ -5079,9 +5632,13 @@ const ACT = {
   ktPick:(el)=>ktPick(el),
   ktLogoUpload:()=>ktLogoUpload(),
   ktLogoClear:()=>ktLogoClear(),
+  ktLogoTab:(el,a)=>ktLogoTab(a),
+  ktLogoPick:(el)=>ktLogoPick(el),
+  ktResetLogo:()=>ktResetLogo(),
   ktPkg:(el)=>ktPkg(el),
   ktBack:()=>ktBack(),
   ktNext:()=>ktNext(),
+  ktNameExample:(el)=>ktNameExample(el),
   kitPublish:()=>kitPublish(),
   editKitStart:(el,a)=>editKitStart(a),
   ekPick:(el)=>ekPick(el),
@@ -5106,6 +5663,9 @@ const ACT = {
   addContactsDo:()=>addContactsDo(),
   contactEdit:(el,a)=>contactEdit(a),
   contactSave:(el,a)=>contactSave(a),
+  // integrations
+  integOpenCategory:(el,a)=>integOpenCategory(a),
+  integBack:()=>integBack(),
   // wizards
   wzExit:()=>wzExit(),
   payPick:(el)=>payPick(el),
@@ -5135,7 +5695,7 @@ function onShelfMerchClick(e){
   if(LIVE[act] || CHANGED[act]) return;   // handled on input/change
   const fn = ACT[act];
   if(!fn){ return; }
-  if(t.tagName==='A'||t.tagName==='BUTTON') e.preventDefault();
+  e.preventDefault();
   if(act==='shopEditOpen'||act==='swagView'||act==='swagCardMenu'||act==='collectionMenu'||t.classList?.contains('swag-card-menu')) e.stopPropagation();
   fn(t, t.dataset.arg);
 }

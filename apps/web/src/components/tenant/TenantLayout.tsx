@@ -14,16 +14,12 @@ import {
   Wallet,
 } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
-import { getStoredUser, isAuthenticated, logout } from "@/services/api-bridge";
+import { getStoredUser, isAuthenticated } from "@/services/api-bridge";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import type { WorkspaceSnapshot } from "@/services/workspace-api";
+import walletIconImg from "../../../assets/wallet-icon.svg";
 import "@/styles/shelf-merch.css";
 
-/**
- * Tenant navigation. `migrated` flips to true as each feature is ported to
- * React; migrated items link to `/app/*`, the rest deep-link back to the legacy
- * engine at `/?view=<key>` until they are cut over. This list is the single
- * source of truth for the cutover.
- */
 type NavItem = {
   key: string;
   label: string;
@@ -31,18 +27,38 @@ type NavItem = {
   migrated: boolean;
 };
 
-const NAV: NavItem[] = [
-  { key: "orders", label: "Orders", icon: Receipt, migrated: false },
-  { key: "wallets", label: "Wallets", icon: Wallet, migrated: false },
-  { key: "shops", label: "Shops", icon: Store, migrated: false },
-  { key: "swag", label: "Swag", icon: Shirt, migrated: false },
-  { key: "kits", label: "Kits", icon: Gift, migrated: false },
-  { key: "campaigns", label: "Campaigns", icon: Megaphone, migrated: false },
-  { key: "contacts", label: "Contacts", icon: Users, migrated: true },
-  { key: "integrations", label: "Integrations", icon: Plug, migrated: false },
-  { key: "billing", label: "Billing", icon: CreditCard, migrated: false },
-  { key: "settings", label: "Settings", icon: Settings, migrated: true },
-  { key: "catalog", label: "Catalog", icon: LayoutGrid, migrated: false },
+type NavSection = {
+  label: string;
+  items: NavItem[];
+};
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    label: "Workspace",
+    items: [
+      { key: "orders", label: "Orders", icon: Receipt, migrated: false },
+      { key: "wallets", label: "Wallets", icon: Wallet, migrated: false },
+      { key: "shops", label: "Shops", icon: Store, migrated: false },
+      { key: "swag", label: "Swag", icon: Shirt, migrated: false },
+      { key: "kits", label: "Kits", icon: Gift, migrated: false },
+      { key: "campaigns", label: "Campaigns", icon: Megaphone, migrated: false },
+    ],
+  },
+  {
+    label: "People & tools",
+    items: [
+      { key: "contacts", label: "Contacts", icon: Users, migrated: true },
+      { key: "integrations", label: "Integrations", icon: Plug, migrated: false },
+    ],
+  },
+  {
+    label: "Admin",
+    items: [
+      { key: "billing", label: "Billing", icon: CreditCard, migrated: false },
+      { key: "settings", label: "Settings", icon: Settings, migrated: true },
+      { key: "catalog", label: "Catalog", icon: LayoutGrid, migrated: false },
+    ],
+  },
 ];
 
 function initialsOf(name: string) {
@@ -53,6 +69,78 @@ function initialsOf(name: string) {
       .slice(0, 2)
       .map((p) => p[0]?.toUpperCase())
       .join("") || "U"
+  );
+}
+
+function truncTopbarName(name: string, max = 16) {
+  const n = name.trim();
+  return n.length > max ? `${n.slice(0, max - 1)}…` : n;
+}
+
+function formatWalletBalance(workspace: WorkspaceSnapshot | undefined) {
+  if (!workspace) return "₹0";
+  if (workspace.userPatch.role === "entity_manager" && workspace.primaryEntityId) {
+    const dept = workspace.org.departments.find(
+      (d) => String(d.id) === String(workspace.primaryEntityId),
+    );
+    if (dept) {
+      const rem = Math.max(0, (dept.allocated || 0) - (dept.spent || 0));
+      return `₹${Math.round(rem).toLocaleString("en-IN")}`;
+    }
+  }
+  const amount =
+    workspace.org.active && workspace.org.wallet.amount != null
+      ? workspace.org.wallet.amount
+      : workspace.wallets[0]?.balance ?? 0;
+  return `₹${Math.round(amount).toLocaleString("en-IN")}`;
+}
+
+function TopbarChevron() {
+  return (
+    <svg
+      className="topbar-chevron"
+      width={11}
+      height={11}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.6}
+      aria-hidden="true"
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+function SidebarNavItem({
+  item,
+  active,
+}: {
+  item: NavItem;
+  active: boolean;
+}) {
+  const className = `nav-item${active ? " on" : ""}`;
+  const inner = (
+    <>
+      <span className="nav-item-icon">
+        <item.icon size={17} />
+      </span>
+      <span className="nav-item-label">{item.label}</span>
+    </>
+  );
+
+  if (item.migrated) {
+    return (
+      <Link to={`/app/${item.key}`} className={className}>
+        {inner}
+      </Link>
+    );
+  }
+
+  return (
+    <a href={`/?view=${item.key}`} className={className}>
+      {inner}
+    </a>
   );
 }
 
@@ -69,14 +157,10 @@ export default function TenantLayout() {
 
   const account = workspace?.account ?? "Workspace";
   const userName = workspace?.userPatch?.name ?? user?.name ?? "User";
-
-  async function onLogout() {
-    await logout().catch(() => {});
-    window.location.href = "/";
-  }
+  const walletBalance = formatWalletBalance(workspace);
 
   return (
-    <div className="store" style={{ minHeight: "100vh" }}>
+    <div className="tenant-shell">
       <header className="topbar">
         <div className="brandmark">
           <svg viewBox="0 0 32 32" fill="none" width={28} height={28} aria-hidden="true">
@@ -95,39 +179,47 @@ export default function TenantLayout() {
             Shelf Merch
           </span>
         </div>
-        <div className="acct">
-          <div>
-            <div className="k">Account</div>
-            <div className="v">{account}</div>
-          </div>
-        </div>
         <div className="spacer" />
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onLogout}>
-          Sign out
-        </button>
-        <div className="avatar" title={userName} aria-label={userName}>
-          {initialsOf(userName)}
+        <div className="topbar-right">
+          <a href="/?view=wallets" className="topbar-wallet" aria-label="Wallet balance">
+            <span className="topbar-wallet-icon">
+              <img src={walletIconImg} alt="" className="topbar-wallet-img" aria-hidden="true" />
+            </span>
+            <span className="topbar-wallet-copy">
+              <span className="k">Wallet balance</span>
+              <span className="v">
+                {walletBalance}
+                <TopbarChevron />
+              </span>
+            </span>
+          </a>
+          <Link to="/app/settings" className="topbar-user" aria-label="Account menu">
+            <span className="topbar-user-avatar">{initialsOf(userName)}</span>
+            <span className="topbar-user-copy">
+              <span className="topbar-user-name">{truncTopbarName(userName)}</span>
+              <span className="topbar-user-sub">{account.toLowerCase()}</span>
+            </span>
+            <TopbarChevron />
+          </Link>
         </div>
       </header>
 
       <div className="body">
         <nav className="sidebar scroll" aria-label="Workspace">
-          {NAV.map(({ key, label, icon: Icon, migrated }) => {
-            const active = pathname === `/app/${key}` || (key === "orders" && pathname === "/app");
-            const className = `nav-item${active ? " on" : ""}`;
-            return migrated ? (
-              <Link key={key} to={`/app/${key}`} className={className}>
-                <Icon size={18} />
-                <span>{label}</span>
-              </Link>
-            ) : (
-              <a key={key} href={`/?view=${key}`} className={className}>
-                <Icon size={18} />
-                <span>{label}</span>
-              </a>
-            );
-          })}
+          {NAV_SECTIONS.map((section) => (
+            <div key={section.label} className="sidebar-section">
+              <div className="nav-sec">{section.label}</div>
+              {section.items.map((item) => (
+                <SidebarNavItem
+                  key={item.key}
+                  item={item}
+                  active={pathname === `/app/${item.key}` || (item.key === "orders" && pathname === "/app")}
+                />
+              ))}
+            </div>
+          ))}
         </nav>
+
         <main className="main scroll">
           <div className="wrap fade-in">
             <Outlet />

@@ -81,7 +81,7 @@ export function ContactFormDialog({ open, onOpenChange, mode, contact }: Props) 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm-modal">
-        <DialogHeader>
+        <DialogHeader className="contact-dialog-header">
           <DialogTitle>
             {mode === "edit" ? "Fix recipient information" : "Add contacts"}
           </DialogTitle>
@@ -116,43 +116,43 @@ export function ContactFormDialog({ open, onOpenChange, mode, contact }: Props) 
         {mode === "add" && tab === "csv" ? (
           <ImportContactsPanel onDone={() => onOpenChange(false)} />
         ) : (
-          <form onSubmit={handleSubmit(onSubmit)} noValidate>
-            <div className="row">
-              <div className="field" style={{ flex: 1 }}>
+          <form className="contact-form" onSubmit={handleSubmit(onSubmit)} noValidate>
+            <div className="contact-form-row">
+              <div className="field">
                 <label className="lbl" htmlFor="ac-first">
                   First name
                 </label>
                 <input id="ac-first" className="inp" {...register("firstName")} />
                 <FieldError message={errors.firstName?.message} />
               </div>
-              <div className="field" style={{ flex: 1 }}>
+              <div className="field">
                 <label className="lbl" htmlFor="ac-last">
                   Last name
                 </label>
                 <input id="ac-last" className="inp" {...register("lastName")} />
               </div>
             </div>
-            <div className="row">
-              <div className="field" style={{ flex: 1 }}>
+            <div className="contact-form-row">
+              <div className="field">
                 <label className="lbl" htmlFor="ac-email">
                   Email
                 </label>
                 <input id="ac-email" type="email" className="inp" {...register("email")} />
                 <FieldError message={errors.email?.message} />
               </div>
-              <div className="field" style={{ flex: 1 }}>
+              <div className="field">
                 <label className="lbl" htmlFor="ac-phone">
                   Phone
                 </label>
                 <input id="ac-phone" className="inp" {...register("phone")} />
               </div>
             </div>
-            <div className="row">
-              <div className="field" style={{ flex: 1 }}>
+            <div className="contact-form-row">
+              <div className="field">
                 <label className="lbl" htmlFor="ac-role">
                   Role
                 </label>
-                <select id="ac-role" className="inp" style={{ height: 40 }} {...register("role")}>
+                <select id="ac-role" className="inp" {...register("role")}>
                   {roleOptions.map((r) => (
                     <option key={r} value={r}>
                       {r}
@@ -160,30 +160,25 @@ export function ContactFormDialog({ open, onOpenChange, mode, contact }: Props) 
                   ))}
                 </select>
               </div>
-              <div className="field" style={{ flex: 1 }}>
+              <div className="field">
                 <label className="lbl" htmlFor="ac-dept">
                   Department
                 </label>
                 <input id="ac-dept" className="inp" {...register("department")} />
               </div>
             </div>
-            <div className="row">
-              <div className="field" style={{ flex: 1 }}>
+            <div className="contact-form-row">
+              <div className="field">
                 <label className="lbl" htmlFor="ac-emp">
                   Employee Code
                 </label>
                 <input id="ac-emp" className="inp" {...register("employeeCode")} />
               </div>
-              <div className="field" style={{ flex: 1 }}>
+              <div className="field">
                 <label className="lbl" htmlFor="ac-country">
                   Country
                 </label>
-                <select
-                  id="ac-country"
-                  className="inp"
-                  style={{ height: 40 }}
-                  {...register("country")}
-                >
+                <select id="ac-country" className="inp" {...register("country")}>
                   {COUNTRIES.map((c) => (
                     <option key={c.value} value={c.value}>
                       {c.label}
@@ -198,35 +193,35 @@ export function ContactFormDialog({ open, onOpenChange, mode, contact }: Props) 
               </label>
               <input id="ac-address" className="inp" {...register("line1")} />
             </div>
-            <div className="row">
-              <div className="field" style={{ flex: 1 }}>
+            <div className="contact-form-row contact-form-row--3">
+              <div className="field">
                 <label className="lbl" htmlFor="ac-city">
                   City
                 </label>
                 <input id="ac-city" className="inp" {...register("city")} />
               </div>
-              <div className="field" style={{ flex: 1 }}>
+              <div className="field">
                 <label className="lbl" htmlFor="ac-state">
                   State
                 </label>
                 <input id="ac-state" className="inp" {...register("state")} />
               </div>
-              <div className="field" style={{ flex: 1 }}>
+              <div className="field contact-form-pin">
                 <label className="lbl" htmlFor="ac-pin">
                   PIN Code
                 </label>
                 <input id="ac-pin" className="inp" {...register("pincode")} />
               </div>
             </div>
-            <div className="row" style={{ marginTop: 16 }}>
+            <div className="contact-form-footer">
               <button
                 type="button"
-                className="btn btn-ghost btn-block"
+                className="btn btn-ghost"
                 onClick={() => onOpenChange(false)}
               >
                 Cancel
               </button>
-              <button type="submit" className="btn btn-brand btn-block" disabled={busy}>
+              <button type="submit" className="btn btn-brand" disabled={busy}>
                 {busy ? "Saving…" : mode === "edit" ? "Save" : "Add contacts"}
               </button>
             </div>
