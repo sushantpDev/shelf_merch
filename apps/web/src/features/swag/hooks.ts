@@ -1,0 +1,65 @@
+import { useMutation } from "@tanstack/react-query";
+import {
+  addProductToShopFlow,
+  archiveCollectionFlow,
+  createCollectionFlow,
+  deleteCollectionFlow,
+  restoreCollectionFlow,
+} from "@/services/api-bridge";
+import { useInvalidateWorkspace } from "@/hooks/useWorkspace";
+import type { UiCollection, UiProduct } from "@/services/mappers";
+
+export type CreateCollectionInput = {
+  shopId?: string;
+  name: string;
+  pickedIndices: number[];
+  catalog: UiProduct[];
+  preferredColors?: string[];
+  artwork?: { file?: File; preview?: string; name?: string };
+  mockups?: Array<{ catalogProductId: string; dataUrl: string }>;
+};
+
+export function useCreateCollection() {
+  const invalidate = useInvalidateWorkspace();
+  return useMutation({
+    mutationFn: (input: CreateCollectionInput) => createCollectionFlow(input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useArchiveCollection() {
+  const invalidate = useInvalidateWorkspace();
+  return useMutation({
+    mutationFn: (collectionId: string) => archiveCollectionFlow(collectionId),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useRestoreCollection() {
+  const invalidate = useInvalidateWorkspace();
+  return useMutation({
+    mutationFn: (collectionId: string) => restoreCollectionFlow(collectionId),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeleteCollection() {
+  const invalidate = useInvalidateWorkspace();
+  return useMutation({
+    mutationFn: (collectionId: string) => deleteCollectionFlow(collectionId),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useAddProductToShop() {
+  const invalidate = useInvalidateWorkspace();
+  return useMutation({
+    mutationFn: (payload: {
+      shopId: string;
+      collection: UiCollection;
+      product: UiProduct;
+      catalog: UiProduct[];
+    }) => addProductToShopFlow(payload),
+    onSuccess: () => invalidate(),
+  });
+}

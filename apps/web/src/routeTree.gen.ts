@@ -38,6 +38,7 @@ import { Route as AppCatalogRouteImport } from './routes/app.catalog'
 import { Route as PlatformOrdersIndexRouteImport } from './routes/platform.orders.index'
 import { Route as PlatformKitsIndexRouteImport } from './routes/platform.kits.index'
 import { Route as PlatformCatalogIndexRouteImport } from './routes/platform.catalog.index'
+import { Route as AppSwagIndexRouteImport } from './routes/app.swag.index'
 import { Route as AppShopsIndexRouteImport } from './routes/app.shops.index'
 import { Route as PlatformOrdersIdRouteImport } from './routes/platform.orders.$id'
 import { Route as PlatformKitsNewRouteImport } from './routes/platform.kits.new'
@@ -46,6 +47,7 @@ import { Route as PlatformKitsIdRouteImport } from './routes/platform.kits.$id'
 import { Route as PlatformCatalogNewRouteImport } from './routes/platform.catalog.new'
 import { Route as PlatformCatalogImportRouteImport } from './routes/platform.catalog.import'
 import { Route as PlatformCatalogIdRouteImport } from './routes/platform.catalog.$id'
+import { Route as AppSwagNewRouteImport } from './routes/app.swag.new'
 import { Route as AppShopsNewRouteImport } from './routes/app.shops.new'
 import { Route as AppShopsIdRouteImport } from './routes/app.shops.$id'
 
@@ -194,6 +196,11 @@ const PlatformCatalogIndexRoute = PlatformCatalogIndexRouteImport.update({
   path: '/',
   getParentRoute: () => PlatformCatalogRoute,
 } as any)
+const AppSwagIndexRoute = AppSwagIndexRouteImport.update({
+  id: '/swag/',
+  path: '/swag/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppShopsIndexRoute = AppShopsIndexRouteImport.update({
   id: '/shops/',
   path: '/shops/',
@@ -233,6 +240,11 @@ const PlatformCatalogIdRoute = PlatformCatalogIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => PlatformCatalogRoute,
+} as any)
+const AppSwagNewRoute = AppSwagNewRouteImport.update({
+  id: '/swag/new',
+  path: '/swag/new',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppShopsNewRoute = AppShopsNewRouteImport.update({
   id: '/shops/new',
@@ -274,6 +286,7 @@ export interface FileRoutesByFullPath {
   '/platform/': typeof PlatformIndexRoute
   '/app/shops/$id': typeof AppShopsIdRoute
   '/app/shops/new': typeof AppShopsNewRoute
+  '/app/swag/new': typeof AppSwagNewRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
   '/platform/catalog/import': typeof PlatformCatalogImportRoute
   '/platform/catalog/new': typeof PlatformCatalogNewRoute
@@ -282,6 +295,7 @@ export interface FileRoutesByFullPath {
   '/platform/kits/new': typeof PlatformKitsNewRoute
   '/platform/orders/$id': typeof PlatformOrdersIdRoute
   '/app/shops/': typeof AppShopsIndexRoute
+  '/app/swag/': typeof AppSwagIndexRoute
   '/platform/catalog/': typeof PlatformCatalogIndexRoute
   '/platform/kits/': typeof PlatformKitsIndexRoute
   '/platform/orders/': typeof PlatformOrdersIndexRoute
@@ -310,6 +324,7 @@ export interface FileRoutesByTo {
   '/platform': typeof PlatformIndexRoute
   '/app/shops/$id': typeof AppShopsIdRoute
   '/app/shops/new': typeof AppShopsNewRoute
+  '/app/swag/new': typeof AppSwagNewRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
   '/platform/catalog/import': typeof PlatformCatalogImportRoute
   '/platform/catalog/new': typeof PlatformCatalogNewRoute
@@ -318,6 +333,7 @@ export interface FileRoutesByTo {
   '/platform/kits/new': typeof PlatformKitsNewRoute
   '/platform/orders/$id': typeof PlatformOrdersIdRoute
   '/app/shops': typeof AppShopsIndexRoute
+  '/app/swag': typeof AppSwagIndexRoute
   '/platform/catalog': typeof PlatformCatalogIndexRoute
   '/platform/kits': typeof PlatformKitsIndexRoute
   '/platform/orders': typeof PlatformOrdersIndexRoute
@@ -352,6 +368,7 @@ export interface FileRoutesById {
   '/platform/': typeof PlatformIndexRoute
   '/app/shops/$id': typeof AppShopsIdRoute
   '/app/shops/new': typeof AppShopsNewRoute
+  '/app/swag/new': typeof AppSwagNewRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
   '/platform/catalog/import': typeof PlatformCatalogImportRoute
   '/platform/catalog/new': typeof PlatformCatalogNewRoute
@@ -360,6 +377,7 @@ export interface FileRoutesById {
   '/platform/kits/new': typeof PlatformKitsNewRoute
   '/platform/orders/$id': typeof PlatformOrdersIdRoute
   '/app/shops/': typeof AppShopsIndexRoute
+  '/app/swag/': typeof AppSwagIndexRoute
   '/platform/catalog/': typeof PlatformCatalogIndexRoute
   '/platform/kits/': typeof PlatformKitsIndexRoute
   '/platform/orders/': typeof PlatformOrdersIndexRoute
@@ -395,6 +413,7 @@ export interface FileRouteTypes {
     | '/platform/'
     | '/app/shops/$id'
     | '/app/shops/new'
+    | '/app/swag/new'
     | '/platform/catalog/$id'
     | '/platform/catalog/import'
     | '/platform/catalog/new'
@@ -403,6 +422,7 @@ export interface FileRouteTypes {
     | '/platform/kits/new'
     | '/platform/orders/$id'
     | '/app/shops/'
+    | '/app/swag/'
     | '/platform/catalog/'
     | '/platform/kits/'
     | '/platform/orders/'
@@ -431,6 +451,7 @@ export interface FileRouteTypes {
     | '/platform'
     | '/app/shops/$id'
     | '/app/shops/new'
+    | '/app/swag/new'
     | '/platform/catalog/$id'
     | '/platform/catalog/import'
     | '/platform/catalog/new'
@@ -439,6 +460,7 @@ export interface FileRouteTypes {
     | '/platform/kits/new'
     | '/platform/orders/$id'
     | '/app/shops'
+    | '/app/swag'
     | '/platform/catalog'
     | '/platform/kits'
     | '/platform/orders'
@@ -472,6 +494,7 @@ export interface FileRouteTypes {
     | '/platform/'
     | '/app/shops/$id'
     | '/app/shops/new'
+    | '/app/swag/new'
     | '/platform/catalog/$id'
     | '/platform/catalog/import'
     | '/platform/catalog/new'
@@ -480,6 +503,7 @@ export interface FileRouteTypes {
     | '/platform/kits/new'
     | '/platform/orders/$id'
     | '/app/shops/'
+    | '/app/swag/'
     | '/platform/catalog/'
     | '/platform/kits/'
     | '/platform/orders/'
@@ -699,6 +723,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlatformCatalogIndexRouteImport
       parentRoute: typeof PlatformCatalogRoute
     }
+    '/app/swag/': {
+      id: '/app/swag/'
+      path: '/swag'
+      fullPath: '/app/swag/'
+      preLoaderRoute: typeof AppSwagIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/shops/': {
       id: '/app/shops/'
       path: '/shops'
@@ -755,6 +786,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlatformCatalogIdRouteImport
       parentRoute: typeof PlatformCatalogRoute
     }
+    '/app/swag/new': {
+      id: '/app/swag/new'
+      path: '/swag/new'
+      fullPath: '/app/swag/new'
+      preLoaderRoute: typeof AppSwagNewRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/shops/new': {
       id: '/app/shops/new'
       path: '/shops/new'
@@ -781,7 +819,9 @@ interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppShopsIdRoute: typeof AppShopsIdRoute
   AppShopsNewRoute: typeof AppShopsNewRoute
+  AppSwagNewRoute: typeof AppSwagNewRoute
   AppShopsIndexRoute: typeof AppShopsIndexRoute
+  AppSwagIndexRoute: typeof AppSwagIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -793,7 +833,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppShopsIdRoute: AppShopsIdRoute,
   AppShopsNewRoute: AppShopsNewRoute,
+  AppSwagNewRoute: AppSwagNewRoute,
   AppShopsIndexRoute: AppShopsIndexRoute,
+  AppSwagIndexRoute: AppSwagIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

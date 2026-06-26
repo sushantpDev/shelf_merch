@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { ArrowLeft, Coins } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { useWorkspace } from "@/hooks/useWorkspace";
@@ -14,6 +14,7 @@ import { ReportsTab } from "./tabs/ReportsTab";
 
 export function ShopDetailPage() {
   const { id } = useParams({ from: "/app/shops/$id" });
+  const navigate = useNavigate();
   const { data: workspace, isLoading, isError, error } = useWorkspace();
   const [tab, setTab] = useState<ShopTab>("Branded Swag");
   const [editingLook, setEditingLook] = useState<UiShop | null>(null);
@@ -51,7 +52,7 @@ export function ShopDetailPage() {
     window.location.href = `/?view=shopDetail&shop=${encodeURIComponent(shop.id)}&launch=sendPoints`;
   };
   const startDesigning = () => {
-    window.location.href = `/?view=shopDetail&shop=${encodeURIComponent(shop.id)}&launch=swag`;
+    navigate({ to: "/app/swag/new", search: { shop: shop.id } });
   };
 
   return (

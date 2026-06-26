@@ -1,0 +1,193 @@
+import { useMemo, useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { LayoutGrid, Plus, Rows3, Shirt } from "lucide-react";
+import { LoadingState } from "@/components/LoadingState";
+import { PageHeader } from "@/components/tenant/PageHeader";
+import { useWorkspace } from "@/hooks/useWorkspace";
+import type { UiCollection, UiProduct } from "@/services/mappers";
+import { CollectionBlock } from "./CollectionBlock";
+import { DesignCard } from "./DesignCard";
+import { ProductDetailDialog, type DesignTarget } from "./ProductDetailDialog";
+import { AddToShopDialog, type AddToShopTarget } from "./AddToShopDialog";
+
+type Tab = "All Products" | "Saved Designs" | "Archived";
+type View = "product" | "collection";
+
+export function SwagPage() {
+  const { data: workspace, isLoading, isError, error } = useWorkspace();
+  const navigate = useNavigate();
+  const [tab, setTab] = useState<Tab>("All Products");
+  const [view, setView] = useState<View>("product");
+  const [design, setDesign] = useState<DesignTarget | null>(null);
+  const [addTarget, setAddTarget] = useState<AddToShopTarget | null>(null);
+
+  const collections = useMemo(
+    () => (workspace?.collections ?? []).filter((c) => !c.isShopSpecific),
+    [workspace?.collections],
+  );
+  const active = collections.filter((c) => c.status !== "archived");
+  const archived = collections.filter((c) => c.status === "archived");
+  const shown = tab === "Archived" ? archived : active;
+
+  const designEntries = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { collection: UiCollection; product: UiProduct; pIdx: number }[] = [];
+    for (const col of shown) {
+      col.products.forEach((p, i) => {
+        const key = `${p.id || ""}|${col.artworkUrl || ""}|${p.nm}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        out.push({ collection: col, product: p, pIdx: i });
+      });
+    }
+    return out;
+  }, [shown]);
+
+  if (isLoading && !workspace) {
+    return <LoadingState message="Loading swag…" fullScreen={false} />;
+  }
+  if (isError || !workspace) {
+    return (
+      <div className="card" style={{ padding: 16, color: "var(--danger)" }}>
+        {error instanceof Error ? error.message : "Could not load swag"}
+      </div>
+    );
+  }
+
+  const tabLabels: Record<Tab, string> = {
+    "All Products": `All Products (${designEntries.length || 0})`,
+    "Saved Designs": "Saved Designs",
+    Archived: "Archived",
+  };
+
+  function selectTab(t: Tab) {
+    setTab(t);
+    setView(t === "All Products" ? "product" : "collection");
+  }
+
+  const empty = shown.length === 0;
+
+  return (
+    <>
+      <PageHeader
+        title="Swag"
+        subtitle="Your designed collections and the full catalog you can build from."
+        actions={
+          <>
+            <Link to="/app/swag/new" className="btn btn-ghost">
+              <Plus size={16} /> Start designing
+            </Link>
+            <Link to="/app/catalog" className="btn btn-dark">
+              Purchase swag
+            </Link>
+          </>
+        }
+      />
+
+      <div
+        className="row"
+        style={{
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 22,
+          flexWrap: "wrap",
+          gap: 12,
+        }}
+      >
+        <div
+          className="tabs"
+          style={{ flex: 1, minWidth: 280, maxWidth: 520 }}
+          role="tablist"
+          aria-label="Swag filter"
+        >
+          {(["All Products", "Saved Designs", "Archived"] as Tab[]).map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={t === tab}
+              className={t === tab ? "on" : ""}
+              onClick={() => selectTab(t)}
+            >
+              {tabLabels[t]}
+            </button>
+          ))}
+        </div>
+        <div className="view-toggle">
+          <button
+            type="button"
+            className={`view-toggle-btn ${view === "product" ? "on" : ""}`}
+            aria-label="View by product"
+            aria-pressed={view === "product"}
+            onClick={() => setView("product")}
+          >
+            <LayoutGrid size={16} />
+          </button>
+          <button
+            type="button"
+            className={`view-toggle-btn ${view === "collection" ? "on" : ""}`}
+            aria-label="View by collection"
+            aria-pressed={view === "collection"}
+            onClick={() => setView("collection")}
+          >
+            <Rows3 size={16} />
+          </button>
+        </div>
+      </div>
+
+      {empty ? (
+        <div className="card empty" style={{ padding: 48 }}>
+          <div className="ic" aria-hidden="true">
+            <Shirt size={34} color="#cdd6cf" />
+          </div>
+          <h3>{tab === "Archived" ? "No archived designs" : "No designs yet"}</h3>
+          <p>
+            {tab === "Archived"
+              ? "Designs you archive will be stored here and can be restored any time."
+              : "Start designing to add branded products to your swag."}
+          </p>
+          {tab !== "Archived" && (
+            <button
+              type="button"
+              className="btn btn-dark btn-lg"
+              style={{ marginTop: 14 }}
+              onClick={() => navigate({ to: "/app/swag/new" })}
+            >
+              <Plus size={16} /> Start designing
+            </button>
+          )}
+        </div>
+      ) : view === "product" ? (
+        <div className="grid swag-designs-grid">
+          {designEntries.map(({ collection, product, pIdx }) => (
+            <DesignCard
+              key={`${collection.id}:${pIdx}`}
+              collection={collection}
+              product={product}
+              onOpen={() => setDesign({ collection, product, pIdx })}
+            />
+          ))}
+        </div>
+      ) : (
+        shown.map((col) => (
+          <CollectionBlock
+            key={col.id}
+            collection={col}
+            onOpenDesign={(product, pIdx) => setDesign({ collection: col, product, pIdx })}
+            onAddToShop={(collection) => setAddTarget({ collection })}
+          />
+        ))
+      )}
+
+      <ProductDetailDialog
+        target={design}
+        onOpenChange={(open) => !open && setDesign(null)}
+        onAddToShop={(t) => {
+          setDesign(null);
+          setAddTarget({ collection: t.collection, product: t.product });
+        }}
+      />
+      <AddToShopDialog target={addTarget} onOpenChange={(open) => !open && setAddTarget(null)} />
+    </>
+  );
+}
