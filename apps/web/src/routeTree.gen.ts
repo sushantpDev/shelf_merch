@@ -38,6 +38,7 @@ import { Route as AppCatalogRouteImport } from './routes/app.catalog'
 import { Route as PlatformOrdersIndexRouteImport } from './routes/platform.orders.index'
 import { Route as PlatformKitsIndexRouteImport } from './routes/platform.kits.index'
 import { Route as PlatformCatalogIndexRouteImport } from './routes/platform.catalog.index'
+import { Route as AppShopsIndexRouteImport } from './routes/app.shops.index'
 import { Route as PlatformOrdersIdRouteImport } from './routes/platform.orders.$id'
 import { Route as PlatformKitsNewRouteImport } from './routes/platform.kits.new'
 import { Route as PlatformKitsImportRouteImport } from './routes/platform.kits.import'
@@ -45,6 +46,8 @@ import { Route as PlatformKitsIdRouteImport } from './routes/platform.kits.$id'
 import { Route as PlatformCatalogNewRouteImport } from './routes/platform.catalog.new'
 import { Route as PlatformCatalogImportRouteImport } from './routes/platform.catalog.import'
 import { Route as PlatformCatalogIdRouteImport } from './routes/platform.catalog.$id'
+import { Route as AppShopsNewRouteImport } from './routes/app.shops.new'
+import { Route as AppShopsIdRouteImport } from './routes/app.shops.$id'
 
 const PlatformRoute = PlatformRouteImport.update({
   id: '/platform',
@@ -191,6 +194,11 @@ const PlatformCatalogIndexRoute = PlatformCatalogIndexRouteImport.update({
   path: '/',
   getParentRoute: () => PlatformCatalogRoute,
 } as any)
+const AppShopsIndexRoute = AppShopsIndexRouteImport.update({
+  id: '/shops/',
+  path: '/shops/',
+  getParentRoute: () => AppRoute,
+} as any)
 const PlatformOrdersIdRoute = PlatformOrdersIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -226,6 +234,16 @@ const PlatformCatalogIdRoute = PlatformCatalogIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => PlatformCatalogRoute,
 } as any)
+const AppShopsNewRoute = AppShopsNewRouteImport.update({
+  id: '/shops/new',
+  path: '/shops/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppShopsIdRoute = AppShopsIdRouteImport.update({
+  id: '/shops/$id',
+  path: '/shops/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -254,6 +272,8 @@ export interface FileRoutesByFullPath {
   '/shop/$id': typeof ShopIdRoute
   '/app/': typeof AppIndexRoute
   '/platform/': typeof PlatformIndexRoute
+  '/app/shops/$id': typeof AppShopsIdRoute
+  '/app/shops/new': typeof AppShopsNewRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
   '/platform/catalog/import': typeof PlatformCatalogImportRoute
   '/platform/catalog/new': typeof PlatformCatalogNewRoute
@@ -261,6 +281,7 @@ export interface FileRoutesByFullPath {
   '/platform/kits/import': typeof PlatformKitsImportRoute
   '/platform/kits/new': typeof PlatformKitsNewRoute
   '/platform/orders/$id': typeof PlatformOrdersIdRoute
+  '/app/shops/': typeof AppShopsIndexRoute
   '/platform/catalog/': typeof PlatformCatalogIndexRoute
   '/platform/kits/': typeof PlatformKitsIndexRoute
   '/platform/orders/': typeof PlatformOrdersIndexRoute
@@ -287,6 +308,8 @@ export interface FileRoutesByTo {
   '/shop/$id': typeof ShopIdRoute
   '/app': typeof AppIndexRoute
   '/platform': typeof PlatformIndexRoute
+  '/app/shops/$id': typeof AppShopsIdRoute
+  '/app/shops/new': typeof AppShopsNewRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
   '/platform/catalog/import': typeof PlatformCatalogImportRoute
   '/platform/catalog/new': typeof PlatformCatalogNewRoute
@@ -294,6 +317,7 @@ export interface FileRoutesByTo {
   '/platform/kits/import': typeof PlatformKitsImportRoute
   '/platform/kits/new': typeof PlatformKitsNewRoute
   '/platform/orders/$id': typeof PlatformOrdersIdRoute
+  '/app/shops': typeof AppShopsIndexRoute
   '/platform/catalog': typeof PlatformCatalogIndexRoute
   '/platform/kits': typeof PlatformKitsIndexRoute
   '/platform/orders': typeof PlatformOrdersIndexRoute
@@ -326,6 +350,8 @@ export interface FileRoutesById {
   '/shop/$id': typeof ShopIdRoute
   '/app/': typeof AppIndexRoute
   '/platform/': typeof PlatformIndexRoute
+  '/app/shops/$id': typeof AppShopsIdRoute
+  '/app/shops/new': typeof AppShopsNewRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
   '/platform/catalog/import': typeof PlatformCatalogImportRoute
   '/platform/catalog/new': typeof PlatformCatalogNewRoute
@@ -333,6 +359,7 @@ export interface FileRoutesById {
   '/platform/kits/import': typeof PlatformKitsImportRoute
   '/platform/kits/new': typeof PlatformKitsNewRoute
   '/platform/orders/$id': typeof PlatformOrdersIdRoute
+  '/app/shops/': typeof AppShopsIndexRoute
   '/platform/catalog/': typeof PlatformCatalogIndexRoute
   '/platform/kits/': typeof PlatformKitsIndexRoute
   '/platform/orders/': typeof PlatformOrdersIndexRoute
@@ -366,6 +393,8 @@ export interface FileRouteTypes {
     | '/shop/$id'
     | '/app/'
     | '/platform/'
+    | '/app/shops/$id'
+    | '/app/shops/new'
     | '/platform/catalog/$id'
     | '/platform/catalog/import'
     | '/platform/catalog/new'
@@ -373,6 +402,7 @@ export interface FileRouteTypes {
     | '/platform/kits/import'
     | '/platform/kits/new'
     | '/platform/orders/$id'
+    | '/app/shops/'
     | '/platform/catalog/'
     | '/platform/kits/'
     | '/platform/orders/'
@@ -399,6 +429,8 @@ export interface FileRouteTypes {
     | '/shop/$id'
     | '/app'
     | '/platform'
+    | '/app/shops/$id'
+    | '/app/shops/new'
     | '/platform/catalog/$id'
     | '/platform/catalog/import'
     | '/platform/catalog/new'
@@ -406,6 +438,7 @@ export interface FileRouteTypes {
     | '/platform/kits/import'
     | '/platform/kits/new'
     | '/platform/orders/$id'
+    | '/app/shops'
     | '/platform/catalog'
     | '/platform/kits'
     | '/platform/orders'
@@ -437,6 +470,8 @@ export interface FileRouteTypes {
     | '/shop/$id'
     | '/app/'
     | '/platform/'
+    | '/app/shops/$id'
+    | '/app/shops/new'
     | '/platform/catalog/$id'
     | '/platform/catalog/import'
     | '/platform/catalog/new'
@@ -444,6 +479,7 @@ export interface FileRouteTypes {
     | '/platform/kits/import'
     | '/platform/kits/new'
     | '/platform/orders/$id'
+    | '/app/shops/'
     | '/platform/catalog/'
     | '/platform/kits/'
     | '/platform/orders/'
@@ -663,6 +699,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlatformCatalogIndexRouteImport
       parentRoute: typeof PlatformCatalogRoute
     }
+    '/app/shops/': {
+      id: '/app/shops/'
+      path: '/shops'
+      fullPath: '/app/shops/'
+      preLoaderRoute: typeof AppShopsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/platform/orders/$id': {
       id: '/platform/orders/$id'
       path: '/$id'
@@ -712,6 +755,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlatformCatalogIdRouteImport
       parentRoute: typeof PlatformCatalogRoute
     }
+    '/app/shops/new': {
+      id: '/app/shops/new'
+      path: '/shops/new'
+      fullPath: '/app/shops/new'
+      preLoaderRoute: typeof AppShopsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/shops/$id': {
+      id: '/app/shops/$id'
+      path: '/shops/$id'
+      fullPath: '/app/shops/$id'
+      preLoaderRoute: typeof AppShopsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -722,6 +779,9 @@ interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRoute
   AppWalletsRoute: typeof AppWalletsRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppShopsIdRoute: typeof AppShopsIdRoute
+  AppShopsNewRoute: typeof AppShopsNewRoute
+  AppShopsIndexRoute: typeof AppShopsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -731,6 +791,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsRoute: AppSettingsRoute,
   AppWalletsRoute: AppWalletsRoute,
   AppIndexRoute: AppIndexRoute,
+  AppShopsIdRoute: AppShopsIdRoute,
+  AppShopsNewRoute: AppShopsNewRoute,
+  AppShopsIndexRoute: AppShopsIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

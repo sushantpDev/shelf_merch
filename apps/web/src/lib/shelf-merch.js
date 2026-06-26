@@ -238,7 +238,7 @@ function notifyViewChange(){
 }
 function go(view, opts={}){ S.view=view; if(opts.nav)S.nav=opts.nav; Object.assign(S.flow, opts.flow||{}); if(view==='contacts')S.flow.contactsSearch=''; window.scrollTo(0,0); render(); }
 // Views migrated to the React app at /app/* — clicking them hands off to React.
-const MIGRATED_VIEWS = new Set(['settings','contacts','wallets','orders','catalog']);
+const MIGRATED_VIEWS = new Set(['settings','contacts','wallets','orders','catalog','shops']);
 async function setNav(n){
   if(MIGRATED_VIEWS.has(n)){ window.location.assign('/app/'+n); return; }
   S.nav=n; S.view=n; closeLayer();
@@ -5282,6 +5282,7 @@ async function init(){
     return;
   }
   const gen=++bootState.gen;
+  let bootLaunch=null;
   appLoadingStart('Loading workspace…');
   const snapshot=await api.tryRestoreSession();
   if(gen!==bootState.gen||S.authed){
@@ -5299,10 +5300,25 @@ async function init(){
     S.authed=true; S.nav='orders'; S.view='orders';
     // Honour a deep-link from the React app (e.g. /?view=wallets); migrated
     // views bounce straight to /app/*.
-    const deepView=new URLSearchParams(location.search).get('view');
+    const deepParams=new URLSearchParams(location.search);
+    const deepView=deepParams.get('view');
     if(deepView){
       if(MIGRATED_VIEWS.has(deepView)){ window.location.replace('/app/'+deepView); return; }
-      S.nav=deepView; S.view=deepView;
+      if(deepView==='shopDetail'){
+        // Hand-off from the migrated React shop detail into a legacy full-screen
+        // flow (send points / design swag) that isn't migrated yet.
+        const shopId=deepParams.get('shop');
+        const shop=shopId&&S.shops.find(x=>String(x.id)===String(shopId));
+        S.nav='shops';
+        if(shop){
+          S.view='shopDetail'; S.flow={shopId:shop.id,shopTab:'Branded Swag'};
+          const launch=deepParams.get('launch');
+          if(launch==='sendPoints'){ bootLaunch=()=>sendPointsStart(shop.id); }
+          else if(launch==='swag'){ bootLaunch=()=>swagDesignerStart(); }
+        } else { S.view='shops'; }
+      } else {
+        S.nav=deepView; S.view=deepView;
+      }
     }
   }else{
     if(gen!==bootState.gen||S.authed){
@@ -5314,6 +5330,7 @@ async function init(){
   }
   appLoadingEnd();
   render();
+  if(bootLaunch){ try{ bootLaunch(); }catch(_e){} }
 }
 init();
 }

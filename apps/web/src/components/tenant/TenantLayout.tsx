@@ -34,7 +34,7 @@ type NavItem = {
 const NAV: NavItem[] = [
   { key: "orders", label: "Orders", icon: Receipt, migrated: true },
   { key: "wallets", label: "Wallets", icon: Wallet, migrated: true },
-  { key: "shops", label: "Shops", icon: Store, migrated: false },
+  { key: "shops", label: "Shops", icon: Store, migrated: true },
   { key: "swag", label: "Swag", icon: Shirt, migrated: false },
   { key: "kits", label: "Kits", icon: Gift, migrated: false },
   { key: "campaigns", label: "Campaigns", icon: Megaphone, migrated: false },
