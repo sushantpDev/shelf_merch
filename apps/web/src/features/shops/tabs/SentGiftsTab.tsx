@@ -1,4 +1,5 @@
 import type { UiShop } from "@/services/mappers";
+import sentGiftsEmptyImg from "../../../../assets/sent-gifts-empty.png";
 
 /**
  * Sent gifts are produced by the (not-yet-migrated) Send Points flow and were
@@ -9,6 +10,7 @@ export function SentGiftsTab({ shop, onSendPoints }: { shop: UiShop; onSendPoint
   return (
     <div className="card sent-gifts-empty">
       <div className="sent-gifts-empty-inner">
+        <img src={sentGiftsEmptyImg} alt="" className="sent-gifts-empty-art" />
         <div className="sent-gifts-empty-content">
           <h3>You haven&apos;t sent any points</h3>
           <p className="muted">

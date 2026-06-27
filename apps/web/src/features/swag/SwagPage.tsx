@@ -9,6 +9,8 @@ import { CollectionBlock } from "./CollectionBlock";
 import { DesignCard } from "./DesignCard";
 import { ProductDetailDialog, type DesignTarget } from "./ProductDetailDialog";
 import { AddToShopDialog, type AddToShopTarget } from "./AddToShopDialog";
+import swagBannerImg from "../../../assets/swag-banner.png";
+import startDesigningImg from "../../../assets/start_designing.png";
 
 type Tab = "All Products" | "Saved Designs" | "Archived";
 type View = "product" | "collection";
@@ -85,6 +87,13 @@ export function SwagPage() {
       />
 
       <div
+        className="swag-hero-banner"
+        style={{ backgroundImage: `url(${swagBannerImg})` }}
+        role="img"
+        aria-label="Build your swag collection"
+      />
+
+      <div
         className="row"
         style={{
           justifyContent: "space-between",
@@ -136,27 +145,35 @@ export function SwagPage() {
       </div>
 
       {empty ? (
-        <div className="card empty" style={{ padding: 48 }}>
-          <div className="ic" aria-hidden="true">
-            <Shirt size={34} color="#cdd6cf" />
+        tab === "Archived" ? (
+          <div className="card empty" style={{ padding: 48 }}>
+            <div className="ic" aria-hidden="true">
+              <Shirt size={34} color="#cdd6cf" />
+            </div>
+            <h3>No archived designs</h3>
+            <p>Designs you archive will be stored here and can be restored any time.</p>
           </div>
-          <h3>{tab === "Archived" ? "No archived designs" : "No designs yet"}</h3>
-          <p>
-            {tab === "Archived"
-              ? "Designs you archive will be stored here and can be restored any time."
-              : "Start designing to add branded products to your swag."}
-          </p>
-          {tab !== "Archived" && (
+        ) : (
+          <div
+            className="card swag-empty-designer"
+            style={{ position: "relative", overflow: "hidden", padding: 0 }}
+          >
+            <img
+              src={startDesigningImg}
+              alt="Design your swag collection"
+              className="start-designing-img"
+              style={{ width: "100%", height: "auto", display: "block" }}
+            />
             <button
               type="button"
               className="btn btn-dark btn-lg"
-              style={{ marginTop: 14 }}
+              style={{ padding: "0 20px", position: "absolute", bottom: 24, left: 80, zIndex: 10 }}
               onClick={() => navigate({ to: "/app/swag/new" })}
             >
               <Plus size={16} /> Start designing
             </button>
-          )}
-        </div>
+          </div>
+        )
       ) : view === "product" ? (
         <div className="grid swag-designs-grid">
           {designEntries.map(({ collection, product, pIdx }) => (
