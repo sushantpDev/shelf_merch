@@ -71,7 +71,7 @@ const NAV_ITEMS: SidebarNavItem[] = [
   },
   { key: "shops", label: "Shops", icon: Store, href: "/app/shops", internal: true },
   { key: "swag", label: "Swag", icon: Shirt, href: "/app/swag", internal: true },
-  { key: "kits", label: "Kits", icon: Gift, href: "/?view=kits" },
+  { key: "kits", label: "Kits", icon: Gift, href: "/app/kits", internal: true },
   { key: "campaigns", label: "Campaigns", icon: Megaphone, href: "/?view=campaigns" },
   {
     key: "contacts",

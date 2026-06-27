@@ -269,7 +269,7 @@ function notifyViewChange(){
 }
 function go(view, opts={}){ S.view=view; if(opts.nav)S.nav=opts.nav; Object.assign(S.flow, opts.flow||{}); if(view==='contacts')S.flow.contactsSearch=''; window.scrollTo(0,0); render(); }
 // Views migrated to the React app at /app/* — clicking them hands off to React.
-const MIGRATED_VIEWS = new Set(['settings','contacts','wallets','orders','catalog','shops','swag']);
+const MIGRATED_VIEWS = new Set(['settings','contacts','wallets','orders','catalog','shops','swag','kits']);
 async function setNav(n){
   if(MIGRATED_VIEWS.has(n)){ window.location.assign('/app/'+n); return; }
   S.nav=n; S.view=n; closeLayer();
@@ -5873,6 +5873,16 @@ async function init(){
           if(launch==='sendPoints'){ bootLaunch=()=>sendPointsStart(shop.id); }
           else if(launch==='swag'){ bootLaunch=()=>swagDesignerStart(); }
         } else { S.view='shops'; }
+      } else if(deepView==='kitsLaunch'){
+        // Hand-off from the migrated React Kits page into a legacy full-screen
+        // kit flow (create / use template / edit / send) that isn't migrated yet.
+        S.nav='kits'; S.view='kits';
+        const launch=deepParams.get('launch');
+        const kitId=deepParams.get('kit');
+        if(launch==='createKit'){ bootLaunch=()=>createKitStart(); }
+        else if(launch==='useKit'&&kitId){ bootLaunch=()=>usePreDesignedKit(kitId); }
+        else if(launch==='editKit'&&kitId){ bootLaunch=()=>editKitStart(kitId); }
+        else if(launch==='sendKit'&&kitId){ bootLaunch=()=>sendItemsStart({dataset:{arg:kitId}}); }
       } else {
         S.nav=deepView; S.view=deepView;
       }

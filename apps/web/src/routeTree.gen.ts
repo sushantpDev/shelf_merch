@@ -33,6 +33,7 @@ import { Route as PlatformAuditRouteImport } from './routes/platform.audit'
 import { Route as AppWalletsRouteImport } from './routes/app.wallets'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppOrdersRouteImport } from './routes/app.orders'
+import { Route as AppKitsRouteImport } from './routes/app.kits'
 import { Route as AppContactsRouteImport } from './routes/app.contacts'
 import { Route as AppCatalogRouteImport } from './routes/app.catalog'
 import { Route as PlatformOrdersIndexRouteImport } from './routes/platform.orders.index'
@@ -171,6 +172,11 @@ const AppOrdersRoute = AppOrdersRouteImport.update({
   path: '/orders',
   getParentRoute: () => AppRoute,
 } as any)
+const AppKitsRoute = AppKitsRouteImport.update({
+  id: '/kits',
+  path: '/kits',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppContactsRoute = AppContactsRouteImport.update({
   id: '/contacts',
   path: '/contacts',
@@ -264,6 +270,7 @@ export interface FileRoutesByFullPath {
   '/platform': typeof PlatformRouteWithChildren
   '/app/catalog': typeof AppCatalogRoute
   '/app/contacts': typeof AppContactsRoute
+  '/app/kits': typeof AppKitsRoute
   '/app/orders': typeof AppOrdersRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/wallets': typeof AppWalletsRoute
@@ -305,6 +312,7 @@ export interface FileRoutesByTo {
   '/accept-invite': typeof AcceptInviteRoute
   '/app/catalog': typeof AppCatalogRoute
   '/app/contacts': typeof AppContactsRoute
+  '/app/kits': typeof AppKitsRoute
   '/app/orders': typeof AppOrdersRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/wallets': typeof AppWalletsRoute
@@ -346,6 +354,7 @@ export interface FileRoutesById {
   '/platform': typeof PlatformRouteWithChildren
   '/app/catalog': typeof AppCatalogRoute
   '/app/contacts': typeof AppContactsRoute
+  '/app/kits': typeof AppKitsRoute
   '/app/orders': typeof AppOrdersRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/wallets': typeof AppWalletsRoute
@@ -391,6 +400,7 @@ export interface FileRouteTypes {
     | '/platform'
     | '/app/catalog'
     | '/app/contacts'
+    | '/app/kits'
     | '/app/orders'
     | '/app/settings'
     | '/app/wallets'
@@ -432,6 +442,7 @@ export interface FileRouteTypes {
     | '/accept-invite'
     | '/app/catalog'
     | '/app/contacts'
+    | '/app/kits'
     | '/app/orders'
     | '/app/settings'
     | '/app/wallets'
@@ -472,6 +483,7 @@ export interface FileRouteTypes {
     | '/platform'
     | '/app/catalog'
     | '/app/contacts'
+    | '/app/kits'
     | '/app/orders'
     | '/app/settings'
     | '/app/wallets'
@@ -688,6 +700,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrdersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/kits': {
+      id: '/app/kits'
+      path: '/kits'
+      fullPath: '/app/kits'
+      preLoaderRoute: typeof AppKitsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/contacts': {
       id: '/app/contacts'
       path: '/contacts'
@@ -813,6 +832,7 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppCatalogRoute: typeof AppCatalogRoute
   AppContactsRoute: typeof AppContactsRoute
+  AppKitsRoute: typeof AppKitsRoute
   AppOrdersRoute: typeof AppOrdersRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppWalletsRoute: typeof AppWalletsRoute
@@ -827,6 +847,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppCatalogRoute: AppCatalogRoute,
   AppContactsRoute: AppContactsRoute,
+  AppKitsRoute: AppKitsRoute,
   AppOrdersRoute: AppOrdersRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppWalletsRoute: AppWalletsRoute,
