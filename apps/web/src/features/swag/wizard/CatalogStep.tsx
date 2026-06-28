@@ -16,10 +16,14 @@ export function CatalogStep({
   catalog,
   picked,
   onToggle,
+  title = "Add products to your collection",
+  subtitle,
 }: {
   catalog: UiProduct[];
   picked: number[];
   onToggle: (index: number) => void;
+  title?: string;
+  subtitle?: string;
 }) {
   const [cat, setCat] = useState("All Products");
   const entries = catalog
@@ -36,11 +40,11 @@ export function CatalogStep({
           letterSpacing: "-.02em",
         }}
       >
-        Add products to your collection
+        {title}
       </h1>
       <p className="muted" style={{ marginBottom: 20, fontSize: 14 }}>
-        {catalog.length} products total · Pick the items you want to brand and add to your
-        collection.
+        {subtitle ??
+          `${catalog.length} products total · Pick the items you want to brand and add to your collection.`}
       </p>
 
       <div

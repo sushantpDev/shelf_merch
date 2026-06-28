@@ -1,6 +1,7 @@
+import { Link } from "@tanstack/react-router";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import type { PlatformKitTemplate } from "@/services/api-bridge";
-import { kitLaunch, usePlatformKits } from "./hooks";
+import { usePlatformKits } from "./hooks";
 import noKitsYetImg from "../../../assets/no-kits-yet.png";
 
 function templateImage(kit: PlatformKitTemplate): string {
@@ -80,14 +81,14 @@ export function PreDesignedKits() {
           <div className="muted" style={{ fontSize: 11.5, marginBottom: 10, textAlign: "center" }}>
             {templateItemLabel(kit)}
           </div>
-          <button
-            type="button"
+          <Link
+            to="/app/kits/new"
+            search={{ template: kit._id }}
             className="btn btn-ghost btn-sm btn-block"
             style={{ border: "1px solid var(--line)", fontWeight: 600, fontSize: 12, height: 32 }}
-            onClick={() => kitLaunch.use(kit._id)}
           >
             Use this kit
-          </button>
+          </Link>
         </div>
       ))}
     </div>

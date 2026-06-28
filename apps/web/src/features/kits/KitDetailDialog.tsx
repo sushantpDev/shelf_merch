@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import type { UiKit, UiProduct } from "@/services/mappers";
@@ -13,6 +14,7 @@ export function KitDetailDialog({
   catalog: UiProduct[];
   onOpenChange: (open: boolean) => void;
 }) {
+  const navigate = useNavigate();
   const products = useMemo(() => {
     if (!kit?.productRefs?.length) return [];
     const byId = new Map(catalog.map((p) => [p.id, p]));
@@ -124,7 +126,10 @@ export function KitDetailDialog({
               <button
                 type="button"
                 className="btn btn-ghost btn-block"
-                onClick={() => kitLaunch.edit(kit.id)}
+                onClick={() => {
+                  onOpenChange(false);
+                  navigate({ to: "/app/kits/$id/edit", params: { id: kit.id } });
+                }}
               >
                 Edit kit
               </button>

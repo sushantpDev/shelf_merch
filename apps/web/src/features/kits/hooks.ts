@@ -12,17 +12,12 @@ export function usePlatformKits() {
   });
 }
 
-/** Legacy hand-off deep-links for kit flows not yet migrated to React. */
+/**
+ * Send-kit checkout still hands off to the legacy engine (not yet migrated).
+ * Create / edit / use-template are native React routes — navigate to
+ * `/app/kits/new`, `/app/kits/$id/edit`, or `/app/kits/new?template=…`.
+ */
 export const kitLaunch = {
-  create: () => {
-    window.location.href = "/?view=kitsLaunch&launch=createKit";
-  },
-  use: (templateId: string) => {
-    window.location.href = `/?view=kitsLaunch&launch=useKit&kit=${encodeURIComponent(templateId)}`;
-  },
-  edit: (kitId: string) => {
-    window.location.href = `/?view=kitsLaunch&launch=editKit&kit=${encodeURIComponent(kitId)}`;
-  },
   send: (kitId: string) => {
     window.location.href = `/?view=kitsLaunch&launch=sendKit&kit=${encodeURIComponent(kitId)}`;
   },

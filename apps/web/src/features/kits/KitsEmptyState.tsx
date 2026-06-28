@@ -1,7 +1,7 @@
 import { type ComponentType, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
 import { BookOpen, Package, Radio, Send, UserPlus, Users } from "lucide-react";
 import { PreDesignedKits } from "./PreDesignedKits";
-import { kitLaunch } from "./hooks";
 import kitsAndItemsImg from "../../../assets/kits-&-items.png";
 import noKitsYetImg from "../../../assets/no-kits-yet.png";
 
@@ -167,9 +167,9 @@ export function KitsEmptyState() {
               occasion.
             </p>
             <div className="row" style={{ gap: 12 }}>
-              <button type="button" className="btn btn-brand" onClick={kitLaunch.create}>
+              <Link to="/app/kits/new" className="btn btn-brand">
                 Create your first kit
-              </button>
+              </Link>
               <button
                 type="button"
                 className="btn btn-ghost"
@@ -295,14 +295,9 @@ export function KitsEmptyState() {
               Looks like you haven&apos;t created any kits yet. Create your first kit to get
               started.
             </p>
-            <button
-              type="button"
-              className="btn btn-brand"
-              style={{ marginBottom: 16 }}
-              onClick={kitLaunch.create}
-            >
+            <Link to="/app/kits/new" className="btn btn-brand" style={{ marginBottom: 16 }}>
               Create your first kit
-            </button>
+            </Link>
             <div className="row" style={{ gap: 16, fontSize: 13, fontWeight: 600 }}>
               <a
                 href="/?view=contacts"

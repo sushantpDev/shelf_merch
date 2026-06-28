@@ -1,4 +1,5 @@
 import { useState, type ComponentType } from "react";
+import { Link } from "@tanstack/react-router";
 import { Package, Plus, Radio, Search, Send, Users } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { PageHeader } from "@/components/tenant/PageHeader";
@@ -99,9 +100,9 @@ export function KitsPage() {
         title="Kits & Items"
         subtitle="Package catalog products into reusable gift kits, then send them at scale."
         actions={
-          <button type="button" className="btn btn-brand" onClick={kitLaunch.create}>
+          <Link to="/app/kits/new" className="btn btn-brand">
             <Plus size={16} /> Create a kit
-          </button>
+          </Link>
         }
       />
 
