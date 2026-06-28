@@ -80,7 +80,13 @@ const NAV_ITEMS: SidebarNavItem[] = [
     href: "/app/contacts",
     internal: true,
   },
-  { key: "integrations", label: "Integrations", icon: Plug, href: "/?view=integrations" },
+  {
+    key: "integrations",
+    label: "Integrations",
+    icon: Plug,
+    href: "/app/integrations",
+    internal: true,
+  },
   {
     key: "settings",
     label: "Settings",
@@ -88,7 +94,7 @@ const NAV_ITEMS: SidebarNavItem[] = [
     href: "/app/settings",
     internal: true,
   },
-  { key: "billing", label: "Billing", icon: CreditCard, href: "/?view=billing" },
+  { key: "billing", label: "Billing", icon: CreditCard, href: "/app/billing", internal: true },
   {
     key: "catalog",
     label: "Catalog",
