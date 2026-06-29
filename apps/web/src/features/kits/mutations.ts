@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { createKitFlow, updateKitFlow } from "@/services/api-bridge";
+import { createKitFlow, launchKitCampaignFlow, updateKitFlow } from "@/services/api-bridge";
 import { useInvalidateWorkspace } from "@/hooks/useWorkspace";
 import type { UiProduct } from "@/services/mappers";
 
@@ -36,6 +36,16 @@ export function useUpdateKit() {
   const invalidate = useInvalidateWorkspace();
   return useMutation({
     mutationFn: (input: UpdateKitInput) => updateKitFlow(input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export type LaunchKitCampaignInput = Parameters<typeof launchKitCampaignFlow>[0];
+
+export function useLaunchKitCampaign() {
+  const invalidate = useInvalidateWorkspace();
+  return useMutation({
+    mutationFn: (input: LaunchKitCampaignInput) => launchKitCampaignFlow(input),
     onSuccess: () => invalidate(),
   });
 }

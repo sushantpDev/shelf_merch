@@ -112,8 +112,8 @@ export function KitWizard() {
           : undefined,
       });
       toast.success(`Kit "${created.name}" saved to your workspace`);
-      // Publish & send: hand off to the send-kit checkout (legacy flow).
-      window.location.href = `/?view=kitsLaunch&launch=sendKit&kit=${encodeURIComponent(created.id)}`;
+      // Publish & send: continue straight into the send-kit checkout.
+      navigate({ to: "/app/kits/$id/send", params: { id: created.id } });
     } catch (err) {
       setPublishing(false);
       toast.error(err instanceof Error ? err.message : "Failed to save kit");

@@ -3,7 +3,6 @@ import { useNavigate } from "@tanstack/react-router";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import type { UiKit, UiProduct } from "@/services/mappers";
-import { kitLaunch } from "./hooks";
 
 export function KitDetailDialog({
   kit,
@@ -136,7 +135,10 @@ export function KitDetailDialog({
               <button
                 type="button"
                 className="btn btn-brand btn-block"
-                onClick={() => kitLaunch.send(kit.id)}
+                onClick={() => {
+                  onOpenChange(false);
+                  navigate({ to: "/app/kits/$id/send", params: { id: kit.id } });
+                }}
               >
                 Send this kit
               </button>

@@ -7,7 +7,6 @@ import { useWorkspace } from "@/hooks/useWorkspace";
 import type { UiKit } from "@/services/mappers";
 import { KitDetailDialog } from "./KitDetailDialog";
 import { KitsEmptyState } from "./KitsEmptyState";
-import { kitLaunch } from "./hooks";
 
 function StatCard({
   label,
@@ -163,13 +162,13 @@ export function KitsPage() {
                   >
                     Details
                   </button>{" "}
-                  <button
-                    type="button"
+                  <Link
+                    to="/app/kits/$id/send"
+                    params={{ id: kit.id }}
                     className="btn btn-dark btn-sm"
-                    onClick={() => kitLaunch.send(kit.id)}
                   >
                     Send
-                  </button>
+                  </Link>
                 </td>
               </tr>
             ))}

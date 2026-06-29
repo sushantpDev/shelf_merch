@@ -1,0 +1,105 @@
+import {
+  EMPTY_SINGLE_LOCATION,
+  type PaymentMethod,
+  type ScheduleDraft,
+  type SendMode,
+  type SingleLocation,
+  type WhenMode,
+} from "@/features/send/types";
+
+export type SendKitDraft = {
+  picked: number[];
+  mode: SendMode;
+  selRecips: string[];
+  singleLocation: SingleLocation;
+  note: string;
+  from: string;
+  msg: string;
+  when: WhenMode;
+  schedule: ScheduleDraft;
+  preview: "landing" | "email";
+  pay: PaymentMethod;
+  pkg: "none" | "box";
+};
+
+export type SendKitAction =
+  | { type: "togglePick"; index: number }
+  | { type: "toggleRecip"; id: string }
+  | { type: "deselectRecips" }
+  | { type: "setMode"; mode: SendMode }
+  | { type: "setSingleLoc"; key: keyof SingleLocation; value: string }
+  | { type: "setNote"; note: string }
+  | { type: "setFrom"; from: string }
+  | { type: "setMsg"; msg: string }
+  | { type: "setWhen"; when: WhenMode }
+  | { type: "setSchedule"; key: keyof ScheduleDraft; value: string }
+  | { type: "setPreview"; preview: "landing" | "email" }
+  | { type: "setPay"; pay: PaymentMethod };
+
+export function sendKitReducer(state: SendKitDraft, action: SendKitAction): SendKitDraft {
+  switch (action.type) {
+    case "togglePick": {
+      const has = state.picked.includes(action.index);
+      return {
+        ...state,
+        picked: has
+          ? state.picked.filter((i) => i !== action.index)
+          : [...state.picked, action.index],
+      };
+    }
+    case "toggleRecip": {
+      const has = state.selRecips.includes(action.id);
+      return {
+        ...state,
+        selRecips: has
+          ? state.selRecips.filter((id) => id !== action.id)
+          : [...state.selRecips, action.id],
+      };
+    }
+    case "deselectRecips":
+      return { ...state, selRecips: [] };
+    case "setMode":
+      return { ...state, mode: action.mode };
+    case "setSingleLoc":
+      return { ...state, singleLocation: { ...state.singleLocation, [action.key]: action.value } };
+    case "setNote":
+      return { ...state, note: action.note };
+    case "setFrom":
+      return { ...state, from: action.from };
+    case "setMsg":
+      return { ...state, msg: action.msg };
+    case "setWhen":
+      return { ...state, when: action.when };
+    case "setSchedule":
+      return { ...state, schedule: { ...state.schedule, [action.key]: action.value } };
+    case "setPreview":
+      return { ...state, preview: action.preview };
+    case "setPay":
+      return { ...state, pay: action.pay };
+    default:
+      return state;
+  }
+}
+
+export function initialSendKitDraft(
+  picked: number[],
+  packaging: "none" | "box",
+  firstRecips: string[],
+  account: string,
+): SendKitDraft {
+  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  return {
+    picked,
+    mode: "redeem",
+    selRecips: firstRecips,
+    singleLocation: { ...EMPTY_SINGLE_LOCATION },
+    note: "Welcome to the team — we are thrilled to have you!",
+    from: `People Team, ${account}`,
+    msg: "Your welcome kit is on its way! A little something from all of us — we're so glad you're here.",
+    when: "now",
+    schedule: { date: tomorrow, time: "10:00", tz: "Asia/Kolkata (IST)" },
+    preview: "landing",
+    pay: "wallet",
+    pkg: packaging,
+  };
+}

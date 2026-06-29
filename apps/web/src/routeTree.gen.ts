@@ -54,6 +54,7 @@ import { Route as AppSwagNewRouteImport } from './routes/app.swag.new'
 import { Route as AppShopsNewRouteImport } from './routes/app.shops.new'
 import { Route as AppShopsIdRouteImport } from './routes/app.shops.$id'
 import { Route as AppKitsNewRouteImport } from './routes/app.kits.new'
+import { Route as AppKitsIdSendRouteImport } from './routes/app.kits.$id.send'
 import { Route as AppKitsIdEditRouteImport } from './routes/app.kits.$id.edit'
 
 const PlatformRoute = PlatformRouteImport.update({
@@ -281,6 +282,11 @@ const AppKitsNewRoute = AppKitsNewRouteImport.update({
   path: '/new',
   getParentRoute: () => AppKitsRoute,
 } as any)
+const AppKitsIdSendRoute = AppKitsIdSendRouteImport.update({
+  id: '/$id/send',
+  path: '/$id/send',
+  getParentRoute: () => AppKitsRoute,
+} as any)
 const AppKitsIdEditRoute = AppKitsIdEditRouteImport.update({
   id: '/$id/edit',
   path: '/$id/edit',
@@ -334,6 +340,7 @@ export interface FileRoutesByFullPath {
   '/platform/kits/': typeof PlatformKitsIndexRoute
   '/platform/orders/': typeof PlatformOrdersIndexRoute
   '/app/kits/$id/edit': typeof AppKitsIdEditRoute
+  '/app/kits/$id/send': typeof AppKitsIdSendRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -377,6 +384,7 @@ export interface FileRoutesByTo {
   '/platform/kits': typeof PlatformKitsIndexRoute
   '/platform/orders': typeof PlatformOrdersIndexRoute
   '/app/kits/$id/edit': typeof AppKitsIdEditRoute
+  '/app/kits/$id/send': typeof AppKitsIdSendRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -426,6 +434,7 @@ export interface FileRoutesById {
   '/platform/kits/': typeof PlatformKitsIndexRoute
   '/platform/orders/': typeof PlatformOrdersIndexRoute
   '/app/kits/$id/edit': typeof AppKitsIdEditRoute
+  '/app/kits/$id/send': typeof AppKitsIdSendRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -476,6 +485,7 @@ export interface FileRouteTypes {
     | '/platform/kits/'
     | '/platform/orders/'
     | '/app/kits/$id/edit'
+    | '/app/kits/$id/send'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -519,6 +529,7 @@ export interface FileRouteTypes {
     | '/platform/kits'
     | '/platform/orders'
     | '/app/kits/$id/edit'
+    | '/app/kits/$id/send'
   id:
     | '__root__'
     | '/'
@@ -567,6 +578,7 @@ export interface FileRouteTypes {
     | '/platform/kits/'
     | '/platform/orders/'
     | '/app/kits/$id/edit'
+    | '/app/kits/$id/send'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -895,6 +907,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppKitsNewRouteImport
       parentRoute: typeof AppKitsRoute
     }
+    '/app/kits/$id/send': {
+      id: '/app/kits/$id/send'
+      path: '/$id/send'
+      fullPath: '/app/kits/$id/send'
+      preLoaderRoute: typeof AppKitsIdSendRouteImport
+      parentRoute: typeof AppKitsRoute
+    }
     '/app/kits/$id/edit': {
       id: '/app/kits/$id/edit'
       path: '/$id/edit'
@@ -908,11 +927,13 @@ declare module '@tanstack/react-router' {
 interface AppKitsRouteChildren {
   AppKitsNewRoute: typeof AppKitsNewRoute
   AppKitsIdEditRoute: typeof AppKitsIdEditRoute
+  AppKitsIdSendRoute: typeof AppKitsIdSendRoute
 }
 
 const AppKitsRouteChildren: AppKitsRouteChildren = {
   AppKitsNewRoute: AppKitsNewRoute,
   AppKitsIdEditRoute: AppKitsIdEditRoute,
+  AppKitsIdSendRoute: AppKitsIdSendRoute,
 }
 
 const AppKitsRouteWithChildren =
