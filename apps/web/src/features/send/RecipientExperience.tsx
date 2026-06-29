@@ -49,9 +49,11 @@ function LogoBanner() {
  * points sends will pass `kind: "points"` when migrated.
  */
 export function RecipientExperience({
+  kind = "items",
   shopName = "Rubix",
   mode = "redeem",
   itemCount = 3,
+  pointsAmount = 0,
   from,
   message,
   onFrom,
@@ -63,9 +65,11 @@ export function RecipientExperience({
   preview,
   onPreview,
 }: {
+  kind?: "items" | "points";
   shopName?: string;
   mode?: SendMode;
   itemCount?: number;
+  pointsAmount?: number;
   from: string;
   message: string;
   onFrom: (v: string) => void;
@@ -77,7 +81,9 @@ export function RecipientExperience({
   preview: "landing" | "email";
   onPreview: (tab: "landing" | "email") => void;
 }) {
-  const shipMode = mode !== "redeem"; // surprise / single-location item sends ship directly
+  const isPoints = kind === "points";
+  // surprise / single-location item sends ship directly; points always redeem
+  const shipMode = !isPoints && mode !== "redeem";
 
   const { track, eta } = useMemo(() => {
     const t = "SM" + (740000000 + Math.floor(Math.random() * 9999999));
@@ -88,8 +94,16 @@ export function RecipientExperience({
     return { track: t, eta: e };
   }, []);
 
-  const headline = shipMode ? `Your gift from ${from} is on its way!` : `${from} sent you a gift!`;
-  const cta = shipMode ? "Track your shipment" : "Choose your gift";
+  const headline = isPoints
+    ? `You've been gifted ${pointsAmount} Pts to ${shopName}!`
+    : shipMode
+      ? `Your gift from ${from} is on its way!`
+      : `${from} sent you a gift!`;
+  const cta = isPoints
+    ? "Redeem your points"
+    : shipMode
+      ? "Track your shipment"
+      : "Choose your gift";
   const tab1 = shipMode ? "Tracking page" : "Landing page";
   const tab2 = shipMode ? "Shipping email" : "Invitation email";
   const cap1 = shipMode

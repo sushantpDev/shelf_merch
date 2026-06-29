@@ -49,7 +49,7 @@ export function ShopDetailPage() {
   }
 
   const sendPoints = () => {
-    window.location.href = `/?view=shopDetail&shop=${encodeURIComponent(shop.id)}&launch=sendPoints`;
+    navigate({ to: "/app/campaigns/send-points", search: { shop: shop.id } });
   };
   const startDesigning = () => {
     navigate({ to: "/app/swag/new", search: { shop: shop.id } });
