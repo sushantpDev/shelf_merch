@@ -67,7 +67,7 @@ export default function TenantLayout() {
   const { data: workspace } = useWorkspace();
 
   useEffect(() => {
-    if (!isAuthenticated()) window.location.href = "/";
+    if (!isAuthenticated()) window.location.href = "/login";
   }, []);
 
   if (!isAuthenticated()) return null;
