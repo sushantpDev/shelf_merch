@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/tenant/PageHeader";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { logout } from "@/services/api-bridge";
 
 type Tab = "workspace" | "sso";
 
@@ -9,11 +11,21 @@ export function SettingsPage() {
   const { data: workspace } = useWorkspace();
   const [tab, setTab] = useState<Tab>("workspace");
 
+  async function onLogout() {
+    await logout().catch(() => {});
+    window.location.href = "/login";
+  }
+
   return (
     <>
       <PageHeader
         title="Settings"
         subtitle="Manage your workspace, ownership, currency and single sign-on."
+        actions={
+          <button type="button" className="btn btn-ghost" onClick={onLogout}>
+            <LogOut size={16} /> Log out
+          </button>
+        }
       />
       <div style={{ display: "flex", gap: 22 }}>
         <div className="subrail" role="tablist" aria-label="Settings sections">

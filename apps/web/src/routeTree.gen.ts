@@ -9,7 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as PlatformRouteImport } from './routes/platform'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as IndexRouteImport } from './routes/index'
@@ -59,9 +61,19 @@ import { Route as AppCampaignsSendPointsRouteImport } from './routes/app.campaig
 import { Route as AppKitsIdSendRouteImport } from './routes/app.kits.$id.send'
 import { Route as AppKitsIdEditRouteImport } from './routes/app.kits.$id.edit'
 
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlatformRoute = PlatformRouteImport.update({
   id: '/platform',
   path: '/platform',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -309,7 +321,9 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accept-invite': typeof AcceptInviteRoute
   '/app': typeof AppRouteWithChildren
+  '/login': typeof LoginRoute
   '/platform': typeof PlatformRouteWithChildren
+  '/signup': typeof SignupRoute
   '/app/billing': typeof AppBillingRoute
   '/app/campaigns': typeof AppCampaignsRouteWithChildren
   '/app/catalog': typeof AppCatalogRoute
@@ -359,6 +373,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accept-invite': typeof AcceptInviteRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
   '/app/billing': typeof AppBillingRoute
   '/app/campaigns': typeof AppCampaignsRouteWithChildren
   '/app/catalog': typeof AppCatalogRoute
@@ -407,7 +423,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/accept-invite': typeof AcceptInviteRoute
   '/app': typeof AppRouteWithChildren
+  '/login': typeof LoginRoute
   '/platform': typeof PlatformRouteWithChildren
+  '/signup': typeof SignupRoute
   '/app/billing': typeof AppBillingRoute
   '/app/campaigns': typeof AppCampaignsRouteWithChildren
   '/app/catalog': typeof AppCatalogRoute
@@ -460,7 +478,9 @@ export interface FileRouteTypes {
     | '/'
     | '/accept-invite'
     | '/app'
+    | '/login'
     | '/platform'
+    | '/signup'
     | '/app/billing'
     | '/app/campaigns'
     | '/app/catalog'
@@ -510,6 +530,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/accept-invite'
+    | '/login'
+    | '/signup'
     | '/app/billing'
     | '/app/campaigns'
     | '/app/catalog'
@@ -557,7 +579,9 @@ export interface FileRouteTypes {
     | '/'
     | '/accept-invite'
     | '/app'
+    | '/login'
     | '/platform'
+    | '/signup'
     | '/app/billing'
     | '/app/campaigns'
     | '/app/catalog'
@@ -609,18 +633,34 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AcceptInviteRoute: typeof AcceptInviteRoute
   AppRoute: typeof AppRouteWithChildren
+  LoginRoute: typeof LoginRoute
   PlatformRoute: typeof PlatformRouteWithChildren
+  SignupRoute: typeof SignupRoute
   RedeemTokenRoute: typeof RedeemTokenRoute
   ShopIdRoute: typeof ShopIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/platform': {
       id: '/platform'
       path: '/platform'
       fullPath: '/platform'
       preLoaderRoute: typeof PlatformRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app': {
@@ -1119,7 +1159,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AcceptInviteRoute: AcceptInviteRoute,
   AppRoute: AppRouteWithChildren,
+  LoginRoute: LoginRoute,
   PlatformRoute: PlatformRouteWithChildren,
+  SignupRoute: SignupRoute,
   RedeemTokenRoute: RedeemTokenRoute,
   ShopIdRoute: ShopIdRoute,
 }
