@@ -198,9 +198,11 @@ export type ShippingAddress = {
   name: string;
   phone: string;
   line1: string;
+  line2?: string;
   city: string;
   state: string;
   pincode: string;
+  country?: string;
 };
 
 type Mode = "preview" | "redeem";
@@ -959,7 +961,7 @@ function parseDetailRows(value?: string): [string, string][] {
       const split = line.indexOf(":");
       if (split > 0) return [line.slice(0, split).trim(), line.slice(split + 1).trim()] as [string, string];
       const trimmed = line.trim();
-      return trimmed ? [trimmed, ""] : ["", ""];
+      return (trimmed ? [trimmed, ""] : ["", ""]) as [string, string];
     })
     .filter(([label, rowValue]) => label || rowValue);
 }

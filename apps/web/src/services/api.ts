@@ -128,7 +128,7 @@ export async function apiFetch<T = unknown>(
 /** Public redemption routes — no auth header. */
 export async function publicFetch<T = unknown>(
   path: string,
-  init: RequestInit = {},
+  init: Omit<RequestOptions, "auth"> = {},
 ): Promise<T> {
   return apiFetch<T>(path, { ...init, auth: false });
 }

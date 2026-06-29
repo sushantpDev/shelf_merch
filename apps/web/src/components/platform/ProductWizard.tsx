@@ -358,7 +358,7 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
 
   async function addOneVariant() {
     if (!id || !variant.sku) return;
-    const color = variant.color.trim() || variant.colorHex || "";
+    const color = (variant.color ?? "").trim() || variant.colorHex || "";
     const colorHex = variant.colorHex || resolveColorHex(color);
     setBusy(true);
     setError("");

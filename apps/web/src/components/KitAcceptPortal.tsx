@@ -19,9 +19,11 @@ function KitItemCard({
   selection: Selection;
   onChange: (sel: Selection) => void;
 }) {
-  const imageCandidates = item.isDrinkware
-    ? [item.imageUrl, item.primaryImageUrl, ...(item.imageUrls || []), item.baseImageUrl]
-    : [item.maskImageUrl, item.imageUrl, item.primaryImageUrl, ...(item.imageUrls || []), item.baseImageUrl];
+  const imageCandidates = (
+    item.isDrinkware
+      ? [item.imageUrl, item.primaryImageUrl, ...(item.imageUrls || []), item.baseImageUrl]
+      : [item.maskImageUrl, item.imageUrl, item.primaryImageUrl, ...(item.imageUrls || []), item.baseImageUrl]
+  ).filter((u): u is string => Boolean(u));
 
   const mockupProduct = {
     name: item.name,

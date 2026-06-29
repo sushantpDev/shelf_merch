@@ -14,9 +14,9 @@ export function seedWizard(org: OrgSnapshot, startStep: number): WizardState {
     step: startStep,
     done: false,
     wallet: {
-      uploaded: false,
-      pay: "card",
       ...org.wallet,
+      uploaded: org.wallet.uploaded ?? false,
+      pay: org.wallet.pay || "card",
     },
     departments: org.departments.map((d) => ({
       ...d,

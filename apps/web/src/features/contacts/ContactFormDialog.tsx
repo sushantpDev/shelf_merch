@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import {
@@ -49,7 +49,9 @@ export function ContactFormDialog({ open, onOpenChange, mode, contact }: Props) 
     reset,
     formState: { errors },
   } = useForm<ContactFormValues>({
-    resolver: zodResolver(contactSchema),
+    // zod `.default("")` fields make the schema's input type wider than the
+    // inferred output; the resolver runs identically, so assert the form type.
+    resolver: zodResolver(contactSchema) as Resolver<ContactFormValues>,
     defaultValues: EMPTY_CONTACT,
   });
 

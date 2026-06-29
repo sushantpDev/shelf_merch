@@ -32,3 +32,29 @@ jobs:
         run: npm test
         env:
           NODE_ENV: test
+
+  web-checks:
+    name: Web typecheck, lint & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The web build is esbuild-based (no type-checking), so a standalone
+      # tsc pass is required to catch frontend type regressions. Build also
+      # runs to surface bundling/codegen failures (e.g. route tree drift).
+      # (Lint is not gated here: the tree has pre-existing prettier drift that
+      # would need a separate repo-wide format pass first.)
+      - name: Typecheck
+        run: npm run typecheck -w @shelfmerch/web
+
+      - name: Build
+        run: npm run build -w @shelfmerch/web
