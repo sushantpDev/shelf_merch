@@ -15,7 +15,7 @@ import festiveGiftBoxImg from '../../assets/festive-gift-box.png';
 import workFromHomeKitImg from '../../assets/work-from-home-kit.png';
 import wellnessKitImg from '../../assets/wellness-kit.png';
 import megaphoneIllustration from '../../assets/megaphone_box.png'
-import swagBannerImg from '../../assets/swag-banner.png';
+import swagHeroBannerImg from '../../assets/swag-hero-banner.svg';
 import walletIconImg from "../../assets/wallet-icon.svg";
 import darwinboxIcon from '../../assets/integrations/darwinbox.jpg';
 import kekaIcon from '../../assets/integrations/keka.png';
@@ -362,6 +362,8 @@ function afterRender(){
   bindCreateShopNameInput();
   bindSwNameInput();
   bindKtNameInput();
+  bindSwArtFileInput();
+  bindKtLogoFileInput();
   mountKonvaMockups();
 }
 function bindSwNameInput(){
@@ -435,6 +437,25 @@ function bindKtNameInput(){
   if(S.flow.kitName!=null&&nameInp.value!==S.flow.kitName) nameInp.value=S.flow.kitName;
   if(descInp&&S.flow.kitDesc!=null&&descInp.value!==S.flow.kitDesc) descInp.value=S.flow.kitDesc;
   updateFeedback(nameInp.value||S.flow.kitName||'');
+}
+function bindFileInput(id, view, onFile){
+  const inp=document.getElementById(id);
+  if(!inp) return;
+  if(inp.dataset.bound) return;
+  inp.dataset.bound='1';
+  inp.addEventListener('change',(e)=>{
+    const f=e.target.files?.[0];
+    if(f) onFile(f);
+    e.target.value='';
+  });
+}
+function bindSwArtFileInput(){
+  if(S.view!=='swagArtwork') return;
+  bindFileInput('sw-art-inp', S.view, swArtSetFile);
+}
+function bindKtLogoFileInput(){
+  if(S.view!=='createKit'&&S.view!=='editKit') return;
+  bindFileInput('kt-logo-inp', S.view, ktLogoSetFile);
 }
 function readCreateShopName(){
   const inp=document.getElementById('sh-name');
@@ -823,13 +844,13 @@ function kitBrandingPanel(f,opts={}){
         <button type="button" class="xbtn" data-act="ktLogoClear" title="Remove logo">✕</button>
       </div>`;
     }else{
-      pickerBody=`<div id="kt-logo-drop" class="sw-art-dropzone" data-act="ktLogoUpload">
-        <input type="file" id="kt-logo-inp" accept=".svg,.png,.webp,.jpeg,.jpg,image/svg+xml,image/png,image/webp,image/jpeg" style="display:none">
+      pickerBody=`<label id="kt-logo-drop" class="sw-art-dropzone" for="kt-logo-inp">
+        <input type="file" id="kt-logo-inp" class="sw-art-file-inp" accept=".svg,.png,.webp,.jpeg,.jpg,image/svg+xml,image/png,image/webp,image/jpeg">
         ${I.upload.replace('<svg ','<svg width="24" height="24" ')}
         <div style="font-weight:600;font-size:14px">Drag &amp; drop your artwork file</div>
         <div class="mut3" style="font-size:12px;margin:2px 0">Supports SVG, PNG, WEBP, JPEG up to 5MB</div>
-        <button type="button" class="btn btn-soft btn-sm" style="margin-top:4px" data-act="ktLogoUpload">Browse local files</button>
-      </div>`;
+        <span class="btn btn-soft btn-sm" style="margin-top:4px;pointer-events:none">Browse local files</span>
+      </label>`;
     }
   }else{
     const prev=S.logoUploads||[];
@@ -1403,10 +1424,10 @@ Wizards.swagName=function(){
   const body=`<div class="sw-name-layout">
     <div class="sw-form-card">
       <div class="sw-eyebrow-badge">Step 1 of 3 · Setup</div>
-      <h1 style="font-size:28px;margin-bottom:10px;font-family:var(--disp);letter-spacing:-.03em;color:var(--ink)">Name your collection</h1>
-      <p class="muted" style="margin-bottom:24px;max-width:48ch;line-height:1.6;font-size:14px">Create a collection for your brand store. Give it a clear name so employees or customers can easily recognize it.</p>
+      <h1 style="font-size:28px;font-family:var(--disp);letter-spacing:-.03em;color:var(--ink)">Name your collection</h1>
+      <p class="muted" style="max-width:48ch;line-height:1.6;font-size:14px">Create a collection for your brand store. Give it a clear name so employees or customers can easily recognize it.</p>
       
-      <div class="field" style="margin-bottom:20px">
+      <div class="field">
         <label class="lbl" style="font-weight:700;margin-bottom:8px">Collection name</label>
         <div class="sw-name-input-container">
           <input class="inp" id="sw-name" value="${name}" autofocus maxlength="32" placeholder="e.g. Welcome Kit">
@@ -1417,7 +1438,7 @@ Wizards.swagName=function(){
         </div>
       </div>
       
-      <div class="sw-name-examples" style="margin-bottom:28px">
+      <div class="sw-name-examples">
         <div class="mut3" style="font-size:12px;margin-bottom:10px;font-weight:600;letter-spacing:.03em;text-transform:uppercase">Suggestions</div>
         <div class="row" style="gap:8px;flex-wrap:wrap">${examples.map(ex=>`<button type="button" class="sw-name-chip" data-act="swNameExample" data-arg="${esc(ex)}">${esc(ex)}</button>`).join('')}</div>
       </div>
@@ -1636,13 +1657,13 @@ Wizards.swagArtwork=function(){
         <button class="xbtn" data-act="swArtClear" title="Remove artwork">✕</button>
       </div>`;
     } else {
-      pickerBody=`<div id="sw-art-drop" class="sw-art-dropzone" data-act="swArtUpload">
-        <input type="file" id="sw-art-inp" accept=".svg,.png,.jpg,.jpeg,.ai,image/svg+xml,image/png,image/jpeg" style="display:none">
+      pickerBody=`<label id="sw-art-drop" class="sw-art-dropzone" for="sw-art-inp">
+        <input type="file" id="sw-art-inp" class="sw-art-file-inp" accept=".svg,.png,.jpg,.jpeg,.webp,.ai,image/svg+xml,image/png,image/jpeg,image/webp">
         ${I.upload.replace('<svg ', '<svg width="24" height="24" ')}
         <div style="font-weight:600;font-size:14px">Drag & drop your artwork file</div>
-        <div class="mut3" style="font-size:12px;margin:2px 0">Supports SVG, PNG, JPG, AI up to 5MB</div>
-        <button type="button" class="btn btn-soft btn-sm" style="margin-top:4px" data-act="swArtUpload">Browse local files</button>
-      </div>`;
+        <div class="mut3" style="font-size:12px;margin:2px 0">Supports SVG, PNG, JPG, WEBP, AI up to 5MB</div>
+        <span class="btn btn-soft btn-sm" style="margin-top:4px;pointer-events:none">Browse local files</span>
+      </label>`;
     }
   } else {
     const prev=S.artUploads||[];
@@ -1719,7 +1740,7 @@ Wizards.swagArtwork=function(){
 function swSummaryRow(k,v){
   return `<div class="sw-summary-row"><span class="k">${esc(k)}</span><span class="v" title="${esc(v)}">${esc(v)}</span></div>`;
 }
-const ART_ACCEPT=/\.(svg|png|jpe?g|ai)$/i;
+const ART_ACCEPT=/\.(svg|png|jpe?g|webp|ai)$/i;
 const ART_MAX=5*1024*1024;
 function swArtImg(f,opts={}){
   const url=f?.artFile?.preview;
@@ -1727,9 +1748,10 @@ function swArtImg(f,opts={}){
   return opts.fallback===false?'':LOGO_DECO;
 }
 function swArtSetFile(file){
-  if(!ART_ACCEPT.test(file.name)){ toast('Accepted formats: SVG, PNG, JPG, AI',false); return; }
+  if(!ART_ACCEPT.test(file.name)){ toast('Accepted formats: SVG, PNG, JPG, WEBP, AI',false); return; }
   if(file.size>ART_MAX){ toast('File must be 5 MB or smaller',false); return; }
   const reader=new FileReader();
+  reader.onerror=()=>toast('Could not read that file. Try another image.',false);
   reader.onload=()=>{
     const entry={name:file.name,size:file.size,ext:logoExt(file.name),preview:reader.result,file};
     S.flow.artwork=true;
@@ -3710,7 +3732,7 @@ function ViewSwag(){
   const body=tab==='Archived'&&!cols.length
     ?`<div class="card empty"><div class="ic">${I.swag.replace('currentColor','#cdd6cf')}</div><h3>No archived designs</h3><p>Designs you archive will be stored here and can be restored any time.</p></div>`
     :swagDesignsBody(cols,view);
-  const heroBanner=`<div class="swag-hero-banner" style="background-image:url('${swagBannerImg}')" role="img" aria-label="Build your swag collection"></div>`;
+  const heroBanner=`<div class="swag-hero-banner"><img src="${swagHeroBannerImg}" width="1600" height="280" alt="Build your swag collection — design branded products and manage your merch in one place" loading="lazy" decoding="async"></div>`;
   return `<div class="page-h"><div><h1>Swag</h1><div class="sub">Your designed collections and the full catalog you can build from.</div></div>
     <div class="row" style="gap:8px"><button class="btn btn-ghost" data-act="swagDesignerStart">${I.plus}Start designing</button>
     <button class="btn btn-dark" data-act="nav" data-arg="catalog">Purchase swag</button></div></div>

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import ShelfMerchApp from "@/components/ShelfMerchApp";
+import LandingPage from "@/components/LandingPage";
 
 export const Route = createFileRoute("/")({
-  component: ShelfMerchApp,
+  component: LandingPage,
 });

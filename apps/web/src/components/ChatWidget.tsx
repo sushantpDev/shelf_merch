@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
+import { MessageCircle } from "lucide-react";
 import { useLocation } from "@tanstack/react-router";
 import { isAuthenticated, getStoredUser } from "@/services/auth-store";
 import { runChatAction } from "@/services/api-bridge";
@@ -892,15 +893,9 @@ export function ChatWidget() {
           onClick={openChat}
           aria-label="Open support chat"
           className="fixed bottom-6 right-6 z-[9999] flex h-14 w-14 items-center justify-center rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.18)] transition-transform hover:scale-105"
-          style={{ backgroundColor: SURFACE, color: BRAND }}
+          style={{ backgroundColor: BRAND, color: SURFACE }}
         >
-          <svg viewBox="0 0 24 24" fill="currentColor" className="h-7 w-7" aria-hidden>
-            <path
-              fillRule="evenodd"
-              d="M4.848 2.771A49.144 49.144 0 0112 2.25c2.43 0 4.817.178 7.152.52 1.978.292 3.348 2.135 3.348 4.022v6.852c0 1.887-1.37 3.73-3.348 4.022a48.52 48.52 0 01-3.228.719 18.01 18.01 0 01-4.772 2.74 1.5 1.5 0 01-1.572-.001 18.01 18.01 0 01-4.772-2.74 48.52 48.52 0 01-3.228-.719c-1.978-.292-3.348-2.135-3.348-4.022V6.771c0-1.887 1.37-3.73 3.348-4.022z"
-              clipRule="evenodd"
-            />
-          </svg>
+          <MessageCircle size={28} strokeWidth={1.75} aria-hidden />
         </button>
       )}
 

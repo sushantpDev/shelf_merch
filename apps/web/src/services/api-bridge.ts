@@ -73,6 +73,41 @@ async function establishSession(result: AuthResult) {
   return result.user;
 }
 
+const DEMO_EMAIL = "hr@rubix.net";
+const DEMO_PASSWORD = "demo1234";
+
+const DEMO_SESSION: AuthResult = {
+  accessToken: "demo-access-token",
+  refreshToken: "demo-refresh-token",
+  user: {
+    id: "demo-hr-rubix",
+    tenantId: "demo-tenant",
+    name: "Chandra Sekhar",
+    email: DEMO_EMAIL,
+    role: "company_admin",
+    scopeType: "tenant",
+    assignedEntityIds: [],
+  },
+};
+
+/** One-click entry from the marketing site — no login screen. */
+export async function enterApp(): Promise<void> {
+  if (isAuthenticated()) return;
+  if (USE_MOCKS) {
+    setSession(DEMO_SESSION);
+    return;
+  }
+  try {
+    await login(DEMO_EMAIL, DEMO_PASSWORD);
+  } catch {
+    if (import.meta.env.DEV) {
+      setSession(DEMO_SESSION);
+      return;
+    }
+    throw new Error("Could not sign in. Start the API and run npm run seed.");
+  }
+}
+
 export async function login(email: string, password: string) {
   const result = await apiFetch<AuthResult>("/auth/login", {
     method: "POST",

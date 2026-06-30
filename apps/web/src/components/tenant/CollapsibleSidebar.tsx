@@ -50,7 +50,7 @@ const NAV_ITEMS: SidebarNavItem[] = [
     key: "home",
     label: "Home",
     icon: Home,
-    href: "/app/orders",
+    href: "/app",
     internal: true,
     match: (pathname) => pathname === "/app" || pathname === "/app/",
   },
