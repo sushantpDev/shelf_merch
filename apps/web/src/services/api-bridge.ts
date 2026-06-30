@@ -153,6 +153,40 @@ export async function refreshPlatformKits(): Promise<PlatformKitTemplate[]> {
   return apiFetch<PlatformKitTemplate[]>("/catalog/kits");
 }
 
+/** Apply a workspace snapshot onto the legacy shelf-merch.js global state object. */
+export function applyWorkspaceToState(S: Record<string, unknown>, data: WorkspaceSnapshot) {
+  const prevOrg = (S.org ?? {}) as {
+    step?: number;
+    seq?: number;
+    inWizard?: boolean;
+    _c?: number;
+  };
+  S.account = data.account;
+  S.user = {
+    ...data.userPatch,
+    email: data.userPatch.email,
+    role: data.userPatch.role || "company_admin",
+  };
+  S.shops = data.shops;
+  S.contacts = data.contacts;
+  S.kits = data.kits;
+  S.collections = data.collections;
+  S.catalogProducts = data.catalogProducts;
+  S.catalogTotal = data.catalogTotal;
+  S.campaigns = data.campaigns;
+  S.orders = data.orders;
+  S.wallets = data.wallets;
+  S.primaryEntityId = data.primaryEntityId;
+  // Replace org data from API; keep only in-progress wizard navigation state.
+  S.org = {
+    step: prevOrg.step ?? 1,
+    seq: prevOrg.seq ?? 6,
+    _c: prevOrg._c,
+    inWizard: prevOrg.inWizard ?? false,
+    ...data.org,
+  };
+}
+
 export { fetchPlatformDashboard } from "./platform-api";
 
 export async function createShopFlow(payload: {
