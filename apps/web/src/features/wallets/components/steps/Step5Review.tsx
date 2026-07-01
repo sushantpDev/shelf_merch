@@ -1,35 +1,46 @@
 import { inr } from "@/components/platform/platform-ui";
-import { fmtDate } from "../../types";
+import { fmtDate, remainingWalletBalanceForWizard, selectedDepartments, wizardCommittedAllocations } from "../../types";
 import { Donut } from "../Donut";
 import type { StepProps } from "./StepProps";
 
 export function Step5Review({ state, dispatch, account }: StepProps & { account: string }) {
   const o = state.wallet;
   const total = o.amount;
-  const depts = state.departments;
+  const depts = selectedDepartments(state.departments);
+  const alloc = wizardCommittedAllocations(state.departments, state.mode);
+  const rem = remainingWalletBalanceForWizard(total, state.departments, state.mode);
 
   return (
     <>
       <div style={{ marginBottom: 14 }}>
-        <h3 style={{ fontSize: 18 }}>Review organization setup</h3>
+        <h3 style={{ fontSize: 18 }}>Review allocation</h3>
         <p className="muted" style={{ fontSize: 13, marginTop: 2 }}>
-          Confirm everything looks right. Jump back to any step to make changes before finishing.
+          Confirm departments, budgets and managers before finishing.
         </p>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(3,1fr)", marginBottom: 18 }}>
+        <div className="card stat">
+          <div className="k">Total budget</div>
+          <div className="v num">{inr(total)}</div>
+        </div>
+        <div className="card stat">
+          <div className="k">Allocated</div>
+          <div className="v num">{inr(alloc)}</div>
+        </div>
+        <div className="card stat">
+          <div className="k">Remaining</div>
+          <div className="v num" style={{ color: rem < 0 ? "var(--danger)" : "var(--brand-d)" }}>
+            {inr(rem)}
+          </div>
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 20 }}>
         <div>
           <div className="card" style={{ padding: 20, marginBottom: 16 }}>
             <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
-              <b style={{ fontSize: 14 }}>Organization &amp; wallet</b>
-              <span
-                className="lnk"
-                role="button"
-                tabIndex={0}
-                onClick={() => dispatch({ type: "goto", step: 1 })}
-              >
-                Edit
-              </span>
+              <b style={{ fontSize: 14 }}>Wallet</b>
             </div>
             <ReviewRow label="Organization" value={account} />
             <ReviewRow label="Wallet" value={o.name} />

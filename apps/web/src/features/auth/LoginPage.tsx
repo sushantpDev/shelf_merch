@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ChevronRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
-import { login, isPlatformUser } from "@/services/api-bridge";
+import { login, isPlatformUser, ApiError } from "@/services/api-bridge";
 import {
   AuthDivider,
   AuthField,
@@ -13,30 +13,44 @@ import {
 } from "./AuthLayout";
 
 export function LoginPage() {
-  const navigate = useNavigate();
   const [email, setEmail] = useState("hr@rubix.net");
   const [password, setPassword] = useState("demo1234");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  function loginErrorMessage(err: unknown): string {
+    if (err instanceof ApiError) {
+      if (err.status === 502 || err.status === 503) {
+        return "Cannot reach the server. Start the API with npm run dev:api.";
+      }
+      return err.message;
+    }
+    if (err instanceof TypeError) {
+      return "Cannot reach the server. Start the API with npm run dev:api.";
+    }
+    return err instanceof Error ? err.message : "Login failed";
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email || !password) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
       toast.error("Enter email and password");
       return;
     }
+    setError("");
     setBusy(true);
     try {
-      const user = await login(email, password);
+      const user = await login(trimmedEmail, password);
       toast.success(`Welcome back, ${user.name.split(" ")[0]}`);
-      if (isPlatformUser(user)) {
-        navigate({ to: "/platform/dashboard" });
-      } else {
-        navigate({ to: "/app/orders" });
-      }
+      const destination = isPlatformUser(user) ? "/platform/dashboard" : "/app/orders";
+      window.location.assign(destination);
     } catch (err) {
       setBusy(false);
-      toast.error(err instanceof Error ? err.message : "Login failed");
+      const message = loginErrorMessage(err);
+      setError(message);
+      toast.error(message);
     }
   }
 
@@ -88,6 +102,12 @@ export function LoginPage() {
             </button>
           </div>
         </div>
+
+        {error ? (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+            {error}
+          </p>
+        ) : null}
 
         <button
           type="submit"

@@ -41,12 +41,18 @@ async function parseBody(res: Response): Promise<unknown> {
 function errorFromResponse(status: number, body: unknown): ApiError {
   if (body && typeof body === "object" && "error" in body) {
     const err = (body as {
-      error: { message?: string; code?: string; details?: Array<{ path?: string; message?: string }> };
+      error: {
+        message?: string;
+        code?: string;
+        details?: unknown;
+      };
     }).error;
     let message = err.message || "Request failed";
     if (err.code === "VALIDATION_ERROR" && Array.isArray(err.details) && err.details.length) {
-      const first = err.details[0];
+      const first = err.details[0] as { path?: string; message?: string };
       message = `${message}: ${first.path || "field"} — ${first.message || "invalid"}`;
+    } else if (Array.isArray(err.details) && err.details.every((d) => typeof d === "string")) {
+      message = `${message}: ${(err.details as string[]).join("; ")}`;
     }
     return new ApiError(status, message, err.code || "API_ERROR", body);
   }

@@ -48,9 +48,35 @@ export async function fund(req, res) {
     action: 'wallet.fund',
     entityType: 'Wallet',
     entityId: req.params.id,
-    after: { amount: req.body.amount, transactionId: result.transaction._id },
+    after: {
+      amount: req.body.amount,
+      pending: Boolean(result.pending),
+      transactionId: result.transaction?._id ?? null,
+    },
   });
   res.status(201).json(result);
+}
+
+export async function uploadFundingDocument(req, res) {
+  const { url } = await walletsService.uploadFundingDocument({
+    tenantId: req.tenantId,
+    walletId: req.params.id,
+    file: req.file,
+  });
+  writeAudit({
+    req,
+    action: 'wallet.funding_document',
+    entityType: 'Wallet',
+    entityId: req.params.id,
+    after: { fileUrl: url },
+  });
+  const wallet = await walletsService.getWallet({ tenantId: req.tenantId, walletId: req.params.id });
+  const obj = wallet.toObject();
+  res.json({
+    ...obj,
+    unallocatedAmount: obj.balance - obj.allocatedAmount,
+    validNextStatuses: validNextStatuses('wallet', obj.status),
+  });
 }
 
 export async function allocate(req, res) {

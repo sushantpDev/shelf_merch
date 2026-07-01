@@ -14,6 +14,7 @@ type OrgWizardState = {
     funding: string;
     docType: string;
     docNumber: string;
+    uploadFile?: { file?: File } | null;
   };
   departments: Array<{
     id: string | number;
@@ -24,6 +25,7 @@ type OrgWizardState = {
     color: string;
     mgr: { name: string; email: string; mobile: string; role: string; invite: boolean };
   }>;
+  createNewWallet?: boolean;
 };
 
 function walletIdFromResponse(wallet: Record<string, unknown>): string {
@@ -34,34 +36,76 @@ function walletIdFromResponse(wallet: Record<string, unknown>): string {
   return String(id);
 }
 
-async function resolveWalletId(org: OrgWizardState): Promise<string> {
-  let candidate = org.wallet.id?.trim();
-  const tenantId = getStoredUser()?.tenantId;
+function normalizeMongoId(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && "_id" in value) {
+    return normalizeMongoId((value as { _id: unknown })._id);
+  }
+  return String(value);
+}
 
-  // Stale UI state sometimes stores tenantId where a wallet id belongs.
-  if (candidate && tenantId && candidate === tenantId) {
-    candidate = undefined;
+async function ensureWalletFunded(
+  walletId: string,
+  amount: number,
+  fundingMethod: "po_upload" | "online" = "po_upload",
+): Promise<void> {
+  if (amount <= 0) return;
+  const existing = await apiFetch<{
+    balance?: number;
+    fundingMethod?: string;
+    fundingDocument?: { approvalStatus?: string };
+  }>(`/wallets/${walletId}`);
+  const method = existing.fundingMethod ?? fundingMethod;
+  const approval = existing.fundingDocument?.approvalStatus ?? "";
+
+  if (method === "po_upload") {
+    if (approval === "pending") return;
+    if (approval === "approved" && Number(existing.balance ?? 0) > 0) return;
+    await apiFetch(`/wallets/${walletId}/fund`, {
+      method: "POST",
+      idempotencyKey: `fund-${walletId}-setup`,
+      body: JSON.stringify({
+        amount,
+        description: "Organization wallet setup funding",
+      }),
+    });
+    return;
   }
 
-  if (candidate && MONGO_ID.test(candidate)) {
-    try {
-      const existing = await apiFetch<{ balance?: number }>(`/wallets/${candidate}`);
-      if (org.wallet.amount > 0 && Number(existing.balance ?? 0) === 0) {
-        await apiFetch(`/wallets/${candidate}/fund`, {
-          method: "POST",
-          idempotencyKey: `fund-${candidate}-setup`,
-          body: JSON.stringify({
-            amount: org.wallet.amount,
-            description: "Organization wallet setup funding",
-          }),
-        });
-      }
-      return candidate;
-    } catch (err) {
-      if (!(err instanceof ApiError) || err.status !== 404) throw err;
-    }
+  if (Number(existing.balance ?? 0) === 0) {
+    await apiFetch(`/wallets/${walletId}/fund`, {
+      method: "POST",
+      idempotencyKey: `fund-${walletId}-setup`,
+      body: JSON.stringify({
+        amount,
+        description: "Organization wallet setup funding",
+      }),
+    });
   }
+}
 
+async function tryResolveExistingWalletId(id: string): Promise<string | null> {
+  if (!MONGO_ID.test(id)) return null;
+  try {
+    await apiFetch(`/wallets/${id}`);
+    return id;
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+export async function uploadWalletFundingDocumentApi(walletId: string, file: File) {
+  const form = new FormData();
+  form.append("document", file);
+  return apiFetch<Record<string, unknown>>(`/wallets/${walletId}/funding-document`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+async function createWalletAndFund(org: OrgWizardState): Promise<string> {
   const wallet = await apiFetch<Record<string, unknown>>("/wallets", {
     method: "POST",
     body: JSON.stringify({
@@ -77,19 +121,67 @@ async function resolveWalletId(org: OrgWizardState): Promise<string> {
     }),
   });
   const walletId = walletIdFromResponse(wallet);
+  const fundingMethod = org.wallet.funding === "pay" ? "online" : "po_upload";
+  if (fundingMethod === "po_upload" && org.wallet.uploadFile?.file) {
+    await uploadWalletFundingDocumentApi(walletId, org.wallet.uploadFile.file);
+  }
+  await ensureWalletFunded(walletId, org.wallet.amount, fundingMethod);
+  return walletId;
+}
 
-  if (org.wallet.amount > 0) {
-    await apiFetch(`/wallets/${walletId}/fund`, {
-      method: "POST",
-      idempotencyKey: `fund-${walletId}-setup`,
-      body: JSON.stringify({
-        amount: org.wallet.amount,
-        description: "Organization wallet setup funding",
-      }),
-    });
+/** Step 1 only — create wallet, upload PO, submit funding request for finance review. */
+export async function createWalletOnlyApi(
+  org: Pick<OrgWizardState, "wallet">,
+): Promise<{ walletId: string }> {
+  const walletId = await createWalletAndFund(org as OrgWizardState);
+  return { walletId };
+}
+
+async function resolveWalletId(org: OrgWizardState, createNewWallet = false): Promise<string> {
+  if (createNewWallet) {
+    return createWalletAndFund(org);
   }
 
-  return walletId;
+  let candidate = org.wallet.id?.trim();
+  const tenantId = getStoredUser()?.tenantId;
+
+  // Stale UI state sometimes stores tenantId where a wallet id belongs.
+  if (candidate && tenantId && candidate === tenantId) {
+    candidate = undefined;
+  }
+
+  if (candidate) {
+    const resolved = await tryResolveExistingWalletId(candidate);
+    if (resolved) {
+      await ensureWalletFunded(
+        resolved,
+        org.wallet.amount,
+        org.wallet.funding === "pay" ? "online" : "po_upload",
+      );
+      return resolved;
+    }
+  }
+
+  // Reuse an existing tenant wallet before creating a duplicate.
+  const wallets = await apiFetch<Array<Record<string, unknown>>>("/wallets");
+  const nameKey = org.wallet.name?.trim().toLowerCase();
+  const ranked = [...wallets].sort(
+    (a, b) => Number(b.balance ?? 0) - Number(a.balance ?? 0),
+  );
+  const byName = nameKey
+    ? ranked.find((w) => String(w.name ?? "").trim().toLowerCase() === nameKey)
+    : undefined;
+  if (byName) {
+    const walletId = walletIdFromResponse(byName);
+    await ensureWalletFunded(
+      walletId,
+      org.wallet.amount,
+      org.wallet.funding === "pay" ? "online" : "po_upload",
+    );
+    return walletId;
+  }
+
+  return createWalletAndFund(org);
 }
 
 function productRefFromUi(p: UiProduct) {
@@ -449,36 +541,96 @@ type ApiEntityRow = {
   allocatedAmount?: number;
 };
 
+export async function fundWalletApi(
+  walletId: string,
+  payload: { amount: number; description?: string },
+): Promise<{ wallet?: { balance?: number }; transaction?: { _id?: string } }> {
+  return apiFetch(`/wallets/${walletId}/fund`, {
+    method: "POST",
+    idempotencyKey: `fund-${walletId}-${payload.amount}-${Date.now()}`,
+    body: JSON.stringify({
+      amount: payload.amount,
+      description: payload.description || "Wallet top-up",
+    }),
+  });
+}
+
+export type WalletTransactionRow = {
+  _id?: string;
+  type: string;
+  amount: number;
+  balanceAfter?: number;
+  description?: string;
+  createdAt?: string;
+};
+
+export async function fetchWalletTransactionsApi(
+  walletId: string,
+  limit = 20,
+): Promise<WalletTransactionRow[]> {
+  const res = await apiFetch<{ items?: WalletTransactionRow[] }>(
+    `/wallets/${walletId}/transactions?limit=${limit}`,
+  );
+  return res.items ?? [];
+}
+
 export async function syncOrgWizardApi(
   org: OrgWizardState,
 ): Promise<{ walletId: string; invites: OrgWizardInvite[] }> {
-  const defaultWalletId = await resolveWalletId(org);
+  const walletId = org.wallet.id?.trim();
+  if (!walletId || !MONGO_ID.test(walletId)) {
+    throw new Error("No wallet found. Create and fund your wallet first.");
+  }
+  const defaultWalletId = walletId;
   const allocationsByWallet = new Map<string, Array<{ entityId: string; amount: number }>>();
   const walletsToActivate = new Set<string>();
   const invites: OrgWizardInvite[] = [];
-  let primaryWalletId = defaultWalletId;
 
   const pushAllocation = (walletId: string, entityId: string, amount: number) => {
-    if (amount <= 0) return;
+    if (amount === 0) return;
     const list = allocationsByWallet.get(walletId) ?? [];
     list.push({ entityId, amount });
     allocationsByWallet.set(walletId, list);
     walletsToActivate.add(walletId);
   };
 
+  const allocationDeltas: Array<{ walletId: string; entityId: string; delta: number }> = [];
+  const plannedAllocations: Array<{ entityId: string; amount: number }> = [];
+
   for (const dept of org.departments) {
     const existingId = String(dept.id);
     const isMongoId = MONGO_ID.test(existingId);
     let entityId = isMongoId ? existingId : "";
-    let entityWalletId = defaultWalletId;
     let currentAllocated = 0;
 
     if (entityId) {
       const entity = await apiFetch<ApiEntityRow>(`/entities/${entityId}`);
-      entityWalletId = String(entity.walletId ?? defaultWalletId);
+      const entityWalletId = normalizeMongoId(entity.walletId);
       currentAllocated = Number(entity.allocatedAmount ?? 0);
-      primaryWalletId = entityWalletId;
-    } else {
+
+      if (entityWalletId && entityWalletId !== defaultWalletId) {
+        // Entity was tied to a stale or missing wallet — recreate on the setup wallet.
+        try {
+          await apiFetch(`/entities/${entityId}`, { method: "DELETE" });
+        } catch (err) {
+          if (!(err instanceof ApiError) || err.status !== 422) throw err;
+        }
+        entityId = "";
+        currentAllocated = 0;
+      } else {
+        await apiFetch(`/entities/${entityId}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            name: dept.name,
+            description: dept.desc || "",
+            colorHex: dept.color || "#2563EB",
+            expectedUsers: dept.users || 0,
+          }),
+        });
+      }
+    }
+
+    if (!entityId) {
       const entity = await apiFetch<ApiEntityRow>("/entities", {
         method: "POST",
         body: JSON.stringify({
@@ -489,43 +641,85 @@ export async function syncOrgWizardApi(
           expectedUsers: dept.users || 0,
         }),
       });
-      entityId = String(entity._id ?? entity.id);
-      entityWalletId = String(entity.walletId ?? defaultWalletId);
-      primaryWalletId = entityWalletId;
+      entityId = normalizeMongoId(entity._id ?? entity.id);
     }
 
-    if (dept.mgr?.email && dept.mgr.invite) {
+    const mgrEmail = dept.mgr?.email?.trim();
+    if (mgrEmail) {
+      const mgrName = dept.mgr.name?.trim() || mgrEmail.split("@")[0] || "Manager";
       const res = await apiFetch<{
         manager?: { email?: string };
         inviteToken?: string;
       }>(`/entities/${entityId}/assign-manager`, {
         method: "POST",
         body: JSON.stringify({
-          name: dept.mgr.name || dept.mgr.email.split("@")[0],
-          email: dept.mgr.email,
+          name: mgrName,
+          email: mgrEmail,
           role: dept.mgr.role || "",
           mobile: dept.mgr.mobile || "",
+          sendInvite: Boolean(dept.mgr.invite),
         }),
       });
-      invites.push({
-        email: dept.mgr.email,
-        name: dept.mgr.name || dept.mgr.email.split("@")[0],
-        entityName: dept.name,
-        inviteToken: res.inviteToken,
+      if (dept.mgr.invite) {
+        invites.push({
+          email: mgrEmail,
+          name: mgrName,
+          entityName: dept.name,
+          inviteToken: res.inviteToken,
+        });
+      }
+    } else if (dept.mgr?.name?.trim() || dept.mgr?.role?.trim()) {
+      await apiFetch(`/entities/${entityId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          managerName: dept.mgr.name?.trim() || "",
+          managerTitle: dept.mgr.role || "",
+        }),
       });
     }
 
     const target = Number(dept.allocated) || 0;
+    if (target > 0) {
+      plannedAllocations.push({ entityId, amount: target });
+    }
     const delta = target - currentAllocated;
-    pushAllocation(entityWalletId, entityId, delta);
+    if (delta !== 0) {
+      allocationDeltas.push({ walletId: defaultWalletId, entityId, delta });
+    }
+  }
+
+  allocationDeltas.sort((a, b) => a.delta - b.delta);
+  for (const { walletId, entityId, delta } of allocationDeltas) {
+    pushAllocation(walletId, entityId, delta);
+  }
+
+  const walletMeta = await apiFetch<{
+    fundingMethod?: string;
+    fundingDocument?: { approvalStatus?: string };
+  }>(`/wallets/${defaultWalletId}`);
+  const poPending =
+    walletMeta.fundingMethod === "po_upload" &&
+    walletMeta.fundingDocument?.approvalStatus === "pending";
+
+  if (poPending) {
+    if (plannedAllocations.length > 0) {
+      await apiFetch(`/wallets/${defaultWalletId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          fundingDocument: { plannedAllocations },
+        }),
+      });
+    }
+    return { walletId: defaultWalletId, invites };
   }
 
   for (const [walletId, allocations] of allocationsByWallet) {
     if (!allocations.length) continue;
+    const ordered = [...allocations].sort((a, b) => a.amount - b.amount);
     await apiFetch(`/wallets/${walletId}/allocate`, {
       method: "POST",
-      idempotencyKey: `alloc-${walletId}-${allocations.map((a) => `${a.entityId}:${a.amount}`).join("|")}`,
-      body: JSON.stringify({ allocations }),
+      idempotencyKey: `alloc-${walletId}-${ordered.map((a) => `${a.entityId}:${a.amount}`).join("|")}`,
+      body: JSON.stringify({ allocations: ordered }),
     });
   }
 
@@ -533,5 +727,5 @@ export async function syncOrgWizardApi(
     await apiFetch(`/wallets/${walletId}/activate`, { method: "POST" });
   }
 
-  return { walletId: primaryWalletId, invites };
+  return { walletId: defaultWalletId, invites };
 }

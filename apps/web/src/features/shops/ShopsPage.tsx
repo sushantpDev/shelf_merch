@@ -69,10 +69,7 @@ export function ShopsPage() {
           </Link>
         }
       />
-      <div
-        className="grid stagger"
-        style={{ gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))" }}
-      >
+      <div className="shops-grid stagger">
         {shops.map((shop) => (
           <ShopCard key={shop.id} shop={shop} fallbackUser={fallbackUser} onEditLook={setEditing} />
         ))}

@@ -49,7 +49,12 @@ beforeEach(async () => {
   tenantB = await Tenant.create({ name: 'Acme', slug: 'acme' });
   ({ user: adminA, token: tokenA } = await makeUser(tenantA, 'company_admin', 'tenant'));
   ({ user: adminB, token: tokenB } = await makeUser(tenantB, 'company_admin', 'tenant'));
-  walletA = await Wallet.create({ tenantId: tenantA._id, name: 'Rubix Wallet' });
+  walletA = await Wallet.create({
+    tenantId: tenantA._id,
+    name: 'Rubix Wallet',
+    fundingMethod: 'online',
+    fundingDocument: { approvalStatus: 'approved' },
+  });
   await ledger.createTransaction({
     tenantId: tenantA._id, walletId: walletA._id, type: 'fund_in', amount: 100_000,
   });
@@ -152,11 +157,17 @@ describe('idempotency (must-have §11.1)', () => {
 });
 
 describe('wallet setup wizard + state machine', () => {
-  it('walks create -> fund -> entities -> allocate -> managers -> activate', async () => {
+  it('walks create -> PO fund (pending) -> finance approve -> entities -> allocate -> managers -> activate', async () => {
+    const { token: financeToken } = await makeUser(null, 'platform_finance_admin', 'platform');
+
     const created = await request(app)
       .post('/api/v1/wallets')
       .set('Authorization', `Bearer ${tokenA}`)
-      .send({ name: 'FY2026 Merchandise Budget', fundingMethod: 'po_upload' });
+      .send({
+        name: 'FY2026 Merchandise Budget',
+        fundingMethod: 'po_upload',
+        fundingDocument: { docType: 'Purchase Order', docNumber: 'PO-2026-01' },
+      });
     expect(created.status).toBe(201);
     expect(created.body.status).toBe('draft');
     const id = created.body._id;
@@ -167,16 +178,39 @@ describe('wallet setup wizard + state machine', () => {
       .set('Authorization', `Bearer ${tokenA}`);
     expect(premature.status).toBe(422);
 
-    await request(app)
+    const funded = await request(app)
       .post(`/api/v1/wallets/${id}/fund`)
       .set('Authorization', `Bearer ${tokenA}`)
       .send({ amount: 1_000_000 });
+    expect(funded.status).toBe(201);
+    expect(funded.body.pending).toBe(true);
+    expect(funded.body.wallet.balance).toBe(0);
+    expect(funded.body.wallet.fundingDocument.approvalStatus).toBe('pending');
+    expect(funded.body.wallet.fundingDocument.requestedAmount).toBe(1_000_000);
+
+    const pendingApprovals = await request(app)
+      .get('/api/v1/platform/finance/funding-approvals')
+      .set('Authorization', `Bearer ${financeToken}`);
+    expect(pendingApprovals.body.some((r) => String(r.walletId) === String(id))).toBe(true);
 
     const entityRes = await request(app)
       .post('/api/v1/entities')
       .set('Authorization', `Bearer ${tokenA}`)
       .send({ walletId: id, name: 'Marketing', colorHex: '#2563EB' });
     expect(entityRes.status).toBe(201);
+
+    const allocBeforeApprove = await request(app)
+      .post(`/api/v1/wallets/${id}/allocate`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ allocations: [{ entityId: entityRes.body._id, amount: 300_000 }] });
+    expect(allocBeforeApprove.status).toBe(422);
+
+    const approved = await request(app)
+      .post(`/api/v1/platform/finance/funding-approvals/${id}/approve`)
+      .set('Authorization', `Bearer ${financeToken}`)
+      .send({ amount: 1_000_000 });
+    expect(approved.status).toBe(201);
+    expect(approved.body.wallet.balance).toBe(1_000_000);
 
     const alloc = await request(app)
       .post(`/api/v1/wallets/${id}/allocate`)

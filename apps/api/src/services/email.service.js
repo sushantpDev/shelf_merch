@@ -4,6 +4,10 @@ import { logger } from '../config/logger.js';
 import { ApiError } from '../utils/errors.js';
 import { buildRedemptionInviteEmail } from './email-templates/redemptionInvite.template.js';
 import { buildSurpriseGiftEmail } from './email-templates/surpriseGift.template.js';
+import {
+  buildManagerAssignmentEmail,
+  buildManagerInviteEmail,
+} from './email-templates/managerEmails.template.js';
 
 let transporter;
 
@@ -69,23 +73,49 @@ export async function sendPasswordResetEmail(to, token) {
   }
 }
 
-export async function sendInviteEmail(to, token, { name = '' } = {}) {
+export async function sendInviteEmail(
+  to,
+  token,
+  { name = '', departmentName = '', organizationName = '', roleTitle = '' } = {},
+) {
   const link = appUrl(`/accept-invite?token=${token}`);
-  const greeting = name ? `Hi ${name},` : 'Hi,';
-  const subject = 'You have been invited to ShelfMerch';
-  const text = `${greeting}\n\nYou have been invited to join ShelfMerch as a department manager.\n\nAccept your invitation and set your password:\n${link}\n\nThis link expires in 7 days.\n\nIf you do not see this email in your inbox, check your spam or promotions folder.`;
-  const html = `<div style="font-family:sans-serif;line-height:1.5;color:#1a1a1a">
-<p>${greeting}</p>
-<p>You have been invited to join <strong>ShelfMerch</strong> as a department manager.</p>
-<p><a href="${link}" style="display:inline-block;padding:12px 20px;background:#15784C;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">Accept invitation</a></p>
-<p style="font-size:13px;color:#555">Or copy this link: <a href="${link}">${link}</a></p>
-<p style="font-size:13px;color:#777">This link expires in 7 days. If you do not see this email in your inbox, check spam or promotions.</p>
-</div>`;
+  const { subject, html, text } = buildManagerInviteEmail({
+    name,
+    departmentName,
+    organizationName,
+    roleTitle,
+    link,
+  });
 
   try {
     return await sendEmail({ to, subject, text, html });
   } catch (err) {
     logger.error({ err, to }, 'Invite email send failed');
+  }
+}
+
+export async function sendManagerAssignmentEmail({
+  to,
+  name = '',
+  departmentName = '',
+  organizationName = '',
+  roleTitle = '',
+  link = '/login',
+}) {
+  const fullLink = link.startsWith('http') ? link : appUrl(link);
+  const { subject, html, text } = buildManagerAssignmentEmail({
+    name,
+    departmentName,
+    organizationName,
+    roleTitle,
+    link: fullLink,
+  });
+
+  try {
+    return await sendEmail({ to, subject, text, html });
+  } catch (err) {
+    logger.warn({ err, to, subject }, 'Manager assignment email send failed');
+    return { success: false, provider: 'smtp' };
   }
 }
 

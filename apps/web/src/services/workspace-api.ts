@@ -1,4 +1,5 @@
 import { apiFetch } from "./api";
+import type { WalletUploadFile } from "@/features/wallets/types";
 import {
   applyAuthUser,
   mapCampaign,
@@ -21,6 +22,12 @@ import {
 } from "./mappers";
 import { getStoredUser, type AuthUser } from "./auth-store";
 
+export type WalletOrgView = {
+  active: boolean;
+  wallet: WorkspaceSnapshot["org"]["wallet"];
+  departments: WorkspaceSnapshot["org"]["departments"];
+};
+
 export type WorkspaceSnapshot = {
   account: string;
   userPatch: { name: string; initials: string; email: string; role: string };
@@ -33,6 +40,8 @@ export type WorkspaceSnapshot = {
   campaigns: UiCampaign[];
   orders: UiOrder[];
   wallets: UiWallet[];
+  primaryWalletId?: string;
+  walletViews: Record<string, WalletOrgView>;
   primaryEntityId?: string;
   org: {
     active: boolean;
@@ -49,7 +58,10 @@ export type WorkspaceSnapshot = {
       docType: string;
       docNumber: string;
       uploaded: boolean;
+      uploadFile: WalletUploadFile | null;
       pay: string;
+      fundingApproval?: string;
+      requestedAmount?: number;
     };
     departments: ReturnType<typeof mapEntityToDept>[];
   };
@@ -57,7 +69,89 @@ export type WorkspaceSnapshot = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function usersMap(users: any[]) {
-  return new Map(users.map((u) => [String(u._id), u]));
+  return new Map(users.map((u) => [String(u._id ?? u.id), u]));
+}
+
+function fileNameFromFundingUrl(fileUrl: string): string {
+  try {
+    const path = new URL(fileUrl, "https://placeholder.local").pathname;
+    const base = path.split("/").pop() || "Document";
+    return decodeURIComponent(base);
+  } catch {
+    return "Document";
+  }
+}
+
+type ApiWalletRow = {
+  _id?: string;
+  id?: string;
+  name: string;
+  balance: number;
+  totalAmount: number;
+  allocatedAmount?: number;
+  validFrom?: string;
+  validTo?: string;
+  fundingMethod?: string;
+  fundingDocument?: {
+    docType?: string;
+    docNumber?: string;
+    fileUrl?: string;
+    approvalStatus?: string;
+    requestedAmount?: number;
+  };
+  status?: string;
+  updatedAt?: string;
+};
+
+function mapWalletOrgFields(
+  w: ApiWalletRow,
+  isEntityManager: boolean,
+  myEntity?: { allocatedAmount?: number },
+): WorkspaceSnapshot["org"]["wallet"] {
+  const id = String(w._id ?? w.id ?? "");
+  return {
+    id: id || undefined,
+    name: w.name || "Merchandise Budget",
+    status: w.status || "",
+    amount: isEntityManager
+      ? (myEntity?.allocatedAmount ?? 0)
+      : (w.balance ?? w.totalAmount ?? 0),
+    start: w.validFrom ? new Date(w.validFrom).toISOString().slice(0, 10) : "",
+    end: w.validTo ? new Date(w.validTo).toISOString().slice(0, 10) : "",
+    funding: w.fundingMethod === "online" ? "pay" : "upload",
+    docType: w.fundingDocument?.docType || "Purchase Order",
+    docNumber: w.fundingDocument?.docNumber || "",
+    uploaded: Boolean(w.fundingDocument?.fileUrl),
+    uploadFile: w.fundingDocument?.fileUrl
+      ? {
+          name: fileNameFromFundingUrl(w.fundingDocument.fileUrl),
+          size: 0,
+          source: "device",
+        }
+      : null,
+    pay: "card",
+    fundingApproval: w.fundingDocument?.approvalStatus || "",
+    requestedAmount: Number(w.fundingDocument?.requestedAmount ?? 0),
+  };
+}
+
+/** Resolve org snapshot for a specific wallet (defaults to primary). */
+export function orgForWallet(
+  workspace: WorkspaceSnapshot,
+  walletId?: string,
+): WorkspaceSnapshot["org"] {
+  const id = walletId || workspace.primaryWalletId || workspace.org.wallet.id;
+  const view = id ? workspace.walletViews[id] : undefined;
+  if (view) {
+    return {
+      active: view.active,
+      done: workspace.org.done,
+      inWizard: workspace.org.inWizard,
+      wallet: view.wallet,
+      departments: view.departments,
+    };
+  }
+  return workspace.org;
 }
 
 export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Promise<WorkspaceSnapshot> {
@@ -136,21 +230,6 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
       .map((c) => c.id);
   }
 
-  type ApiWalletRow = {
-    _id?: string;
-    id?: string;
-    name: string;
-    balance: number;
-    totalAmount: number;
-    allocatedAmount?: number;
-    validFrom?: string;
-    validTo?: string;
-    fundingMethod?: string;
-    fundingDocument?: { docType?: string; docNumber?: string; fileUrl?: string };
-    status?: string;
-    updatedAt?: string;
-  };
-
   const walletList = wallets as ApiWalletRow[];
   // Surface an in-progress wallet that still needs allocation before the live one.
   const stuckSetup = [...walletList]
@@ -164,9 +243,16 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
       (a, b) =>
         new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime(),
     )[0];
+  const fundedSetup = [...walletList]
+    .filter((w) => (w.balance ?? 0) > 0 || (w.totalAmount ?? 0) > 0)
+    .sort(
+      (a, b) =>
+        new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime(),
+    )[0];
   const primaryWallet =
     stuckSetup ??
     walletList.find((w) => w.status === "active") ??
+    fundedSetup ??
     [...walletList].sort((a, b) => (b.balance ?? 0) - (a.balance ?? 0))[0];
 
   const primaryWalletId = primaryWallet
@@ -197,6 +283,21 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
 
   const orgActive = isEntityManager ? Boolean(myEntity) : Boolean(primaryWallet);
 
+  const entityRows = entities as never[];
+  const walletViews: Record<string, WalletOrgView> = {};
+  for (const w of walletList) {
+    const id = String(w._id ?? w.id ?? "");
+    if (!id) continue;
+    const ents = entityRows.filter(
+      (e) => String((e as { walletId: string }).walletId) === id,
+    );
+    walletViews[id] = {
+      active: Boolean(w),
+      wallet: mapWalletOrgFields(w, isEntityManager, myEntity),
+      departments: ents.map((e) => mapEntityToDept(e, userById)),
+    };
+  }
+
   const auth = applyAuthUser(me, tenant.name);
   return {
     account: auth.account,
@@ -212,6 +313,8 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
       mapOrder(o, (o as { campaignName?: string }).campaignName || ""),
     ),
     wallets: (wallets as never[]).map((w) => mapWallet(w, owner)),
+    primaryWalletId: primaryWalletId || undefined,
+    walletViews,
     primaryEntityId: isEntityManager
       ? (myEntity ? String((myEntity as { _id: string })._id) : undefined)
       : walletEntities[0]
@@ -221,25 +324,13 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
       active: orgActive,
       done: false,
       inWizard: false,
-      wallet: {
-        id: primaryWalletId || undefined,
-        name: primaryWallet?.name || "Merchandise Budget",
-        status: primaryWallet?.status || "",
-        amount: isEntityManager
-          ? (myEntity?.allocatedAmount ?? 0)
-          : (primaryWallet?.balance ?? primaryWallet?.totalAmount ?? 0),
-        start: primaryWallet?.validFrom
-          ? new Date(primaryWallet.validFrom).toISOString().slice(0, 10)
-          : "",
-        end: primaryWallet?.validTo
-          ? new Date(primaryWallet.validTo).toISOString().slice(0, 10)
-          : "",
-        funding: primaryWallet?.fundingMethod === "online" ? "pay" : "upload",
-        docType: primaryWallet?.fundingDocument?.docType || "Purchase Order",
-        docNumber: primaryWallet?.fundingDocument?.docNumber || "",
-        uploaded: Boolean(primaryWallet?.fundingDocument?.fileUrl),
-        pay: "card",
-      },
+      wallet: primaryWallet
+        ? mapWalletOrgFields(primaryWallet, isEntityManager, myEntity)
+        : mapWalletOrgFields(
+            { name: "Merchandise Budget", balance: 0, totalAmount: 0 },
+            isEntityManager,
+            myEntity,
+          ),
       departments: walletEntities.map((e) => mapEntityToDept(e, userById)),
     },
   };

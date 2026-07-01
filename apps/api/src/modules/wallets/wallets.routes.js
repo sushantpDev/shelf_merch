@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { resolveTenant, requireTenantContext, blockDuringImpersonation } from '../../middleware/tenant.middleware.js';
@@ -17,6 +18,7 @@ import {
 } from './wallets.validation.js';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
 router.use(authenticate, resolveTenant, requireTenantContext);
 
@@ -27,6 +29,13 @@ router.get('/', canRead, asyncHandler(controller.list));
 router.post('/', adminOnly, validate({ body: createWalletSchema }), asyncHandler(controller.create));
 router.get('/:id', canRead, validate({ params: walletIdParams }), asyncHandler(controller.getOne));
 router.patch('/:id', adminOnly, validate({ params: walletIdParams, body: updateWalletSchema }), asyncHandler(controller.update));
+router.post(
+  '/:id/funding-document',
+  adminOnly,
+  validate({ params: walletIdParams }),
+  upload.single('document'),
+  asyncHandler(controller.uploadFundingDocument),
+);
 
 // §6.4 — wallet adjustments are blocked during impersonation.
 router.post(

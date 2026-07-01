@@ -1,5 +1,6 @@
 import { Entity } from './entity.model.js';
 import { Wallet } from '../wallets/wallet.model.js';
+import { Tenant } from '../tenants/tenant.model.js';
 import { inviteUser } from '../users/users.service.js';
 import { RoleAssignment } from '../roles/roleAssignment.model.js';
 import { transitionState } from '../../services/stateMachine.service.js';
@@ -11,7 +12,7 @@ export async function listEntities({ tenantId, user, walletId }) {
   if (user.scopeType === 'entity') {
     filter._id = { $in: user.assignedEntityIds };
   }
-  return Entity.find(filter).sort({ createdAt: 1 });
+  return Entity.find(filter).sort({ createdAt: 1 }).populate('managerUserId', 'name email phone status');
 }
 
 export async function getEntity({ tenantId, entityId }) {
@@ -69,6 +70,8 @@ export async function deleteEntity({ tenantId, entityId }) {
 /** §7.5 /assign-manager — invite (or reuse) a user and bind them to the entity. */
 export async function assignManager({ tenantId, entityId, data, userId }) {
   const entity = await getEntity({ tenantId, entityId });
+  const tenant = await Tenant.findById(tenantId).select('name').lean();
+  const sendInvite = data.sendInvite !== false;
 
   const { user, inviteToken } = await inviteUser({
     tenantId,
@@ -79,10 +82,19 @@ export async function assignManager({ tenantId, entityId, data, userId }) {
     scopeType: 'entity',
     scopeId: entity._id,
     assignedEntityIds: [entity._id],
+    sendInvite,
+    emailContext: {
+      departmentName: entity.name,
+      organizationName: tenant?.name || 'your organization',
+      roleTitle: data.role || 'Department Manager',
+    },
   });
 
   entity.managerUserId = user._id;
-  entity.managerInvitePending = user.status === 'invited';
+  entity.managerInvitePending = sendInvite && user.status === 'invited';
+  entity.managerTitle = data.role || '';
+  entity.managerName = data.name || user.name || '';
+  entity.managerEmail = user.email || data.email || '';
   await entity.save();
 
   // Wizard advance: all entities of the wallet managed → managers_assigned.
@@ -99,7 +111,7 @@ export async function assignManager({ tenantId, entityId, data, userId }) {
     }
   }
 
-  return { entity, manager: user, inviteToken };
+  return { entity, manager: user, inviteToken: sendInvite ? inviteToken : undefined };
 }
 
 export async function entityRoleAssignment({ tenantId, entityId }) {

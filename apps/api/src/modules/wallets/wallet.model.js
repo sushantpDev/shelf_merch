@@ -28,6 +28,13 @@ const walletSchema = new mongoose.Schema(
       docNumber: { type: String, default: '' },
       fileUrl: { type: String, default: '' },
       approvalStatus: { type: String, enum: ['', 'pending', 'approved', 'rejected'], default: '' },
+      requestedAmount: { type: Number, default: 0 },
+      plannedAllocations: [
+        {
+          entityId: { type: mongoose.Schema.Types.ObjectId, ref: 'Entity' },
+          amount: { type: Number, default: 0 },
+        },
+      ],
     },
     ownerUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },

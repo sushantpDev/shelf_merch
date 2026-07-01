@@ -10,7 +10,11 @@ const LOCAL_UPLOAD_DIR = path.resolve(__dirname, '../../uploads');
 
 const ALLOWED_TYPES = {
   artwork: ['image/svg+xml', 'image/png', 'image/jpeg'],
-  document: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+  document: [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ],
   logo: ['image/svg+xml', 'image/png', 'image/jpeg'],
   product: ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'],
   mockup: ['image/png', 'image/jpeg', 'image/webp'],

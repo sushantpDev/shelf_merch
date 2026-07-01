@@ -22,9 +22,9 @@ export function ShopCard({
       >
         <ShopBanner
           source={shop}
-          height={132}
+          height={168}
           layout="center"
-          logoSize={52}
+          logoSize={58}
           onEdit={() => onEditLook(shop)}
         />
       </Link>
@@ -33,7 +33,7 @@ export function ShopCard({
           className="row"
           style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}
         >
-          <h3 style={{ fontSize: 17 }}>{shop.name}</h3>
+          <h3>{shop.name}</h3>
           {shop.live ? (
             <span className="tag tag-live tag-live-outline">
               <span className="dot" />

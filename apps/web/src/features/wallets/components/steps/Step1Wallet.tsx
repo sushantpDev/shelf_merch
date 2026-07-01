@@ -1,7 +1,7 @@
-import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { inr } from "@/components/platform/platform-ui";
 import { amtInput, fmtDate, parseAmt } from "../../types";
+import { DocumentUploadZone } from "../DocumentUploadZone";
 import type { StepProps } from "./StepProps";
 
 const FUNDING_OPTIONS = [
@@ -151,66 +151,10 @@ export function Step1Wallet({ state, dispatch }: StepProps) {
             </div>
             <div className="field">
               <label className="lbl">Upload document</label>
-              {o.uploaded ? (
-                <div
-                  className="row"
-                  style={{
-                    gap: 10,
-                    alignItems: "center",
-                    border: "1px solid var(--brand)",
-                    borderRadius: "var(--r-sm)",
-                    padding: "11px 13px",
-                    background: "var(--brand-50)",
-                  }}
-                >
-                  <div
-                    className="logo-chip"
-                    style={{ width: 34, height: 34, fontSize: 10, fontWeight: 800 }}
-                  >
-                    PDF
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>Merch-Agreement-FY26.pdf</div>
-                    <div className="mut3" style={{ fontSize: 11 }}>
-                      1.8 MB · uploaded just now
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="xbtn"
-                    aria-label="Remove document"
-                    onClick={() => setField("uploaded", false)}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  style={{
-                    width: "100%",
-                    border: "1.5px dashed var(--line)",
-                    borderRadius: "var(--r-sm)",
-                    padding: 22,
-                    textAlign: "center",
-                    color: "var(--ink-2)",
-                    cursor: "pointer",
-                    background: "transparent",
-                  }}
-                  onClick={() => {
-                    setField("uploaded", true);
-                    toast.success("Document uploaded · pending review");
-                  }}
-                >
-                  <Upload size={24} color="#15784C" />
-                  <div style={{ fontWeight: 600, fontSize: 13, marginTop: 8 }}>
-                    Click to upload or drag &amp; drop
-                  </div>
-                  <div className="mut3" style={{ fontSize: 11, marginTop: 4 }}>
-                    PDF or DOCX · up to 25MB
-                  </div>
-                </button>
-              )}
+              <DocumentUploadZone
+                file={o.uploadFile}
+                onFileChange={(file) => dispatch({ type: "setUploadFile", file })}
+              />
               <div className="row" style={{ gap: 9, alignItems: "center", marginTop: 12 }}>
                 <span className="lbl" style={{ margin: 0 }}>
                   Approval status

@@ -100,7 +100,7 @@ export async function login(email: string, password: string) {
   const result = await apiFetch<AuthResult>("/auth/login", {
     method: "POST",
     auth: false,
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
   });
   return establishSession(result);
 }
@@ -121,15 +121,16 @@ export async function register(payload: {
 
 export async function logout() {
   const refreshToken = getRefreshToken();
+  clearSession();
+  if (!refreshToken) return;
   try {
-    if (refreshToken) {
-      await apiFetch("/auth/logout", {
-        method: "POST",
-        body: JSON.stringify({ refreshToken }),
-      });
-    }
-  } finally {
-    clearSession();
+    await apiFetch("/auth/logout", {
+      method: "POST",
+      auth: false,
+      body: JSON.stringify({ refreshToken }),
+    });
+  } catch {
+    /* session already cleared locally */
   }
 }
 

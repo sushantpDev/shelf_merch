@@ -27,9 +27,9 @@ export function EntityManagerDashboard({
           </div>
           <h3>Budget not available yet</h3>
           <p>
-            Your company admin must finish <b>organization setup</b> (step 5 — Review &amp; Finish)
-            and allocate budget to your department. If you were invited by email, accept the invite
-            link first.
+            Your company admin must finish <b>wallet allocation</b> (departments, budget split, and
+            manager invites) before you can launch campaigns. If you were invited by email, accept
+            the invite link first.
           </p>
         </div>
       </>

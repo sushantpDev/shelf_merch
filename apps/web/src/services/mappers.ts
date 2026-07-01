@@ -150,7 +150,9 @@ export type UiOrgDept = {
     email: string;
     mobile: string;
     role: string;
+    /** @deprecated use inviteStatus */
     invite: boolean;
+    inviteStatus: 'unassigned' | 'pending' | 'active';
   };
 };
 
@@ -413,7 +415,24 @@ export function mapWallet(w: ApiProduct, owner?: ApiUser): UiWallet {
 }
 
 export function mapEntityToDept(e: ApiEntity, usersById: Map<string, ApiUser>): UiOrgDept {
-  const mgr = e.managerUserId ? usersById.get(String(e.managerUserId)) : null;
+  const mgrRef = e.managerUserId;
+  const mgr =
+    mgrRef && typeof mgrRef === "object"
+      ? mgrRef
+      : mgrRef
+        ? usersById.get(String(mgrRef))
+        : null;
+  const mgrName = mgr?.name?.trim() || e.managerName?.trim() || "";
+  const mgrEmail = mgr?.email?.trim() || e.managerEmail?.trim() || "";
+  const hasManager = Boolean(e.managerUserId || mgrEmail || mgrName);
+  let inviteStatus: 'unassigned' | 'pending' | 'active' = 'unassigned';
+  if (hasManager) {
+    if (e.managerInvitePending || mgr?.status === 'invited') {
+      inviteStatus = 'pending';
+    } else {
+      inviteStatus = 'active';
+    }
+  }
   return {
     id: String(e._id),
     name: e.name,
@@ -423,11 +442,12 @@ export function mapEntityToDept(e: ApiEntity, usersById: Map<string, ApiUser>): 
     spent: e.spentAmount ?? 0,
     color: e.colorHex || "#2563EB",
     mgr: {
-      name: mgr?.name || "",
-      email: mgr?.email || "",
+      name: mgrName,
+      email: mgrEmail,
       mobile: mgr?.phone || "",
-      role: mgr ? "Entity Manager" : "",
-      invite: Boolean(e.managerInvitePending),
+      role: e.managerTitle || (mgr ? "Entity Manager" : ""),
+      invite: inviteStatus === 'pending',
+      inviteStatus,
     },
   };
 }

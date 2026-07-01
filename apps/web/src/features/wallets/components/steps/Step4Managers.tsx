@@ -1,5 +1,5 @@
 import { inr } from "@/components/platform/platform-ui";
-import { ORG_ROLES } from "../../types";
+import { ORG_ROLES, selectedDepartments } from "../../types";
 import type { StepProps } from "./StepProps";
 
 export function Step4Managers({ state, dispatch }: StepProps) {
@@ -13,7 +13,7 @@ export function Step4Managers({ state, dispatch }: StepProps) {
         </p>
       </div>
 
-      {state.departments.map((d) => (
+      {selectedDepartments(state.departments).map((d) => (
         <div key={d.id} className="mgr-card">
           <div className="mgr-head">
             <div

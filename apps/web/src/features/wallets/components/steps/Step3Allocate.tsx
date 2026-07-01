@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 import { inr } from "@/components/platform/platform-ui";
-import { amtInput, parseAmt, totalAlloc } from "../../types";
+import { amtInput, parseAmt, pctOfWalletTotal, remainingWalletBalanceForWizard, selectedDepartments, wizardCommittedAllocations } from "../../types";
 import type { StepProps } from "./StepProps";
 
 function pctLabel(value: number, total: number): string {
@@ -11,11 +11,12 @@ function pctLabel(value: number, total: number): string {
 
 export function Step3Allocate({ state, dispatch }: StepProps) {
   const total = state.wallet.amount;
-  const alloc = totalAlloc(state.departments);
-  const rem = total - alloc;
+  const depts = selectedDepartments(state.departments);
+  const alloc = wizardCommittedAllocations(state.departments, state.mode);
+  const rem = remainingWalletBalanceForWizard(total, state.departments, state.mode);
   const over = alloc > total;
 
-  const segments = state.departments.filter((d) => d.allocated > 0);
+  const segments = depts.filter((d) => d.allocated > 0);
 
   return (
     <>
@@ -73,7 +74,7 @@ export function Step3Allocate({ state, dispatch }: StepProps) {
           )}
         </div>
         <div className="alloc-legend">
-          {state.departments.map((d) => (
+          {depts.map((d) => (
             <div key={d.id} className="leg">
               <span className="lc" style={{ background: d.color }} />
               {d.name} · {inr(d.allocated)}
@@ -82,75 +83,62 @@ export function Step3Allocate({ state, dispatch }: StepProps) {
         </div>
       </div>
 
-      <div
-        className="row"
-        style={{ justifyContent: "flex-end", gap: 10, alignItems: "center", marginTop: 14 }}
-      >
-        <span className="mut3" style={{ fontSize: 12.5 }}>
-          Need a starting point?
-        </span>
-        <button
-          type="button"
-          className="btn btn-soft btn-sm"
-          onClick={() => {
-            dispatch({ type: "splitEven" });
-            toast.success("Budget split evenly");
-          }}
-        >
-          Split evenly
-        </button>
-      </div>
+      <div className="card alloc-panel">
+        <div className="alloc-panel-head">
+          <div>
+            <div className="alloc-panel-title">Department allocations</div>
+            <div className="alloc-panel-sub">Set an amount for each selected department</div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-soft btn-sm"
+            onClick={() => {
+              dispatch({ type: "splitEven" });
+              toast.success("Budget split evenly");
+            }}
+          >
+            Split evenly
+          </button>
+        </div>
 
-      <table className="alloc-table">
-        <thead>
-          <tr>
-            <th>Department</th>
-            <th className="r">Allocated budget</th>
-            <th className="r">Percentage</th>
-          </tr>
-        </thead>
-        <tbody>
-          {state.departments.map((d) => (
-            <tr key={d.id}>
-              <td>
-                <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                  <span
-                    className="lc"
-                    style={{ width: 10, height: 10, borderRadius: 3, background: d.color }}
-                  />
-                  {d.name}
+        <div className="alloc-list">
+          {depts.map((d) => {
+            const pct = pctLabel(d.allocated, total);
+            const rowOver = over && d.allocated > 0;
+            return (
+              <div key={d.id} className="alloc-row">
+                <div className="alloc-row-dept">
+                  <div className="alloc-row-swatch" style={{ background: d.color }}>
+                    {d.name.charAt(0)}
+                  </div>
+                  <span className="alloc-row-name">{d.name}</span>
                 </div>
-              </td>
-              <td className="r">
-                <span style={{ color: "var(--ink-3)", marginRight: 2 }}>₹</span>
-                <input
-                  className={`alloc-input ${over ? "over" : ""}`}
-                  inputMode="numeric"
-                  aria-label={`Allocation for ${d.name}`}
-                  value={amtInput(d.allocated)}
-                  onChange={(e) =>
-                    dispatch({ type: "setAlloc", id: d.id, amount: parseAmt(e.target.value) })
-                  }
-                />
-              </td>
-              <td className="r">
-                <span className="pct-pill">{pctLabel(d.allocated, total)}</span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr style={{ fontWeight: 700 }}>
-            <td style={{ padding: "12px 10px" }}>Total allocated</td>
-            <td className="r" style={{ padding: "12px 10px" }}>
-              {inr(alloc)}
-            </td>
-            <td className="r" style={{ padding: "12px 10px" }}>
-              {total ? Math.round((alloc / total) * 100) : 0}%
-            </td>
-          </tr>
-        </tfoot>
-      </table>
+                <div className="alloc-row-controls">
+                  <div className={`alloc-money${rowOver ? " alloc-money--over" : ""}`}>
+                    <span className="alloc-money-prefix">₹</span>
+                    <input
+                      className="alloc-money-input"
+                      inputMode="numeric"
+                      aria-label={`Allocation for ${d.name}`}
+                      value={amtInput(d.allocated)}
+                      onChange={(e) =>
+                        dispatch({ type: "setAlloc", id: d.id, amount: parseAmt(e.target.value) })
+                      }
+                    />
+                  </div>
+                  <span className={`alloc-pct${d.allocated > 0 ? " alloc-pct--on" : ""}`}>{pct}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className={`alloc-total${over ? " alloc-total--over" : ""}`}>
+          <span className="alloc-total-label">Total allocated</span>
+          <span className="alloc-total-amt num">{inr(alloc)}</span>
+          <span className="alloc-total-pct">{pctOfWalletTotal(alloc, total)}</span>
+        </div>
+      </div>
 
       {over && (
         <div

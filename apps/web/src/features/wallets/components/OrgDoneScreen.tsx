@@ -1,9 +1,9 @@
 import { Box, Check, Send, Store, Users, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { inr } from "@/components/platform/platform-ui";
-import type { WizardState } from "../types";
+import { selectedDepartments, type WizardState } from "../types";
 
-/** Success screen after finishing organization setup. */
+/** Success screen after wallet create or allocate-funds wizard. */
 export function OrgDoneScreen({
   account,
   state,
@@ -14,7 +14,8 @@ export function OrgDoneScreen({
   onGoToDashboard: () => void;
 }) {
   const o = state.wallet;
-  const depts = state.departments;
+  const isWalletFlow = state.flow === "wallet";
+  const depts = selectedDepartments(state.departments);
   const invited = depts.filter((d) => d.mgr.invite && d.mgr.email).length;
   const inviteLinks = state.sentInvites.filter((i) => i.inviteToken);
 
@@ -26,14 +27,50 @@ export function OrgDoneScreen({
     );
   }
 
+  if (isWalletFlow) {
+    return (
+      <div style={{ maxWidth: 620, margin: "30px auto", textAlign: "center" }}>
+        <div className="success-burst" aria-hidden="true">
+          <Check size={36} />
+        </div>
+        <h1 style={{ fontSize: 26 }}>Wallet submitted for review</h1>
+        <p className="muted" style={{ margin: "8px 0 24px" }}>
+          Platform finance will review your PO. Once approved, {inr(o.amount)} will appear in your
+          wallet and you can allocate funds to departments.
+        </p>
+
+        <div className="card" style={{ padding: "8px 20px", textAlign: "left" }}>
+          <div className="succ-item">
+            <div className="si">
+              <Wallet size={17} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600 }}>{o.name}</div>
+              <div className="mut3" style={{ fontSize: 12 }}>
+                {inr(o.amount)} requested · {o.docType} {o.docNumber}
+              </div>
+            </div>
+            <span className="tag tag-warn">Pending review</span>
+          </div>
+        </div>
+
+        <div className="row" style={{ justifyContent: "center", marginTop: 22 }}>
+          <button type="button" className="btn btn-brand btn-lg" onClick={onGoToDashboard}>
+            Go to wallet dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: 620, margin: "30px auto", textAlign: "center" }}>
       <div className="success-burst" aria-hidden="true">
         <Check size={36} />
       </div>
-      <h1 style={{ fontSize: 26 }}>Organization setup complete</h1>
+      <h1 style={{ fontSize: 26 }}>Allocation complete</h1>
       <p className="muted" style={{ margin: "8px 0 24px" }}>
-        Your merchandise program is live. {account} is ready to launch its first company store.
+        Your wallet budget is split across departments. {account} is ready to launch campaigns.
       </p>
 
       <div className="card" style={{ padding: "8px 20px", textAlign: "left" }}>
@@ -42,9 +79,9 @@ export function OrgDoneScreen({
             <Wallet size={17} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 600 }}>Wallet created</div>
+            <div style={{ fontWeight: 600 }}>{o.name}</div>
             <div className="mut3" style={{ fontSize: 12 }}>
-              {inr(o.amount)} budget activated
+              {inr(o.amount)} total budget
             </div>
           </div>
           <span className="tag tag-live">
@@ -57,7 +94,7 @@ export function OrgDoneScreen({
             <Box size={17} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 600 }}>{depts.length} departments created</div>
+            <div style={{ fontWeight: 600 }}>{depts.length} departments</div>
             <div className="mut3" style={{ fontSize: 12 }}>
               {depts.map((d) => d.name).join(", ")}
             </div>

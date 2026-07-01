@@ -23,11 +23,22 @@ export const updateWalletSchema = z
     validFrom: z.coerce.date().nullable(),
     validTo: z.coerce.date().nullable(),
     fundingMethod: z.enum(['po_upload', 'online']),
-    fundingDocument: z.object({
+    fundingDocument: z
+    .object({
       docType: z.string().optional(),
       docNumber: z.string().optional(),
       fileUrl: z.string().optional(),
-    }),
+      plannedAllocations: z
+        .array(
+          z.object({
+            entityId: objectId,
+            amount: z.number().nonnegative(),
+          }),
+        )
+        .optional(),
+    })
+    .partial()
+    .optional(),
   })
   .partial();
 
@@ -38,7 +49,12 @@ export const fundWalletSchema = z.object({
 
 export const allocateSchema = z.object({
   allocations: z
-    .array(z.object({ entityId: objectId, amount: z.number().positive() }))
+    .array(
+      z.object({
+        entityId: objectId,
+        amount: z.number().refine((n) => n !== 0, { message: 'Allocation amount must be non-zero' }),
+      }),
+    )
     .min(1),
 });
 

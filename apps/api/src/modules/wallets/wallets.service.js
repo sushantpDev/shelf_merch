@@ -2,6 +2,7 @@ import { Wallet } from './wallet.model.js';
 import { WalletTransaction } from './walletTransaction.model.js';
 import { Entity } from '../entities/entity.model.js';
 import * as ledger from '../../services/ledger.service.js';
+import { uploadFile } from '../../services/storage.service.js';
 import { transitionState, transitionThrough, validNextStatuses } from '../../services/stateMachine.service.js';
 import { ApiError, NotFoundError } from '../../utils/errors.js';
 import { getPagination, paginatedResponse } from '../../utils/pagination.js';
@@ -44,19 +45,39 @@ export async function updateWallet({ tenantId, walletId, patch }) {
   const wallet = await getWallet({ tenantId, walletId });
   const before = wallet.toObject();
   // Status is never patchable — state machine only (§3.4).
-  const { status: _ignored, ...rest } = patch;
+  const { status: _ignored, fundingDocument, ...rest } = patch;
+  if (fundingDocument && typeof fundingDocument === 'object') {
+    if (Array.isArray(fundingDocument.plannedAllocations)) {
+      wallet.fundingDocument.plannedAllocations = fundingDocument.plannedAllocations;
+    }
+    const { plannedAllocations: _pa, ...docRest } = fundingDocument;
+    Object.assign(wallet.fundingDocument, docRest);
+  }
   Object.assign(wallet, rest);
   await wallet.save();
   return { before, wallet: withMeta(wallet) };
 }
 
 /**
- * §7.4 /fund — manual PO funding marks the document pending approval; the
- * cash still enters the ledger so the wizard can proceed in MVP. Online
- * (Razorpay) funding arrives with Phase 7's webhook.
+ * §7.4 /fund — PO uploads submit a finance approval request (no ledger credit until
+ * platform finance approves). Online payments credit immediately via Razorpay webhook.
  */
 export async function fundWallet({ tenantId, walletId, userId, amount, description }) {
   const wallet = await getWallet({ tenantId, walletId });
+
+  if (wallet.fundingMethod === 'po_upload') {
+    wallet.fundingDocument.approvalStatus = 'pending';
+    wallet.fundingDocument.requestedAmount = amount;
+    if (wallet.status === 'draft') {
+      transitionState('wallet', wallet, 'wallet_created', { userId });
+    }
+    await wallet.save();
+    return {
+      pending: true,
+      transaction: null,
+      wallet: withMeta(await getWallet({ tenantId, walletId })),
+    };
+  }
 
   const txn = await ledger.createTransaction({
     tenantId,
@@ -67,9 +88,6 @@ export async function fundWallet({ tenantId, walletId, userId, amount, descripti
     performedBy: userId,
   });
 
-  if (wallet.fundingMethod === 'po_upload') {
-    wallet.fundingDocument.approvalStatus = 'pending';
-  }
   if (wallet.status === 'draft') {
     transitionState('wallet', wallet, 'wallet_created', { userId });
   }
@@ -78,19 +96,36 @@ export async function fundWallet({ tenantId, walletId, userId, amount, descripti
   return { transaction: txn, wallet: withMeta(await getWallet({ tenantId, walletId })) };
 }
 
+export async function uploadFundingDocument({ tenantId, walletId, file }) {
+  if (!file) throw new ApiError(400, 'No document uploaded', 'MISSING_FILE');
+  const wallet = await getWallet({ tenantId, walletId });
+  const { url } = await uploadFile({ tenantId, kind: 'document', file });
+  wallet.fundingDocument.fileUrl = url;
+  await wallet.save();
+  return { url, wallet: withMeta(wallet) };
+}
+
 export async function allocate({ tenantId, walletId, userId, allocations }) {
   const wallet = await getWallet({ tenantId, walletId });
 
-  const total = allocations.reduce((sum, a) => sum + a.amount, 0);
-  if (total > wallet.balance - wallet.allocatedAmount) {
+  // Apply deallocations before increases so freed budget is available in the same batch.
+  const ordered = [...allocations].sort((a, b) => a.amount - b.amount);
+  const netIncrease = ordered.reduce((sum, a) => sum + Math.max(0, a.amount), 0);
+  const unallocated = wallet.balance - wallet.allocatedAmount;
+  if (netIncrease > unallocated) {
     throw new ApiError(
       422,
-      `Allocations (₹${total}) exceed unallocated balance (₹${wallet.balance - wallet.allocatedAmount})`,
+      `Allocations (₹${netIncrease}) exceed unallocated balance (₹${unallocated})`,
       'ALLOCATION_EXCEEDS_BALANCE',
     );
   }
 
-  const txns = await ledger.allocateToEntities({ tenantId, walletId, allocations, performedBy: userId });
+  const txns = await ledger.allocateToEntities({
+    tenantId,
+    walletId,
+    allocations: ordered,
+    performedBy: userId,
+  });
 
   const fresh = await getWallet({ tenantId, walletId });
   if (fresh.status === 'entities_added') {
@@ -128,15 +163,21 @@ export async function listTransactions({ tenantId, walletId, query }) {
 /** §7.4 /activate — only allowed once every setup step is complete. */
 export async function activate({ tenantId, walletId, userId }) {
   const wallet = await getWallet({ tenantId, walletId });
+  if (wallet.status === 'active') {
+    return withMeta(wallet);
+  }
 
   const entities = await Entity.find({ tenantId, walletId });
+  const fundedEntities = entities.filter((e) => e.allocatedAmount > 0);
+  const hasManager = (e) =>
+    Boolean(e.managerUserId || e.managerName?.trim() || e.managerEmail?.trim());
+
   const problems = [];
   if (wallet.balance <= 0) problems.push('Wallet has no funds');
-  if (entities.length === 0) problems.push('No entities/departments added');
-  if (wallet.allocatedAmount <= 0) problems.push('No budget allocated to entities');
-  const unmanaged = entities.filter((e) => !e.managerUserId);
+  if (fundedEntities.length === 0) problems.push('No budget allocated to entities');
+  const unmanaged = fundedEntities.filter((e) => !hasManager(e));
   if (unmanaged.length) {
-    problems.push(`Entities without a manager: ${unmanaged.map((e) => e.name).join(', ')}`);
+    problems.push(`Departments without a manager: ${unmanaged.map((e) => e.name).join(', ')}`);
   }
   if (problems.length) {
     throw new ApiError(422, 'Wallet setup incomplete', 'WALLET_SETUP_INCOMPLETE', problems);

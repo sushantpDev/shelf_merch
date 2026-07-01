@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { enterApp } from "@/services/api-bridge";
 import type { LucideIcon } from "lucide-react";
 import {
   Award,
@@ -406,20 +405,8 @@ const KUDOS_FEED = [
 export default function LandingPage() {
   const [offering, setOffering] = useState<OfferingId>("shops");
   const [team, setTeam] = useState<(typeof TEAMS)[number]["id"]>("hr");
-  const [entering, setEntering] = useState(false);
   const activeTeam = TEAMS.find((t) => t.id === team)!;
   const activeOffering = OFFERING_TABS.find((t) => t.id === offering)!;
-
-  async function handleEnterApp() {
-    if (entering) return;
-    setEntering(true);
-    try {
-      await enterApp();
-      window.location.href = "/app";
-    } catch {
-      setEntering(false);
-    }
-  }
 
   return (
     <div className="lp">
@@ -444,12 +431,8 @@ export default function LandingPage() {
             <a href="#resources">Resources</a>
           </nav>
           <div className="lp-nav__actions">
-            <button type="button" className="lp-btn-ghost" onClick={handleEnterApp} disabled={entering}>
-              {entering ? "Opening…" : "Log in"}
-            </button>
-            <button type="button" className="lp-btn-primary lp-btn-primary-sm" onClick={handleEnterApp} disabled={entering}>
-              Get Started
-            </button>
+            <Link to="/login" className="lp-btn-ghost">Log in</Link>
+            <Link to="/signup" className="lp-btn-primary lp-btn-primary-sm">Get Started</Link>
           </div>
         </div>
       </header>
@@ -1107,7 +1090,7 @@ const LP_CSS = `
 .lp-btn-primary{display:inline-flex;align-items:center;gap:6px;background:#006838;color:#fff;font-weight:600;font-size:.9rem;padding:12px 24px;border-radius:8px;border:none;cursor:pointer;text-decoration:none;transition:background .2s}
 .lp-btn-primary:hover{background:#004d2a}
 .lp-btn-primary-sm{padding:8px 18px;font-size:.85rem}
-.lp-btn-primary-sm,.lp-btn-ghost,.lp-btn-gold,.lp-btn-outline,.lp-btn-outline-green{text-decoration:none;display:inline-flex;align-items:center}
+.lp-btn-primary-sm,.lp-btn-ghost,.lp-btn-gold,.lp-btn-outline,.lp-btn-outline-green{text-decoration:none;display:inline-flex;align-items:center;cursor:pointer;font:inherit}
 .lp-btn-gold{background:var(--lp-gold);color:#1a2e28;font-weight:700;padding:14px 28px;border-radius:10px;border:none;cursor:pointer;font-size:.95rem;transition:transform .2s,box-shadow .2s}
 .lp-btn-gold--sm{padding:11px 22px;font-size:.88rem;border-radius:8px}
 .lp-btn-gold:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(212,162,76,.35)}
@@ -1116,8 +1099,7 @@ const LP_CSS = `
 .lp-btn-outline:hover{border-color:#fff}
 .lp-btn-outline-green{background:#fff;color:#006838;border:2px solid #006838;padding:12px 28px;border-radius:999px;font-weight:700;font-size:.85rem;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:background .2s,color .2s}
 .lp-btn-outline-green:hover{background:#006838;color:#fff}
-.lp-btn-ghost{color:#1a1a1a;font-weight:500;font-size:.9rem;padding:8px 16px;border:none;background:transparent;cursor:pointer;font:inherit}
-.lp-btn-ghost:disabled{opacity:.6;cursor:wait}
+.lp-btn-ghost{color:#1a1a1a;font-weight:500;font-size:.9rem;padding:8px 16px;border:none;background:transparent}
 .lp-btn-ghost:hover{color:#006838}
 .lp-btn-full{width:100%;justify-content:center;margin-top:16px}
 .lp-btn-pill{border-radius:999px;padding:14px 36px}

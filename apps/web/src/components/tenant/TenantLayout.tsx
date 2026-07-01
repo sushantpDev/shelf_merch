@@ -1,11 +1,12 @@
 import { useEffect } from "react";
-import { Link, Outlet } from "@tanstack/react-router";
+import { Outlet, useRouterState } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { CollapsibleSidebar } from "@/components/tenant/CollapsibleSidebar";
+import { UserMenu } from "@/components/tenant/UserMenu";
+import { WalletBalanceMenu } from "@/components/tenant/WalletBalanceMenu";
 import { getStoredUser, isAuthenticated } from "@/services/api-bridge";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import type { WorkspaceSnapshot } from "@/services/workspace-api";
-import walletIconImg from "../../../assets/wallet-icon.svg";
 import "@/styles/shelf-merch.css";
 
 // The workspace navigation now lives in <CollapsibleSidebar/>; this layout only
@@ -38,42 +39,36 @@ function formatWalletBalance(workspace: WorkspaceSnapshot | undefined) {
       return `₹${Math.round(rem).toLocaleString("en-IN")}`;
     }
   }
-  const amount =
-    workspace.org.active && workspace.org.wallet.amount != null
-      ? workspace.org.wallet.amount
-      : (workspace.wallets[0]?.balance ?? 0);
-  return `₹${Math.round(amount).toLocaleString("en-IN")}`;
-}
-
-function TopbarChevron() {
-  return (
-    <svg
-      className="topbar-chevron"
-      width={11}
-      height={11}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.6}
-      aria-hidden="true"
-    >
-      <path d="M6 9l6 6 6-6" />
-    </svg>
+  const totalUnalloc = workspace.wallets.reduce(
+    (sum, w) => sum + Math.max(0, w.unalloc ?? w.balance ?? 0),
+    0,
   );
+  return `₹${Math.round(totalUnalloc).toLocaleString("en-IN")}`;
 }
 
 export default function TenantLayout() {
   const user = getStoredUser();
   const { data: workspace } = useWorkspace();
+  const routerState = useRouterState();
+  const walletSearch =
+    routerState.location.pathname === "/app/wallets"
+      ? (routerState.location.search as { wallet?: string })
+      : undefined;
+  const currentWalletId = walletSearch?.wallet || workspace?.primaryWalletId;
 
   useEffect(() => {
-    if (!isAuthenticated()) window.location.href = "/login";
+    if (!isAuthenticated()) {
+      window.location.href = "/login";
+    }
   }, []);
 
-  if (!isAuthenticated()) return null;
+  if (!isAuthenticated()) {
+    return null;
+  }
 
   const account = workspace?.account ?? "Workspace";
   const userName = workspace?.userPatch?.name ?? user?.name ?? "User";
+  const userEmail = workspace?.userPatch?.email ?? user?.email ?? "";
   const walletBalance = formatWalletBalance(workspace);
 
   return (
@@ -98,26 +93,18 @@ export default function TenantLayout() {
         </div>
         <div className="spacer" />
         <div className="topbar-right">
-          <Link to="/app/wallets" className="topbar-wallet" aria-label="Wallet balance">
-            <span className="topbar-wallet-icon">
-              <img src={walletIconImg} alt="" className="topbar-wallet-img" aria-hidden="true" />
-            </span>
-            <span className="topbar-wallet-copy">
-              <span className="k">Wallet balance</span>
-              <span className="v">
-                {walletBalance}
-                <TopbarChevron />
-              </span>
-            </span>
-          </Link>
-          <Link to="/app/settings" className="topbar-user" aria-label="Account menu">
-            <span className="topbar-user-avatar">{initialsOf(userName)}</span>
-            <span className="topbar-user-copy">
-              <span className="topbar-user-name">{truncTopbarName(userName)}</span>
-              <span className="topbar-user-sub">{account.toLowerCase()}</span>
-            </span>
-            <TopbarChevron />
-          </Link>
+          <WalletBalanceMenu
+            wallets={workspace?.wallets ?? []}
+            totalLabel={walletBalance}
+            currentWalletId={currentWalletId}
+          />
+          <UserMenu
+            userName={userName}
+            userEmail={userEmail}
+            workspaceName={account}
+            initials={initialsOf(userName)}
+            truncName={truncTopbarName(userName)}
+          />
         </div>
       </header>
 

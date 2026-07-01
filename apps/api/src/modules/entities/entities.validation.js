@@ -19,6 +19,9 @@ export const updateEntitySchema = z
     description: z.string(),
     colorHex: z.string().regex(/^#[0-9a-f]{6}$/i),
     expectedUsers: z.number().int().nonnegative(),
+    managerName: z.string(),
+    managerTitle: z.string(),
+    managerEmail: z.string().email().or(z.literal('')),
   })
   .partial();
 
@@ -27,6 +30,7 @@ export const assignManagerSchema = z.object({
   email: z.string().email(),
   role: z.string().optional().default(''), // display role e.g. "Marketing Manager"
   mobile: z.string().optional().default(''),
+  sendInvite: z.boolean().optional().default(true),
 });
 
 export const entityIdParams = z.object({ id: objectId });

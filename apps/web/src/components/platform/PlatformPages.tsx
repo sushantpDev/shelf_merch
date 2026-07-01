@@ -1637,7 +1637,19 @@ function TaskManageModal({ row, onClose, onChanged }: { row: Record<string, unkn
   );
 }
 
-type FundingRow = { walletId: string; walletName: string; tenantName: string; balance: number };
+type FundingRow = {
+  walletId: string;
+  walletName: string;
+  tenantName: string;
+  balance: number;
+  requestedAmount?: number;
+  fundingDocument?: {
+    docType?: string;
+    docNumber?: string;
+    fileUrl?: string;
+    approvalStatus?: string;
+  };
+};
 
 export function FinancePage() {
   const [reloadKey, setReloadKey] = useState(0);
@@ -1647,9 +1659,28 @@ export function FinancePage() {
   const canWrite = canAccessArea(getStoredUser()?.role, "finance", "write");
 
   const fundingColumns: { key: string; label: string; render?: (row: Record<string, unknown>) => ReactNode }[] = [
-    { key: "walletName", label: "Wallet" },
     { key: "tenantName", label: "Tenant" },
-    { key: "balance", label: "Balance", render: (r) => inr(Number(r.balance ?? 0)) },
+    { key: "walletName", label: "Wallet" },
+    {
+      key: "document",
+      label: "Document",
+      render: (r) => {
+        const doc = r.fundingDocument as FundingRow["fundingDocument"];
+        const label = [doc?.docType, doc?.docNumber].filter(Boolean).join(" · ") || "—";
+        return doc?.fileUrl ? (
+          <a className="lnk" href={String(doc.fileUrl)} target="_blank" rel="noreferrer">
+            {label}
+          </a>
+        ) : (
+          label
+        );
+      },
+    },
+    {
+      key: "requestedAmount",
+      label: "Requested",
+      render: (r) => inr(Number(r.requestedAmount ?? 0)),
+    },
     {
       key: "fundingDocument",
       label: "Status",
@@ -1717,7 +1748,7 @@ export function FinancePage() {
 }
 
 function FundingActionModal({ row, mode, onClose, onDone }: { row: FundingRow; mode: "approve" | "reject"; onClose: () => void; onDone: () => void }) {
-  const [amount, setAmount] = useState(row.balance || 0);
+  const [amount, setAmount] = useState(row.requestedAmount || row.balance || 0);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -1751,6 +1782,12 @@ function FundingActionModal({ row, mode, onClose, onDone }: { row: FundingRow; m
         <div className="field">
           <label className="lbl">Amount to credit (₹)</label>
           <input className="inp" type="number" min={1} value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} />
+          {row.requestedAmount ? (
+            <p className="muted" style={{ fontSize: 12.5, marginTop: 8 }}>
+              Requested by tenant: {inr(row.requestedAmount)}
+              {row.fundingDocument?.docNumber ? ` · ${row.fundingDocument.docNumber}` : ""}
+            </p>
+          ) : null}
         </div>
       ) : (
         <div className="field">

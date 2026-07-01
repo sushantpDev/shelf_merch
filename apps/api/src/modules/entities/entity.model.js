@@ -18,6 +18,9 @@ const entitySchema = new mongoose.Schema(
     spentAmount: { type: Number, default: 0 }, // cached, derived from wallet transactions
     managerUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     managerInvitePending: { type: Boolean, default: false },
+    managerTitle: { type: String, default: '' },
+    managerName: { type: String, default: '' },
+    managerEmail: { type: String, default: '' },
   },
   { timestamps: true },
 );

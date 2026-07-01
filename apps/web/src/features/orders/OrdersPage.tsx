@@ -49,8 +49,10 @@ export function OrdersPage() {
           <p>Orders appear here when recipients redeem gifts or you send kits at scale.</p>
         </div>
       ) : (
-        <>
-          <div className="search" style={{ marginBottom: 18 }}>
+        <div className="card data-list-card orders-list">
+          <div className="data-list-title">Order history</div>
+
+          <div className="data-list-search">
             <Search size={17} aria-hidden="true" />
             <input
               aria-label="Search orders"
@@ -59,57 +61,59 @@ export function OrdersPage() {
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
-          <div className="card">
-            {filtered.length === 0 ? (
-              <div className="empty" style={{ padding: "40px 0", textAlign: "center" }}>
-                <h3>No matching orders</h3>
-                <p className="muted">Try a different order name or ID.</p>
-              </div>
-            ) : (
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Order details</th>
-                    <th>Status</th>
-                    <th>Amount</th>
-                    <th />
+
+          {filtered.length === 0 ? (
+            <div className="data-list-empty">
+              <h4>No matching orders</h4>
+              <p className="muted" style={{ fontSize: 13 }}>Try a different order name or ID.</p>
+            </div>
+          ) : (
+            <table className="tbl data-list-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Order details</th>
+                  <th>Status</th>
+                  <th>Amount</th>
+                  <th>View</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((o) => (
+                  <tr
+                    key={o.id}
+                    className="data-list-row"
+                    onClick={() => setSelected(o)}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Open order ${o.orderNumber}`}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelected(o);
+                      }
+                    }}
+                  >
+                    <td className="muted data-list-cell">{o.date}</td>
+                    <td className="data-list-cell">
+                      <div className="data-list-primary">{o.orderNumber}</div>
+                      {o.name && o.name !== o.orderNumber ? (
+                        <div className="data-list-secondary">{o.name}</div>
+                      ) : null}
+                    </td>
+                    <td className="data-list-cell">
+                      <OrderStatusTag status={o.status} />
+                    </td>
+                    <td className="num data-list-cell data-list-amount">{inr(o.amount)}</td>
+                    <td className="data-list-cell">
+                      <span className="lnk">{o.track ? "Tracking" : "View"}</span>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((o) => (
-                    <tr
-                      key={o.id}
-                      style={{ cursor: "pointer" }}
-                      onClick={() => setSelected(o)}
-                      tabIndex={0}
-                      role="button"
-                      aria-label={`Open order ${o.name}`}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setSelected(o);
-                        }
-                      }}
-                    >
-                      <td className="num">{o.date}</td>
-                      <td style={{ fontWeight: 600 }}>{o.name}</td>
-                      <td>
-                        <OrderStatusTag status={o.status} />
-                      </td>
-                      <td className="num" style={{ fontWeight: 600 }}>
-                        {inr(o.amount)}
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        <span className="lnk">{o.track ? "Tracking" : "View"}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
 
       <OrderDetailDialog order={selected} onOpenChange={(open) => !open && setSelected(null)} />

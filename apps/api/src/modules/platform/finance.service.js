@@ -5,6 +5,7 @@ import { Payment } from '../payments/payment.model.js';
 import { Invoice } from '../invoices/invoice.model.js';
 import { CreditNote } from '../invoices/creditNote.model.js';
 import * as ledger from '../../services/ledger.service.js';
+import * as walletsService from '../wallets/wallets.service.js';
 import { ApiError, NotFoundError } from '../../utils/errors.js';
 import { getPagination, paginatedResponse } from '../../utils/pagination.js';
 
@@ -28,6 +29,7 @@ export async function listFundingApprovals() {
     tenantName: tenantById[String(w.tenantId)]?.name ?? '',
     walletName: w.name,
     balance: w.balance,
+    requestedAmount: w.fundingDocument?.requestedAmount ?? 0,
     fundingMethod: w.fundingMethod,
     fundingDocument: w.fundingDocument,
     requestedAt: w.updatedAt,
@@ -40,28 +42,60 @@ async function getWalletAnyTenant(walletId) {
   return wallet;
 }
 
-/** Approve → fund_in via ledger.service — the ONLY way money enters (§3.8). */
+/** Approve → fund_in via ledger.service — the ONLY way PO money enters (§3.8). */
 export async function approveFunding({ walletId, amount, performedBy }) {
   const wallet = await getWalletAnyTenant(walletId);
   if (wallet.fundingDocument.approvalStatus !== 'pending') {
     throw new ApiError(422, 'This wallet has no pending funding request', 'NOT_PENDING');
   }
 
+  const creditAmount = amount > 0 ? amount : wallet.fundingDocument.requestedAmount;
+  if (!creditAmount || creditAmount <= 0) {
+    throw new ApiError(422, 'Enter an amount greater than zero', 'INVALID_AMOUNT');
+  }
+
   const transaction = await ledger.createTransaction({
     tenantId: wallet.tenantId,
     walletId: wallet._id,
     type: 'fund_in',
-    amount,
+    amount: creditAmount,
     description: `Funding approved (${wallet.fundingDocument.docType || 'PO'} ${wallet.fundingDocument.docNumber || ''})`.trim(),
     performedBy,
   });
 
-  // Patch approval status only — do not save the pre-ledger wallet instance or
-  // its stale balance would clobber the ledger write.
+  const planned = wallet.fundingDocument.plannedAllocations ?? [];
+  if (planned.length > 0) {
+    await ledger.allocateToEntities({
+      tenantId: wallet.tenantId,
+      walletId: wallet._id,
+      allocations: planned.map((row) => ({
+        entityId: row.entityId,
+        amount: row.amount,
+      })),
+      performedBy,
+    });
+  }
+
   await Wallet.updateOne(
     { _id: wallet._id },
-    { $set: { 'fundingDocument.approvalStatus': 'approved' } },
+    {
+      $set: {
+        'fundingDocument.approvalStatus': 'approved',
+        'fundingDocument.plannedAllocations': [],
+      },
+    },
   ).setOptions({ skipTenantGuard: true });
+
+  const refreshed = await getWalletAnyTenant(walletId);
+  try {
+    await walletsService.activate({
+      tenantId: refreshed.tenantId,
+      walletId: refreshed._id,
+      userId: performedBy,
+    });
+  } catch {
+    // Setup may still be incomplete — funds are credited regardless.
+  }
 
   return { transaction, wallet: await getWalletAnyTenant(walletId) };
 }

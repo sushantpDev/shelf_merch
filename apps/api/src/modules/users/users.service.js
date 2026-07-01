@@ -3,7 +3,7 @@ import { User } from './user.model.js';
 import { RoleAssignment } from '../roles/roleAssignment.model.js';
 import { hashPassword } from '../auth/auth.service.js';
 import { ApiError, ConflictError, NotFoundError } from '../../utils/errors.js';
-import { sendInviteEmail, sendNotificationEmail } from '../../services/email.service.js';
+import { sendInviteEmail, sendManagerAssignmentEmail } from '../../services/email.service.js';
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -13,7 +13,18 @@ const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
  * Reused by /users/invite and /entities/:id/assign-manager.
  */
 export async function inviteUser(
-  { tenantId, name, email, phone = '', role, scopeType = 'tenant', scopeId = null, assignedEntityIds = [] },
+  {
+    tenantId,
+    name,
+    email,
+    phone = '',
+    role,
+    scopeType = 'tenant',
+    scopeId = null,
+    assignedEntityIds = [],
+    sendInvite = true,
+    emailContext = {},
+  },
   session = null,
 ) {
   const normalizedEmail = email.toLowerCase();
@@ -78,15 +89,19 @@ export async function inviteUser(
     await assignment.save({ session });
   }
 
-  if (inviteToken) {
-    await sendInviteEmail(normalizedEmail, inviteToken, { name });
-  } else if (user.status === 'active') {
-    await sendNotificationEmail({
-      to: normalizedEmail,
-      title: 'You have been assigned as a department manager',
-      body: `Hi ${name || normalizedEmail}, you can now manage your department budget on Shelf Merch.`,
-      link: '/login',
-    });
+  const mailContext = {
+    name,
+    departmentName: emailContext.departmentName || '',
+    organizationName: emailContext.organizationName || 'your organization',
+    roleTitle: emailContext.roleTitle || 'Department Manager',
+  };
+
+  if (sendInvite && inviteToken) {
+    await sendInviteEmail(normalizedEmail, inviteToken, mailContext);
+  } else if (sendInvite && user.status === 'active') {
+    await sendManagerAssignmentEmail({ to: normalizedEmail, ...mailContext });
+  } else if (!sendInvite && user.status === 'active') {
+    await sendManagerAssignmentEmail({ to: normalizedEmail, ...mailContext });
   }
 
   return { user, inviteToken };

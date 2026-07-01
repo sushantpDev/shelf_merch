@@ -1,41 +1,24 @@
 import { useReducer, useState } from "react";
 import { LoadingState } from "@/components/LoadingState";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import { seedWizard, wizardReducer } from "./reducer";
-import type { WizardState } from "./types";
+import { orgForWallet } from "@/services/workspace-api";
+import { Route } from "@/routes/app.wallets";
+import { seedAllocateWizard, seedNewWizard, wizardReducer } from "./reducer";
 import { EntityManagerDashboard } from "./components/EntityManagerDashboard";
 import { OrgDashboard } from "./components/OrgDashboard";
 import { OrgDoneScreen } from "./components/OrgDoneScreen";
 import { OrgWizard } from "./components/OrgWizard";
 
-const EMPTY_WIZARD: WizardState = {
-  step: 1,
-  done: false,
-  wallet: {
-    name: "",
-    amount: 0,
-    start: "",
-    end: "",
-    funding: "upload",
-    docType: "Purchase Order",
-    docNumber: "",
-    uploaded: false,
-    pay: "card",
-  },
-  departments: [],
-  seq: 1,
-  colorIdx: 0,
-  sentInvites: [],
-};
-
 export function WalletsPage() {
+  const { wallet: walletId, addFunds } = Route.useSearch();
   const { data: workspace, isLoading, isError, error } = useWorkspace();
   const [inWizard, setInWizard] = useState(false);
-  const [wizard, dispatch] = useReducer(wizardReducer, EMPTY_WIZARD);
+  const [wizard, dispatch] = useReducer(wizardReducer, undefined, seedNewWizard);
 
   if (isLoading && !workspace) {
     return <LoadingState message="Loading wallets…" fullScreen={false} />;
   }
+
   if (isError || !workspace) {
     return (
       <div className="card" style={{ padding: 16, color: "var(--danger)" }}>
@@ -44,15 +27,20 @@ export function WalletsPage() {
     );
   }
 
-  const { account, org } = workspace;
+  const { account } = workspace;
+  const org = orgForWallet(workspace, walletId);
   const role = workspace.userPatch.role;
 
-  function startWizard(step: number) {
-    dispatch(seedWizard(org, step));
+  function startNewWallet() {
+    dispatch(seedNewWizard());
     setInWizard(true);
   }
 
-  // Department managers only ever see their own budget.
+  function startAllocateFunds(step = 2) {
+    dispatch(seedAllocateWizard(org, step));
+    setInWizard(true);
+  }
+
   if (role === "entity_manager") {
     return (
       <EntityManagerDashboard
@@ -73,15 +61,15 @@ export function WalletsPage() {
         />
       );
     }
+
     return (
       <OrgWizard
         account={account}
-        active={org.active}
         state={wizard}
         dispatch={dispatch}
         onExit={() => setInWizard(false)}
         onFinished={() => {
-          /* keep the wizard mounted so the done screen can render */
+          /* keep wizard mounted so the done screen can render */
         }}
       />
     );
@@ -92,8 +80,9 @@ export function WalletsPage() {
       account={account}
       org={org}
       hasWallets={workspace.wallets.length > 0}
-      onStart={() => startWizard(1)}
-      onEdit={startWizard}
+      onStart={startNewWallet}
+      onAllocate={startAllocateFunds}
+      openAddFundsOnMount={addFunds === "1"}
     />
   );
 }
