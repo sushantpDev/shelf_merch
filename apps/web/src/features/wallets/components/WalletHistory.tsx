@@ -1,6 +1,7 @@
 import { Wallet } from "lucide-react";
 import { inr } from "@/components/platform/platform-ui";
 import { useWalletTransactions } from "../hooks";
+import type { WalletTransactionRow } from "@/services/mutations-api";
 
 function formatTxnDate(iso?: string): string {
   if (!iso) return "—";
@@ -20,8 +21,44 @@ function txnLabel(type: string): string {
   return type.replace(/_/g, " ");
 }
 
+/** Running unallocated balance (cash − earmarked to departments) after each row. */
+function withAvailableBalance(txns: WalletTransactionRow[]) {
+  const chronological = [...txns].sort(
+    (a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime(),
+  );
+  let allocated = 0;
+  const availableByKey = new Map<string, number>();
+
+  for (const t of chronological) {
+    if (t.type === "allocation_to_entity") {
+      allocated += t.amount;
+    } else if (t.type === "campaign_spend" || t.type === "order_payment") {
+      allocated += t.amount;
+    }
+    const cash = t.balanceAfter ?? 0;
+    const key = t._id ?? `${t.createdAt}-${t.amount}-${t.type}`;
+    availableByKey.set(key, cash - allocated);
+  }
+
+  return txns.map((t) => {
+    const key = t._id ?? `${t.createdAt}-${t.amount}-${t.type}`;
+    return { ...t, availableAfter: availableByKey.get(key) };
+  });
+}
+
+function txnAmountDisplay(t: WalletTransactionRow): { text: string; color: string } {
+  if (t.type === "allocation_to_entity") {
+    return { text: `-${inr(t.amount)}`, color: "var(--danger)" };
+  }
+  return {
+    text: `${t.amount >= 0 ? "+" : ""}${inr(Math.abs(t.amount))}`,
+    color: t.amount >= 0 ? "var(--brand-d)" : "var(--ink)",
+  };
+}
+
 export function WalletHistory({ walletId }: { walletId: string }) {
   const { data: txns = [], isLoading } = useWalletTransactions(walletId);
+  const rows = withAvailableBalance(txns);
 
   return (
     <div className="card data-list-card wallet-history">
@@ -50,27 +87,29 @@ export function WalletHistory({ walletId }: { walletId: string }) {
               <th>Description</th>
               <th>Type</th>
               <th>Amount</th>
-              <th>Balance</th>
+              <th>Available balance</th>
             </tr>
           </thead>
           <tbody>
-            {txns.map((t) => (
+            {rows.map((t) => {
+              const amount = txnAmountDisplay(t);
+              return (
               <tr key={t._id ?? `${t.createdAt}-${t.amount}`}>
                 <td className="muted data-list-cell">{formatTxnDate(t.createdAt)}</td>
                 <td className="data-list-cell">{t.description || "—"}</td>
                 <td className="muted data-list-cell">{txnLabel(t.type)}</td>
                 <td
                   className="num data-list-cell data-list-amount"
-                  style={{ color: t.amount >= 0 ? "var(--brand-d)" : "var(--ink)" }}
+                  style={{ color: amount.color }}
                 >
-                  {t.amount >= 0 ? "+" : ""}
-                  {inr(Math.abs(t.amount))}
+                  {amount.text}
                 </td>
                 <td className="num muted data-list-cell">
-                  {t.balanceAfter != null ? inr(t.balanceAfter) : "—"}
+                  {t.availableAfter != null ? inr(t.availableAfter) : "—"}
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       )}

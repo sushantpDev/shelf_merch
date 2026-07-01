@@ -3,6 +3,8 @@ import { syncOrgWizard } from "@/services/api-bridge";
 import {
   createWalletOnlyApi,
   fundWalletApi,
+  createRazorpayOrderApi,
+  uploadWalletFundingDocumentApi,
   fetchWalletTransactionsApi,
 } from "@/services/mutations-api";
 import { useInvalidateWorkspace } from "@/hooks/useWorkspace";
@@ -36,15 +38,39 @@ export function useFundWallet() {
   const invalidateWorkspace = useInvalidateWorkspace();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { walletId: string; amount: number; description?: string }) =>
-      fundWalletApi(payload.walletId, {
-        amount: payload.amount,
-        description: payload.description,
-      }),
+    mutationFn: (payload: {
+      walletId: string;
+      amount: number;
+      description?: string;
+      fundingMethod?: "po_upload" | "online";
+      docType?: string;
+      docNumber?: string;
+      uploadFile?: File;
+    }) =>
+      (async () => {
+        const result = await fundWalletApi(payload.walletId, {
+          amount: payload.amount,
+          description: payload.description,
+          fundingMethod: payload.fundingMethod,
+          docType: payload.docType,
+          docNumber: payload.docNumber,
+        });
+        if (payload.uploadFile) {
+          await uploadWalletFundingDocumentApi(payload.walletId, payload.uploadFile);
+        }
+        return result;
+      })(),
     onSuccess: (_data, variables) => {
       invalidateWorkspace();
       queryClient.invalidateQueries({ queryKey: ["wallet-transactions", variables.walletId] });
     },
+  });
+}
+
+export function useCreateRazorpayOrder() {
+  return useMutation({
+    mutationFn: (payload: { walletId: string; amount: number }) =>
+      createRazorpayOrderApi(payload.walletId, payload.amount),
   });
 }
 
