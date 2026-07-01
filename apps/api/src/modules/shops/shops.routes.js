@@ -18,5 +18,6 @@ router.post('/', adminOnly, validate({ body: createShopSchema }), asyncHandler(c
 router.get('/:id', canRead, validate({ params: shopIdParams }), asyncHandler(controller.getOne));
 router.patch('/:id', adminOnly, validate({ params: shopIdParams, body: updateShopSchema }), asyncHandler(controller.update));
 router.post('/:id/publish', adminOnly, validate({ params: shopIdParams }), asyncHandler(controller.publish));
+router.delete('/:id', adminOnly, validate({ params: shopIdParams }), asyncHandler(controller.archive));
 
 export default router;

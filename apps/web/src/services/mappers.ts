@@ -244,6 +244,24 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
   };
 }
 
+/** Fill in catalog copy (description, features, size guide) when a collection ref is sparse. */
+export function mergeCatalogProductDetails(
+  product: UiProduct,
+  catalogProducts: UiProduct[],
+): UiProduct {
+  const id = product.id;
+  if (!id) return product;
+  const fromCatalog = catalogProducts.find((p) => p.id === id);
+  if (!fromCatalog) return product;
+  return {
+    ...product,
+    category: product.category || fromCatalog.category,
+    description: product.description || fromCatalog.description,
+    keyFeatures: product.keyFeatures || fromCatalog.keyFeatures,
+    sizeGuide: product.sizeGuide || fromCatalog.sizeGuide,
+  };
+}
+
 export function mapProductRef(ref: ApiProduct, catalogById?: Map<string, UiProduct>): UiProduct {
   const id = ref.catalogProductId ? String(ref.catalogProductId) : undefined;
   const fromCatalog = id ? catalogById?.get(id) : undefined;

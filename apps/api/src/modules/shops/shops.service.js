@@ -34,3 +34,9 @@ export async function publishShop({ tenantId, shopId }) {
   await shop.save();
   return shop;
 }
+
+export async function archiveShop({ tenantId, shopId }) {
+  const shop = await getShop({ tenantId, shopId });
+  await shop.softDelete();
+  return shop;
+}

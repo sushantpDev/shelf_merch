@@ -7,8 +7,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ProductInfoTabs } from "@/features/catalog/ProductInfoTabs";
 import type { UiCollection, UiProduct } from "@/services/mappers";
-import { collectionProductColorNames, productColorHex, productDescription } from "./colors";
+import { collectionProductColorNames, productColorHex } from "./colors";
 import { DesignedProductThumb } from "./DesignedProductThumb";
 
 export type DesignTarget = { collection: UiCollection; product: UiProduct; pIdx: number };
@@ -103,9 +104,9 @@ function Body({
             </div>
           )}
 
-          <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.55, marginBottom: 18 }}>
-            {productDescription(product)}
-          </p>
+          <div style={{ marginBottom: 18 }}>
+            <ProductInfoTabs product={product} />
+          </div>
 
           <button
             type="button"

@@ -1,17 +1,13 @@
-import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Store } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { PageHeader } from "@/components/tenant/PageHeader";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import type { UiShop } from "@/services/mappers";
-import { BannerEditorDialog } from "./BannerEditorDialog";
 import { ShopCard } from "./ShopCard";
 
 export function ShopsPage() {
   const { data: workspace, isLoading, isError, error } = useWorkspace();
   const navigate = useNavigate();
-  const [editing, setEditing] = useState<UiShop | null>(null);
 
   if (isLoading && !workspace) {
     return <LoadingState message="Loading shops…" fullScreen={false} />;
@@ -71,11 +67,9 @@ export function ShopsPage() {
       />
       <div className="shops-grid stagger">
         {shops.map((shop) => (
-          <ShopCard key={shop.id} shop={shop} fallbackUser={fallbackUser} onEditLook={setEditing} />
+          <ShopCard key={shop.id} shop={shop} fallbackUser={fallbackUser} />
         ))}
       </div>
-
-      <BannerEditorDialog shop={editing} onOpenChange={(open) => !open && setEditing(null)} />
     </>
   );
 }

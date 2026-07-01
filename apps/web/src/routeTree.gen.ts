@@ -60,8 +60,10 @@ import { Route as AppShopsIdRouteImport } from './routes/app.shops.$id'
 import { Route as AppKitsNewRouteImport } from './routes/app.kits.new'
 import { Route as AppCatalogIdRouteImport } from './routes/app.catalog.$id'
 import { Route as AppCampaignsSendPointsRouteImport } from './routes/app.campaigns.send-points'
+import { Route as AppShopsIdIndexRouteImport } from './routes/app.shops.$id.index'
 import { Route as AppKitsIdSendRouteImport } from './routes/app.kits.$id.send'
 import { Route as AppKitsIdEditRouteImport } from './routes/app.kits.$id.edit'
+import { Route as AppShopsIdDesignsCollectionIdRouteImport } from './routes/app.shops.$id.designs.$collectionId'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -318,6 +320,11 @@ const AppCampaignsSendPointsRoute = AppCampaignsSendPointsRouteImport.update({
   path: '/send-points',
   getParentRoute: () => AppCampaignsRoute,
 } as any)
+const AppShopsIdIndexRoute = AppShopsIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppShopsIdRoute,
+} as any)
 const AppKitsIdSendRoute = AppKitsIdSendRouteImport.update({
   id: '/$id/send',
   path: '/$id/send',
@@ -328,6 +335,12 @@ const AppKitsIdEditRoute = AppKitsIdEditRouteImport.update({
   path: '/$id/edit',
   getParentRoute: () => AppKitsRoute,
 } as any)
+const AppShopsIdDesignsCollectionIdRoute =
+  AppShopsIdDesignsCollectionIdRouteImport.update({
+    id: '/designs/$collectionId',
+    path: '/designs/$collectionId',
+    getParentRoute: () => AppShopsIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -364,7 +377,7 @@ export interface FileRoutesByFullPath {
   '/app/campaigns/send-points': typeof AppCampaignsSendPointsRoute
   '/app/catalog/$id': typeof AppCatalogIdRoute
   '/app/kits/new': typeof AppKitsNewRoute
-  '/app/shops/$id': typeof AppShopsIdRoute
+  '/app/shops/$id': typeof AppShopsIdRouteWithChildren
   '/app/shops/new': typeof AppShopsNewRoute
   '/app/swag/new': typeof AppSwagNewRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
@@ -383,6 +396,8 @@ export interface FileRoutesByFullPath {
   '/platform/orders/': typeof PlatformOrdersIndexRoute
   '/app/kits/$id/edit': typeof AppKitsIdEditRoute
   '/app/kits/$id/send': typeof AppKitsIdSendRoute
+  '/app/shops/$id/': typeof AppShopsIdIndexRoute
+  '/app/shops/$id/designs/$collectionId': typeof AppShopsIdDesignsCollectionIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -413,7 +428,6 @@ export interface FileRoutesByTo {
   '/app/campaigns/send-points': typeof AppCampaignsSendPointsRoute
   '/app/catalog/$id': typeof AppCatalogIdRoute
   '/app/kits/new': typeof AppKitsNewRoute
-  '/app/shops/$id': typeof AppShopsIdRoute
   '/app/shops/new': typeof AppShopsNewRoute
   '/app/swag/new': typeof AppSwagNewRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
@@ -432,6 +446,8 @@ export interface FileRoutesByTo {
   '/platform/orders': typeof PlatformOrdersIndexRoute
   '/app/kits/$id/edit': typeof AppKitsIdEditRoute
   '/app/kits/$id/send': typeof AppKitsIdSendRoute
+  '/app/shops/$id': typeof AppShopsIdIndexRoute
+  '/app/shops/$id/designs/$collectionId': typeof AppShopsIdDesignsCollectionIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -469,7 +485,7 @@ export interface FileRoutesById {
   '/app/campaigns/send-points': typeof AppCampaignsSendPointsRoute
   '/app/catalog/$id': typeof AppCatalogIdRoute
   '/app/kits/new': typeof AppKitsNewRoute
-  '/app/shops/$id': typeof AppShopsIdRoute
+  '/app/shops/$id': typeof AppShopsIdRouteWithChildren
   '/app/shops/new': typeof AppShopsNewRoute
   '/app/swag/new': typeof AppSwagNewRoute
   '/platform/catalog/$id': typeof PlatformCatalogIdRoute
@@ -488,6 +504,8 @@ export interface FileRoutesById {
   '/platform/orders/': typeof PlatformOrdersIndexRoute
   '/app/kits/$id/edit': typeof AppKitsIdEditRoute
   '/app/kits/$id/send': typeof AppKitsIdSendRoute
+  '/app/shops/$id/': typeof AppShopsIdIndexRoute
+  '/app/shops/$id/designs/$collectionId': typeof AppShopsIdDesignsCollectionIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -545,6 +563,8 @@ export interface FileRouteTypes {
     | '/platform/orders/'
     | '/app/kits/$id/edit'
     | '/app/kits/$id/send'
+    | '/app/shops/$id/'
+    | '/app/shops/$id/designs/$collectionId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -575,7 +595,6 @@ export interface FileRouteTypes {
     | '/app/campaigns/send-points'
     | '/app/catalog/$id'
     | '/app/kits/new'
-    | '/app/shops/$id'
     | '/app/shops/new'
     | '/app/swag/new'
     | '/platform/catalog/$id'
@@ -594,6 +613,8 @@ export interface FileRouteTypes {
     | '/platform/orders'
     | '/app/kits/$id/edit'
     | '/app/kits/$id/send'
+    | '/app/shops/$id'
+    | '/app/shops/$id/designs/$collectionId'
   id:
     | '__root__'
     | '/'
@@ -649,6 +670,8 @@ export interface FileRouteTypes {
     | '/platform/orders/'
     | '/app/kits/$id/edit'
     | '/app/kits/$id/send'
+    | '/app/shops/$id/'
+    | '/app/shops/$id/designs/$collectionId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1021,6 +1044,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCampaignsSendPointsRouteImport
       parentRoute: typeof AppCampaignsRoute
     }
+    '/app/shops/$id/': {
+      id: '/app/shops/$id/'
+      path: '/'
+      fullPath: '/app/shops/$id/'
+      preLoaderRoute: typeof AppShopsIdIndexRouteImport
+      parentRoute: typeof AppShopsIdRoute
+    }
     '/app/kits/$id/send': {
       id: '/app/kits/$id/send'
       path: '/$id/send'
@@ -1034,6 +1064,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/kits/$id/edit'
       preLoaderRoute: typeof AppKitsIdEditRouteImport
       parentRoute: typeof AppKitsRoute
+    }
+    '/app/shops/$id/designs/$collectionId': {
+      id: '/app/shops/$id/designs/$collectionId'
+      path: '/designs/$collectionId'
+      fullPath: '/app/shops/$id/designs/$collectionId'
+      preLoaderRoute: typeof AppShopsIdDesignsCollectionIdRouteImport
+      parentRoute: typeof AppShopsIdRoute
     }
   }
 }
@@ -1067,6 +1104,20 @@ const AppKitsRouteChildren: AppKitsRouteChildren = {
 const AppKitsRouteWithChildren =
   AppKitsRoute._addFileChildren(AppKitsRouteChildren)
 
+interface AppShopsIdRouteChildren {
+  AppShopsIdIndexRoute: typeof AppShopsIdIndexRoute
+  AppShopsIdDesignsCollectionIdRoute: typeof AppShopsIdDesignsCollectionIdRoute
+}
+
+const AppShopsIdRouteChildren: AppShopsIdRouteChildren = {
+  AppShopsIdIndexRoute: AppShopsIdIndexRoute,
+  AppShopsIdDesignsCollectionIdRoute: AppShopsIdDesignsCollectionIdRoute,
+}
+
+const AppShopsIdRouteWithChildren = AppShopsIdRoute._addFileChildren(
+  AppShopsIdRouteChildren,
+)
+
 interface AppRouteChildren {
   AppBillingRoute: typeof AppBillingRoute
   AppCampaignsRoute: typeof AppCampaignsRouteWithChildren
@@ -1078,7 +1129,7 @@ interface AppRouteChildren {
   AppWalletsRoute: typeof AppWalletsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppCatalogIdRoute: typeof AppCatalogIdRoute
-  AppShopsIdRoute: typeof AppShopsIdRoute
+  AppShopsIdRoute: typeof AppShopsIdRouteWithChildren
   AppShopsNewRoute: typeof AppShopsNewRoute
   AppSwagNewRoute: typeof AppSwagNewRoute
   AppCatalogIndexRoute: typeof AppCatalogIndexRoute
@@ -1097,7 +1148,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppWalletsRoute: AppWalletsRoute,
   AppIndexRoute: AppIndexRoute,
   AppCatalogIdRoute: AppCatalogIdRoute,
-  AppShopsIdRoute: AppShopsIdRoute,
+  AppShopsIdRoute: AppShopsIdRouteWithChildren,
   AppShopsNewRoute: AppShopsNewRoute,
   AppSwagNewRoute: AppSwagNewRoute,
   AppCatalogIndexRoute: AppCatalogIndexRoute,

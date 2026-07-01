@@ -1,55 +1,154 @@
-import { Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { MoreHorizontal } from "lucide-react";
+import { toast } from "sonner";
 import type { UiShop } from "@/services/mappers";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ShopBanner } from "./banner";
+import { useArchiveShop, useDuplicateShop } from "./hooks";
 import { shopCardMeta } from "./types";
 
 export function ShopCard({
   shop,
   fallbackUser,
-  onEditLook,
 }: {
   shop: UiShop;
   fallbackUser: string;
-  onEditLook: (shop: UiShop) => void;
 }) {
+  const navigate = useNavigate();
+  const duplicate = useDuplicateShop();
+  const archive = useArchiveShop();
+  const [confirmArchive, setConfirmArchive] = useState(false);
+
+  async function onDuplicate() {
+    try {
+      const copy = await duplicate.mutateAsync(shop);
+      toast.success(`Duplicated as “${copy.name}”`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not duplicate shop");
+    }
+  }
+
+  async function onArchive() {
+    try {
+      await archive.mutateAsync(shop.id);
+      toast.success(`“${shop.name}” archived`);
+      setConfirmArchive(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not archive shop");
+    }
+  }
+
   return (
-    <div className="card shop-card">
-      <Link
-        to="/app/shops/$id"
-        params={{ id: shop.id }}
-        aria-label={`Open ${shop.name}`}
-        style={{ display: "block", color: "inherit", textDecoration: "none" }}
-      >
-        <ShopBanner
-          source={shop}
-          height={168}
-          layout="center"
-          logoSize={58}
-          onEdit={() => onEditLook(shop)}
-        />
-      </Link>
-      <div className="shop-card-body">
-        <div
-          className="row"
-          style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}
-        >
-          <h3>{shop.name}</h3>
-          {shop.live ? (
-            <span className="tag tag-live tag-live-outline">
-              <span className="dot" />
-              Live
-            </span>
-          ) : (
-            <span className="tag tag-draft">Draft</span>
-          )}
-        </div>
-        <div className="shop-card-meta">{shopCardMeta(shop, fallbackUser)}</div>
-        <div style={{ marginTop: 14, textAlign: "right" }}>
-          <Link to="/app/shops/$id" params={{ id: shop.id }} className="btn btn-soft btn-sm">
-            Open
+    <>
+      <div className="card shop-card">
+        <div className="shop-card-banner-wrap">
+          <Link
+            to="/app/shops/$id"
+            params={{ id: shop.id }}
+            aria-label={`Open ${shop.name}`}
+            style={{ display: "block", color: "inherit", textDecoration: "none" }}
+          >
+            <ShopBanner source={shop} height={168} layout="center" logoSize={58} />
           </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="shopbanner-menu"
+                aria-label="Shop actions"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal size={18} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="bottom" className="shop-card-menu">
+              <DropdownMenuItem
+                onSelect={() =>
+                  navigate({
+                    to: "/app/shops/$id",
+                    params: { id: shop.id },
+                    search: { tab: "layout" },
+                  })
+                }
+              >
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => navigate({ to: "/app/contacts" })}>
+                Add Users
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={onDuplicate} disabled={duplicate.isPending}>
+                Duplicate
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="shop-card-menu-item--danger"
+                onSelect={() => setConfirmArchive(true)}
+              >
+                Archive
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <div className="shop-card-body">
+          <div
+            className="row"
+            style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}
+          >
+            <h3>{shop.name}</h3>
+            {shop.live ? (
+              <span className="tag tag-live tag-live-outline">
+                <span className="dot" />
+                Live
+              </span>
+            ) : (
+              <span className="tag tag-draft">Draft</span>
+            )}
+          </div>
+          <div className="shop-card-meta">{shopCardMeta(shop, fallbackUser)}</div>
+          <div style={{ marginTop: 14, textAlign: "right" }}>
+            <Link to="/app/shops/$id" params={{ id: shop.id }} className="btn btn-soft btn-sm">
+              Open
+            </Link>
+          </div>
         </div>
       </div>
-    </div>
+
+      <AlertDialog open={confirmArchive} onOpenChange={setConfirmArchive}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive “{shop.name}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This shop will be removed from your list. You can restore it later from support if
+              needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={onArchive}
+              disabled={archive.isPending}
+              style={{ background: "var(--danger)" }}
+            >
+              {archive.isPending ? "Archiving…" : "Archive"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

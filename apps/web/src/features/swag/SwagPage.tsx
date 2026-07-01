@@ -3,6 +3,13 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { LayoutGrid, Plus, Rows3, Shirt } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { PageHeader } from "@/components/tenant/PageHeader";
+import {
+  Tooltip,
+  TooltipArrow,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import type { UiCollection, UiProduct } from "@/services/mappers";
 import { CollectionBlock } from "./CollectionBlock";
@@ -122,26 +129,44 @@ export function SwagPage() {
             </button>
           ))}
         </div>
-        <div className="view-toggle">
-          <button
-            type="button"
-            className={`view-toggle-btn ${view === "product" ? "on" : ""}`}
-            aria-label="View by product"
-            aria-pressed={view === "product"}
-            onClick={() => setView("product")}
-          >
-            <LayoutGrid size={16} />
-          </button>
-          <button
-            type="button"
-            className={`view-toggle-btn ${view === "collection" ? "on" : ""}`}
-            aria-label="View by collection"
-            aria-pressed={view === "collection"}
-            onClick={() => setView("collection")}
-          >
-            <Rows3 size={16} />
-          </button>
-        </div>
+        <TooltipProvider delayDuration={150}>
+          <div className="view-toggle">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={`view-toggle-btn ${view === "product" ? "on" : ""}`}
+                  aria-label="View by product"
+                  aria-pressed={view === "product"}
+                  onClick={() => setView("product")}
+                >
+                  <LayoutGrid size={16} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={10} className="view-toggle-tip">
+                View by product
+                <TooltipArrow className="view-toggle-tip-arrow" width={12} height={6} />
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={`view-toggle-btn ${view === "collection" ? "on" : ""}`}
+                  aria-label="View by collection"
+                  aria-pressed={view === "collection"}
+                  onClick={() => setView("collection")}
+                >
+                  <Rows3 size={16} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={10} className="view-toggle-tip">
+                View by collection
+                <TooltipArrow className="view-toggle-tip-arrow" width={12} height={6} />
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
       </div>
 
       {empty ? (
@@ -181,7 +206,17 @@ export function SwagPage() {
               key={`${collection.id}:${pIdx}`}
               collection={collection}
               product={product}
+              productView
               onOpen={() => setDesign({ collection, product, pIdx })}
+              onEditDesign={() => navigate({ to: "/app/swag/new" })}
+              onViewProduct={() => {
+                if (product.id) {
+                  navigate({ to: "/app/catalog/$id", params: { id: product.id } });
+                } else {
+                  setDesign({ collection, product, pIdx });
+                }
+              }}
+              onAddToShop={() => setAddTarget({ collection, product })}
             />
           ))}
         </div>

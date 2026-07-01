@@ -47,60 +47,48 @@ export function AddToShopDialog({
 
   return (
     <Dialog open={target !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="sm-modal">
-        <div className="modal-pad">
-          <DialogHeader>
-            <DialogTitle>Add to shop</DialogTitle>
-            <DialogDescription className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-              {target?.product
-                ? `Choose a shop to add “${target.product.nm}” to.`
-                : "Choose a shop to add this collection's designs to."}
-            </DialogDescription>
-          </DialogHeader>
+      <DialogContent className="sm-modal add-to-shop-modal">
+        <DialogHeader className="add-to-shop-header">
+          <DialogTitle>Add to shop</DialogTitle>
+          <DialogDescription>
+            {target?.product
+              ? `Choose a shop to add “${target.product.nm}” to.`
+              : "Choose a shop to add this collection's designs to."}
+          </DialogDescription>
+        </DialogHeader>
 
-          {shops.length === 0 ? (
-            <div className="empty" style={{ padding: "30px 0", textAlign: "center" }}>
-              <h3>No shops yet</h3>
-              <p className="muted">Create a shop first, then add designs to it.</p>
-            </div>
-          ) : (
-            <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
-              {shops.map((shop) => (
-                <button
-                  key={shop.id}
-                  type="button"
-                  className="card"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
-                    padding: 12,
-                    cursor: "pointer",
-                    textAlign: "left",
-                  }}
-                  disabled={busy}
-                  onClick={() => add(shop.id)}
-                >
-                  <div style={{ width: 96, flex: "none" }}>
-                    <ShopBanner
-                      source={shop}
-                      height={48}
-                      layout="center"
-                      logoSize={28}
-                      radius={8}
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700 }}>{shop.name}</div>
-                    <div className="mut3" style={{ fontSize: 12 }}>
-                      {shop.currency}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {shops.length === 0 ? (
+          <div className="add-to-shop-empty">
+            <h3>No shops yet</h3>
+            <p className="muted">Create a shop first, then add designs to it.</p>
+          </div>
+        ) : (
+          <div className="add-to-shop-list">
+            {shops.map((shop) => (
+              <button
+                key={shop.id}
+                type="button"
+                className="add-to-shop-row"
+                disabled={busy}
+                onClick={() => add(shop.id)}
+              >
+                <div className="add-to-shop-row-thumb">
+                  <ShopBanner
+                    source={shop}
+                    height={36}
+                    layout="center"
+                    logoSize={22}
+                    radius={6}
+                  />
+                </div>
+                <div className="add-to-shop-row-body">
+                  <div className="add-to-shop-row-name">{shop.name}</div>
+                  <div className="add-to-shop-row-meta">{shop.currency}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

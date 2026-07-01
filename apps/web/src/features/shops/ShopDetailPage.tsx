@@ -1,23 +1,23 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { ArrowLeft, Coins } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import type { UiShop } from "@/services/mappers";
-import { BannerEditorDialog } from "./BannerEditorDialog";
+import { Route } from "@/routes/app.shops.$id";
 import { ShopBanner } from "./banner";
-import { collectionLinkedToShop, SHOP_TABS, type ShopTab } from "./types";
+import { collectionLinkedToShop, SHOP_TABS, shopTabFromSearch, type ShopTab } from "./types";
 import { BrandedSwagTab } from "./tabs/BrandedSwagTab";
 import { ShopCatalogTab } from "./tabs/ShopCatalogTab";
 import { SentGiftsTab } from "./tabs/SentGiftsTab";
+import { ShopLayoutTab } from "./tabs/ShopLayoutTab";
 import { ReportsTab } from "./tabs/ReportsTab";
 
 export function ShopDetailPage() {
   const { id } = useParams({ from: "/app/shops/$id" });
+  const { tab: tabSearch } = Route.useSearch();
   const navigate = useNavigate();
   const { data: workspace, isLoading, isError, error } = useWorkspace();
-  const [tab, setTab] = useState<ShopTab>("Branded Swag");
-  const [editingLook, setEditingLook] = useState<UiShop | null>(null);
+  const [tab, setTab] = useState<ShopTab>(() => shopTabFromSearch(tabSearch) ?? "Branded Swag");
 
   const shop = workspace?.shops.find((s) => s.id === id) ?? null;
   const collections = useMemo(
@@ -25,6 +25,22 @@ export function ShopDetailPage() {
       shop ? (workspace?.collections ?? []).filter((c) => collectionLinkedToShop(c, shop.id)) : [],
     [workspace?.collections, shop],
   );
+
+  useEffect(() => {
+    const fromSearch = shopTabFromSearch(tabSearch);
+    if (fromSearch) setTab(fromSearch);
+  }, [tabSearch]);
+
+  function selectTab(next: ShopTab) {
+    setTab(next);
+    const slug = next.toLowerCase().replace(/\s+/g, "-");
+    void navigate({
+      to: "/app/shops/$id",
+      params: { id },
+      search: { tab: slug },
+      replace: true,
+    });
+  }
 
   if (isLoading && !workspace) {
     return <LoadingState message="Loading shop…" fullScreen={false} />;
@@ -67,14 +83,7 @@ export function ShopDetailPage() {
 
       <div className="row" style={{ alignItems: "center", gap: 16, marginBottom: 18 }}>
         <div style={{ width: 160, flex: "none" }}>
-          <ShopBanner
-            source={shop}
-            height={84}
-            layout="center"
-            logoSize={46}
-            radius={10}
-            onEdit={() => setEditingLook(shop)}
-          />
+          <ShopBanner source={shop} height={84} layout="center" logoSize={46} radius={10} />
         </div>
         <div style={{ flex: 1 }}>
           <h1 style={{ fontSize: 26 }}>{shop.name}</h1>
@@ -106,7 +115,7 @@ export function ShopDetailPage() {
             )}
           </div>
         </div>
-        <button type="button" className="btn btn-dark" onClick={sendPoints}>
+        <button type="button" className="btn btn-brand" onClick={sendPoints}>
           <Coins size={16} /> Send points
         </button>
       </div>
@@ -119,7 +128,7 @@ export function ShopDetailPage() {
             role="tab"
             aria-selected={t === tab}
             className={t === tab ? "on" : ""}
-            onClick={() => setTab(t)}
+            onClick={() => selectTab(t)}
           >
             {t}
           </button>
@@ -133,21 +142,16 @@ export function ShopDetailPage() {
         <ShopCatalogTab shop={shop} products={workspace.catalogProducts} />
       )}
       {tab === "Sent Gifts" && <SentGiftsTab shop={shop} onSendPoints={sendPoints} />}
+      {tab === "Layout" && <ShopLayoutTab shop={shop} />}
       {tab === "Reports" && <ReportsTab />}
-      {(tab === "Layout" || tab === "Settings") && (
+      {tab === "Settings" && (
         <div className="card" style={{ padding: 26 }}>
-          <h3 style={{ fontSize: 17, marginBottom: 8 }}>{tab}</h3>
+          <h3 style={{ fontSize: 17, marginBottom: 8 }}>Settings</h3>
           <p className="muted">
-            Configure {tab.toLowerCase()} for {shop.name}. Banner, theme colours, custom domain and
-            visibility live here.
+            Configure settings for {shop.name}. Custom domain and visibility options live here.
           </p>
         </div>
       )}
-
-      <BannerEditorDialog
-        shop={editingLook}
-        onOpenChange={(open) => !open && setEditingLook(null)}
-      />
     </>
   );
 }

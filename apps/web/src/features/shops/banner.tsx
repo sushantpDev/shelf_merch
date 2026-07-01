@@ -163,6 +163,7 @@ export function ShopBanner({
           className="shopbanner-menu"
           aria-label="Edit shop look"
           onClick={(e) => {
+            e.preventDefault();
             e.stopPropagation();
             onEdit();
           }}

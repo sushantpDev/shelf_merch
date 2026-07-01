@@ -1,6 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ShopDetailPage } from "@/features/shops/ShopDetailPage";
-
-export const Route = createFileRoute("/app/shops/$id")({
-  component: ShopDetailPage,
-});
+import { createFileRoute, Outlet } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/app/shops/$id")({
+  validateSearch: (search: Record<string, unknown>): { tab?: string } => ({
+    tab: typeof search.tab === "string" ? search.tab : undefined,
+  }),
+  component: Outlet,
+});
+

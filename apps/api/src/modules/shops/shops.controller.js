@@ -30,3 +30,9 @@ export async function publish(req, res) {
   writeAudit({ req, action: 'shop.publish', entityType: 'Shop', entityId: shop._id, after: { status: 'live' } });
   res.json(shop);
 }
+
+export async function archive(req, res) {
+  const shop = await shopsService.archiveShop({ tenantId: req.tenantId, shopId: req.params.id });
+  writeAudit({ req, action: 'shop.archive', entityType: 'Shop', entityId: shop._id, after: { deletedAt: shop.deletedAt } });
+  res.json({ ok: true });
+}

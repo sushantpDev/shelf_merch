@@ -10,6 +10,14 @@ export const SHOP_TABS = [
 ] as const;
 export type ShopTab = (typeof SHOP_TABS)[number];
 
+/** Map `?tab=layout` (etc.) to a shop detail tab. */
+export function shopTabFromSearch(tab?: string): ShopTab | null {
+  if (!tab) return null;
+  const norm = tab.toLowerCase().replace(/[\s_-]/g, "");
+  const match = SHOP_TABS.find((t) => t.toLowerCase().replace(/\s/g, "") === norm);
+  return match ?? null;
+}
+
 export const SHOP_CURRENCIES = [
   { key: "Points", title: "Points", desc: "₹2 = 1 Pt. Recipients redeem with points." },
   { key: "INR", title: "Indian Rupee (₹)", desc: "Prices shown in rupees, GST inclusive." },

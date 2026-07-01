@@ -97,7 +97,7 @@ export function CollectionBlock({
                 <MoreHorizontal size={15} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" side="bottom" className="shop-card-menu">
               {archived ? (
                 <>
                   <DropdownMenuItem
@@ -108,8 +108,8 @@ export function CollectionBlock({
                     Restore to saved designs
                   </DropdownMenuItem>
                   <DropdownMenuItem
+                    className="shop-card-menu-item--danger"
                     onSelect={() => setConfirmDelete(true)}
-                    style={{ color: "var(--danger)" }}
                   >
                     Delete permanently
                   </DropdownMenuItem>
@@ -127,8 +127,8 @@ export function CollectionBlock({
                     Archive collection
                   </DropdownMenuItem>
                   <DropdownMenuItem
+                    className="shop-card-menu-item--danger"
                     onSelect={() => setConfirmDelete(true)}
-                    style={{ color: "var(--danger)" }}
                   >
                     Delete collection
                   </DropdownMenuItem>

@@ -372,6 +372,30 @@ export async function updateShopApi(
   return mapShop(shop as never);
 }
 
+export async function archiveShopApi(shopId: string) {
+  return apiFetch<{ ok: boolean }>(`/shops/${shopId}`, { method: "DELETE" });
+}
+
+function shopCurrencyMode(currency: string): "points" | "inr" | "priceless" {
+  if (currency === "INR") return "inr";
+  if (currency === "Priceless") return "priceless";
+  return "points";
+}
+
+export async function duplicateShopApi(shop: UiShop) {
+  const draft = await createShopApi({
+    name: `${shop.name} (copy)`,
+    currencyMode: shopCurrencyMode(shop.currency),
+    categories: shop.categories.length ? shop.categories : ["Merch"],
+    logoUrl: shop.logoUrl || "",
+    bannerConfig: shop.bannerConfig || {},
+  });
+  if (shop.selectedCatalogProductIds.length > 0) {
+    return updateShopApi(draft.id, { selectedCatalogProductIds: shop.selectedCatalogProductIds });
+  }
+  return draft;
+}
+
 export async function createContactsApi(
   entries: Array<{
     name: string;
