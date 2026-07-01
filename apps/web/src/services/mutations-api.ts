@@ -543,15 +543,45 @@ type ApiEntityRow = {
 
 export async function fundWalletApi(
   walletId: string,
-  payload: { amount: number; description?: string },
-): Promise<{ wallet?: { balance?: number }; transaction?: { _id?: string } }> {
+  payload: {
+    amount: number;
+    description?: string;
+    fundingMethod?: "po_upload" | "online";
+    docType?: string;
+    docNumber?: string;
+  },
+): Promise<{ pending?: boolean; wallet?: { balance?: number }; transaction?: { _id?: string } }> {
   return apiFetch(`/wallets/${walletId}/fund`, {
     method: "POST",
     idempotencyKey: `fund-${walletId}-${payload.amount}-${Date.now()}`,
     body: JSON.stringify({
       amount: payload.amount,
       description: payload.description || "Wallet top-up",
+      fundingMethod: payload.fundingMethod,
+      docType: payload.docType,
+      docNumber: payload.docNumber,
     }),
+  });
+}
+
+export type RazorpayOrderResult = {
+  orderId: string;
+  amount: number;
+  amountPaise: number;
+  currency: string;
+  keyId: string;
+  paymentId: string;
+  walletId: string;
+};
+
+export async function createRazorpayOrderApi(
+  walletId: string,
+  amount: number,
+): Promise<RazorpayOrderResult> {
+  return apiFetch("/payments/razorpay/order", {
+    method: "POST",
+    idempotencyKey: `rzp-order-${walletId}-${amount}-${Date.now()}`,
+    body: JSON.stringify({ walletId, amount }),
   });
 }
 

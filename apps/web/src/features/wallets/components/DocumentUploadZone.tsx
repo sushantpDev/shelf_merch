@@ -49,9 +49,15 @@ function validateAndBuild(file: File, source: WalletUploadFile["source"]): Walle
 type DocumentUploadZoneProps = {
   file: WalletUploadFile | null;
   onFileChange: (file: WalletUploadFile | null) => void;
+  /** Compact layout for add-funds modal — hides cloud sources, taller dropzone */
+  variant?: "default" | "modal";
 };
 
-export function DocumentUploadZone({ file, onFileChange }: DocumentUploadZoneProps) {
+export function DocumentUploadZone({
+  file,
+  onFileChange,
+  variant = "default",
+}: DocumentUploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -85,12 +91,15 @@ export function DocumentUploadZone({ file, onFileChange }: DocumentUploadZonePro
     inputRef.current?.click();
   };
 
+  const isModal = variant === "modal";
+  const panelClass = `wallet-doc-panel${isModal ? " wallet-doc-panel--modal" : ""}${file ? " wallet-doc-panel--filled" : ""}`;
+
   if (file) {
     const sizeLabel = file.size ? formatFileSize(file.size) : null;
     const sourceLabel = file.source === "device" ? "From this device" : "From cloud";
 
     return (
-      <div className="wallet-doc-panel wallet-doc-panel--filled">
+      <div className={panelClass}>
         <div className="wallet-doc-file">
           <div className="wallet-doc-file-icon" aria-hidden>
             <FileText size={18} strokeWidth={2} />
@@ -134,7 +143,7 @@ export function DocumentUploadZone({ file, onFileChange }: DocumentUploadZonePro
   }
 
   return (
-    <div className="wallet-doc-panel">
+    <div className={panelClass}>
       <input
         ref={inputRef}
         type="file"
@@ -146,7 +155,16 @@ export function DocumentUploadZone({ file, onFileChange }: DocumentUploadZonePro
       />
 
       <div
-        className={`wallet-doc-dropzone${dragOver ? " wallet-doc-dropzone--drag" : ""}`}
+        className={`wallet-doc-dropzone${dragOver ? " wallet-doc-dropzone--drag" : ""}${isModal ? " wallet-doc-dropzone--modal" : ""}`}
+        role="button"
+        tabIndex={0}
+        onClick={() => isModal && inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (isModal && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
         onDragEnter={(e) => {
           e.preventDefault();
           setDragOver(true);
@@ -165,14 +183,26 @@ export function DocumentUploadZone({ file, onFileChange }: DocumentUploadZonePro
           <Upload size={20} strokeWidth={2} />
         </div>
         <div className="wallet-doc-dropzone-copy">
-          <span className="wallet-doc-dropzone-title">Drag &amp; drop or browse</span>
-          <span className="wallet-doc-dropzone-hint">PDF or DOCX · up to 25 MB</span>
+          <span className="wallet-doc-dropzone-title">
+            {isModal ? "Drag and drop your file here" : "Drag & drop or browse"}
+          </span>
+          <span className="wallet-doc-dropzone-hint">
+            {isModal ? "or click browse below" : "PDF or DOCX · up to 25 MB"}
+          </span>
         </div>
-        <button type="button" className="wallet-doc-browse" onClick={() => inputRef.current?.click()}>
-          Browse
+        <button
+          type="button"
+          className="wallet-doc-browse"
+          onClick={(e) => {
+            e.stopPropagation();
+            inputRef.current?.click();
+          }}
+        >
+          Browse files
         </button>
       </div>
 
+      {!isModal && (
       <div className="wallet-doc-sources">
         <span className="wallet-doc-sources-label">Cloud</span>
         {CLOUD_SOURCES.map((src) => {
@@ -191,6 +221,7 @@ export function DocumentUploadZone({ file, onFileChange }: DocumentUploadZonePro
           );
         })}
       </div>
+      )}
     </div>
   );
 }

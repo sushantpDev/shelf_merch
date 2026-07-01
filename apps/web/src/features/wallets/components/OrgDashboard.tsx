@@ -288,17 +288,7 @@ export function OrgDashboard({
       </div>
 
       <div className="card" style={{ padding: 22 }}>
-        <div
-          className="row"
-          style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}
-        >
-          <h3 style={{ fontSize: 17 }}>Departments (cost centers)</h3>
-          {canAllocate && (
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => onAllocate(2)}>
-              <Plus size={15} /> {depts.length ? "Edit departments" : "Add departments"}
-            </button>
-          )}
-        </div>
+        <h3 style={{ fontSize: 17, marginBottom: 14 }}>Budget Allocated</h3>
         {depts.length === 0 ? (
           <p className="muted" style={{ fontSize: 13.5 }}>
             No departments configured yet.

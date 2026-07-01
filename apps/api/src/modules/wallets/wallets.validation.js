@@ -45,6 +45,10 @@ export const updateWalletSchema = z
 export const fundWalletSchema = z.object({
   amount: z.number().positive(),
   description: z.string().optional().default(''),
+  /** Per-request method for top-ups; online must use Razorpay order endpoint. */
+  fundingMethod: z.enum(['po_upload', 'online']).optional(),
+  docType: z.string().optional().default(''),
+  docNumber: z.string().optional().default(''),
 });
 
 export const allocateSchema = z.object({

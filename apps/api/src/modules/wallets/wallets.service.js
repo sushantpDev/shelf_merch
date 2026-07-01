@@ -62,12 +62,40 @@ export async function updateWallet({ tenantId, walletId, patch }) {
  * §7.4 /fund — PO uploads submit a finance approval request (no ledger credit until
  * platform finance approves). Online payments credit immediately via Razorpay webhook.
  */
-export async function fundWallet({ tenantId, walletId, userId, amount, description }) {
+export async function fundWallet({
+  tenantId,
+  walletId,
+  userId,
+  amount,
+  description,
+  fundingMethod,
+  docType,
+  docNumber,
+}) {
   const wallet = await getWallet({ tenantId, walletId });
 
-  if (wallet.fundingMethod === 'po_upload') {
+  if (fundingMethod === 'online') {
+    throw new ApiError(
+      422,
+      'Online wallet funding must use Razorpay checkout',
+      'USE_RAZORPAY',
+    );
+  }
+
+  const method = fundingMethod ?? wallet.fundingMethod;
+
+  if (method === 'po_upload') {
+    if (wallet.fundingDocument.approvalStatus === 'pending') {
+      throw new ApiError(
+        422,
+        'A funding request is already pending finance approval',
+        'FUNDING_PENDING',
+      );
+    }
     wallet.fundingDocument.approvalStatus = 'pending';
     wallet.fundingDocument.requestedAmount = amount;
+    if (docType) wallet.fundingDocument.docType = docType;
+    if (docNumber) wallet.fundingDocument.docNumber = docNumber;
     if (wallet.status === 'draft') {
       transitionState('wallet', wallet, 'wallet_created', { userId });
     }

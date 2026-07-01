@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, ChevronDown, CreditCard, Wallet } from "lucide-react";
+import { ArrowLeft, ChevronDown, Clock, CreditCard, FileText, Zap } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -9,19 +9,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { inr } from "@/components/platform/platform-ui";
-import { parseAmt } from "../types";
-import { useFundWallet } from "../hooks";
-import {
-  CardBrandIcons,
-  detectCardBrand,
-  formatCardNumber,
-} from "./card-brands";
+import { openRazorpayCheckout } from "@/lib/razorpay";
+import { useInvalidateWorkspace } from "@/hooks/useWorkspace";
+import { parseAmt, type WalletUploadFile } from "../types";
+import { useCreateRazorpayOrder, useFundWallet } from "../hooks";
+import { DocumentUploadZone } from "./DocumentUploadZone";
 
 const PRESET_AMOUNTS = [10_000, 25_000, 50_000, 1_00_000, 2_00_000];
-const ACH_BONUS_THRESHOLD = 1_00_000;
+const PO_BONUS_THRESHOLD = 1_00_000;
 
-type PaymentMethod = "card" | "ach";
-type CardMode = "saved" | "new";
+type PaymentMethod = "po" | "online";
 
 type Props = {
   open: boolean;
@@ -30,25 +27,22 @@ type Props = {
   walletName: string;
 };
 
-function formatExpiry(raw: string): string {
-  const digits = raw.replace(/\D/g, "").slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)} / ${digits.slice(2)}`;
-}
-
 export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Props) {
   const fund = useFundWallet();
+  const rzpOrder = useCreateRazorpayOrder();
+  const invalidateWorkspace = useInvalidateWorkspace();
+
   const [step, setStep] = useState(1);
   const [amount, setAmount] = useState(0);
   const [amountText, setAmountText] = useState("");
   const [note, setNote] = useState("");
-  const [method, setMethod] = useState<PaymentMethod>("card");
-  const [cardMode, setCardMode] = useState<CardMode>("new");
-  const [cardName, setCardName] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvv, setCardCvv] = useState("");
-  const [country, setCountry] = useState("IN");
+  const [method, setMethod] = useState<PaymentMethod>("online");
+  const [docType, setDocType] = useState("Purchase Order");
+  const [docNumber, setDocNumber] = useState("");
+  const [uploadFile, setUploadFile] = useState<WalletUploadFile | null>(null);
+  const [paying, setPaying] = useState(false);
+
+  const busy = fund.isPending || rzpOrder.isPending || paying;
 
   useEffect(() => {
     if (!open) {
@@ -56,33 +50,49 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
       setAmount(0);
       setAmountText("");
       setNote("");
-      setMethod("card");
-      setCardMode("new");
-      setCardName("");
-      setCardNumber("");
-      setCardExpiry("");
-      setCardCvv("");
-      setCountry("IN");
+      setMethod("online");
+      setDocType("Purchase Order");
+      setDocNumber("");
+      setUploadFile(null);
+      setPaying(false);
     }
   }, [open]);
 
-  const bonusEligible = method === "ach" && amount >= ACH_BONUS_THRESHOLD;
-  const bonusAmount = bonusEligible ? Math.floor(amount * 0.05) : 0;
+  const poBonusEligible = method === "po" && amount >= PO_BONUS_THRESHOLD;
 
-  const cardDigits = cardNumber.replace(/\D/g, "");
-  const cardBrand = detectCardBrand(cardDigits);
-
-  const cardValid =
-    cardName.trim().length >= 2 &&
-    cardDigits.length >= (cardBrand === "amex" ? 15 : 12) &&
-    /^\d{2}\s\/\s\d{2}$/.test(cardExpiry.trim()) &&
-    cardCvv.trim().length >= (cardBrand === "amex" ? 4 : 3);
+  function AmountSummary({
+    label,
+    badge,
+  }: {
+    label: string;
+    badge?: { text: string; tone: "pending" | "instant" };
+  }) {
+    if (amount <= 0) return null;
+    return (
+      <div className="add-funds-brand-summary">
+        <div className="add-funds-brand-summary-main">
+          <span className="add-funds-brand-summary-label">{label}</span>
+          <span className="add-funds-brand-summary-amt num">{inr(amount)}</span>
+        </div>
+        {badge && (
+          <span className={`add-funds-brand-badge add-funds-brand-badge--${badge.tone}`}>
+            {badge.tone === "pending" ? (
+              <Clock size={12} strokeWidth={2.5} aria-hidden />
+            ) : (
+              <Zap size={12} strokeWidth={2.5} aria-hidden />
+            )}
+            {badge.text}
+          </span>
+        )}
+      </div>
+    );
+  }
 
   const canNext =
     (step === 1 && amount > 0) ||
     step === 2 ||
-    (step === 3 && method === "ach") ||
-    (step === 3 && method === "card" && cardMode === "new" && cardValid);
+    (step === 3 && method === "online") ||
+    (step === 3 && method === "po" && Boolean(uploadFile?.file) && docNumber.trim().length > 0);
 
   function handleAmountChange(raw: string) {
     setAmountText(raw);
@@ -94,29 +104,63 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
     setAmountText(value.toLocaleString("en-IN"));
   }
 
-  async function handleConfirm() {
-    const description = [
-      method === "card" ? "Card top-up" : "Bank transfer",
-      note.trim() || undefined,
-      walletName,
-    ]
-      .filter(Boolean)
-      .join(" · ");
+  async function handlePoSubmit() {
+    const description = [note.trim() || undefined, walletName].filter(Boolean).join(" · ");
 
     try {
-      const totalCredit = amount + bonusAmount;
       await fund.mutateAsync({
         walletId,
-        amount: totalCredit,
-        description:
-          bonusAmount > 0
-            ? `${description} (includes ₹${bonusAmount.toLocaleString("en-IN")} bonus)`
-            : description,
+        amount,
+        description: description || `PO top-up to ${walletName}`,
+        fundingMethod: "po_upload",
+        docType,
+        docNumber: docNumber.trim(),
+        uploadFile: uploadFile?.file,
       });
-      toast.success(`₹${totalCredit.toLocaleString("en-IN")} added to ${walletName}`);
+      toast.success("Funding request submitted", {
+        description: "Finance will review your PO and credit the wallet once approved.",
+      });
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not add funds");
+      toast.error(err instanceof Error ? err.message : "Could not submit funding request");
+    }
+  }
+
+  async function handleRazorpayPay() {
+    setPaying(true);
+    try {
+      const order = await rzpOrder.mutateAsync({ walletId, amount });
+      await openRazorpayCheckout({
+        order,
+        walletName,
+        onSuccess: () => {
+          toast.success("Payment received", {
+            description: `${inr(amount)} will be added to your wallet shortly.`,
+          });
+          invalidateWorkspace();
+          onOpenChange(false);
+        },
+        onDismiss: () => setPaying(false),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Payment could not be started";
+      if (message.includes("RAZORPAY_NOT_CONFIGURED") || message.includes("not configured")) {
+        toast.error("Razorpay is not configured", {
+          description: "Add RAZORPAY_KEY_ID and related keys to the API .env file.",
+        });
+      } else if (message !== "Payment cancelled") {
+        toast.error(message);
+      }
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  async function handleConfirm() {
+    if (method === "po") {
+      await handlePoSubmit();
+    } else {
+      await handleRazorpayPay();
     }
   }
 
@@ -127,308 +171,299 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
           <div className="add-funds-scroll">
             <p className="add-funds-eyebrow">Add wallet funds ({step}/4)</p>
 
-          {step === 1 && (
-            <div className="add-funds-body">
-              <DialogHeader className="add-funds-header">
-                <DialogTitle>How much would you like to add?</DialogTitle>
-                <DialogDescription>
-                  Add ₹1,00,000+ via bank transfer and get up to 5% bonus funds. All funds belong
-                  to your workspace and stay available for department campaigns.
-                </DialogDescription>
-              </DialogHeader>
+            {step === 1 && (
+              <div className="add-funds-body add-funds-step">
+                <DialogHeader className="add-funds-header">
+                  <DialogTitle>How much would you like to add?</DialogTitle>
+                  <DialogDescription>
+                    Add ₹1,00,000+ via PO and get up to 5% bonus funds after finance approval.
+                    Online payments via Razorpay are credited instantly.
+                  </DialogDescription>
+                </DialogHeader>
 
-              <div className="add-funds-field">
-                <label className="add-funds-lbl" htmlFor="add-funds-amount">
-                  Amount
-                </label>
-                <div className="add-funds-amount-wrap">
-                  <span className="add-funds-currency">₹</span>
-                  <input
-                    id="add-funds-amount"
-                    className="add-funds-amount-input num"
-                    inputMode="numeric"
-                    placeholder="0"
-                    autoFocus
-                    value={amountText}
-                    onChange={(e) => handleAmountChange(e.target.value)}
-                  />
-                </div>
-                <div className="add-funds-presets">
-                  {PRESET_AMOUNTS.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      className={`add-funds-preset${amount === p ? " on" : ""}`}
-                      onClick={() => selectPreset(p)}
-                    >
-                      ₹{p.toLocaleString("en-IN")}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                <AmountSummary label={`Adding to ${walletName}`} />
 
-              <div className="add-funds-field">
-                <label className="add-funds-lbl" htmlFor="add-funds-note">
-                  Note
-                </label>
-                <p className="add-funds-field-hint">Add a reference note for your deposit (optional)</p>
-                <input
-                  id="add-funds-note"
-                  className="add-funds-inp"
-                  placeholder='e.g. "Q3 gifting budget"'
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="add-funds-body">
-              <DialogHeader className="add-funds-header">
-                <DialogTitle>Select your payment method</DialogTitle>
-              </DialogHeader>
-
-              <div className="add-funds-methods">
-                <button
-                  type="button"
-                  className={`add-funds-method${method === "card" ? " on" : ""}`}
-                  onClick={() => setMethod("card")}
-                >
-                  <span
-                    className={`add-funds-method-radio${method === "card" ? " on" : ""}`}
-                    aria-hidden="true"
-                  />
-                  <div>
-                    <div className="add-funds-method-title">Credit card</div>
-                    <div className="add-funds-method-sub">Funds are available to use immediately.</div>
-                  </div>
-                </button>
-
-                <p className="add-funds-bonus-hint">
-                  Get 5% extra funds when you add ₹1,00,000+ with:
-                </p>
-
-                <button
-                  type="button"
-                  className={`add-funds-method${method === "ach" ? " on" : ""}`}
-                  onClick={() => setMethod("ach")}
-                >
-                  <span
-                    className={`add-funds-method-radio${method === "ach" ? " on" : ""}`}
-                    aria-hidden="true"
-                  />
-                  <div>
-                    <div className="add-funds-method-title">Bank transfer</div>
-                    <div className="add-funds-method-sub">
-                      Send the funds to Shelf Merch — we&apos;ll credit your wallet once the transfer
-                      is processed.
+                <div className="add-funds-brand-card">
+                  <p className="add-funds-brand-card-title">Amount</p>
+                  <div className="add-funds-field add-funds-field--tight">
+                    <div className={`add-funds-amount-wrap${amount > 0 ? " has-value" : ""}`}>
+                      <span className="add-funds-currency">₹</span>
+                      <input
+                        id="add-funds-amount"
+                        className="add-funds-amount-input num"
+                        inputMode="numeric"
+                        placeholder="0"
+                        autoFocus
+                        value={amountText}
+                        onChange={(e) => handleAmountChange(e.target.value)}
+                      />
+                    </div>
+                    <div className="add-funds-presets">
+                      {PRESET_AMOUNTS.map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          className={`add-funds-preset${amount === p ? " on" : ""}`}
+                          onClick={() => selectPreset(p)}
+                        >
+                          ₹{p.toLocaleString("en-IN")}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {step === 3 && method === "card" && (
-            <div className="add-funds-body">
-              <DialogHeader className="add-funds-header">
-                <DialogTitle>Pay with credit card</DialogTitle>
-                <DialogDescription>How would you like to pay?</DialogDescription>
-              </DialogHeader>
-
-              <button type="button" className="add-funds-method add-funds-method-disabled" disabled>
-                <span className="add-funds-method-radio" aria-hidden="true" />
-                <div>
-                  <div className="add-funds-method-title">Use saved card</div>
-                  <div className="add-funds-method-sub">You have no saved cards on file.</div>
                 </div>
-              </button>
 
-              <div className={`add-funds-card-panel${cardMode === "new" ? " on" : ""}`}>
-                <button
-                  type="button"
-                  className="add-funds-card-panel-head"
-                  onClick={() => setCardMode("new")}
-                >
-                  <span className="add-funds-method-radio on" aria-hidden="true" />
-                  <span>Add new card</span>
-                </button>
-
-                <div className="add-funds-card-form">
-                  <div className="add-funds-field">
-                    <label className="add-funds-lbl" htmlFor="card-name">
-                      Name on card
-                    </label>
+                <div className="add-funds-brand-card">
+                  <p className="add-funds-brand-card-title">Reference note</p>
+                  <div className="add-funds-field add-funds-field--tight">
+                    <p className="add-funds-field-hint">Optional — shown on your funding request</p>
                     <input
-                      id="card-name"
+                      id="add-funds-note"
                       className="add-funds-inp"
-                      placeholder="Name on card"
-                      value={cardName}
-                      onChange={(e) => setCardName(e.target.value)}
+                      placeholder='e.g. "Q3 gifting budget"'
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
                     />
                   </div>
+                </div>
+              </div>
+            )}
 
-                  <div className="add-funds-field">
-                    <div className="add-funds-card-label-row">
-                      <CreditCard size={14} className="add-funds-card-icon" />
-                      <label className="add-funds-lbl add-funds-lbl-inline" htmlFor="card-number">
-                        Card
-                      </label>
-                    </div>
-                    <label className="add-funds-lbl" htmlFor="card-number">
-                      Card number
-                    </label>
-                    <div className="add-funds-card-number-wrap">
-                      <input
-                        id="card-number"
-                        className="add-funds-inp num"
-                        placeholder={cardBrand === "amex" ? "3782 822463 10005" : "1234 1234 1234 1234"}
-                        inputMode="numeric"
-                        value={cardNumber}
-                        onChange={(e) => {
-                          const brand = detectCardBrand(e.target.value.replace(/\D/g, ""));
-                          setCardNumber(formatCardNumber(e.target.value, brand));
-                        }}
+            {step === 2 && (
+              <div className="add-funds-body add-funds-step">
+                <DialogHeader className="add-funds-header">
+                  <DialogTitle>Select your payment method</DialogTitle>
+                  <DialogDescription>
+                    Choose how you want to fund <b>{walletName}</b>.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <AmountSummary label="Amount to add" />
+
+                <div className="add-funds-brand-card add-funds-brand-card--methods">
+                  <p className="add-funds-brand-card-title">Payment method</p>
+                  <div className="add-funds-methods">
+                    <button
+                      type="button"
+                      className={`add-funds-method${method === "online" ? " on" : ""}`}
+                      onClick={() => setMethod("online")}
+                    >
+                      <span
+                        className={`add-funds-method-radio${method === "online" ? " on" : ""}`}
+                        aria-hidden="true"
                       />
-                      <CardBrandIcons cardNumber={cardNumber} />
-                    </div>
-                  </div>
+                      <div>
+                        <div className="add-funds-method-title">Pay online (Razorpay)</div>
+                        <div className="add-funds-method-sub">
+                          UPI, cards, or net banking — funds available immediately after payment.
+                        </div>
+                      </div>
+                    </button>
 
-                  <div className="add-funds-card-row">
-                    <div className="add-funds-field">
-                      <label className="add-funds-lbl" htmlFor="card-expiry">
-                        Expiration date
+                    <p className="add-funds-bonus-hint">
+                      Get 5% extra funds when you add ₹1,00,000+ with:
+                    </p>
+
+                    <button
+                      type="button"
+                      className={`add-funds-method${method === "po" ? " on" : ""}`}
+                      onClick={() => setMethod("po")}
+                    >
+                      <span
+                        className={`add-funds-method-radio${method === "po" ? " on" : ""}`}
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <div className="add-funds-method-title">Upload Purchase Order</div>
+                        <div className="add-funds-method-sub">
+                          Submit a signed PO for finance approval — credited once approved.
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {step === 3 && method === "po" && (
+              <div className="add-funds-body add-funds-step">
+                <DialogHeader className="add-funds-header">
+                  <DialogTitle>Upload purchase order</DialogTitle>
+                  <DialogDescription>
+                    Finance will review your document and credit your wallet once approved.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <AmountSummary
+                  label="Amount requested"
+                  badge={{ text: "Pending review", tone: "pending" }}
+                />
+
+                <div className="add-funds-brand-card">
+                  <p className="add-funds-brand-card-title">Document details</p>
+                  <div className="add-funds-doc-grid">
+                    <div className="add-funds-field add-funds-field--tight">
+                      <label className="add-funds-lbl" htmlFor="add-funds-doctype">
+                        Document type
+                      </label>
+                      <div className="add-funds-select-wrap">
+                        <select
+                          id="add-funds-doctype"
+                          className="add-funds-inp add-funds-select"
+                          value={docType}
+                          onChange={(e) => setDocType(e.target.value)}
+                        >
+                          <option>Agreement</option>
+                          <option>Purchase Order</option>
+                          <option>Work Order</option>
+                        </select>
+                        <ChevronDown size={16} className="add-funds-select-chevron" aria-hidden />
+                      </div>
+                    </div>
+                    <div className="add-funds-field add-funds-field--tight">
+                      <label className="add-funds-lbl" htmlFor="add-funds-docnum">
+                        Document number
                       </label>
                       <input
-                        id="card-expiry"
+                        id="add-funds-docnum"
                         className="add-funds-inp"
-                        placeholder="MM / YY"
-                        inputMode="numeric"
-                        value={cardExpiry}
-                        onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
-                      />
-                    </div>
-                    <div className="add-funds-field">
-                      <label className="add-funds-lbl" htmlFor="card-cvv">
-                        Security code
-                      </label>
-                      <input
-                        id="card-cvv"
-                        className="add-funds-inp num"
-                        placeholder="CVC"
-                        inputMode="numeric"
-                        maxLength={4}
-                        value={cardCvv}
-                        onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                        placeholder="PO-2026-001"
+                        value={docNumber}
+                        onChange={(e) => setDocNumber(e.target.value)}
                       />
                     </div>
                   </div>
+                </div>
 
-                  <div className="add-funds-field">
-                    <label className="add-funds-lbl" htmlFor="card-country">
-                      Country
-                    </label>
-                    <div className="add-funds-select-wrap">
-                      <select
-                        id="card-country"
-                        className="add-funds-inp add-funds-select"
-                        value={country}
-                        onChange={(e) => setCountry(e.target.value)}
-                      >
-                        <option value="IN">India</option>
-                        <option value="US">United States</option>
-                        <option value="GB">United Kingdom</option>
-                        <option value="SG">Singapore</option>
-                        <option value="AE">United Arab Emirates</option>
-                      </select>
-                      <ChevronDown size={16} className="add-funds-select-chevron" aria-hidden />
+                <div className="add-funds-field add-funds-po-upload-field">
+                  <label className="add-funds-lbl">Upload document</label>
+                  <p className="add-funds-field-hint">PDF or DOCX · max 25 MB</p>
+                  <DocumentUploadZone
+                    variant="modal"
+                    file={uploadFile}
+                    onFileChange={setUploadFile}
+                  />
+                </div>
+              </div>
+            )}
+
+            {step === 3 && method === "online" && (
+              <div className="add-funds-body add-funds-step">
+                <DialogHeader className="add-funds-header">
+                  <DialogTitle>Pay with Razorpay</DialogTitle>
+                  <DialogDescription>
+                    You&apos;ll be redirected to Razorpay&apos;s secure checkout to complete payment.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <AmountSummary
+                  label="Amount to pay"
+                  badge={{ text: "Instant credit", tone: "instant" }}
+                />
+
+                <div className="add-funds-brand-card">
+                  <p className="add-funds-brand-card-title">Payment details</p>
+                  <div className="add-funds-detail-rows">
+                    <div className="add-funds-detail-row">
+                      <span>Payment gateway</span>
+                      <b>Razorpay</b>
+                    </div>
+                    <div className="add-funds-detail-row">
+                      <span>Accepted methods</span>
+                      <b>UPI · Cards · Net banking</b>
+                    </div>
+                    <div className="add-funds-detail-row">
+                      <span>Wallet</span>
+                      <b>{walletName}</b>
                     </div>
                   </div>
-
-                  <p className="add-funds-terms">
-                    By providing your card information, you allow Shelf Merch to charge your card for
-                    future payments in accordance with their terms.
-                  </p>
                 </div>
+
+                <p className="add-funds-brand-hint">
+                  <CreditCard size={14} strokeWidth={2} aria-hidden />
+                  Funds are credited to your wallet automatically once payment is confirmed.
+                </p>
               </div>
-            </div>
-          )}
+            )}
 
-          {step === 3 && method === "ach" && (
-            <div className="add-funds-body">
-              <DialogHeader className="add-funds-header">
-                <DialogTitle>Bank transfer details</DialogTitle>
-                <DialogDescription>
-                  Send {inr(amount)} to the account below. Use your note as the payment reference.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="add-funds-ach-card">
-                <div className="add-funds-ach-row">
-                  <span>Account name</span>
-                  <b>Shelf Merch Pvt Ltd</b>
-                </div>
-                <div className="add-funds-ach-row">
-                  <span>Account number</span>
-                  <b>50200012345678</b>
-                </div>
-                <div className="add-funds-ach-row">
-                  <span>IFSC</span>
-                  <b>HDFC0001234</b>
-                </div>
-                <div className="add-funds-ach-row">
-                  <span>Reference</span>
-                  <b>{note.trim() || walletName}</b>
-                </div>
-              </div>
-              <p className="add-funds-field-hint" style={{ marginTop: 14 }}>
-                After you transfer, continue to confirm. We&apos;ll credit your wallet once payment is
-                received (usually 1–2 business days).
-              </p>
-            </div>
-          )}
+            {step === 4 && (
+              <div className="add-funds-body add-funds-step">
+                <DialogHeader className="add-funds-header">
+                  <DialogTitle>Review and confirm</DialogTitle>
+                  <DialogDescription>Check the details before adding funds to your wallet.</DialogDescription>
+                </DialogHeader>
 
-          {step === 4 && (
-            <div className="add-funds-body">
-              <DialogHeader className="add-funds-header">
-                <DialogTitle>Review and confirm</DialogTitle>
-                <DialogDescription>Check the details before adding funds to your wallet.</DialogDescription>
-              </DialogHeader>
-              <div className="add-funds-review">
-                <div className="add-funds-review-row">
-                  <span>Wallet</span>
-                  <b>{walletName}</b>
-                </div>
-                <div className="add-funds-review-row">
-                  <span>Amount</span>
-                  <b className="num">{inr(amount)}</b>
-                </div>
-                {bonusAmount > 0 && (
-                  <div className="add-funds-review-row">
-                    <span>Bonus (5%)</span>
-                    <b className="num add-funds-bonus-val">+{inr(bonusAmount)}</b>
+                <AmountSummary
+                  label={method === "online" ? "Total to pay" : "Amount requested"}
+                  badge={
+                    method === "online"
+                      ? { text: "Instant credit", tone: "instant" }
+                      : { text: "Pending review", tone: "pending" }
+                  }
+                />
+
+                <div className="add-funds-brand-card">
+                  <p className="add-funds-brand-card-title">Summary</p>
+                  <div className="add-funds-detail-rows">
+                    <div className="add-funds-detail-row">
+                      <span>Wallet</span>
+                      <b>{walletName}</b>
+                    </div>
+                    <div className="add-funds-detail-row">
+                      <span>Amount</span>
+                      <b className="num add-funds-detail-amt">{inr(amount)}</b>
+                    </div>
+                    {poBonusEligible && (
+                      <div className="add-funds-detail-row">
+                        <span>Bonus (5%, after approval)</span>
+                        <b className="num add-funds-detail-bonus">
+                          +{inr(Math.floor(amount * 0.05))}
+                        </b>
+                      </div>
+                    )}
+                    <div className="add-funds-detail-row">
+                      <span>Payment method</span>
+                      <b>{method === "online" ? "Razorpay (online)" : "Purchase Order"}</b>
+                    </div>
+                    {method === "po" && (
+                      <>
+                        <div className="add-funds-detail-row">
+                          <span>Document</span>
+                          <b>
+                            {docType} {docNumber}
+                          </b>
+                        </div>
+                        <div className="add-funds-detail-row">
+                          <span>File</span>
+                          <b>{uploadFile?.name ?? "—"}</b>
+                        </div>
+                      </>
+                    )}
+                    {note.trim() && (
+                      <div className="add-funds-detail-row">
+                        <span>Note</span>
+                        <b>{note.trim()}</b>
+                      </div>
+                    )}
                   </div>
-                )}
-                <div className="add-funds-review-row">
-                  <span>Payment method</span>
-                  <b>{method === "card" ? "Credit card" : "Bank transfer"}</b>
                 </div>
-                {note.trim() && (
-                  <div className="add-funds-review-row">
-                    <span>Note</span>
-                    <b>{note.trim()}</b>
-                  </div>
-                )}
-              </div>
-              <div className="add-funds-review-total">
-                <Wallet size={18} />
-                <span>
-                  Total credit: <b className="num">{inr(amount + bonusAmount)}</b>
-                </span>
-              </div>
-            </div>
-          )}
 
+                <div className="add-funds-brand-summary add-funds-brand-summary--foot">
+                  {method === "online" ? <CreditCard size={18} /> : <FileText size={18} />}
+                  <span>
+                    {method === "online" ? (
+                      <>
+                        Pay <b className="num">{inr(amount)}</b> via Razorpay
+                      </>
+                    ) : (
+                      <>
+                        Submit <b className="num">{inr(amount)}</b> for approval
+                      </>
+                    )}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="add-funds-foot">
@@ -437,7 +472,7 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
                 type="button"
                 className="add-funds-back"
                 onClick={() => setStep((s) => s - 1)}
-                disabled={fund.isPending}
+                disabled={busy}
               >
                 <ArrowLeft size={15} /> Back
               </button>
@@ -460,10 +495,16 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
               <button
                 type="button"
                 className="add-funds-next ready"
-                disabled={fund.isPending}
+                disabled={busy}
                 onClick={handleConfirm}
               >
-                {fund.isPending ? "Adding…" : "Add funds"}
+                {busy
+                  ? method === "online"
+                    ? "Opening checkout…"
+                    : "Submitting…"
+                  : method === "online"
+                    ? "Pay with Razorpay"
+                    : "Submit for approval"}
               </button>
             )}
           </div>
