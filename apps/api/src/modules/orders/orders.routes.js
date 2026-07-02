@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { resolveTenant, requireTenantContext } from '../../middleware/tenant.middleware.js';
-import { requireRole } from '../../middleware/rbac.middleware.js';
+import { tenantArea } from '../../middleware/tenantAccess.middleware.js';
 import { requireScope } from '../../middleware/abac.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { Order } from './order.model.js';
@@ -14,8 +14,8 @@ const router = Router();
 
 router.use(authenticate, resolveTenant, requireTenantContext);
 
-const canRead = requireRole('company_admin', 'entity_manager', 'platform_super_admin');
-const canUpdate = requireRole('company_admin', 'platform_super_admin');
+const canRead = tenantArea('orders', 'read');
+const canUpdate = tenantArea('orders', 'write');
 
 const entityScope = requireScope(async (req) => {
   const order = await Order.findOne({ _id: req.params.id, tenantId: req.tenantId }).select('campaignId');

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { useTenantAccess } from "@/hooks/useTenantAccess";
 
 import { KitsEmptyState } from "./KitsEmptyState";
 
@@ -26,7 +27,6 @@ import scaleYourGiftingImg from "../../../assets/scale_your_gifting.png";
 import wellnessKitImg from "../../../assets/wellness-kit.png";
 import workFromHomeKitImg from "../../../assets/work-from-home-kit.png";
 import kitPreviewImg from "../../../assets/kit-preview.png";
-import { KitDetailDialog } from "./KitDetailDialog";
 import "./kits-page.css";
 
 
@@ -157,6 +157,9 @@ function kitRowsFromWorkspace(kits: UiKit[]): KitRow[] {
 
 export function KitsPage() {
   const { data: workspace, isLoading, isError, error } = useWorkspace();
+  const { canWrite, canOperateCampaigns } = useTenantAccess();
+  const canCreateKits = canWrite("kits");
+  const canSendKits = canOperateCampaigns();
 
   if (isLoading && !workspace) {
     return <LoadingState message="Loading kits..." fullScreen={false} />;
@@ -184,10 +187,12 @@ export function KitsPage() {
               <h1>Kits &amp; Items</h1>
               <p>Create reusable gift kits with your products and send them at scale.</p>
             </div>
-            <Link to="/app/kits/new" className="kits-create-btn">
-              <Plus size={18} strokeWidth={2.4} />
-              Create a kit
-            </Link>
+            {canCreateKits ? (
+              <Link to="/app/kits/new" className="kits-create-btn">
+                <Plus size={18} strokeWidth={2.4} />
+                Create a kit
+              </Link>
+            ) : null}
           </div>
 
           <div className="kits-stats-grid">
@@ -287,19 +292,19 @@ export function KitsPage() {
 
                   <div className="kits-row-actions">
                     {row.kit ? (
-                      <button
-                        type="button"
+                      <Link
+                        to="/app/kits/$id"
+                        params={{ id: row.id }}
                         className="kits-row-btn"
-                        onClick={() => setDetail(row.kit ?? null)}
                       >
                         View
-                      </button>
+                      </Link>
                     ) : (
                       <button type="button" className="kits-row-btn">
                         View
                       </button>
                     )}
-                    {row.status === "live" && row.kit ? (
+                    {row.status === "live" && row.kit && canSendKits ? (
                       <Link
                         to="/app/kits/$id/send"
                         params={{ id: row.id }}
@@ -307,11 +312,11 @@ export function KitsPage() {
                       >
                         Send
                       </Link>
-                    ) : row.status === "live" ? (
+                    ) : row.status === "live" && canSendKits ? (
                       <Link to="/app/kits/new" className="kits-send-btn">
                         Send
                       </Link>
-                    ) : row.kit ? (
+                    ) : row.kit && canCreateKits ? (
                       <Link
                         to="/app/kits/$id/edit"
                         params={{ id: row.id }}
@@ -319,11 +324,11 @@ export function KitsPage() {
                       >
                         Edit
                       </Link>
-                    ) : (
+                    ) : canCreateKits ? (
                       <Link to="/app/kits/new" className="kits-row-btn">
                         Edit
                       </Link>
-                    )}
+                    ) : null}
                     <button
                       type="button"
                       className="kits-more-btn" 
@@ -365,43 +370,6 @@ export function KitsPage() {
                     <strong>{title}</strong>
                     <p>{meta}</p>
                   </div>
-
-                </td>
-                <td className="num">{kit.items}</td>
-                <td>
-                  {kit.status === "live" ? (
-                    <span className="tag tag-live">
-                      <span className="dot" />
-                      Live
-                    </span>
-                  ) : (
-                    <span className="tag tag-draft">Draft</span>
-                  )}
-                </td>
-                <td className="muted">{kit.sent ? "Recently" : "Not yet"}</td>
-                <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                  <Link
-                    to="/app/kits/$id"
-                    params={{ id: kit.id }}
-                    className="btn btn-ghost btn-sm"
-                  >
-                    Details
-                  </Link>{" "}
-                  <Link
-                    to="/app/kits/$id/send"
-                    params={{ id: kit.id }}
-                    className="btn btn-dark btn-sm"
-                  >
-                    Send
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-
                 </div>
               ))}
             </div>
@@ -452,12 +420,6 @@ export function KitsPage() {
         </aside>
       </div>
 
-      <KitDetailDialog
-        kit={detail}
-        catalog={workspace.catalogProducts}
-        onOpenChange={(open) => !open && setDetail(null)}
-      />
     </section>
-
   );
 }

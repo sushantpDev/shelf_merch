@@ -3,7 +3,7 @@ import multer from 'multer';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { resolveTenant, requireTenantContext, blockDuringImpersonation } from '../../middleware/tenant.middleware.js';
-import { requireRole } from '../../middleware/rbac.middleware.js';
+import { tenantArea } from '../../middleware/tenantAccess.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { idempotency } from '../../middleware/idempotency.middleware.js';
 import * as controller from './wallets.controller.js';
@@ -22,16 +22,16 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 
 
 router.use(authenticate, resolveTenant, requireTenantContext);
 
-const adminOnly = requireRole('company_admin', 'platform_super_admin');
-const canRead = requireRole('company_admin', 'entity_manager', 'platform_super_admin', 'platform_finance_admin');
+const canWrite = tenantArea('wallets', 'write');
+const canRead = tenantArea('wallets', 'read');
 
 router.get('/', canRead, asyncHandler(controller.list));
-router.post('/', adminOnly, validate({ body: createWalletSchema }), asyncHandler(controller.create));
+router.post('/', canWrite, validate({ body: createWalletSchema }), asyncHandler(controller.create));
 router.get('/:id', canRead, validate({ params: walletIdParams }), asyncHandler(controller.getOne));
-router.patch('/:id', adminOnly, validate({ params: walletIdParams, body: updateWalletSchema }), asyncHandler(controller.update));
+router.patch('/:id', canWrite, validate({ params: walletIdParams, body: updateWalletSchema }), asyncHandler(controller.update));
 router.post(
   '/:id/funding-document',
-  adminOnly,
+  canWrite,
   validate({ params: walletIdParams }),
   upload.single('document'),
   asyncHandler(controller.uploadFundingDocument),
@@ -40,7 +40,7 @@ router.post(
 // §6.4 — wallet adjustments are blocked during impersonation.
 router.post(
   '/:id/fund',
-  adminOnly,
+  canWrite,
   blockDuringImpersonation,
   idempotency(),
   validate({ params: walletIdParams, body: fundWalletSchema }),
@@ -48,7 +48,7 @@ router.post(
 );
 router.post(
   '/:id/allocate',
-  adminOnly,
+  canWrite,
   blockDuringImpersonation,
   idempotency(),
   validate({ params: walletIdParams, body: allocateSchema }),
@@ -56,7 +56,7 @@ router.post(
 );
 router.post(
   '/:id/transfer',
-  adminOnly,
+  canWrite,
   blockDuringImpersonation,
   idempotency(),
   validate({ params: walletIdParams, body: transferSchema }),
@@ -70,7 +70,7 @@ router.get(
 );
 router.post(
   '/:id/activate',
-  adminOnly,
+  canWrite,
   blockDuringImpersonation,
   validate({ params: walletIdParams }),
   asyncHandler(controller.activate),

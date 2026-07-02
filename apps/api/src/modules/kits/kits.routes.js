@@ -4,7 +4,7 @@ import multer from 'multer';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { resolveTenant, requireTenantContext } from '../../middleware/tenant.middleware.js';
-import { requireRole } from '../../middleware/rbac.middleware.js';
+import { tenantArea } from '../../middleware/tenantAccess.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { objectId } from '../users/users.validation.js';
 import { Kit } from './kit.model.js';
@@ -16,8 +16,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 
 const router = Router();
 
 router.use(authenticate, resolveTenant, requireTenantContext);
-const adminOnly = requireRole('company_admin', 'platform_super_admin');
-const canRead = requireRole('company_admin', 'entity_manager', 'platform_super_admin');
+const canWrite = tenantArea('kits', 'write');
+const canRead = tenantArea('kits', 'read');
 
 const productRef = z.object({
   catalogProductId: objectId,
@@ -47,7 +47,7 @@ router.get(
 
 router.post(
   '/',
-  adminOnly,
+  canWrite,
   validate({ body: createSchema }),
   asyncHandler(async (req, res) => {
     const kit = await Kit.create({ tenantId: req.tenantId, ...req.body });
@@ -58,7 +58,7 @@ router.post(
 
 router.patch(
   '/:id',
-  adminOnly,
+  canWrite,
   validate({ params: z.object({ id: objectId }), body: updateSchema }),
   asyncHandler(async (req, res) => {
     const kit = await Kit.findOne({ _id: req.params.id, tenantId: req.tenantId });
@@ -73,7 +73,7 @@ router.patch(
 
 router.post(
   '/:id/artwork',
-  adminOnly,
+  canWrite,
   validate({ params: z.object({ id: objectId }) }),
   upload.single('artwork'),
   asyncHandler(async (req, res) => {

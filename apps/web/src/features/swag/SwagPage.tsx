@@ -11,6 +11,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { useTenantAccess } from "@/hooks/useTenantAccess";
 import type { UiCollection, UiProduct } from "@/services/mappers";
 import { CollectionBlock } from "./CollectionBlock";
 import { DesignCard } from "./DesignCard";
@@ -24,6 +25,8 @@ type View = "product" | "collection";
 
 export function SwagPage() {
   const { data: workspace, isLoading, isError, error } = useWorkspace();
+  const { canWrite } = useTenantAccess();
+  const canDesignSwag = canWrite("swag");
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("All Products");
   const [view, setView] = useState<View>("product");
@@ -83,9 +86,11 @@ export function SwagPage() {
         subtitle="Your designed collections and the full catalog you can build from."
         actions={
           <>
-            <Link to="/app/swag/new" className="btn btn-ghost">
-              <Plus size={16} /> Start designing
-            </Link>
+            {canDesignSwag ? (
+              <Link to="/app/swag/new" className="btn btn-ghost">
+                <Plus size={16} /> Start designing
+              </Link>
+            ) : null}
             <Link to="/app/catalog" className="btn btn-dark">
               Purchase swag
             </Link>
@@ -189,14 +194,16 @@ export function SwagPage() {
               className="start-designing-img"
               style={{ width: "100%", height: "auto", display: "block" }}
             />
-            <button
-              type="button"
-              className="btn btn-dark btn-lg"
-              style={{ padding: "0 20px", position: "absolute", bottom: 24, left: 80, zIndex: 10 }}
-              onClick={() => navigate({ to: "/app/swag/new" })}
-            >
-              <Plus size={16} /> Start designing
-            </button>
+            {canDesignSwag ? (
+              <button
+                type="button"
+                className="btn btn-dark btn-lg"
+                style={{ padding: "0 20px", position: "absolute", bottom: 24, left: 80, zIndex: 10 }}
+                onClick={() => navigate({ to: "/app/swag/new" })}
+              >
+                <Plus size={16} /> Start designing
+              </button>
+            ) : null}
           </div>
         )
       ) : view === "product" ? (

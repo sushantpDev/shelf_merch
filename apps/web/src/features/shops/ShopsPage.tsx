@@ -3,10 +3,13 @@ import { Plus, Store } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { PageHeader } from "@/components/tenant/PageHeader";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { ShopCard } from "./ShopCard";
 
 export function ShopsPage() {
   const { data: workspace, isLoading, isError, error } = useWorkspace();
+  const { canWrite } = useTenantAccess();
+  const canCreateShop = canWrite("shops");
   const navigate = useNavigate();
 
   if (isLoading && !workspace) {
@@ -30,9 +33,11 @@ export function ShopsPage() {
           title="Shops"
           subtitle="Branded storefronts your recipients shop from."
           actions={
-            <Link to="/app/shops/new" className="btn btn-brand">
-              <Plus size={16} /> Create shop
-            </Link>
+            canCreateShop ? (
+              <Link to="/app/shops/new" className="btn btn-brand">
+                <Plus size={16} /> Create shop
+              </Link>
+            ) : undefined
           }
         />
         <div className="card empty">
@@ -41,14 +46,16 @@ export function ShopsPage() {
           </div>
           <h3>No shops yet</h3>
           <p>Create one to celebrate a moment.</p>
-          <button
-            type="button"
-            className="btn btn-brand"
-            style={{ marginTop: 14 }}
-            onClick={() => navigate({ to: "/app/shops/new" })}
-          >
-            Create your first shop
-          </button>
+          {canCreateShop ? (
+            <button
+              type="button"
+              className="btn btn-brand"
+              style={{ marginTop: 14 }}
+              onClick={() => navigate({ to: "/app/shops/new" })}
+            >
+              Create your first shop
+            </button>
+          ) : null}
         </div>
       </>
     );
@@ -60,9 +67,11 @@ export function ShopsPage() {
         title="Shops"
         subtitle="Branded storefronts your recipients redeem points in."
         actions={
-          <Link to="/app/shops/new" className="btn btn-brand">
-            <Plus size={16} /> Create shop
-          </Link>
+          canCreateShop ? (
+            <Link to="/app/shops/new" className="btn btn-brand">
+              <Plus size={16} /> Create shop
+            </Link>
+          ) : undefined
         }
       />
       <div className="shops-grid stagger">

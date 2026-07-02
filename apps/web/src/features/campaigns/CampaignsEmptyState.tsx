@@ -1,8 +1,12 @@
 import { BarChart3, Box, LayoutGrid, ShieldCheck, Star, Users } from "lucide-react";
+import { useTenantAccess } from "@/hooks/useTenantAccess";
 import megaphoneBox from "../../../assets/megaphone_box.png";
 
 /** Campaigns page with no campaigns yet: hero + "ways to get started" + "why". */
 export function CampaignsEmptyState({ onSendGift }: { onSendGift: () => void }) {
+  const { canOperateCampaigns } = useTenantAccess();
+  const canSend = canOperateCampaigns();
+
   return (
     <>
       <div className="page-h">
@@ -10,9 +14,11 @@ export function CampaignsEmptyState({ onSendGift }: { onSendGift: () => void }) 
           <h1>Campaigns</h1>
           <div className="sub">Launch points campaigns and track redemptions.</div>
         </div>
-        <button type="button" className="btn btn-dark" onClick={onSendGift}>
-          Send Gift
-        </button>
+        {canSend ? (
+          <button type="button" className="btn btn-dark" onClick={onSendGift}>
+            Send Gift
+          </button>
+        ) : null}
       </div>
 
       <div className="card camp-empty-card">
@@ -26,16 +32,24 @@ export function CampaignsEmptyState({ onSendGift }: { onSendGift: () => void }) 
         <p className="camp-empty-desc">
           Create a campaign from a shop or set a budget to send redemption invites.
         </p>
-        <button
-          type="button"
-          className="btn btn-brand"
-          style={{ marginTop: 14 }}
-          onClick={onSendGift}
-        >
-          Create your first campaign
-        </button>
+        {canSend ? (
+          <button
+            type="button"
+            className="btn btn-brand"
+            style={{ marginTop: 14 }}
+            onClick={onSendGift}
+          >
+            Create your first campaign
+          </button>
+        ) : (
+          <p className="muted" style={{ marginTop: 14 }}>
+            Your company admin sets up shops and kits; you can launch campaigns from here once
+            assigned as a department manager.
+          </p>
+        )}
       </div>
 
+      {canSend ? (
       <div className="camp-ways">
         <h2 className="camp-section-title">Ways to get started</h2>
         <div className="camp-ways-grid">
@@ -83,6 +97,7 @@ export function CampaignsEmptyState({ onSendGift }: { onSendGift: () => void }) 
           </div>
         </div>
       </div>
+      ) : null}
 
       <div className="camp-why">
         <h2 className="camp-section-title">Why use campaigns?</h2>

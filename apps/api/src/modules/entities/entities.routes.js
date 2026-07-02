@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { resolveTenant, requireTenantContext } from '../../middleware/tenant.middleware.js';
-import { requireRole } from '../../middleware/rbac.middleware.js';
+import { tenantArea } from '../../middleware/tenantAccess.middleware.js';
 import { requireScope } from '../../middleware/abac.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import * as controller from './entities.controller.js';
@@ -18,23 +18,23 @@ const router = Router();
 
 router.use(authenticate, resolveTenant, requireTenantContext);
 
-const adminOnly = requireRole('company_admin', 'platform_super_admin');
-const canRead = requireRole('company_admin', 'entity_manager', 'platform_super_admin');
+const canWrite = tenantArea('wallets', 'write');
+const canRead = tenantArea('wallets', 'read');
 const entityScope = requireScope((req) => req.params.id); // ABAC on /:id routes
 
 router.get('/', canRead, validate({ query: listEntitiesQuery }), asyncHandler(controller.list));
-router.post('/', adminOnly, validate({ body: createEntitySchema }), asyncHandler(controller.create));
+router.post('/', canWrite, validate({ body: createEntitySchema }), asyncHandler(controller.create));
 router.get('/:id', canRead, entityScope, validate({ params: entityIdParams }), asyncHandler(controller.getOne));
 router.patch(
   '/:id',
-  adminOnly,
+  canWrite,
   validate({ params: entityIdParams, body: updateEntitySchema }),
   asyncHandler(controller.update),
 );
-router.delete('/:id', adminOnly, validate({ params: entityIdParams }), asyncHandler(controller.remove));
+router.delete('/:id', canWrite, validate({ params: entityIdParams }), asyncHandler(controller.remove));
 router.post(
   '/:id/assign-manager',
-  adminOnly,
+  canWrite,
   validate({ params: entityIdParams, body: assignManagerSchema }),
   asyncHandler(controller.assignManager),
 );

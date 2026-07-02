@@ -3,6 +3,7 @@ import { LogOut, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/tenant/PageHeader";
 import { useInvalidateWorkspace, useWorkspace } from "@/hooks/useWorkspace";
+import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { logout } from "@/services/api-bridge";
 import { getStoredUser } from "@/services/auth-store";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
@@ -90,6 +91,8 @@ function WorkspaceSettings({
   userPatch?: { name: string; email: string };
 }) {
   const invalidateWorkspace = useInvalidateWorkspace();
+  const { canWrite } = useTenantAccess();
+  const canEditWorkspace = canWrite("settings");
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(account);
   const [logoUrl, setLogoUrl] = useState(savedLogoUrl);
@@ -171,6 +174,7 @@ function WorkspaceSettings({
           className="inp"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          readOnly={!canEditWorkspace}
         />
       </div>
 
@@ -210,14 +214,16 @@ function WorkspaceSettings({
             </svg>
           )}
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          disabled={isUploading}
-          onClick={() => fileRef.current?.click()}
-        >
-          <Upload size={15} /> {isUploading ? "Uploading..." : "Upload"}
-        </button>
+        {canEditWorkspace ? (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={isUploading}
+            onClick={() => fileRef.current?.click()}
+          >
+            <Upload size={15} /> {isUploading ? "Uploading..." : "Upload"}
+          </button>
+        ) : null}
         <input
           ref={fileRef}
           type="file"
@@ -253,7 +259,7 @@ function WorkspaceSettings({
             No owner assigned
           </span>
         )}
-        {isCurrentOwner && displayOwner ? (
+        {isCurrentOwner && displayOwner && canEditWorkspace ? (
           <button type="button" className="lnk" onClick={() => setTransferOpen(true)}>
             Transfer ownership ↗
           </button>
@@ -293,20 +299,23 @@ function WorkspaceSettings({
           className="inp"
           value={slug}
           onChange={(e) => setSlug(e.target.value)}
+          readOnly={!canEditWorkspace}
           style={{ maxWidth: 320 }}
         />
       </div>
 
-      <div style={{ marginTop: 24 }}>
-        <button
-          type="button"
-          className="btn btn-brand"
-          disabled={isSaving || isUploading}
-          onClick={onSave}
-        >
-          {isSaving ? "Saving..." : "Save changes"}
-        </button>
-      </div>
+      {canEditWorkspace ? (
+        <div style={{ marginTop: 24 }}>
+          <button
+            type="button"
+            className="btn btn-brand"
+            disabled={isSaving || isUploading}
+            onClick={onSave}
+          >
+            {isSaving ? "Saving..." : "Save changes"}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
