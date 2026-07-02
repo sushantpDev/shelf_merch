@@ -7,9 +7,10 @@ import { Campaign } from '../campaigns/campaign.model.js';
 import { Order } from '../orders/order.model.js';
 import { Invoice } from '../invoices/invoice.model.js';
 import { SupportTicket } from '../support/supportTicket.model.js';
+import { Contact } from '../contacts/contact.model.js';
 import { inviteUser } from '../users/users.service.js';
 import { signImpersonationAccessToken } from '../auth/auth.service.js';
-import { ConflictError, NotFoundError } from '../../utils/errors.js';
+import { ApiError, ConflictError, ForbiddenError, NotFoundError } from '../../utils/errors.js';
 
 const OPEN_ORDER_STATUSES = [
   'created',
@@ -54,6 +55,95 @@ export async function getTenant(tenantId) {
   const tenant = await Tenant.findOne({ _id: tenantId });
   if (!tenant) throw new NotFoundError('Tenant not found');
   return tenant;
+}
+
+/** Resolve workspace owner from wallet ownerUserId, else earliest company_admin. */
+export async function resolveWorkspaceOwner(tenantId) {
+  const wallets = await Wallet.find({ tenantId }).sort({ createdAt: 1 }).select('ownerUserId').lean();
+  let ownerUserId = wallets.find((w) => w.ownerUserId)?.ownerUserId ?? null;
+
+  if (!ownerUserId) {
+    const assignment = await RoleAssignment.findOne({ tenantId, role: 'company_admin' })
+      .sort({ createdAt: 1 })
+      .lean();
+    ownerUserId = assignment?.userId ?? null;
+  }
+
+  if (!ownerUserId) return null;
+
+  const user = await User.findOne({ _id: ownerUserId, tenantId }).lean();
+  if (!user) return null;
+
+  return { id: String(user._id), name: user.name, email: user.email };
+}
+
+export async function getTenantWithOwner(tenantId) {
+  const tenant = await getTenant(tenantId);
+  const owner = await resolveWorkspaceOwner(tenantId);
+  const obj = tenant.toObject ? tenant.toObject() : tenant;
+  return { ...obj, owner };
+}
+
+/** Transfer workspace ownership to another active company_admin. */
+export async function transferOwnership({ tenantId, actorUserId, newOwnerUserId }) {
+  const currentOwner = await resolveWorkspaceOwner(tenantId);
+  if (!currentOwner) {
+    throw new ApiError(422, 'Workspace has no owner to transfer from', 'NO_OWNER');
+  }
+  if (String(actorUserId) !== currentOwner.id) {
+    throw new ForbiddenError('Only the workspace owner can transfer ownership');
+  }
+  if (String(newOwnerUserId) === currentOwner.id) {
+    throw new ApiError(422, 'Cannot transfer ownership to yourself', 'INVALID_RECIPIENT');
+  }
+
+  const newOwner = await User.findOne({ _id: newOwnerUserId, tenantId, status: 'active' });
+  if (!newOwner) {
+    throw new ApiError(422, 'Recipient must be an active user in this workspace', 'INVALID_RECIPIENT');
+  }
+
+  const assignment = await RoleAssignment.findOne({
+    tenantId,
+    userId: newOwnerUserId,
+    role: 'company_admin',
+  });
+  if (!assignment) {
+    throw new ApiError(
+      422,
+      'Recipient must be an active company admin in this workspace',
+      'INVALID_RECIPIENT',
+    );
+  }
+
+  const oldOwner = await User.findOne({ _id: currentOwner.id, tenantId });
+  if (!oldOwner) throw new NotFoundError('Current owner not found');
+
+  const session = await mongoose.startSession();
+  try {
+    let result;
+    await session.withTransaction(async () => {
+      await Wallet.updateMany({ tenantId }, { ownerUserId: newOwnerUserId }).session(session);
+
+      await Contact.updateMany(
+        { tenantId, email: oldOwner.email.toLowerCase(), role: 'Owner' },
+        { role: 'Admin' },
+      ).session(session);
+
+      await Contact.updateOne(
+        { tenantId, email: newOwner.email.toLowerCase() },
+        { role: 'Owner' },
+      ).session(session);
+
+      result = {
+        id: String(newOwner._id),
+        name: newOwner.name,
+        email: newOwner.email,
+      };
+    });
+    return result;
+  } finally {
+    await session.endSession();
+  }
 }
 
 export async function updateTenant(tenantId, patch) {

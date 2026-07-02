@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Check, Globe, HelpCircle, Plus, User } from "lucide-react";
+import { Check, Globe, HelpCircle, User } from "lucide-react";
 import { toast } from "sonner";
 import { logout } from "@/services/api-bridge";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 function TopbarChevron({ open }: { open: boolean }) {
   return (
@@ -26,6 +27,7 @@ type UserMenuProps = {
   userName: string;
   userEmail: string;
   workspaceName: string;
+  workspaceLogoUrl: string;
   initials: string;
   truncName: string;
 };
@@ -34,6 +36,7 @@ export function UserMenu({
   userName,
   userEmail,
   workspaceName,
+  workspaceLogoUrl,
   initials,
   truncName,
 }: UserMenuProps) {
@@ -107,7 +110,15 @@ export function UserMenu({
 
               <button type="button" className="user-menu-ws on" role="menuitem">
                 <span className="user-menu-ws-icon">
-                  <Globe size={16} strokeWidth={2} />
+                  {workspaceLogoUrl ? (
+                    <img
+                      src={resolveMediaUrl(workspaceLogoUrl)}
+                      alt=""
+                      style={{ width: 18, height: 18, objectFit: "contain" }}
+                    />
+                  ) : (
+                    <Globe size={16} strokeWidth={2} />
+                  )}
                 </span>
                 <span className="user-menu-ws-label">{workspaceLabel}</span>
                 <span className="user-menu-ws-meta">

@@ -1,11 +1,22 @@
-import { useEffect, useState } from "react";
-import { LogOut } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { LogOut, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/tenant/PageHeader";
-import { useWorkspace } from "@/hooks/useWorkspace";
+import { useInvalidateWorkspace, useWorkspace } from "@/hooks/useWorkspace";
 import { logout } from "@/services/api-bridge";
+import { getStoredUser } from "@/services/auth-store";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
+import {
+  updateWorkspaceSettingsApi,
+  uploadWorkspaceLogoApi,
+  type WorkspaceOwner,
+} from "@/services/workspace-api";
+import { TransferOwnershipDialog } from "./TransferOwnershipDialog";
 
 type Tab = "workspace" | "sso";
+
+const LOGO_ACCEPT = /\.(svg|png|webp|jpe?g)$/i;
+const LOGO_MAX = 5 * 1024 * 1024;
 
 export function SettingsPage() {
   const { data: workspace } = useWorkspace();
@@ -49,7 +60,13 @@ export function SettingsPage() {
         </div>
         <div style={{ flex: 1, maxWidth: 780 }}>
           {tab === "workspace" ? (
-            <WorkspaceSettings account={workspace?.account ?? ""} />
+            <WorkspaceSettings
+              account={workspace?.account ?? ""}
+              logoUrl={workspace?.logoUrl ?? ""}
+              owner={workspace?.owner}
+              userId={getStoredUser()?.id}
+              userPatch={workspace?.userPatch}
+            />
           ) : (
             <SsoSettings />
           )}
@@ -59,15 +76,85 @@ export function SettingsPage() {
   );
 }
 
-function WorkspaceSettings({ account }: { account: string }) {
+function WorkspaceSettings({
+  account,
+  logoUrl: savedLogoUrl,
+  owner,
+  userId,
+  userPatch,
+}: {
+  account: string;
+  logoUrl: string;
+  owner?: WorkspaceOwner;
+  userId?: string;
+  userPatch?: { name: string; email: string };
+}) {
+  const invalidateWorkspace = useInvalidateWorkspace();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(account);
+  const [logoUrl, setLogoUrl] = useState(savedLogoUrl);
   const [slug, setSlug] = useState(account.toLowerCase());
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+
+  const displayOwner: WorkspaceOwner | undefined =
+    owner ??
+    (userId && userPatch
+      ? { id: userId, name: userPatch.name, email: userPatch.email }
+      : undefined);
+  const isCurrentOwner = Boolean(displayOwner && userId && displayOwner.id === userId);
 
   // Keep local fields in sync once the workspace snapshot resolves.
   useEffect(() => {
     setName(account);
     setSlug(account.toLowerCase());
-  }, [account]);
+    setLogoUrl(savedLogoUrl);
+  }, [account, savedLogoUrl]);
+
+  async function onPickLogo(file: File) {
+    if (!LOGO_ACCEPT.test(file.name)) {
+      toast.error("Accepted formats: SVG, PNG, WEBP, JPEG, JPG");
+      return;
+    }
+    if (file.size > LOGO_MAX) {
+      toast.error("File must be 5 MB or smaller");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const uploadedLogoUrl = await uploadWorkspaceLogoApi(file);
+      await updateWorkspaceSettingsApi({ logoUrl: uploadedLogoUrl });
+      setLogoUrl(uploadedLogoUrl);
+      await invalidateWorkspace();
+      toast.success("Workspace icon updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not update workspace icon");
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  async function onSave() {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      toast.error("Enter a workspace name");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await updateWorkspaceSettingsApi({ name: trimmedName, logoUrl });
+      setName(trimmedName);
+      await invalidateWorkspace();
+      toast.success("Workspace settings saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save workspace settings");
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   return (
     <div className="card" style={{ padding: 30 }}>
@@ -96,20 +183,52 @@ function WorkspaceSettings({ account }: { account: string }) {
       <div className="row" style={{ gap: 14, alignItems: "center" }}>
         <div
           className="logo-chip"
-          style={{ width: 50, height: 50, display: "grid", placeItems: "center" }}
+          style={{
+            width: 50,
+            height: 50,
+            display: "grid",
+            placeItems: "center",
+            overflow: "hidden",
+            padding: logoUrl ? 5 : 0,
+          }}
         >
-          <svg viewBox="0 0 32 32" fill="none" width={26} height={26} aria-hidden="true">
-            <path d="M16 3 4 9l12 6 12-6-12-6Z" fill="#15784C" />
-            <path d="M4 15l12 6 12-6" stroke="#0E5536" strokeWidth="2.4" strokeLinejoin="round" />
-          </svg>
+          {logoUrl ? (
+            <img
+              src={resolveMediaUrl(logoUrl)}
+              alt="Workspace icon"
+              style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+            />
+          ) : (
+            <svg viewBox="0 0 32 32" fill="none" width={26} height={26} aria-hidden="true">
+              <path d="M16 3 4 9l12 6 12-6-12-6Z" fill="#15784C" />
+              <path
+                d="M4 15l12 6 12-6"
+                stroke="#0E5536"
+                strokeWidth="2.4"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
         </div>
         <button
           type="button"
           className="btn btn-ghost btn-sm"
-          onClick={() => toast.success("Icon uploaded")}
+          disabled={isUploading}
+          onClick={() => fileRef.current?.click()}
         >
-          Upload
+          <Upload size={15} /> {isUploading ? "Uploading..." : "Upload"}
         </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".svg,.png,.webp,.jpeg,.jpg,image/svg+xml,image/png,image/webp,image/jpeg"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void onPickLogo(file);
+            e.target.value = "";
+          }}
+        />
       </div>
 
       <div className="divider" />
@@ -119,13 +238,35 @@ function WorkspaceSettings({ account }: { account: string }) {
         className="row"
         style={{ gap: 18, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}
       >
-        <div style={{ fontSize: 14 }}>
-          <b>Jonna Madhavi</b> &nbsp;<span className="muted">jonnaml2015@gmail.com</span>
-        </div>
-        <button type="button" className="lnk" onClick={() => toast("Transfer ownership flow")}>
-          Transfer ownership ↗
-        </button>
+        {displayOwner ? (
+          <div style={{ fontSize: 14 }}>
+            <b>{displayOwner.name}</b>
+            {displayOwner.email ? (
+              <>
+                {" "}
+                &nbsp;<span className="muted">{displayOwner.email}</span>
+              </>
+            ) : null}
+          </div>
+        ) : (
+          <span className="muted" style={{ fontSize: 14 }}>
+            No owner assigned
+          </span>
+        )}
+        {isCurrentOwner && displayOwner ? (
+          <button type="button" className="lnk" onClick={() => setTransferOpen(true)}>
+            Transfer ownership ↗
+          </button>
+        ) : null}
       </div>
+
+      {displayOwner && isCurrentOwner ? (
+        <TransferOwnershipDialog
+          open={transferOpen}
+          onOpenChange={setTransferOpen}
+          currentOwner={displayOwner}
+        />
+      ) : null}
 
       <div className="divider" />
 
@@ -160,9 +301,10 @@ function WorkspaceSettings({ account }: { account: string }) {
         <button
           type="button"
           className="btn btn-brand"
-          onClick={() => toast.success("Workspace settings saved")}
+          disabled={isSaving || isUploading}
+          onClick={onSave}
         >
-          Save changes
+          {isSaving ? "Saving..." : "Save changes"}
         </button>
       </div>
     </div>

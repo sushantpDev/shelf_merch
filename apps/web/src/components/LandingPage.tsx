@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import "./landing-page.css";
 import { Link } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
+import arrowAsset from "../../assets/arrow.avif";
 import bottleAsset from "../../assets/bottle.png";
 import capAsset from "../../assets/cap.png";
 import diaryAsset from "../../assets/diary.png";
@@ -9,6 +10,7 @@ import hoodieAsset from "../../assets/hoodie.png";
 import mugAsset from "../../assets/mug.png";
 import templateAsset from "../../assets/template.png";
 import toteAsset from "../../assets/tote.png";
+import zigAsset from "../../assets/zig.avif";
 import {
   Award,
   Backpack,
@@ -138,6 +140,13 @@ const HERO_FLOATS = [
   { src: bottleAsset, alt: "Water bottle mockup", className: "lp-hero__float--bottle" },
   { src: diaryAsset, alt: "Notebook mockup", className: "lp-hero__float--diary" },
   { src: capAsset, alt: "Cap mockup", className: "lp-hero__float--cap" },
+] as const;
+
+const HERO_ACCENTS = [
+  { src: zigAsset, className: "lp-hero__accent--zig-left" },
+  // { src: zigAsset, className: "lp-hero__accent--zig-right" },
+  // { src: arrowAsset, className: "lp-hero__accent--arrow-left" },
+  { src: arrowAsset, className: "lp-hero__accent--arrow-right" },
 ] as const;
 
 const INTRO_FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
@@ -497,6 +506,15 @@ export default function LandingPage() {
       {/* ── HERO ── */}
       <div className="lp-hero-zone lp-hero-zone--merch">
         <div className="lp-hero__floats" aria-hidden="true">
+          {HERO_ACCENTS.map((accent) => (
+            <img
+              key={accent.className}
+              src={accent.src}
+              alt=""
+              className={`lp-hero__accent ${accent.className}`}
+              loading="eager"
+            />
+          ))}
           {HERO_FLOATS.map((product) => (
             <img
               key={product.alt}
@@ -578,6 +596,14 @@ export default function LandingPage() {
                 }
               }}
             >
+              
+              <img
+                src={arrowAsset}
+                alt=""
+                className="lp-hero__mockup-accent lp-hero__mockup-accent--arrow"
+                aria-hidden="true"
+                loading="eager"
+              />
               <div className="lp-hero__mockup-frame">
                 <img
                   src={templateAsset}

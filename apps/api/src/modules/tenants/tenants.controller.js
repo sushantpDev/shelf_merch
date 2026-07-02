@@ -1,6 +1,7 @@
 import * as tenantsService from './tenants.service.js';
 import { signAccessToken } from '../auth/auth.service.js';
 import { writeAudit } from '../../services/audit.service.js';
+import { uploadFile } from '../../services/storage.service.js';
 import { ForbiddenError } from '../../utils/errors.js';
 import { env } from '../../config/env.js';
 
@@ -17,13 +18,34 @@ export async function create(req, res) {
 }
 
 export async function me(req, res) {
-  res.json(await tenantsService.getTenant(req.tenantId));
+  res.json(await tenantsService.getTenantWithOwner(req.tenantId));
+}
+
+export async function transferOwnership(req, res) {
+  const owner = await tenantsService.transferOwnership({
+    tenantId: req.tenantId,
+    actorUserId: req.user.userId,
+    newOwnerUserId: req.body.newOwnerUserId,
+  });
+  writeAudit({
+    req,
+    action: 'tenant.transfer_ownership',
+    entityType: 'Tenant',
+    entityId: req.tenantId,
+    after: { owner },
+  });
+  res.json({ owner });
 }
 
 export async function updateMe(req, res) {
   const { before, after } = await tenantsService.updateTenant(req.tenantId, req.body);
   writeAudit({ req, action: 'tenant.update', entityType: 'Tenant', entityId: req.tenantId, before, after: after.toObject() });
   res.json(after);
+}
+
+export async function uploadLogo(req, res) {
+  const { url } = await uploadFile({ tenantId: req.tenantId, kind: 'logo', file: req.file });
+  res.status(201).json({ logoUrl: url });
 }
 
 export async function list(req, res) {

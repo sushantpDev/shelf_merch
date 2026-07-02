@@ -412,4 +412,120 @@ describe('impersonation guard (must-have §11.1)', () => {
       .send({ reason: 'x', reasonCategory: 'support' });
     expect(res.status).toBe(403);
   });
+
+  it('blocks ownership transfer during impersonation', async () => {
+    const superAdmin = await makeUser(null, 'platform_super_admin', 'platform');
+    const { user: otherAdmin } = await makeUser(tenantA, 'company_admin', 'tenant');
+    walletA.ownerUserId = adminA._id;
+    await walletA.save();
+
+    const start = await request(app)
+      .post(`/api/v1/platform/tenants/${tenantA._id}/impersonate`)
+      .set('Authorization', `Bearer ${superAdmin.token}`)
+      .send({ reason: 'support ticket', reasonCategory: 'support' });
+    expect(start.status).toBe(200);
+
+    const res = await request(app)
+      .post('/api/v1/tenants/me/transfer-ownership')
+      .set('Authorization', `Bearer ${start.body.accessToken}`)
+      .send({ newOwnerUserId: String(otherAdmin._id) });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('workspace ownership transfer', () => {
+  it('GET /tenants/me includes resolved owner', async () => {
+    walletA.ownerUserId = adminA._id;
+    await walletA.save();
+
+    const res = await request(app)
+      .get('/api/v1/tenants/me')
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(res.status).toBe(200);
+    expect(res.body.owner).toEqual({
+      id: String(adminA._id),
+      name: adminA.name,
+      email: adminA.email,
+    });
+  });
+
+  it('company admin can update workspace name and logo URL', async () => {
+    const res = await request(app)
+      .patch('/api/v1/tenants/me')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ name: 'Rubix Labs', logoUrl: '/uploads/rubix-logo.png' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('Rubix Labs');
+    expect(res.body.logoUrl).toBe('/uploads/rubix-logo.png');
+
+    const tenant = await Tenant.findOne({ _id: tenantA._id });
+    expect(tenant.name).toBe('Rubix Labs');
+    expect(tenant.logoUrl).toBe('/uploads/rubix-logo.png');
+  });
+
+  it('company admin can upload a workspace logo', async () => {
+    const res = await request(app)
+      .post('/api/v1/tenants/me/logo')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .attach('logo', Buffer.from('fake image'), {
+        filename: 'logo.png',
+        contentType: 'image/png',
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.logoUrl).toContain(`/${tenantA._id}/logo/`);
+    expect(res.body.logoUrl).toMatch(/\.png$/);
+  });
+
+  it('owner can transfer to another active company_admin', async () => {
+    walletA.ownerUserId = adminA._id;
+    await walletA.save();
+    const { user: adminA2, token: tokenA2 } = await makeUser(tenantA, 'company_admin', 'tenant');
+
+    const transfer = await request(app)
+      .post('/api/v1/tenants/me/transfer-ownership')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ newOwnerUserId: String(adminA2._id) });
+    expect(transfer.status).toBe(200);
+    expect(transfer.body.owner.id).toBe(String(adminA2._id));
+
+    const refreshed = await Wallet.findOne({ _id: walletA._id, tenantId: tenantA._id });
+    expect(String(refreshed.ownerUserId)).toBe(String(adminA2._id));
+
+    const me = await request(app)
+      .get('/api/v1/tenants/me')
+      .set('Authorization', `Bearer ${tokenA2}`);
+    expect(me.body.owner.id).toBe(String(adminA2._id));
+  });
+
+  it('non-owner company_admin cannot transfer ownership', async () => {
+    walletA.ownerUserId = adminA._id;
+    await walletA.save();
+    const { user: adminA2, token: tokenA2 } = await makeUser(tenantA, 'company_admin', 'tenant');
+
+    const res = await request(app)
+      .post('/api/v1/tenants/me/transfer-ownership')
+      .set('Authorization', `Bearer ${tokenA2}`)
+      .send({ newOwnerUserId: String(adminA._id) });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects transfer to entity_manager or self', async () => {
+    walletA.ownerUserId = adminA._id;
+    await walletA.save();
+    const { user: manager } = await makeUser(tenantA, 'entity_manager', 'entity');
+
+    const toManager = await request(app)
+      .post('/api/v1/tenants/me/transfer-ownership')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ newOwnerUserId: String(manager._id) });
+    expect(toManager.status).toBe(422);
+
+    const toSelf = await request(app)
+      .post('/api/v1/tenants/me/transfer-ownership')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ newOwnerUserId: String(adminA._id) });
+    expect(toSelf.status).toBe(422);
+  });
 });

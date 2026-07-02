@@ -28,9 +28,13 @@ export type WalletOrgView = {
   departments: WorkspaceSnapshot["org"]["departments"];
 };
 
+export type WorkspaceOwner = { id: string; name: string; email: string };
+
 export type WorkspaceSnapshot = {
   account: string;
+  logoUrl: string;
   userPatch: { name: string; initials: string; email: string; role: string };
+  owner?: WorkspaceOwner;
   shops: UiShop[];
   contacts: UiContact[];
   kits: UiKit[];
@@ -171,7 +175,7 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
     entities,
     users,
   ] = await Promise.all([
-    apiFetch<{ name: string }>("/tenants/me"),
+    apiFetch<{ name: string; logoUrl?: string; owner?: WorkspaceOwner }>("/tenants/me"),
     apiFetch<unknown[]>("/shops"),
     apiFetch<unknown[]>("/contacts"),
     apiFetch<unknown[]>("/kits"),
@@ -185,7 +189,10 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
   ]);
 
   const userById = usersMap(users);
-  const owner = me ? { name: me.name, email: me.email } : undefined;
+  const workspaceOwner = tenant.owner;
+  const walletOwner = workspaceOwner
+    ? { name: workspaceOwner.name, email: workspaceOwner.email }
+    : undefined;
   const catalogProducts = (catalog.items || []).map(mapCatalogProduct);
   const catalogTotal = catalog.pagination?.total ?? catalogProducts.length;
   const catalogById = new Map(
@@ -301,7 +308,9 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
   const auth = applyAuthUser(me, tenant.name);
   return {
     account: auth.account,
+    logoUrl: tenant.logoUrl || "",
     userPatch: { ...auth.user, role: me.role },
+    owner: workspaceOwner,
     shops: mappedShops,
     contacts: (contacts as never[]).map(mapContact),
     kits: (kits as never[]).map(mapKit),
@@ -312,7 +321,7 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
     orders: (ordersPage.items || []).map((o) =>
       mapOrder(o, (o as { campaignName?: string }).campaignName || ""),
     ),
-    wallets: (wallets as never[]).map((w) => mapWallet(w, owner)),
+    wallets: (wallets as never[]).map((w) => mapWallet(w, walletOwner)),
     primaryWalletId: primaryWalletId || undefined,
     walletViews,
     primaryEntityId: isEntityManager
@@ -483,4 +492,41 @@ export async function fetchContactsImportStatusApi(jobId: string) {
 export async function listContactsApi() {
   const contacts = await apiFetch<unknown[]>("/contacts");
   return contacts.map(mapContact);
+}
+
+export type TenantUser = {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  role: string | null;
+};
+
+export async function listTenantUsersApi(): Promise<TenantUser[]> {
+  return apiFetch<TenantUser[]>("/users");
+}
+
+export async function transferOwnershipApi(newOwnerUserId: string): Promise<WorkspaceOwner> {
+  const res = await apiFetch<{ owner: WorkspaceOwner }>("/tenants/me/transfer-ownership", {
+    method: "POST",
+    body: JSON.stringify({ newOwnerUserId }),
+  });
+  return res.owner;
+}
+
+export async function uploadWorkspaceLogoApi(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("logo", file);
+  const res = await apiFetch<{ logoUrl: string }>("/tenants/me/logo", {
+    method: "POST",
+    body: form,
+  });
+  return res.logoUrl;
+}
+
+export async function updateWorkspaceSettingsApi(payload: { name?: string; logoUrl?: string }) {
+  return apiFetch<{ name: string; logoUrl?: string }>("/tenants/me", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }

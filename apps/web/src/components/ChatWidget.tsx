@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { useLocation, useNavigate } from "@tanstack/react-router";
+import { useLocation } from "@tanstack/react-router";
 import { isAuthenticated, getStoredUser } from "@/services/auth-store";
+// import { runChatAction } from "@/services/api-bridge";
 import {
   advanceChatSession,
   fetchChatNode,
@@ -31,7 +32,7 @@ const ICON_MUTED = "#8A8A86";
 
 const BOT_BUBBLE_STYLE: CSSProperties = {
   backgroundColor: SURFACE,
-  border: "0.5px solid rgba(67, 27, 66, 0.12)",
+  border: "0.5px solid rgba(27,67,50,0.12)",
   borderRadius: "14px",
   borderTopLeftRadius: "4px",
   padding: "10px 14px",
@@ -467,28 +468,8 @@ function CarouselCards({
   );
 }
 
-function isFullscreenFlowPath(pathname: string): boolean {
-  return (
-    pathname === "/app/shops/new" ||
-    pathname === "/app/swag/new" ||
-    pathname === "/app/campaigns/send-points" ||
-    pathname === "/app/kits/new" ||
-    /^\/app\/kits\/[^/]+\/(edit|send)$/.test(pathname)
-  );
-}
-
-type NavigateFn = ReturnType<typeof useNavigate>;
-
-function runChatAction(action: string, navigate: NavigateFn): void {
-  if (action === "create_shop") navigate({ to: "/app/shops/new" });
-  else if (action === "create_kit") navigate({ to: "/app/kits/new" });
-  else if (action === "view_shops") navigate({ to: "/app/shops" });
-  else if (action === "view_kits") navigate({ to: "/app/kits" });
-}
-
 export function ChatWidget() {
   const location = useLocation();
-  const navigate = useNavigate();
   const [authed, setAuthed] = useState(() => isAuthenticated());
   const [open, setOpen] = useState(false);
   const [session, setSession] = useState<ChatSession | null>(null);
@@ -508,10 +489,17 @@ export function ChatWidget() {
   const isPublicRoute =
     location.pathname.startsWith("/redeem/") ||
     location.pathname.startsWith("/shop/") ||
-    location.pathname.startsWith("/accept-invite") ||
-    location.pathname === "/login" ||
-    location.pathname === "/signup";
-  const fullscreenFlow = isFullscreenFlowPath(location.pathname);
+    location.pathname.startsWith("/accept-invite");
+  const [fullscreenFlow, setFullscreenFlow] = useState(false);
+
+  useEffect(() => {
+    const onViewChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ fullscreenFlow?: boolean }>).detail;
+      setFullscreenFlow(!!detail?.fullscreenFlow);
+    };
+    window.addEventListener("sm:view-change", onViewChange);
+    return () => window.removeEventListener("sm:view-change", onViewChange);
+  }, []);
 
   useEffect(() => {
     const sync = () => setAuthed(isAuthenticated());
@@ -744,7 +732,10 @@ export function ChatWidget() {
       showUserChoiceImmediately(userEntry);
     }
 
-    runChatAction(action, navigate);
+    const ran = runChatAction(action);
+    if (!ran) {
+      window.setTimeout(() => runChatAction(action), 100);
+    }
     setOpen(false);
   };
 
@@ -901,9 +892,8 @@ export function ChatWidget() {
           onClick={openChat}
           aria-label="Open support chat"
           className="fixed bottom-6 right-6 z-[9999] flex h-14 w-14 items-center justify-center rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.18)] transition-transform hover:scale-105"
-          style={{ backgroundColor: BRAND, color: SURFACE }}
+          style={{ backgroundColor: SURFACE, color: BRAND }}
         >
-          {/* <MessageCircle size={28} strokeWidth={1.75} aria-hidden /> */}
           <svg viewBox="0 0 24 24" fill="currentColor" className="h-7 w-7" aria-hidden>
             <path
               fillRule="evenodd"

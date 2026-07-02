@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { objectId } from '../users/users.validation.js';
 
 const address = z
   .object({
@@ -60,4 +61,8 @@ export const tenantLimitsSchema = z.object({
 export const impersonateSchema = z.object({
   reason: z.string().min(1),
   reasonCategory: z.string().min(1),
+});
+
+export const transferOwnershipSchema = z.object({
+  newOwnerUserId: objectId,
 });
