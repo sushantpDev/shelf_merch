@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { Outlet, useRouterState } from "@tanstack/react-router";
-import { Toaster } from "@/components/ui/sonner";
 import { CollapsibleSidebar } from "@/components/tenant/CollapsibleSidebar";
 import { UserMenu } from "@/components/tenant/UserMenu";
 import { WalletBalanceMenu } from "@/components/tenant/WalletBalanceMenu";
@@ -117,7 +116,6 @@ export default function TenantLayout() {
           </div>
         </main>
       </div>
-      <Toaster position="bottom-center" richColors />
     </div>
   );
 }

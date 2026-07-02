@@ -1,6 +1,6 @@
 :root{
   --bg:#F4F6F4; --surface:#FFFFFF; --surface-2:#FBFCFB;
-  --app-sidebar-bg:#EEF6F1; --app-content-bg:#F7F9F7;
+  --app-sidebar-bg:#8bca84; --app-content-bg:#F7F9F7;
   --ink:#0E1E16; --ink-2:#56655C; --ink-3:#8C988F;
   --line:#E6EAE6; --line-2:#EFF2EF; --line-strong:#D5DBD6;
   --brand:#15784C; --brand-d:#0E5536; --brand-l:#1E8E5C;
@@ -812,8 +812,8 @@ select.inp{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http
 .btn-purchase{display:inline-flex;align-items:center;gap:10px;height:46px;padding:0 24px 0 28px;border-radius:var(--r-pill);background:var(--ink);color:#fff;font-weight:700;font-size:12px;letter-spacing:.12em;text-transform:uppercase;transition:.16s ease;white-space:nowrap}
 .btn-purchase:hover{background:#1b3326}
 .btn-purchase svg{width:15px;height:15px;flex:none}
-.pd-body{display:grid;grid-template-columns:minmax(280px,1fr) minmax(300px,1fr);gap:36px;align-items:start}
-.pd-gallery{position:sticky;top:20px}
+.pd-body{display:grid;grid-template-columns:minmax(280px,520px) minmax(360px,1fr);gap:40px;align-items:start}
+.pd-gallery{position:sticky;top:20px;max-width:520px;width:100%}
 .pd-img{aspect-ratio:1;border-radius:var(--r);border:1px solid var(--line);position:relative;overflow:hidden;display:grid;place-items:center;transition:background .2s ease}
 .pd-img-inner{position:relative;width:72%;height:72%;display:grid;place-items:center}
 .pd-img-inner.pd-img-mockup{width:100%;height:100%}
@@ -1330,6 +1330,42 @@ button.thumb{font:inherit;color:inherit}
   background:#fff!important;
 }
 .sm-modal>.absolute{top:20px;right:20px}
+.upload-tile{
+  width:100%;
+  border:1px dashed #cad4ce;
+  border-radius:14px;
+  background:#f8faf8;
+  padding:16px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  color:var(--ink);
+  cursor:pointer;
+  transition:border-color .16s ease,background .16s ease,box-shadow .16s ease;
+}
+.upload-tile:hover{border-color:var(--brand);background:#f4fbf7;box-shadow:var(--sh-1)}
+.upload-tile:disabled{opacity:.65;cursor:not-allowed}
+.upload-tile strong{display:block;font-size:14px;line-height:1.2}
+.upload-tile small{display:block;margin-top:4px;color:var(--ink-2);font-size:12.5px;line-height:1.35}
+.icon-soft{
+  width:42px;
+  height:42px;
+  border-radius:12px;
+  background:#e8f5ee;
+  color:var(--brand);
+  display:grid;
+  place-items:center;
+  flex:0 0 auto;
+}
+.soft-panel{
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:#fff;
+  padding:12px;
+  box-shadow:0 1px 0 rgba(16,24,20,.03);
+}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px}
+.spin{animation:sm-spin .75s linear infinite}
 .contact-dialog-header{
   margin:0 0 18px;
   padding-right:28px;

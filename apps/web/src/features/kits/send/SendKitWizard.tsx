@@ -130,14 +130,18 @@ export function SendKitWizard() {
 
   const footer = (
     <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-      <button
-        type="button"
-        className="lnk"
-        style={{ background: "none", border: "none", cursor: "pointer" }}
-        onClick={() => (step === 0 ? exit() : setStep((s) => (s - 1) as 0 | 1 | 2))}
-      >
-        {step === 0 ? "Save draft" : "Back"}
-      </button>
+      {step > 0 ? (
+        <button
+          type="button"
+          className="lnk"
+          style={{ background: "none", border: "none", cursor: "pointer" }}
+          onClick={() => setStep((s) => (s - 1) as 0 | 1 | 2)}
+        >
+          Back
+        </button>
+      ) : (
+        <span />
+      )}
       {step < 2 ? (
         <button type="button" className="btn btn-dark" onClick={next}>
           Next
@@ -154,7 +158,7 @@ export function SendKitWizard() {
       steps={STEPS}
       activeIndex={step}
       onExit={exit}
-      exitLabel="Save draft"
+      exitLabel="Cancel"
       footer={footer}
     >
       {step === 0 && (

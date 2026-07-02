@@ -203,6 +203,7 @@ export async function bakeMockup(
   artUrl: string,
   placement: Placement | null,
   size = 1000,
+  requireProductBase = false,
 ): Promise<string> {
   if (!artUrl) return "";
   try {
@@ -211,6 +212,7 @@ export async function bakeMockup(
       maskUrl ? loadImageEl(maskUrl, true).catch(() => null) : Promise.resolve(null),
       loadImageEl(artUrl, true),
     ]);
+    if (requireProductBase && !maskImg) return "";
     const canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;

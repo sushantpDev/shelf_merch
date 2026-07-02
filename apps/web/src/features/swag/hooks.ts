@@ -5,6 +5,7 @@ import {
   createCollectionFlow,
   deleteCollectionFlow,
   restoreCollectionFlow,
+  updateCollectionArtworkFlow,
 } from "@/services/api-bridge";
 import { useInvalidateWorkspace } from "@/hooks/useWorkspace";
 import type { UiCollection, UiProduct } from "@/services/mappers";
@@ -23,6 +24,14 @@ export function useCreateCollection() {
   const invalidate = useInvalidateWorkspace();
   return useMutation({
     mutationFn: (input: CreateCollectionInput) => createCollectionFlow(input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateCollectionArtwork() {
+  const invalidate = useInvalidateWorkspace();
+  return useMutation({
+    mutationFn: updateCollectionArtworkFlow,
     onSuccess: () => invalidate(),
   });
 }

@@ -1,11 +1,9 @@
-import { useState, type ComponentType } from "react";
+import { type ComponentType } from "react";
 import { Link } from "@tanstack/react-router";
 import { Package, Plus, Radio, Search, Send, Users } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { PageHeader } from "@/components/tenant/PageHeader";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import type { UiKit } from "@/services/mappers";
-import { KitDetailDialog } from "./KitDetailDialog";
 import { KitsEmptyState } from "./KitsEmptyState";
 
 function StatCard({
@@ -71,7 +69,6 @@ function StatCard({
 
 export function KitsPage() {
   const { data: workspace, isLoading, isError, error } = useWorkspace();
-  const [detail, setDetail] = useState<UiKit | null>(null);
 
   if (isLoading && !workspace) {
     return <LoadingState message="Loading kits…" fullScreen={false} />;
@@ -155,13 +152,13 @@ export function KitsPage() {
                 </td>
                 <td className="muted">{kit.sent ? "Recently" : "Not yet"}</td>
                 <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                  <button
-                    type="button"
+                  <Link
+                    to="/app/kits/$id"
+                    params={{ id: kit.id }}
                     className="btn btn-ghost btn-sm"
-                    onClick={() => setDetail(kit)}
                   >
                     Details
-                  </button>{" "}
+                  </Link>{" "}
                   <Link
                     to="/app/kits/$id/send"
                     params={{ id: kit.id }}
@@ -175,12 +172,6 @@ export function KitsPage() {
           </tbody>
         </table>
       </div>
-
-      <KitDetailDialog
-        kit={detail}
-        catalog={workspace.catalogProducts}
-        onOpenChange={(open) => !open && setDetail(null)}
-      />
     </>
   );
 }

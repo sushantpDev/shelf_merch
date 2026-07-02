@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { DesignedProductThumb } from "@/features/swag/DesignedProductThumb";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import type { UiKit, UiProduct } from "@/services/mappers";
 
@@ -94,22 +95,26 @@ export function KitDetailDialog({
                       : undefined;
                     return (
                       <div key={`${p.name}-${i}`} className="pcard">
-                        <div className="img">
-                          {src ? (
-                            <img
-                              src={src}
-                              alt={p.name}
-                              loading="lazy"
-                              style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                            />
-                          ) : (
-                            <div
-                              className="sm-skeleton-img"
-                              aria-hidden="true"
-                              style={{ width: "100%", height: "100%" }}
-                            />
-                          )}
-                        </div>
+                        {p.img && kit.artworkUrl ? (
+                          <DesignedProductThumb product={p.img} artworkUrl={kit.artworkUrl} />
+                        ) : (
+                          <div className="img">
+                            {src ? (
+                              <img
+                                src={src}
+                                alt={p.name}
+                                loading="lazy"
+                                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                              />
+                            ) : (
+                              <div
+                                className="sm-skeleton-img"
+                                aria-hidden="true"
+                                style={{ width: "100%", height: "100%" }}
+                              />
+                            )}
+                          </div>
+                        )}
                         <div className="meta">
                           {p.brand && <div className="brand">{p.brand}</div>}
                           <div className="nm">{p.name}</div>

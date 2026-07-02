@@ -1,12 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type FocusEvent,
-  type MouseEvent,
-} from "react";
+import { useEffect, useRef, useState, type FocusEvent, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
@@ -185,19 +177,6 @@ export function CollapsibleSidebar() {
   const railRef = useRef<HTMLElement>(null);
   const [expanded, setExpanded] = useState(readExpandedPreference);
   const [flyout, setFlyout] = useState<HoverFlyout | null>(null);
-  const [togglePos, setTogglePos] = useState<{ top: number; left: number } | null>(null);
-
-  const syncTogglePosition = useCallback(() => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const rect = rail.getBoundingClientRect();
-    const topbar = document.querySelector<HTMLElement>(".tenant-shell .topbar, #app .topbar");
-    const topbarBottom = topbar?.getBoundingClientRect().bottom;
-    setTogglePos({
-      top: topbarBottom ?? rect.top,
-      left: rect.right - 1,
-    });
-  }, []);
 
   useEffect(() => {
     try {
@@ -211,23 +190,6 @@ export function CollapsibleSidebar() {
     if (expanded) setFlyout(null);
   }, [expanded]);
 
-  useLayoutEffect(() => {
-    syncTogglePosition();
-
-    const rail = railRef.current;
-    const observer = rail ? new ResizeObserver(syncTogglePosition) : null;
-    if (rail && observer) observer.observe(rail);
-
-    window.addEventListener("resize", syncTogglePosition);
-    window.addEventListener("scroll", syncTogglePosition, true);
-
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener("resize", syncTogglePosition);
-      window.removeEventListener("scroll", syncTogglePosition, true);
-    };
-  }, [expanded, syncTogglePosition]);
-
   const showFlyout = (label: string, el: HTMLElement) => {
     const rect = el.getBoundingClientRect();
     setFlyout({
@@ -238,26 +200,6 @@ export function CollapsibleSidebar() {
   };
 
   const hideFlyout = () => setFlyout(null);
-
-  const toggleButton =
-    togglePos &&
-    createPortal(
-      <button
-        type="button"
-        className="sidebar-rail__toggle"
-        style={{ top: togglePos.top, left: togglePos.left }}
-        aria-label="Toggle sidebar"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((prev) => !prev)}
-      >
-        {expanded ? (
-          <ChevronLeft size={13} strokeWidth={2.2} aria-hidden="true" />
-        ) : (
-          <ChevronRight size={13} strokeWidth={2.2} aria-hidden="true" />
-        )}
-      </button>,
-      document.body,
-    );
 
   return (
     <>
@@ -279,9 +221,20 @@ export function CollapsibleSidebar() {
             />
           ))}
         </div>
+        <button
+          type="button"
+          className="sidebar-rail__toggle"
+          aria-label="Toggle sidebar"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((prev) => !prev)}
+        >
+          {expanded ? (
+            <ChevronLeft size={13} strokeWidth={2.2} aria-hidden="true" />
+          ) : (
+            <ChevronRight size={13} strokeWidth={2.2} aria-hidden="true" />
+          )}
+        </button>
       </nav>
-
-      {toggleButton}
 
       {!expanded &&
         flyout &&

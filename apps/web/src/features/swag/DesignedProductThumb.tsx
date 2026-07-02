@@ -63,9 +63,9 @@ function LiveArtworkComposite({
 }
 
 /**
- * Saved-design thumbnail: pre-baked mockup when available, otherwise live
- * mask + artwork positioned on the full stage (legacy `designedMockupHtml`
- * behaviour, aligned with the swag designer / bakeMockup).
+ * Saved-design thumbnail: prefer a live product + artwork composite when the
+ * product base is available. Saved mockups are still used as a fallback, but
+ * not trusted first because older records may contain artwork-only mockups.
  */
 export function DesignedProductThumb({
   product,
@@ -82,7 +82,9 @@ export function DesignedProductThumb({
   const overlay = artworkUrl ? resolveMediaUrl(artworkUrl) : "";
   const base = resolveMediaUrl(designImgUrl(product)) || productThumbUrl(product, true);
 
-  const inner = baked ? (
+  const inner = overlay && base ? (
+    <LiveArtworkComposite product={product} base={base} overlay={overlay} />
+  ) : baked ? (
     <div className="img img-mockup">
       <img
         src={baked}
@@ -91,8 +93,6 @@ export function DesignedProductThumb({
         style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
       />
     </div>
-  ) : overlay && base ? (
-    <LiveArtworkComposite product={product} base={base} overlay={overlay} />
   ) : (
     <div className={`img${base ? " img-mockup" : ""}`}>
       {base ? (

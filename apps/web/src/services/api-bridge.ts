@@ -16,6 +16,8 @@ import {
   createCollectionApi,
   createKitApi,
   updateKitApi,
+  uploadCollectionArtworkApi,
+  uploadCollectionMockupsApi,
   uploadKitArtworkApi,
   launchKitCampaignApi,
   launchPointsCampaignApi,
@@ -377,6 +379,27 @@ export async function createCollectionFlow(payload: {
   mockups?: Array<{ catalogProductId: string; dataUrl: string }>;
 }) {
   return createCollectionApi(payload);
+}
+
+export async function updateCollectionArtworkFlow(payload: {
+  collectionId: string;
+  artwork: { file: File };
+  mockups?: Array<{ catalogProductId: string; dataUrl: string }>;
+  catalog?: UiProduct[];
+}) {
+  let collection = await uploadCollectionArtworkApi(payload.collectionId, payload.artwork.file);
+  if (payload.mockups?.length) {
+    const catalogById = payload.catalog
+      ? new Map(payload.catalog.filter((p) => p.id).map((p) => [p.id as string, p]))
+      : undefined;
+    const withMockups = await uploadCollectionMockupsApi(
+      payload.collectionId,
+      payload.mockups,
+      catalogById,
+    );
+    if (withMockups) collection = withMockups;
+  }
+  return collection;
 }
 
 export async function linkCollectionToShopFlow(collectionId: string, shopId: string) {

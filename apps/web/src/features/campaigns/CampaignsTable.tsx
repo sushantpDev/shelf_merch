@@ -14,36 +14,55 @@ const TAB_LABELS: Record<(typeof TABS)[number], string> = {
 const LIVE = ["live", "launched", "redemption_open"];
 const COMPLETE = ["completed", "redemption_closed", "fulfilled"];
 
-function statusTag(status: string) {
-  if (LIVE.includes(status))
+function isPointsCampaign(c: UiCampaign) {
+  return c.type === "send_points" || c.type === "points";
+}
+
+function isLiveCampaign(c: UiCampaign) {
+  return isPointsCampaign(c) && LIVE.includes(c.status);
+}
+
+function isSentKitCampaign(c: UiCampaign) {
+  return !isPointsCampaign(c) && LIVE.includes(c.status);
+}
+
+function statusTag(c: UiCampaign) {
+  if (isSentKitCampaign(c))
+    return (
+      <span className="tag tag-live">
+        <span className="dot" />
+        Sent
+      </span>
+    );
+  if (isLiveCampaign(c))
     return (
       <span className="tag tag-live">
         <span className="dot" />
         Live
       </span>
     );
-  if (status === "scheduled")
+  if (c.status === "scheduled")
     return (
       <span className="tag tag-sched">
         <span className="dot" />
         Scheduled
       </span>
     );
-  if (status === "draft")
+  if (c.status === "draft")
     return (
       <span className="tag tag-camp-draft">
         <span className="dot" />
         Draft
       </span>
     );
-  if (COMPLETE.includes(status))
+  if (COMPLETE.includes(c.status))
     return (
       <span className="tag tag-completed">
         <span className="dot" />
         Completed
       </span>
     );
-  return <span className="tag tag-proc">{status}</span>;
+  return <span className="tag tag-proc">{c.status}</span>;
 }
 
 function typeLabel(type: string) {
@@ -51,13 +70,23 @@ function typeLabel(type: string) {
   return (
     <span className="camp-type">
       {points ? <CalendarDays size={14} /> : <Box size={14} />}
-      {points ? "Send points" : "Send a kit"}
+      {points ? "Send points" : "Kit send"}
     </span>
   );
 }
 
+function campaignTitle(c: UiCampaign) {
+  if (isPointsCampaign(c)) return c.name;
+  return `Kit send: ${c.name}`;
+}
+
+function campaignSubtext(c: UiCampaign) {
+  if (isPointsCampaign(c)) return null;
+  return `From kit: ${c.name}`;
+}
+
 function CampaignAvatar({ c }: { c: UiCampaign }) {
-  const points = c.type === "send_points" || c.type === "points";
+  const points = isPointsCampaign(c);
   return (
     <div className="camp-avatar" style={{ background: "#15784C" }}>
       {points ? <CalendarDays size={16} color="#fff" /> : <Box size={16} color="#fff" />}
@@ -100,12 +129,12 @@ export function CampaignsTable({
   const [page, setPage] = useState(1);
 
   const totalCamp = campaigns.length;
-  const liveCount = campaigns.filter((c) => LIVE.includes(c.status)).length;
+  const liveCount = campaigns.filter(isLiveCampaign).length;
   const draftCount = campaigns.filter((c) => c.status === "draft").length;
   const totalRecipients = campaigns.reduce((s, c) => s + (c.recipientCount || 0), 0);
 
   let filtered = campaigns;
-  if (filter === "live") filtered = filtered.filter((c) => LIVE.includes(c.status));
+  if (filter === "live") filtered = filtered.filter(isLiveCampaign);
   else if (filter === "draft") filtered = filtered.filter((c) => c.status === "draft");
   else if (filter === "completed") filtered = filtered.filter((c) => COMPLETE.includes(c.status));
   const q = search.toLowerCase();
@@ -124,7 +153,7 @@ export function CampaignsTable({
       <div className="page-h">
         <div>
           <h1>Campaigns</h1>
-          <div className="sub">Launch points campaigns and track redemptions.</div>
+          <div className="sub">Track points campaigns and kit-send history.</div>
         </div>
         <button type="button" className="btn btn-dark" onClick={onSendGift}>
           Send Gift
@@ -196,11 +225,20 @@ export function CampaignsTable({
                   <td>
                     <div className="camp-name-cell">
                       <CampaignAvatar c={c} />
-                      <span style={{ fontWeight: 600 }}>{c.name}</span>
+                      <span>
+                        <span style={{ display: "block", fontWeight: 600 }}>
+                          {campaignTitle(c)}
+                        </span>
+                        {campaignSubtext(c) ? (
+                          <span className="muted" style={{ display: "block", fontSize: 12, marginTop: 2 }}>
+                            {campaignSubtext(c)}
+                          </span>
+                        ) : null}
+                      </span>
                     </div>
                   </td>
                   <td>{typeLabel(c.type)}</td>
-                  <td>{statusTag(c.status)}</td>
+                  <td>{statusTag(c)}</td>
                   <td className="num">{c.recipientCount.toLocaleString("en-IN")}</td>
                   <td className="num">—</td>
                   <td className="num">—</td>

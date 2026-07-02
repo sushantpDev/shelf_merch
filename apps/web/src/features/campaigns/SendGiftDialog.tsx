@@ -26,7 +26,7 @@ export function SendGiftDialog({
 }) {
   const navigate = useNavigate();
   const [view, setView] = useState<"choose" | "kit">("choose");
-  const liveKits = kits.filter((k) => k.status === "live");
+  const availableKits = kits.filter((k) => k.id);
 
   function close() {
     onOpenChange(false);
@@ -93,8 +93,8 @@ export function SendGiftDialog({
                 Select one of your existing kits, or create a new kit.
               </p>
               <div style={{ display: "grid", gap: 10 }}>
-                {liveKits.length > 0 ? (
-                  liveKits.map((k) => (
+                {availableKits.length > 0 ? (
+                  availableKits.map((k) => (
                     <div
                       key={k.id}
                       className="card"

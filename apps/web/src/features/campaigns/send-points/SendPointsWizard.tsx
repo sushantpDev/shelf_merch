@@ -125,7 +125,7 @@ export function SendPointsWizard() {
       footer={footer}
     >
       {step === 0 && (
-        <div className="card" style={{ padding: 24, maxWidth: 880 }}>
+        <div className="card" style={{ padding: 24, maxWidth: 880, width: "100%", margin: "10px auto 0" }}>
           <div
             className="row"
             style={{ justifyContent: "space-between", alignItems: "flex-start" }}
