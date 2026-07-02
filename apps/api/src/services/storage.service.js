@@ -15,7 +15,7 @@ const ALLOWED_TYPES = {
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   ],
-  logo: ['image/svg+xml', 'image/png', 'image/jpeg'],
+  logo: ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'],
   product: ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'],
   mockup: ['image/png', 'image/jpeg', 'image/webp'],
   production: ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'],

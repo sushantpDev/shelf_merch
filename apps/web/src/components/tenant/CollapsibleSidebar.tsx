@@ -19,6 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import "./collapsible-sidebar.css";
+import NavFooterImage from "../../../assets/nav_footer_img.png";
 
 const STORAGE_KEY = "shelfmerch.sidebar.expanded";
 
@@ -78,13 +79,13 @@ const NAV_ITEMS: SidebarNavItem[] = [
     href: "/app/contacts",
     internal: true,
   },
-  {
-    key: "integrations",
-    label: "Integrations",
-    icon: Plug,
-    href: "/app/integrations",
-    internal: true,
-  },
+  // {
+  //   key: "integrations",
+  //   label: "Integrations",
+  //   icon: Plug,
+  //   href: "/app/integrations",
+  //   internal: true,
+  // },
   {
     key: "settings",
     label: "Settings",
@@ -92,7 +93,7 @@ const NAV_ITEMS: SidebarNavItem[] = [
     href: "/app/settings",
     internal: true,
   },
-  { key: "billing", label: "Billing", icon: CreditCard, href: "/app/billing", internal: true },
+  // { key: "billing", label: "Billing", icon: CreditCard, href: "/app/billing", internal: true },
   {
     key: "catalog",
     label: "Catalog",
@@ -221,6 +222,7 @@ export function CollapsibleSidebar() {
             />
           ))}
         </div>
+
         <button
           type="button"
           className="sidebar-rail__toggle"
@@ -234,6 +236,12 @@ export function CollapsibleSidebar() {
             <ChevronRight size={13} strokeWidth={2.2} aria-hidden="true" />
           )}
         </button>
+
+
+        <div className="sidebar-rail__footer" style={{ marginTop: 0, paddingTop: 0 }}>
+          <img src={NavFooterImage} alt="Nav Footer" />
+        </div>
+
       </nav>
 
       {!expanded &&

@@ -1,8 +1,9 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { z } from 'zod';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
-import { resolveTenant, requireTenantContext } from '../../middleware/tenant.middleware.js';
+import { resolveTenant, requireTenantContext, blockDuringImpersonation } from '../../middleware/tenant.middleware.js';
 import { requireRole } from '../../middleware/rbac.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { objectId } from '../users/users.validation.js';
@@ -15,11 +16,13 @@ import {
   tenantPlanSchema,
   tenantLimitsSchema,
   impersonateSchema,
+  transferOwnershipSchema,
 } from './tenants.validation.js';
 
 // Tenant-facing routes: /api/v1/tenants
 export const tenantsRouter = Router();
 tenantsRouter.use(authenticate, resolveTenant);
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 tenantsRouter.post(
   '/',
@@ -34,6 +37,21 @@ tenantsRouter.patch(
   requireRole('company_admin'),
   validate({ body: updateTenantSchema }),
   asyncHandler(controller.updateMe),
+);
+tenantsRouter.post(
+  '/me/logo',
+  requireTenantContext,
+  requireRole('company_admin'),
+  upload.single('logo'),
+  asyncHandler(controller.uploadLogo),
+);
+tenantsRouter.post(
+  '/me/transfer-ownership',
+  requireTenantContext,
+  requireRole('company_admin'),
+  blockDuringImpersonation,
+  validate({ body: transferOwnershipSchema }),
+  asyncHandler(controller.transferOwnership),
 );
 
 // Platform control plane: /api/v1/platform/tenants

@@ -2,7 +2,7 @@ import { type ComponentType, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { BookOpen, Package, Radio, Send, UserPlus, Users } from "lucide-react";
 import { PreDesignedKits } from "./PreDesignedKits";
-import kitsAndItemsImg from "../../../assets/kits-&-items.png";
+import kitsAndItemsImg from "../../../assets/kits.png";
 import noKitsYetImg from "../../../assets/no-kits-yet.png";
 
 const ICON_CHIP: React.CSSProperties = {
@@ -149,11 +149,11 @@ export function KitsEmptyState() {
           >
             <h1
               style={{
-                fontSize: "clamp(26px,3vw,32px)",
+                fontSize: "clamp(32px,6vw,45px)",
                 fontWeight: 700,
                 marginBottom: 10,
                 fontFamily: "var(--disp)",
-                lineHeight: 1.1,
+                lineHeight: 1.3,
                 color: "var(--ink)",
               }}
             >
@@ -161,7 +161,7 @@ export function KitsEmptyState() {
             </h1>
             <p
               className="muted"
-              style={{ fontSize: 13.5, lineHeight: 1.55, marginBottom: 24, maxWidth: 340 }}
+              style={{ fontSize: 15.5, lineHeight: 1.70, marginBottom: 20, maxWidth: 400 }}
             >
               Bundle catalog products into reusable kits and send them to employees at scale for any
               occasion.
@@ -187,15 +187,15 @@ export function KitsEmptyState() {
             style={{
               flex: 1,
               display: "flex",
-              justifyContent: "center",
+              justifyContent: "flex-end",
               alignItems: "center",
-              minHeight: 160,
+              minHeight: 300,
             }}
           >
             <img
               src={kitsAndItemsImg}
               alt="Kits and Items"
-              style={{ maxHeight: 220, maxWidth: "100%", objectFit: "contain" }}
+              style={{ maxHeight: 300, maxWidth: "100%", objectFit: "contain" }}
             />
           </div>
         </div>

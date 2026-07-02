@@ -101,6 +101,7 @@ export default function TenantLayout() {
             userName={userName}
             userEmail={userEmail}
             workspaceName={account}
+            workspaceLogoUrl={workspace?.logoUrl ?? ""}
             initials={initialsOf(userName)}
             truncName={truncTopbarName(userName)}
           />
