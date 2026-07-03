@@ -277,18 +277,15 @@ export async function getCatalog(token) {
     // Campaign explicitly hand-picked products — those win over the shop.
     filter._id = { $in: campaign.selectedProductIds };
   } else if (campaign.shopId) {
-    const shop = await Shop.findById(campaign.shopId)
-      .select('selectedCatalogProductIds')
-      .setOptions({ skipTenantGuard: true })
-      .lean();
-    const shopSelected = (shop?.selectedCatalogProductIds || []).map(String);
+    // Redemption catalog mirrors the storefront: only products with an active
+    // Branded Swag design for this shop are shown.
     const collectionCatalogIds = [];
     for (const col of shopCollections) {
       for (const ref of col.productRefs || []) {
         if (ref.catalogProductId) collectionCatalogIds.push(String(ref.catalogProductId));
       }
     }
-    const effectiveIds = [...new Set([...shopSelected, ...collectionCatalogIds])];
+    const effectiveIds = [...new Set(collectionCatalogIds)];
     if (!effectiveIds.length) {
       return { products: [] };
     }

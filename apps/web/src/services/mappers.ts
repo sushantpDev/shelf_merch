@@ -30,6 +30,8 @@ export type UiProduct = {
   photoUrl?: string;
   /** Display URL for mockup/design flows — prefers production mask when set. */
   imgUrl?: string;
+  /** Product-stage/base image used behind artwork previews. */
+  baseImageUrl?: string;
   /** Transparent design/production image used by artwork mockups. */
   maskImageUrl?: string;
   /** Pre-baked design mockup served to shop/storefront. */
@@ -221,6 +223,7 @@ function extractVariantColors(
 export function mapCatalogProduct(p: ApiProduct): UiProduct {
   const { colors: variantColors, colorHexByName } = extractVariantColors(p.variants);
   const photoUrl = resolveMediaUrl(p.primaryImageUrl || p.imageUrls?.[0]);
+  const baseImageUrl = resolveMediaUrl(p.baseImageUrl);
   const imgUrl = resolveMediaUrl(p.maskImageUrl || photoUrl);
   const printAreas = Array.isArray(p.printAreas)
     ? (p.printAreas as UiPrintArea[]).filter((a) => a?.box?.widthPct > 0 && a?.box?.heightPct > 0)
@@ -239,6 +242,7 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
     colors: variantColors,
     colorHexByName: Object.keys(colorHexByName).length ? colorHexByName : undefined,
     photoUrl,
+    baseImageUrl,
     imgUrl,
     maskImageUrl: resolveMediaUrl(p.maskImageUrl),
     printAreas: printAreas?.length ? printAreas : undefined,
@@ -269,6 +273,7 @@ export function mapProductRef(ref: ApiProduct, catalogById?: Map<string, UiProdu
   const photoUrl = resolveMediaUrl(
     ref.primaryImageUrl || ref.imageUrls?.[0] || fromCatalog?.photoUrl,
   );
+  const baseImageUrl = resolveMediaUrl(ref.baseImageUrl) || fromCatalog?.baseImageUrl;
   const imgUrl = resolveMediaUrl(
     ref.maskImageUrl || ref.imgUrl || photoUrl || fromCatalog?.imgUrl,
   );
@@ -286,6 +291,7 @@ export function mapProductRef(ref: ApiProduct, catalogById?: Map<string, UiProdu
     colors: fromCatalog?.colors,
     colorHexByName: fromCatalog?.colorHexByName,
     photoUrl: photoUrl || fromCatalog?.photoUrl,
+    baseImageUrl,
     imgUrl,
     maskImageUrl: resolveMediaUrl(ref.maskImageUrl) || fromCatalog?.maskImageUrl,
     mockupUrl: resolveMediaUrl(ref.mockupUrl),

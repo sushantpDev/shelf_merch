@@ -22,9 +22,9 @@ function normMediaPath(url: string | undefined): string {
   return path.startsWith("/") ? path : `/${path}`;
 }
 
-/** The production/design image (transparent mask) used as the mockup base. */
+/** Visible stage image used behind artwork in design previews and baked mockups. */
 export function designImgUrl(p: UiProduct): string {
-  return p?.maskImageUrl || p?.imgUrl || "";
+  return p?.baseImageUrl || p?.photoUrl || p?.imgUrl || p?.maskImageUrl || "";
 }
 
 /** Pick the print area whose mockup image matches the mask/photo, else the first usable one. */

@@ -66,7 +66,7 @@ export function OrgDashboard({
   const fundingPending = o.fundingApproval === "pending";
   const total = o.amount;
   const alloc = totalAllocatedAmount(org.departments);
-  const rem = remainingWalletBalance(total, org.departments);
+  const rem = o.unallocated ?? remainingWalletBalance(total, org.departments);
   const walletLive = o.status === "active";
   const depts = org.departments;
   const managersActive = depts.filter((d) => d.mgr.inviteStatus === "active").length;

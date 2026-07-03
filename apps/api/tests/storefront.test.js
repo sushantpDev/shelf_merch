@@ -109,7 +109,7 @@ describe('public storefront (no auth)', () => {
     });
   });
 
-  it('returns a plain catalog listing for a selected product without a collection', async () => {
+  it('hides products enabled in Shop Catalog when no Branded Swag design covers them', async () => {
     const shop = await Shop.create({
       tenantId: tenant._id,
       name: 'Plain Store',
@@ -118,13 +118,7 @@ describe('public storefront (no auth)', () => {
     });
     const res = await request(app).get(`/api/v1/storefront/${shop._id}`);
     expect(res.status).toBe(200);
-    expect(res.body.products).toHaveLength(1);
-    expect(res.body.products[0]).toMatchObject({
-      catalogProductId: String(curated._id),
-      name: 'Welcome Tee',
-      collectionId: '',
-      artworkUrl: '',
-    });
+    expect(res.body.products).toHaveLength(0);
   });
 
   it('returns the base/mask master images and variant colorHex for recolouring', async () => {

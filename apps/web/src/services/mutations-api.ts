@@ -676,15 +676,19 @@ export async function syncOrgWizardApi(
     return n && e ? `${n}|${e}` : "";
   };
   const entityByDepartmentManager = new Map<string, ApiEntityRow>();
-  for (const entity of allEntities ?? []) {
+  for (const entity of walletEntities ?? []) {
     const key = identityKey(entity.name, managerEmailOf(entity));
     if (key) entityByDepartmentManager.set(key, entity);
   }
+
+  const entityBelongsToWallet = (entity: ApiEntityRow) =>
+    normalizeMongoId(entity.walletId) === defaultWalletId;
 
   type EntityPlan = {
     dept: (typeof org.departments)[number];
     entityId: string;
     target: number;
+    currentAllocated: number;
   };
   const entityPlans = new Map<string, EntityPlan>();
 
@@ -692,20 +696,28 @@ export async function syncOrgWizardApi(
     const existingId = String(dept.id);
     const isMongoId = MONGO_ID.test(existingId);
     let entityId = isMongoId ? existingId : "";
+    let currentAllocated = 0;
 
     if (entityId) {
       const entity = await apiFetch<ApiEntityRow>(`/entities/${entityId}`);
-      await apiFetch(`/entities/${entityId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          name: dept.name,
-          description: dept.desc || "",
-          colorHex: dept.color || "#2563EB",
-          expectedUsers: dept.users || 0,
-          managerEmail: entity.managerEmail,
-          managerName: entity.managerName,
-        }),
-      });
+      const entityWalletId = normalizeMongoId(entity.walletId);
+      if (entityWalletId && entityWalletId !== defaultWalletId) {
+        entityId = "";
+        currentAllocated = 0;
+      } else {
+        currentAllocated = Number(entity.allocatedAmount ?? 0);
+        await apiFetch(`/entities/${entityId}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            name: dept.name,
+            description: dept.desc || "",
+            colorHex: dept.color || "#2563EB",
+            expectedUsers: dept.users || 0,
+            managerEmail: entity.managerEmail,
+            managerName: entity.managerName,
+          }),
+        });
+      }
     }
 
     if (!entityId) {
@@ -713,8 +725,9 @@ export async function syncOrgWizardApi(
         identityKey(dept.name, dept.mgr?.email),
       );
       const byName = byIdentity ?? entityByName.get(dept.name.trim().toLowerCase());
-      if (byName) {
+      if (byName && entityBelongsToWallet(byName)) {
         entityId = normalizeMongoId(byName._id ?? byName.id);
+        currentAllocated = Number(byName.allocatedAmount ?? 0);
         await apiFetch(`/entities/${entityId}`, {
           method: "PATCH",
           body: JSON.stringify({
@@ -747,11 +760,11 @@ export async function syncOrgWizardApi(
     const target = Number(dept.allocated) || 0;
     const prev = entityPlans.get(entityId);
     if (!prev) {
-      entityPlans.set(entityId, { dept, entityId, target });
+      entityPlans.set(entityId, { dept, entityId, target, currentAllocated });
     }
   }
 
-  for (const { dept, entityId, target } of entityPlans.values()) {
+  for (const { dept, entityId, target, currentAllocated } of entityPlans.values()) {
     const mgrEmail = dept.mgr?.email?.trim();
     if (mgrEmail) {
       const mgrName = dept.mgr.name?.trim() || mgrEmail.split("@")[0] || "Manager";
@@ -790,7 +803,7 @@ export async function syncOrgWizardApi(
       plannedAllocations.push({ entityId, amount: target });
     }
 
-    const delta = target;
+    const delta = target - currentAllocated;
     if (delta !== 0) {
       allocationDeltas.push({ walletId: defaultWalletId, entityId, delta });
     }

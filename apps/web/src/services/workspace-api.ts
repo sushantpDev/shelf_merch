@@ -57,6 +57,7 @@ export type WorkspaceSnapshot = {
       id?: string;
       name: string;
       amount: number;
+      unallocated?: number;
       status?: string;
       start: string;
       end: string;
@@ -112,9 +113,11 @@ type ApiWalletRow = {
 function mapWalletOrgFields(
   w: ApiWalletRow,
   isEntityManager: boolean,
-  myEntity?: { allocatedAmount?: number },
+  myEntity?: { allocatedAmount?: number; spentAmount?: number },
 ): WorkspaceSnapshot["org"]["wallet"] {
   const id = String(w._id ?? w.id ?? "");
+  const balance = w.balance ?? w.totalAmount ?? 0;
+  const allocated = w.allocatedAmount ?? 0;
   return {
     id: id || undefined,
     name: w.name || "Merchandise Budget",
@@ -122,6 +125,9 @@ function mapWalletOrgFields(
     amount: isEntityManager
       ? (myEntity?.allocatedAmount ?? 0)
       : (w.totalAmount ?? w.balance ?? 0),
+    unallocated: isEntityManager
+      ? Math.max(0, (myEntity?.allocatedAmount ?? 0) - (myEntity?.spentAmount ?? 0))
+      : Math.max(0, balance - allocated),
     start: w.validFrom ? new Date(w.validFrom).toISOString().slice(0, 10) : "",
     end: w.validTo ? new Date(w.validTo).toISOString().slice(0, 10) : "",
     funding: w.fundingMethod === "online" ? "pay" : "upload",

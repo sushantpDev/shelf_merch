@@ -42,10 +42,9 @@ export function seedAllocateWizard(org: OrgSnapshot, startStep = 2): WizardState
         mgr: { ...d.mgr },
       })),
     ),
-    unallocatedAtStart: Math.max(
-      0,
-      (org.wallet.amount || 0) - totalAllocatedAmount(org.departments),
-    ),
+    unallocatedAtStart:
+      org.wallet.unallocated ??
+      Math.max(0, (org.wallet.amount || 0) - totalAllocatedAmount(org.departments)),
     seq: org.departments.length + 1,
     colorIdx: org.departments.length,
     sentInvites: [],

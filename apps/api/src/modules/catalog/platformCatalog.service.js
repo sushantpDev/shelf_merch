@@ -107,6 +107,15 @@ export async function publishProduct(productId) {
   }
   if (!(product.gstRate >= 0 && product.gstRate <= 28)) problems.push('gstRate must be set (0–28)');
   if (!product.hsnCode) problems.push('hsnCode is required');
+  const hasVisiblePreviewImage = Boolean(
+    product.baseImageUrl
+      || product.primaryImageUrl
+      || product.imageUrls?.length
+      || product.printAreas?.some((area) => area?.mockupImageUrl),
+  );
+  if (!hasVisiblePreviewImage) {
+    problems.push('Visible product stage image is required');
+  }
   const legacyShopifyImageInMask =
     product.source?.provider === 'shopify'
     && !product.primaryImageUrl

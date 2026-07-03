@@ -38,6 +38,8 @@ export type WizardWallet = {
   id?: string;
   name: string;
   amount: number;
+  /** Cash not yet earmarked to departments (balance − allocated). */
+  unallocated?: number;
   status?: string;
   start: string;
   end: string;

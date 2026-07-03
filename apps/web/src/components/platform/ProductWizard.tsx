@@ -324,6 +324,7 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
       || (legacyShopifyImageInMask ? product?.maskImageUrl : undefined);
     return raw ? resolveMediaUrl(raw) : undefined;
   }, [legacyShopifyImageInMask, product?.primaryImageUrl, product?.imageUrls, product?.maskImageUrl]);
+  const baseStageImageUrl = product?.baseImageUrl ? resolveMediaUrl(product.baseImageUrl) : undefined;
   const productionMaskImageUrl =
     product?.maskImageUrl && !legacyShopifyImageInMask
       ? product.maskImageUrl
@@ -388,6 +389,24 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
         return;
       }
       await uploadProductImage(id, file, "mask");
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function uploadBase(file: File | undefined) {
+    if (!id || !file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Product stage image must be an image file.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await uploadProductImage(id, file, "base");
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
@@ -638,10 +657,18 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
           <>
             <h3 style={{ marginBottom: 4 }}>Product images</h3>
             <p className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
-              Marketing and production imagery are kept separate. Only the transparent design mask is used for artwork placement.
+              Marketing and production imagery are kept separate. Upload both a visible product stage image and the transparent production mask.
             </p>
             <div className="row" style={{ gap: 18, flexWrap: "wrap", marginBottom: 22, alignItems: "flex-start" }}>
               <MarketingImageCard imageUrl={marketingImageUrl} />
+              <MasterImageUpload
+                label="Product stage image"
+                hint="Visible garment/product image used in swag previews"
+                accept="image/*"
+                imageUrl={baseStageImageUrl}
+                disabled={busy || !id}
+                onFile={uploadBase}
+              />
               <MasterImageUpload
                 label="Design & production mask"
                 hint="Transparent PNG · used for artwork, print areas and production"
@@ -749,6 +776,7 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
             <p className="muted" style={{ marginBottom: 6 }}>
               {product?.name} · {product?.sku} · {product?.variants?.length ?? 0} variants ·{" "}
               {marketingImageUrl ? "Shopify marketing image" : "no marketing image"} ·{" "}
+              {baseStageImageUrl ? "stage image" : "no stage image"} ·{" "}
               {productionMaskImageUrl ? "production mask" : "no production mask"} · {printAreas.length} print areas
             </p>
             {problems.length > 0 && (

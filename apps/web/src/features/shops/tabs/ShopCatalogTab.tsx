@@ -22,11 +22,8 @@ export function ShopCatalogTab({ shop, products }: { shop: UiShop; products: UiP
           <div>
             <h3 style={{ fontSize: 20, marginBottom: 10 }}>Your Shop Catalog</h3>
             <p className="muted" style={{ lineHeight: 1.65, marginBottom: 8 }}>
-              Choose which catalog products appear in your live shop. Only selected items are
-              visible to recipients.
-            </p>
-            <p className="muted" style={{ fontSize: 13, lineHeight: 1.55 }}>
-              Create branded designs in <b>Branded Swag</b> after enabling products here.
+              Mark the catalog products you plan to design for this shop. Products only appear on
+              your live storefront after you create a design for them in <b>Branded Swag</b>.
             </p>
             <div
               className="row"
@@ -65,8 +62,8 @@ export function ShopCatalogTab({ shop, products }: { shop: UiShop; products: UiP
             }}
           >
             <div>
-              <b>No products enabled.</b> Your live shop will show the banner only until you select
-              catalog items in <b>Edit catalog</b>.
+              <b>No products marked yet.</b> Add designs in <b>Branded Swag</b> to make products
+              visible on your storefront.
             </div>
           </div>
         )}

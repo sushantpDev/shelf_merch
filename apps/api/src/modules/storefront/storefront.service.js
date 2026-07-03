@@ -24,29 +24,14 @@ function mapBrandedListing(col, ref, base) {
   };
 }
 
-function mapPlainListing(base) {
-  const catalogProductId = String(base._id);
-  return {
-    ...base,
-    _id: catalogProductId,
-    catalogProductId,
-    collectionId: '',
-    artworkUrl: '',
-    mockupUrl: '',
-    preferredColors: [],
-  };
-}
-
 /**
- * Public, no-auth storefront for a live shop. Returns the shop's branding plus
- * products the admin enabled in Shop Catalog. Only `live` shops are exposed.
- * An empty selection yields an empty product list.
+ * Public, no-auth storefront for a live shop. Storefront listings are driven
+ * entirely by Branded Swag: one entry per (active collection × productRef).
+ * A product with no design is hidden even if it's enabled in Shop Catalog.
  */
 export async function getStorefront(shopId) {
   const shop = await Shop.findById(shopId).setOptions({ skipTenantGuard: true });
   if (!shop || shop.status !== 'live') throw new NotFoundError('Shop not found');
-
-  const selectedIds = (shop.selectedCatalogProductIds || []).map(String);
 
   const collections = await Collection.find({
     ...collectionsForShopFilter(shop._id),
@@ -63,7 +48,7 @@ export async function getStorefront(shopId) {
       if (ref.catalogProductId) collectionCatalogIds.push(String(ref.catalogProductId));
     }
   }
-  const effectiveIds = [...new Set([...selectedIds, ...collectionCatalogIds])];
+  const effectiveIds = [...new Set(collectionCatalogIds)];
   if (!effectiveIds.length) {
     return {
       shop: {
@@ -78,8 +63,6 @@ export async function getStorefront(shopId) {
     };
   }
 
-  const selectedSet = new Set(effectiveIds);
-
   const catalogRows = await CatalogProduct.find({
     status: 'active',
     _id: { $in: effectiveIds },
@@ -91,24 +74,14 @@ export async function getStorefront(shopId) {
   const catalogById = new Map(catalogRows.map((row) => [String(row._id), row]));
 
   const products = [];
-  const covered = new Set();
-
   for (const col of collections) {
     for (const ref of col.productRefs || []) {
       const catalogProductId = ref.catalogProductId ? String(ref.catalogProductId) : '';
-      if (!catalogProductId || !selectedSet.has(catalogProductId)) continue;
+      if (!catalogProductId) continue;
       const base = catalogById.get(catalogProductId);
       if (!base) continue;
-      covered.add(catalogProductId);
       products.push(mapBrandedListing(col, ref, base));
     }
-  }
-
-  for (const id of effectiveIds) {
-    if (covered.has(id)) continue;
-    const base = catalogById.get(id);
-    if (!base) continue;
-    products.push(mapPlainListing(base));
   }
 
   products.sort((a, b) => String(a.name).localeCompare(String(b.name)));
