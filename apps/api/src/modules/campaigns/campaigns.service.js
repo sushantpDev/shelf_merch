@@ -12,6 +12,7 @@ import * as ledger from '../../services/ledger.service.js';
 import { transitionState, validNextStatuses, canTransition } from '../../services/stateMachine.service.js';
 import { notify } from '../notifications/notifications.service.js';
 import { ApiError, ForbiddenError, NotFoundError } from '../../utils/errors.js';
+import { assertEntityAccess } from '../../middleware/abac.middleware.js';
 
 function withCampaignMeta(campaign) {
   const obj = campaign.toObject ? campaign.toObject() : campaign;
@@ -88,9 +89,10 @@ export async function getCampaign({ tenantId, campaignId, user }) {
   return withCampaignMeta(campaign);
 }
 
-export async function createCampaign({ tenantId, userId, data }) {
+export async function createCampaign({ tenantId, userId, user, data }) {
   const entity = await Entity.findOne({ _id: data.entityId, tenantId });
   if (!entity) throw new NotFoundError('Entity not found');
+  assertEntityAccess(user, entity._id);
 
   if (data.shopId) {
     const shop = await Shop.findOne({ _id: data.shopId, tenantId });
@@ -384,6 +386,7 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
 export async function closeCampaign({ tenantId, campaignId, user }) {
   const campaign = await Campaign.findOne({ _id: campaignId, tenantId });
   if (!campaign) throw new NotFoundError('Campaign not found');
+  assertEntityAccess(user, campaign.entityId);
   transitionState('campaign', campaign, 'redemption_closed', { userId: user.userId });
   await campaign.save();
   return withCampaignMeta(campaign);

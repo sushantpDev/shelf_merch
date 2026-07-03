@@ -125,6 +125,53 @@ describe('RBAC + ABAC (must-have §11.1)', () => {
     expect(list.body.map((e) => e.name)).toEqual(['Marketing']);
   });
 
+  it('entity manager cannot create shops (tenant RBAC)', async () => {
+    const { token } = await makeUser(tenantA, 'entity_manager', 'entity');
+    const res = await request(app)
+      .post('/api/v1/shops')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Sneaky Shop', slug: 'sneaky' });
+    expect(res.status).toBe(403);
+  });
+
+  it('company admin cannot import campaign recipients; entity manager can (campaignOps RBAC)', async () => {
+    const entity = await Entity.create({ tenantId: tenantA._id, walletId: walletA._id, name: 'HR' });
+    const { token: mgrToken } = await makeUser(tenantA, 'entity_manager', 'entity', {
+      assignedEntityIds: [entity._id],
+    });
+    const created = await request(app)
+      .post('/api/v1/campaigns')
+      .set('Authorization', `Bearer ${mgrToken}`)
+      .send({ entityId: String(entity._id), name: 'Ops test', type: 'points' });
+    expect(created.status).toBe(201);
+    const id = created.body._id;
+
+    const denied = await request(app)
+      .post(`/api/v1/campaigns/${id}/recipients/import`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ recipients: [{ name: 'A', email: 'a@test.io' }] });
+    expect(denied.status).toBe(403);
+
+    const allowed = await request(app)
+      .post(`/api/v1/campaigns/${id}/recipients/import`)
+      .set('Authorization', `Bearer ${mgrToken}`)
+      .send({ recipients: [{ name: 'A', email: 'a@test.io' }] });
+    expect(allowed.status).toBe(200);
+  });
+
+  it('entity manager cannot create campaign for unassigned entity (ABAC)', async () => {
+    const entity1 = await Entity.create({ tenantId: tenantA._id, walletId: walletA._id, name: 'HR' });
+    const entity2 = await Entity.create({ tenantId: tenantA._id, walletId: walletA._id, name: 'Sales' });
+    const { token } = await makeUser(tenantA, 'entity_manager', 'entity', {
+      assignedEntityIds: [entity1._id],
+    });
+    const res = await request(app)
+      .post('/api/v1/campaigns')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ entityId: String(entity2._id), name: 'Cross dept', type: 'points' });
+    expect(res.status).toBe(403);
+  });
+
   it('unauthenticated requests are rejected', async () => {
     const res = await request(app).get('/api/v1/wallets');
     expect(res.status).toBe(401);

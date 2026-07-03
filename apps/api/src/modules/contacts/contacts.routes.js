@@ -4,7 +4,7 @@ import multer from 'multer';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { resolveTenant, requireTenantContext } from '../../middleware/tenant.middleware.js';
-import { requireRole } from '../../middleware/rbac.middleware.js';
+import { tenantArea } from '../../middleware/tenantAccess.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { objectId } from '../users/users.validation.js';
 import { Contact } from './contact.model.js';
@@ -17,7 +17,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 const router = Router();
 
 router.use(authenticate, resolveTenant, requireTenantContext);
-const canWrite = requireRole('company_admin', 'entity_manager', 'platform_super_admin');
+const canRead = tenantArea('contacts', 'read');
+const canWrite = tenantArea('contacts', 'write');
 
 const addressSchema = z
   .object({
@@ -42,7 +43,7 @@ const createSchema = z.object({
 
 router.get(
   '/',
-  canWrite,
+  canRead,
   asyncHandler(async (req, res) => {
     res.json(await Contact.find({ tenantId: req.tenantId }).sort({ name: 1 }));
   }),
@@ -109,7 +110,7 @@ router.post(
 
 router.get(
   '/import/:jobId/status',
-  canWrite,
+  canRead,
   validate({ params: z.object({ jobId: objectId }) }),
   asyncHandler(async (req, res) => {
     const job = await ImportJob.findOne({ _id: req.params.jobId, tenantId: req.tenantId });

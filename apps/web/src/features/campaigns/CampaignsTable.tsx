@@ -116,6 +116,8 @@ function StatCard({
   );
 }
 
+import { useTenantAccess } from "@/hooks/useTenantAccess";
+
 /** Campaigns table with stats, filter tabs, search and pagination. */
 export function CampaignsTable({
   campaigns,
@@ -148,6 +150,9 @@ export function CampaignsTable({
   const showingStart = totalFiltered ? start + 1 : 0;
   const showingEnd = Math.min(start + PER_PAGE, totalFiltered);
 
+  const { canOperateCampaigns } = useTenantAccess();
+  const canSend = canOperateCampaigns();
+
   return (
     <>
       <div className="page-h">
@@ -155,9 +160,11 @@ export function CampaignsTable({
           <h1>Campaigns</h1>
           <div className="sub">Track points campaigns and kit-send history.</div>
         </div>
-        <button type="button" className="btn btn-dark" onClick={onSendGift}>
-          Send Gift
-        </button>
+        {canSend ? (
+          <button type="button" className="btn btn-dark" onClick={onSendGift}>
+            Send Gift
+          </button>
+        ) : null}
       </div>
 
       <div className="camp-stats">

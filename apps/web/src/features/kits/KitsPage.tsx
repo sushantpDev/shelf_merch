@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { useTenantAccess } from "@/hooks/useTenantAccess";
 
 import { KitsEmptyState } from "./KitsEmptyState";
 
@@ -199,10 +200,12 @@ export function KitsPage() {
               <h1>Kits &amp; Items</h1>
               <p>Create reusable gift kits with your products and send them at scale.</p>
             </div>
-            <Link to="/app/kits/new" className="kits-create-btn">
-              <Plus size={18} strokeWidth={2.4} />
-              Create a kit
-            </Link>
+            {canCreateKits ? (
+              <Link to="/app/kits/new" className="kits-create-btn">
+                <Plus size={18} strokeWidth={2.4} />
+                Create a kit
+              </Link>
+            ) : null}
           </div>
 
           <div className="kits-stats-grid">
@@ -320,7 +323,7 @@ export function KitsPage() {
                         View
                       </button>
                     )}
-                    {row.status === "live" && row.kit ? (
+                    {row.status === "live" && row.kit && canSendKits ? (
                       <Link
                         to="/app/kits/$id/send"
                         params={{ id: row.id }}
@@ -328,11 +331,11 @@ export function KitsPage() {
                       >
                         Send
                       </Link>
-                    ) : row.status === "live" ? (
+                    ) : row.status === "live" && canSendKits ? (
                       <Link to="/app/kits/new" className="kits-send-btn">
                         Send
                       </Link>
-                    ) : row.kit ? (
+                    ) : row.kit && canCreateKits ? (
                       <Link
                         to="/app/kits/$id/edit"
                         params={{ id: row.id }}
@@ -340,11 +343,11 @@ export function KitsPage() {
                       >
                         Edit
                       </Link>
-                    ) : (
+                    ) : canCreateKits ? (
                       <Link to="/app/kits/new" className="kits-row-btn">
                         Edit
                       </Link>
-                    )}
+                    ) : null}
                     <button
                       type="button"
                       className="kits-more-btn" 

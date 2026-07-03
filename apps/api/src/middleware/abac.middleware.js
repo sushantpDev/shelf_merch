@@ -1,5 +1,14 @@
 import { ForbiddenError } from '../utils/errors.js';
 
+/** Service-layer ABAC — entity managers may only touch assigned entities. */
+export function assertEntityAccess(user, entityId) {
+  if (user?.scopeType !== 'entity' || !entityId) return;
+  const allowed = (user.assignedEntityIds ?? []).map(String);
+  if (!allowed.includes(String(entityId))) {
+    throw new ForbiddenError('You do not have access to this entity');
+  }
+}
+
 /**
  * §6.3 ABAC — where can this user act?
  * `scopeResolver(req)` returns the entityId being touched (or a promise of it,

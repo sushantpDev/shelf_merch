@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { getStoredUser } from "@/services/api-bridge";
 import "./home.css";
 
@@ -23,6 +24,7 @@ function formatRole(role: string) {
   const map: Record<string, string> = {
     owner: "Owner",
     admin: "Admin",
+    company_admin: "Admin",
     entity_manager: "Manager",
     member: "Member",
   };
@@ -38,6 +40,8 @@ const HELP_LINKS = [
 
 export function HomePage() {
   const { data: workspace, isLoading, isError, error } = useWorkspace();
+  const { canWrite } = useTenantAccess();
+  const canCreateShop = canWrite("shops");
   const sessionUser = getStoredUser();
 
   if (isLoading && !workspace) {
@@ -224,10 +228,16 @@ export function HomePage() {
                   Launch a branded shop so recipients can redeem swag on their own schedule.
                 </p>
                 <div className="home-card__footer">
-                  <Link to="/app/shops" className="btn btn-brand btn-sm">
-                    <Store size={15} aria-hidden="true" />
-                    Create a shop
-                  </Link>
+                  {canCreateShop ? (
+                    <Link to="/app/shops/new" className="btn btn-brand btn-sm">
+                      <Store size={15} aria-hidden="true" />
+                      Create a shop
+                    </Link>
+                  ) : (
+                    <Link to="/app/shops" className="lnk">
+                      Browse shops
+                    </Link>
+                  )}
                 </div>
               </>
             )}

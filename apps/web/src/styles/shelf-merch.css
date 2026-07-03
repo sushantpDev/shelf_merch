@@ -1929,7 +1929,7 @@ a.shop-collection-cell:hover{background:#eef1ee}
   linear-gradient(150deg,var(--brand-d),var(--brand) 60%,var(--brand-l));color:#fff;padding:54px 56px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden}
 .auth-art .big{font-family:var(--disp);font-weight:800;font-size:46px;line-height:1.05;letter-spacing:-.03em;max-width:13ch}
 .auth-art .sub{opacity:.85;margin-top:18px;font-size:16px;max-width:34ch;line-height:1.5}
-.auth-form{display:flex;align-items:center;justify-content:center;padding:40px}
+.auth-form{display:flex; flex-direction: column;align-items:center;justify-content:center;padding:10px}
 .auth-form .inner{width:100%;max-width:380px}
 .chiprow{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px}
 .chip{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);padding:7px 13px;border-radius:var(--r-pill);font-size:12.5px;font-weight:600}

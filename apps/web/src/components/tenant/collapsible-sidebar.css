@@ -25,15 +25,13 @@
 }
 
 .sidebar-rail--expanded {
-  width: 200px;
+  width: 225px;
 }
 
 /* Portaled to body — flush on sidebar edge, same fill as rail */
 .sidebar-rail__toggle {
-  position: absolute;
-  top: 0;
-  right: -22px;
-  z-index: 2;
+  position: fixed;
+  z-index: 1001;
   width: 22px;
   height: 40px;
   border-radius: 0 0 8px 0;

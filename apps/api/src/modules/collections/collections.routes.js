@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { resolveTenant, requireTenantContext } from '../../middleware/tenant.middleware.js';
-import { requireRole } from '../../middleware/rbac.middleware.js';
+import { tenantArea } from '../../middleware/tenantAccess.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { objectId } from '../users/users.validation.js';
 import { Collection } from './collection.model.js';
@@ -19,8 +19,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 
 const router = Router();
 
 router.use(authenticate, resolveTenant, requireTenantContext);
-const adminOnly = requireRole('company_admin', 'platform_super_admin');
-const canRead = requireRole('company_admin', 'entity_manager', 'platform_super_admin');
+const canWrite = tenantArea('swag', 'write');
+const canRead = tenantArea('swag', 'read');
 
 const productRef = z.object({
   catalogProductId: objectId,
@@ -56,7 +56,7 @@ router.get(
 
 router.post(
   '/',
-  adminOnly,
+  canWrite,
   validate({ body: createSchema }),
   asyncHandler(async (req, res) => {
     let shopId = null;
@@ -104,7 +104,7 @@ const patchSchema = z.object({
 
 router.patch(
   '/:id',
-  adminOnly,
+  canWrite,
   validate({ params: z.object({ id: objectId }), body: patchSchema }),
   asyncHandler(async (req, res) => {
     const collection = await Collection.findOne({ _id: req.params.id, tenantId: req.tenantId });
@@ -129,7 +129,7 @@ router.patch(
 
 router.post(
   '/:id/archive',
-  adminOnly,
+  canWrite,
   validate({ params: z.object({ id: objectId }) }),
   asyncHandler(async (req, res) => {
     const collection = await Collection.findOne({ _id: req.params.id, tenantId: req.tenantId });
@@ -143,7 +143,7 @@ router.post(
 
 router.post(
   '/:id/restore',
-  adminOnly,
+  canWrite,
   validate({ params: z.object({ id: objectId }) }),
   asyncHandler(async (req, res) => {
     const collection = await Collection.findOne({ _id: req.params.id, tenantId: req.tenantId });
@@ -157,7 +157,7 @@ router.post(
 
 router.delete(
   '/:id',
-  adminOnly,
+  canWrite,
   validate({ params: z.object({ id: objectId }) }),
   asyncHandler(async (req, res) => {
     const collection = await Collection.findOne({ _id: req.params.id, tenantId: req.tenantId });
@@ -171,7 +171,7 @@ router.delete(
 // §7.6 — artwork upload flips the collection to "ready".
 router.post(
   '/:id/artwork',
-  adminOnly,
+  canWrite,
   validate({ params: z.object({ id: objectId }) }),
   upload.single('artwork'),
   asyncHandler(async (req, res) => {
@@ -193,7 +193,7 @@ const mockupMetaItem = z.object({
 // Upload pre-baked product mockups (one PNG per catalog product in the collection).
 router.post(
   '/:id/mockups',
-  adminOnly,
+  canWrite,
   validate({ params: z.object({ id: objectId }) }),
   upload.array('mockups', 50),
   asyncHandler(async (req, res) => {

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { resolveTenant, requireTenantContext } from '../../middleware/tenant.middleware.js';
-import { requireRole } from '../../middleware/rbac.middleware.js';
+import { tenantArea } from '../../middleware/tenantAccess.middleware.js';
 import { requireScope } from '../../middleware/abac.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { idempotency } from '../../middleware/idempotency.middleware.js';
@@ -19,39 +19,41 @@ import { Campaign } from './campaign.model.js';
 const router = Router();
 router.use(authenticate, resolveTenant, requireTenantContext);
 
-const canManage = requireRole('company_admin', 'entity_manager', 'platform_super_admin');
+const canRead = tenantArea('campaigns', 'read');
+const canWrite = tenantArea('campaigns', 'write');
+const canOperate = tenantArea('campaignOps', 'write');
 const entityScope = requireScope(async (req) => {
   const c = await Campaign.findOne({ _id: req.params.id, tenantId: req.tenantId }).select('entityId');
   return c?.entityId ?? null;
 });
 
-router.get('/', canManage, asyncHandler(controller.list));
-router.post('/', canManage, validate({ body: createCampaignSchema }), asyncHandler(controller.create));
-router.get('/:id', canManage, entityScope, validate({ params: campaignIdParams }), asyncHandler(controller.getOne));
+router.get('/', canRead, asyncHandler(controller.list));
+router.post('/', canWrite, validate({ body: createCampaignSchema }), asyncHandler(controller.create));
+router.get('/:id', canRead, entityScope, validate({ params: campaignIdParams }), asyncHandler(controller.getOne));
 router.patch(
   '/:id',
-  canManage,
+  canWrite,
   entityScope,
   validate({ params: campaignIdParams, body: updateCampaignSchema }),
   asyncHandler(controller.update),
 );
 router.post(
   '/:id/recipients/import',
-  canManage,
+  canOperate,
   entityScope,
   validate({ params: campaignIdParams, body: importRecipientsSchema }),
   asyncHandler(controller.importRecipients),
 );
 router.post(
   '/:id/allocate-credits',
-  canManage,
+  canOperate,
   entityScope,
   validate({ params: campaignIdParams, body: allocateCreditsSchema }),
   asyncHandler(controller.allocateCredits),
 );
 router.post(
   '/:id/launch',
-  canManage,
+  canOperate,
   entityScope,
   idempotency({ required: true }),
   validate({ params: campaignIdParams }),
@@ -59,14 +61,14 @@ router.post(
 );
 router.post(
   '/:id/close',
-  canManage,
+  canOperate,
   entityScope,
   validate({ params: campaignIdParams }),
   asyncHandler(controller.close),
 );
 router.get(
   '/:id/report',
-  canManage,
+  canRead,
   entityScope,
   validate({ params: campaignIdParams }),
   asyncHandler(controller.report),

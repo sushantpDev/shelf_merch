@@ -13,6 +13,7 @@ export async function create(req, res) {
   const campaign = await campaignsService.createCampaign({
     tenantId: req.tenantId,
     userId: req.user.userId,
+    user: req.user,
     data: req.body,
   });
   writeAudit({ req, action: 'campaign.create', entityType: 'Campaign', entityId: campaign._id, after: campaign });

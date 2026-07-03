@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { resolveTenant, requireTenantContext, blockDuringImpersonation } from '../../middleware/tenant.middleware.js';
+import { tenantArea } from '../../middleware/tenantAccess.middleware.js';
 import { requireRole } from '../../middleware/rbac.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { objectId } from '../users/users.validation.js';
@@ -34,21 +35,21 @@ tenantsRouter.get('/me', requireTenantContext, asyncHandler(controller.me));
 tenantsRouter.patch(
   '/me',
   requireTenantContext,
-  requireRole('company_admin'),
+  tenantArea('settings', 'write'),
   validate({ body: updateTenantSchema }),
   asyncHandler(controller.updateMe),
 );
 tenantsRouter.post(
   '/me/logo',
   requireTenantContext,
-  requireRole('company_admin'),
+  tenantArea('settings', 'write'),
   upload.single('logo'),
   asyncHandler(controller.uploadLogo),
 );
 tenantsRouter.post(
   '/me/transfer-ownership',
   requireTenantContext,
-  requireRole('company_admin'),
+  tenantArea('settings', 'write'),
   blockDuringImpersonation,
   validate({ body: transferOwnershipSchema }),
   asyncHandler(controller.transferOwnership),
