@@ -4,8 +4,10 @@ import { ArrowLeftRight } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingState } from "@/components/LoadingState";
 import { inr } from "@/components/platform/platform-ui";
-import { useWorkspace } from "@/hooks/useWorkspace";
+import { useWorkspace, useInvalidateWorkspace } from "@/hooks/useWorkspace";
+import { formatWalletAmount } from "@/lib/walletFormat";
 import type { UiContact } from "@/services/mappers";
+import { entityIdForWallet, spendableForWallet } from "@/services/workspace-api";
 import { WizardChrome } from "@/features/swag/wizard/WizardChrome";
 import { RecipientPicker } from "@/features/send/RecipientPicker";
 import { RecipientExperience } from "@/features/send/RecipientExperience";
@@ -20,9 +22,11 @@ export function SendPointsWizard() {
   const navigate = useNavigate();
   const search = useSearch({ from: "/app/campaigns/send-points" }) as { shop?: string };
   const { data: workspace, isLoading } = useWorkspace();
+  const refreshWorkspace = useInvalidateWorkspace();
   const launch = useLaunchPointsCampaign();
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [sending, setSending] = useState(false);
+  const [selectedWalletId, setSelectedWalletId] = useState("");
 
   const contacts: UiContact[] = useMemo(() => workspace?.contacts ?? [], [workspace]);
   const shops = workspace?.shops ?? [];
@@ -47,7 +51,7 @@ export function SendPointsWizard() {
   }
 
   const totals = pointsSendTotals(draft.ppr, draft.recips);
-  const wallet = workspace?.wallets[0];
+  const wallet = workspace?.wallets.find((w) => w.id === selectedWalletId) ?? workspace?.wallets[0];
 
   function exit() {
     navigate({ to: "/app/campaigns" });
@@ -58,9 +62,10 @@ export function SendPointsWizard() {
   }
 
   async function payNow() {
-    const entityId = workspace?.primaryEntityId || workspace?.org.departments[0]?.id;
+    const walletId = selectedWalletId || workspace?.wallets[0]?.id;
+    const entityId = walletId && workspace ? entityIdForWallet(workspace, walletId) : undefined;
     if (!entityId) {
-      toast.error("No department budget found — complete wallet setup first");
+      toast.error("No budget department found for this wallet — allocate funds first");
       return;
     }
     if (!shopId) {
@@ -71,6 +76,18 @@ export function SendPointsWizard() {
       toast.error("Select at least one recipient");
       return;
     }
+    const paymentTotal = Math.round(totals.total);
+    if (draft.pay === "wallet") {
+      const available =
+        walletId && workspace ? spendableForWallet(workspace, walletId) : 0;
+      const payWallet = walletId ? workspace?.wallets.find((w) => w.id === walletId) : undefined;
+      if (available < paymentTotal) {
+        toast.error(
+          `Insufficient wallet balance — ${formatWalletAmount(available, payWallet?.cur)} available`,
+        );
+        return;
+      }
+    }
     setSending(true);
     try {
       await launch.mutateAsync({
@@ -78,6 +95,7 @@ export function SendPointsWizard() {
         shopId: String(shopId),
         name: draft.orderName || "Points campaign",
         creditsPerRecipient: draft.ppr,
+        totalBudget: paymentTotal,
         message: { from: draft.from, body: draft.msg },
         contactIds: draft.selRecips,
         contacts: contacts.map((c) => ({
@@ -87,6 +105,7 @@ export function SendPointsWizard() {
           phone: c.phone,
         })),
       });
+      await refreshWorkspace();
       toast.success(`Points sent to ${draft.selRecips.length} recipients! 🎉`);
       navigate({ to: "/app/shops/$id", params: { id: String(shopId) } });
     } catch (err) {
@@ -224,6 +243,11 @@ export function SendPointsWizard() {
               wallets={workspace?.wallets ?? []}
               selected={draft.pay}
               onSelect={(pay) => dispatch({ type: "setPay", pay })}
+              selectedWalletId={selectedWalletId || workspace?.wallets[0]?.id}
+              onWalletSelect={setSelectedWalletId}
+              walletAvailable={(w) =>
+                workspace ? spendableForWallet(workspace, w.id) : 0
+              }
             />
             <div className="card" style={{ padding: 22, height: "fit-content" }}>
               <div

@@ -8,7 +8,7 @@ import { useWorkspace } from "@/hooks/useWorkspace";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 export function KitDetailPage() {
-  const { id } = useParams({ from: "/app/kits/$id" });
+  const { id } = useParams({ from: "/app/kits/$id/" });
   const { data: workspace, isLoading, isError, error } = useWorkspace();
   const kit = workspace?.kits.find((k) => k.id === id);
 

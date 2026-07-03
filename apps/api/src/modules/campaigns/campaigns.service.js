@@ -6,6 +6,7 @@ import { Entity } from '../entities/entity.model.js';
 import { Contact } from '../contacts/contact.model.js';
 import { Shop } from '../shops/shop.model.js';
 import { Kit } from '../kits/kit.model.js';
+import { Wallet } from '../wallets/wallet.model.js';
 import { Tenant } from '../tenants/tenant.model.js';
 import * as ledger from '../../services/ledger.service.js';
 import { transitionState, validNextStatuses, canTransition } from '../../services/stateMachine.service.js';
@@ -15,6 +16,45 @@ import { ApiError, ForbiddenError, NotFoundError } from '../../utils/errors.js';
 function withCampaignMeta(campaign) {
   const obj = campaign.toObject ? campaign.toObject() : campaign;
   return { ...obj, validNextStatuses: validNextStatuses('campaign', obj.status) };
+}
+
+async function assertWalletCanSpend({ tenantId, entityId, amount, user }) {
+  const budget = Math.round(amount ?? 0);
+  if (budget <= 0) return;
+  const entity = await Entity.findOne({ _id: entityId, tenantId });
+  if (!entity) throw new NotFoundError('Entity not found');
+  const wallet = await Wallet.findOne({ _id: entity.walletId, tenantId });
+  if (!wallet) throw new NotFoundError('Wallet not found');
+
+  if (budget > wallet.balance) {
+    throw new ApiError(
+      422,
+      `Insufficient wallet balance: cash ₹${wallet.balance}, required ₹${budget}`,
+      'INSUFFICIENT_FUNDS',
+    );
+  }
+
+  const unalloc = Math.max(0, wallet.balance - wallet.allocatedAmount);
+  const entityAvailable = Math.max(0, entity.allocatedAmount - entity.spentAmount);
+
+  if (user?.scopeType === 'entity') {
+    if (budget > entityAvailable) {
+      throw new ApiError(
+        422,
+        `Insufficient budget: available ₹${entityAvailable}, required ₹${budget}`,
+        'INSUFFICIENT_FUNDS',
+      );
+    }
+    return;
+  }
+
+  if (budget > unalloc) {
+    throw new ApiError(
+      422,
+      `Insufficient wallet balance: available ₹${unalloc}, required ₹${budget}`,
+      'INSUFFICIENT_FUNDS',
+    );
+  }
 }
 
 function transitionRedemption(recipient, toStatus) {
@@ -125,7 +165,7 @@ async function upsertRecipientsFromList({ tenantId, campaign, rows }) {
 }
 
 /** §7.8 — CSV or manual recipient list. */
-export async function importRecipients({ tenantId, campaignId, user, recipients }) {
+export async function importRecipients({ tenantId, campaignId, user, recipients, totalBudget }) {
   const campaign = await Campaign.findOne({ _id: campaignId, tenantId });
   if (!campaign) throw new NotFoundError('Campaign not found');
   if (user?.scopeType === 'entity') {
@@ -144,7 +184,18 @@ export async function importRecipients({ tenantId, campaignId, user, recipients 
   // Kit / items sends skip credit allocation — approve once recipients are uploaded.
   if (['kit', 'items'].includes(campaign.type) && campaign.status === 'recipients_uploaded') {
     campaign.creditsPerRecipient = 0;
-    campaign.totalBudget = 0;
+    const budget = Math.round(totalBudget ?? 0);
+    if (budget > 0) {
+      await assertWalletCanSpend({
+        tenantId,
+        entityId: campaign.entityId,
+        amount: budget,
+        user,
+      });
+      campaign.totalBudget = budget;
+    } else {
+      campaign.totalBudget = 0;
+    }
     transitionState('campaign', campaign, 'credits_allocated', { userId: user.userId });
     transitionState('campaign', campaign, 'approved', { userId: user.userId });
   }
@@ -152,7 +203,13 @@ export async function importRecipients({ tenantId, campaignId, user, recipients 
   return { count: rows.length, campaign: withCampaignMeta(campaign) };
 }
 
-export async function allocateCredits({ tenantId, campaignId, user, creditsPerRecipient }) {
+export async function allocateCredits({
+  tenantId,
+  campaignId,
+  user,
+  creditsPerRecipient,
+  totalBudget: totalBudgetOverride,
+}) {
   const campaign = await Campaign.findOne({ _id: campaignId, tenantId });
   if (!campaign) throw new NotFoundError('Campaign not found');
   if (user?.scopeType === 'entity') {
@@ -163,15 +220,23 @@ export async function allocateCredits({ tenantId, campaignId, user, creditsPerRe
   const count = await Recipient.countDocuments({ tenantId, campaignId: campaign._id });
   if (count === 0) throw new ApiError(422, 'Upload recipients before allocating credits', 'NO_RECIPIENTS');
 
-  const totalBudget = creditsPerRecipient * count;
+  const totalBudget = Math.round(totalBudgetOverride ?? creditsPerRecipient * count);
+  await assertWalletCanSpend({
+    tenantId,
+    entityId: campaign.entityId,
+    amount: totalBudget,
+    user,
+  });
   const entity = await Entity.findOne({ _id: campaign.entityId, tenantId });
-  const available = entity.allocatedAmount - entity.spentAmount;
-  if (totalBudget > available) {
-    throw new ApiError(
-      422,
-      `Total budget ₹${totalBudget} exceeds entity available budget ₹${available}`,
-      'INSUFFICIENT_ENTITY_BUDGET',
-    );
+  if (user?.scopeType === 'entity') {
+    const entityAvailable = entity.allocatedAmount - entity.spentAmount;
+    if (totalBudget > entityAvailable) {
+      throw new ApiError(
+        422,
+        `Total budget ₹${totalBudget} exceeds entity available budget ₹${entityAvailable}`,
+        'INSUFFICIENT_ENTITY_BUDGET',
+      );
+    }
   }
 
   campaign.creditsPerRecipient = creditsPerRecipient;
@@ -204,13 +269,14 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
 
   const entity = await Entity.findOne({ _id: campaign.entityId, tenantId });
   const isFulfillment = campaign.type === 'kit' || campaign.type === 'items';
-  if (!isFulfillment && campaign.totalBudget > 0) {
+  const spendFromEntity = user?.scopeType === 'entity';
+  if (campaign.totalBudget > 0) {
     await ledger.createTransaction({
       tenantId,
       walletId: entity.walletId,
       type: 'campaign_spend',
       amount: -campaign.totalBudget,
-      relatedEntityId: entity._id,
+      relatedEntityId: spendFromEntity ? entity._id : null,
       description: `Campaign launch: ${campaign.name}`,
       performedBy: user.userId,
     });

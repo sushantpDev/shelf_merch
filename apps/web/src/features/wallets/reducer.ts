@@ -6,7 +6,10 @@ import {
   ORG_ROLES,
   isDeptSelected,
   isPersistedDept,
+  dedupeWizardDepartments,
+  deptPaletteColor,
   selectedDepartments,
+  totalAllocatedAmount,
   type OrgSnapshot,
   type SentInvite,
   type WizardDept,
@@ -28,13 +31,23 @@ export function seedAllocateWizard(org: OrgSnapshot, startStep = 2): WizardState
       uploadFile: org.wallet.uploadFile ?? null,
       pay: org.wallet.pay || "card",
     },
-    departments: org.departments.map((d) => ({
-      ...d,
-      selected: false,
-      mgr: { ...d.mgr },
-    })),
+    departments: dedupeWizardDepartments(
+      org.departments.map((d, i) => ({
+        ...d,
+        color: deptPaletteColor(i),
+        allocated: 0,
+        selected: true,
+        seedAllocated: d.allocated || 0,
+        allocBaselineReset: false,
+        mgr: { ...d.mgr },
+      })),
+    ),
+    unallocatedAtStart: Math.max(
+      0,
+      (org.wallet.amount || 0) - totalAllocatedAmount(org.departments),
+    ),
     seq: org.departments.length + 1,
-    colorIdx: 0,
+    colorIdx: org.departments.length,
     sentInvites: [],
   };
 }
@@ -91,6 +104,16 @@ function newDept(id: number, color: string, fields: Partial<WizardDept>): Wizard
   };
 }
 
+function restoreSelectedDept(d: WizardDept): WizardDept {
+  if (d.selected === true) return d;
+  return {
+    ...d,
+    selected: true,
+    allocated: d.allocated || 0,
+    allocBaselineReset: false,
+  };
+}
+
 export type WizardAction =
   | { type: "goto"; step: number }
   | { type: "next" }
@@ -136,8 +159,15 @@ export function wizardReducer(state: WizardState, action: WizardState | WizardAc
         },
       };
     case "quickAddDept": {
-      if (state.departments.some((d) => d.name.toLowerCase() === action.name.toLowerCase())) {
-        return state;
+      const key = action.name.toLowerCase();
+      const existing = state.departments.find((d) => d.name.toLowerCase() === key);
+      if (existing) {
+        return {
+          ...state,
+          departments: state.departments.map((d) =>
+            d.name.toLowerCase() === key ? restoreSelectedDept(d) : d,
+          ),
+        };
       }
       const { color, colorIdx } = nextColor(state);
       const role = ORG_ROLES.find((r) => r.startsWith(action.name)) || "Operations Manager";
@@ -151,6 +181,7 @@ export function wizardReducer(state: WizardState, action: WizardState | WizardAc
             name: action.name,
             desc: QUICK_ADD_DESCRIPTIONS[action.name] || "Department merchandise and campaigns.",
             mgr: { name: "", email: "", mobile: "", role, invite: true },
+            selected: true,
           }),
         ],
       };
@@ -167,6 +198,7 @@ export function wizardReducer(state: WizardState, action: WizardState | WizardAc
             name: action.name,
             desc: action.desc,
             users: action.users,
+            selected: true,
           }),
         ],
       };
@@ -180,12 +212,26 @@ export function wizardReducer(state: WizardState, action: WizardState | WizardAc
             : d,
         ),
       };
-    case "deleteDept":
+    case "deleteDept": {
       if (state.departments.length <= 1) return state;
+      const target = state.departments.find((d) => String(d.id) === String(action.id));
+      if (!target) return state;
+      // Keep persisted departments in the list so re-select reuses the same entity.
+      if (state.flow === "allocate" && isPersistedDept(target)) {
+        return {
+          ...state,
+          departments: state.departments.map((d) =>
+            String(d.id) === String(action.id)
+              ? { ...d, selected: false, allocated: 0 }
+              : d,
+          ),
+        };
+      }
       return {
         ...state,
         departments: state.departments.filter((d) => String(d.id) !== String(action.id)),
       };
+    }
     case "toggleDeptSelect": {
       const target = state.departments.find((d) => String(d.id) === String(action.id));
       if (!target) return state;
@@ -194,12 +240,9 @@ export function wizardReducer(state: WizardState, action: WizardState | WizardAc
         ...state,
         departments: state.departments.map((d) =>
           String(d.id) === String(action.id)
-            ? {
-                ...d,
-                selected: !turningOff,
-                allocated:
-                  turningOff && (state.mode === "create" || !isPersistedDept(d)) ? 0 : d.allocated,
-              }
+            ? turningOff
+              ? { ...d, selected: false, allocated: 0, allocBaselineReset: false }
+              : restoreSelectedDept(d)
             : d,
         ),
       };
@@ -208,31 +251,36 @@ export function wizardReducer(state: WizardState, action: WizardState | WizardAc
       return {
         ...state,
         departments: state.departments.map((d) =>
-          String(d.id) === String(action.id) ? { ...d, allocated: action.amount } : d,
+          String(d.id) === String(action.id)
+            ? {
+                ...d,
+                allocated: action.amount,
+                selected: true,
+                allocBaselineReset: action.amount === 0 ? true : d.allocBaselineReset,
+              }
+            : d,
         ),
       };
     case "splitEven": {
-      const total = state.wallet.amount;
       const active = selectedDepartments(state.departments);
       const n = active.length;
       if (!n) return state;
-      const committedElsewhere =
-        state.mode === "edit"
-          ? state.departments
-              .filter((d) => !isDeptSelected(d))
-              .reduce((sum, d) => sum + (d.allocated || 0), 0)
-          : 0;
-      const pool = Math.max(0, total - committedElsewhere);
+      const pool =
+        state.flow === "allocate" && state.unallocatedAtStart != null
+          ? state.unallocatedAtStart
+          : state.wallet.amount;
       const base = Math.floor(pool / n / 1000) * 1000;
       const activeIds = new Set(active.map((d) => String(d.id)));
       return {
         ...state,
         departments: state.departments.map((d) => {
-          if (!activeIds.has(String(d.id))) return d;
+          if (!activeIds.has(String(d.id))) return { ...d, allocated: 0 };
           const idx = active.findIndex((a) => String(a.id) === String(d.id));
+          const share = idx === n - 1 ? pool - base * (n - 1) : base;
           return {
             ...d,
-            allocated: idx === n - 1 ? pool - base * (n - 1) : base,
+            allocated: state.flow === "allocate" ? share : share,
+            allocBaselineReset: state.flow === "allocate",
           };
         }),
       };

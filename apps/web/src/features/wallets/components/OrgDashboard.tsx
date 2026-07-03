@@ -3,7 +3,7 @@ import { Plus, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { inr } from "@/components/platform/platform-ui";
 import { PageHeader } from "@/components/tenant/PageHeader";
-import { fmtDate, remainingWalletBalance, totalAllocatedAmount, type OrgSnapshot } from "../types";
+import { fmtDate, deptPaletteColor, remainingWalletBalance, totalAllocatedAmount, type OrgSnapshot } from "../types";
 import { AddFundsDialog } from "./AddFundsDialog";
 import { Donut } from "./Donut";
 import { WalletHistory } from "./WalletHistory";
@@ -184,29 +184,44 @@ export function OrgDashboard({
         </div>
         <div className="row" style={{ alignItems: "stretch" }}>
           <div className="stat" style={{ flex: 1, padding: "18px 22px" }}>
-            <div className="k">Your balance (INR)</div>
+            <div className="k">Total wallet cash</div>
             <div className="v num" style={{ fontSize: 26 }}>
               {inr(total)}
+            </div>
+            <div className="mut3" style={{ fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
+              All cash in this wallet after funding and spend
             </div>
           </div>
           <div style={{ width: 1, background: "var(--line)" }} />
           <div className="stat" style={{ flex: 1, padding: "18px 22px" }}>
-            <div className="k">Unallocated balance</div>
+            <div className="k">Allocated to departments</div>
+            <div className="v num" style={{ fontSize: 26 }}>
+              {inr(alloc)}
+            </div>
+            <div className="mut3" style={{ fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
+              Earmarked for cost-center budgets
+            </div>
+          </div>
+          <div style={{ width: 1, background: "var(--line)" }} />
+          <div className="stat" style={{ flex: 1, padding: "18px 22px" }}>
+            <div className="k">Available to spend</div>
             <div className="v num" style={{ fontSize: 26, color: "var(--brand-d)" }}>
               {inr(rem)}
             </div>
-          </div>
-          <div style={{ width: 1, background: "var(--line)" }} />
-          <div className="stat" style={{ flex: 1, padding: "18px 22px" }}>
-            <div className="k">Total balance (includes allocations)</div>
-            <div className="v num" style={{ fontSize: 26 }}>
-              {inr(total)}
+            <div className="mut3" style={{ fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
+              Unallocated — pay from wallet at checkout
             </div>
           </div>
         </div>
         <div className="muted" style={{ fontSize: 12.5, padding: "10px 22px 14px" }}>
-          Valid {fmtDate(o.start)} → {fmtDate(o.end)} · Funded via{" "}
-          {o.funding === "upload" ? `${o.docType} ${o.docNumber}` : "online payment"}
+          <span>
+            {inr(alloc)} allocated + {inr(rem)} available = {inr(total)} total cash
+          </span>
+          <span style={{ margin: "0 8px" }}>·</span>
+          <span>
+            Valid {fmtDate(o.start)} → {fmtDate(o.end)} · Funded via{" "}
+            {o.funding === "upload" ? `${o.docType} ${o.docNumber}` : "online payment"}
+          </span>
         </div>
       </div>
 
@@ -225,7 +240,14 @@ export function OrgDashboard({
             Budget distribution
           </div>
           <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
-            <Donut segments={depts} centerValue={depts.length} centerLabel="Depts" />
+            <Donut
+              segments={depts.map((d, i) => ({
+                color: deptPaletteColor(i),
+                allocated: d.allocated,
+              }))}
+              centerValue={depts.length}
+              centerLabel="Depts"
+            />
             <div style={{ flex: 1 }}>
               {depts.length === 0 ? (
                 <p className="muted" style={{ fontSize: 13 }}>
@@ -238,7 +260,7 @@ export function OrgDashboard({
                   to add cost centers.
                 </p>
               ) : (
-                depts.map((d) => (
+                depts.map((d, i) => (
                   <div
                     key={d.id}
                     className="row"
@@ -247,7 +269,7 @@ export function OrgDashboard({
                     <span className="row" style={{ gap: 6, alignItems: "center" }}>
                       <span
                         className="lc"
-                        style={{ width: 9, height: 9, borderRadius: 3, background: d.color }}
+                        style={{ width: 9, height: 9, borderRadius: 3, background: deptPaletteColor(i) }}
                       />
                       {d.name}
                     </span>
@@ -307,13 +329,13 @@ export function OrgDashboard({
               </tr>
             </thead>
             <tbody>
-              {depts.map((d) => (
+              {depts.map((d, i) => (
                 <tr key={d.id}>
                   <td>
                     <div className="row" style={{ gap: 9, alignItems: "center" }}>
                       <span
                         className="lc"
-                        style={{ width: 11, height: 11, borderRadius: 3, background: d.color }}
+                        style={{ width: 11, height: 11, borderRadius: 3, background: deptPaletteColor(i) }}
                       />
                       <span style={{ fontWeight: 600 }}>{d.name}</span>
                     </div>

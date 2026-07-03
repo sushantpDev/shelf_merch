@@ -13,6 +13,8 @@ import { ApiError, InsufficientFundsError, NotFoundError } from '../utils/errors
  * - `allocation_to_entity` is an earmark, not a cash movement: it moves
  *   `wallet.allocatedAmount` (and the entity's allocatedAmount) while the cash
  *   stays in the wallet. Invariant: allocatedAmount <= balance at all times.
+ * - `campaign_spend` / `order_payment` debit cash only. Department earmarks
+ *   stay until explicitly deallocated; entity `spentAmount` tracks consumption.
  * - Every movement is an append-only WalletTransaction with a balanceAfter
  *   snapshot, so `balance` is always recomputable/auditable from the log.
  *
@@ -66,10 +68,6 @@ export async function createTransaction(
         );
       }
       if (type === 'fund_in') wallet.totalAmount += amount;
-      // Spending against an entity's earmark releases that earmark.
-      if ((type === 'campaign_spend' || type === 'order_payment') && relatedEntityId) {
-        newAllocated = Math.max(0, wallet.allocatedAmount + amount); // amount is negative
-      }
     } else if (type === 'allocation_to_entity') {
       newAllocated = wallet.allocatedAmount + amount;
       if (newAllocated < 0) {
@@ -115,7 +113,7 @@ export async function createTransaction(
       } else if (type === 'campaign_spend' || type === 'order_payment') {
         await Entity.updateOne(
           { _id: relatedEntityId, tenantId },
-          { $inc: { spentAmount: Math.abs(amount), allocatedAmount: amount } },
+          { $inc: { spentAmount: Math.abs(amount) } },
           { session: s },
         );
       }
@@ -133,8 +131,8 @@ export async function allocateToEntities({ tenantId, walletId, allocations, perf
     await session.withTransaction(async () => {
       txns = [];
       for (const { entityId, amount } of allocations) {
-        const entity = await Entity.findOne({ _id: entityId, tenantId, walletId }).session(session);
-        if (!entity) throw new NotFoundError(`Entity ${entityId} not found in this wallet`);
+        const entity = await Entity.findOne({ _id: entityId, tenantId }).session(session);
+        if (!entity) throw new NotFoundError(`Entity ${entityId} not found`);
         const txn = await createTransaction(
           {
             tenantId,
@@ -142,7 +140,10 @@ export async function allocateToEntities({ tenantId, walletId, allocations, perf
             type: 'allocation_to_entity',
             amount,
             relatedEntityId: entity._id,
-            description: `Budget allocation to ${entity.name}`,
+            description:
+              amount >= 0
+                ? `Budget allocation to ${entity.name}`
+                : `Budget returned from ${entity.name}`,
             performedBy,
           },
           session,
@@ -215,4 +216,94 @@ export async function recomputeBalance({ tenantId, walletId }) {
     { $group: { _id: null, balance: { $sum: '$amount' } } },
   ]);
   return rows[0]?.balance ?? 0;
+}
+
+/** Recompute earmarked budget from allocation transactions (spend does not release earmarks). */
+export async function recomputeAllocatedAmount({ tenantId, walletId }) {
+  const rows = await WalletTransaction.aggregate([
+    {
+      $match: {
+        tenantId: new mongoose.Types.ObjectId(String(tenantId)),
+        walletId: new mongoose.Types.ObjectId(String(walletId)),
+        type: 'allocation_to_entity',
+      },
+    },
+    { $group: { _id: null, allocated: { $sum: '$amount' } } },
+  ]);
+  return rows[0]?.allocated ?? 0;
+}
+
+export async function repairEntityCache({ tenantId, entityId }) {
+  const entity = await Entity.findOne({ _id: entityId, tenantId });
+  if (!entity) return null;
+
+  const [allocRows, spentRows] = await Promise.all([
+    WalletTransaction.aggregate([
+      {
+        $match: {
+          tenantId: new mongoose.Types.ObjectId(String(tenantId)),
+          relatedEntityId: entity._id,
+          type: 'allocation_to_entity',
+        },
+      },
+      { $group: { _id: null, allocated: { $sum: '$amount' } } },
+    ]),
+    WalletTransaction.aggregate([
+      {
+        $match: {
+          tenantId: new mongoose.Types.ObjectId(String(tenantId)),
+          relatedEntityId: entity._id,
+          type: { $in: ['campaign_spend', 'order_payment'] },
+        },
+      },
+      { $group: { _id: null, spent: { $sum: { $abs: '$amount' } } } },
+    ]),
+  ]);
+
+  const allocatedAmount = allocRows[0]?.allocated ?? 0;
+  const spentAmount = spentRows[0]?.spent ?? 0;
+  let dirty = false;
+  if (entity.allocatedAmount !== allocatedAmount) {
+    entity.allocatedAmount = allocatedAmount;
+    dirty = true;
+  }
+  if (entity.spentAmount !== spentAmount) {
+    entity.spentAmount = spentAmount;
+    dirty = true;
+  }
+  if (dirty) await entity.save();
+  return entity;
+}
+
+/** Repair cached wallet/entity figures from the append-only ledger. */
+export async function repairWalletCaches({ tenantId, walletId }) {
+  const wallet = await Wallet.findOne({ _id: walletId, tenantId });
+  if (!wallet) return null;
+
+  const [balance, allocated] = await Promise.all([
+    recomputeBalance({ tenantId, walletId }),
+    recomputeAllocatedAmount({ tenantId, walletId }),
+  ]);
+
+  let walletDirty = false;
+  if (wallet.balance !== balance) {
+    wallet.balance = balance;
+    walletDirty = true;
+  }
+  if (wallet.allocatedAmount !== allocated) {
+    wallet.allocatedAmount = allocated;
+    walletDirty = true;
+  }
+  if (walletDirty) await wallet.save();
+
+  const walletEntityIds = await Entity.find({ tenantId, walletId }).distinct('_id');
+  const ledgerEntityIds = await WalletTransaction.find({
+    tenantId,
+    walletId,
+    relatedEntityId: { $ne: null },
+  }).distinct('relatedEntityId');
+  const entityIds = [...new Set([...walletEntityIds, ...ledgerEntityIds].map(String))];
+  await Promise.all(entityIds.map((entityId) => repairEntityCache({ tenantId, entityId })));
+
+  return wallet;
 }

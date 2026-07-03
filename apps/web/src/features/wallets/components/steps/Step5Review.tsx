@@ -1,5 +1,5 @@
 import { inr } from "@/components/platform/platform-ui";
-import { fmtDate, remainingWalletBalanceForWizard, selectedDepartments, wizardCommittedAllocations } from "../../types";
+import { fmtDate, allocationFromPool, isAllocateEditFlow, remainingWalletBalanceForWizard, selectedDepartments, wizardTargetAllocation } from "../../types";
 import { Donut } from "../Donut";
 import type { StepProps } from "./StepProps";
 
@@ -7,8 +7,13 @@ export function Step5Review({ state, dispatch, account }: StepProps & { account:
   const o = state.wallet;
   const total = o.amount;
   const depts = selectedDepartments(state.departments);
-  const alloc = wizardCommittedAllocations(state.departments, state.mode);
-  const rem = remainingWalletBalanceForWizard(total, state.departments, state.mode);
+  const isEdit = isAllocateEditFlow(state.flow, state.mode);
+  const fromPool = allocationFromPool(state.departments);
+  const rem = remainingWalletBalanceForWizard(total, state.departments, {
+    flow: state.flow,
+    mode: state.mode,
+    unallocatedAtStart: state.unallocatedAtStart,
+  });
 
   return (
     <>
@@ -21,12 +26,12 @@ export function Step5Review({ state, dispatch, account }: StepProps & { account:
 
       <div className="grid" style={{ gridTemplateColumns: "repeat(3,1fr)", marginBottom: 18 }}>
         <div className="card stat">
-          <div className="k">Total budget</div>
-          <div className="v num">{inr(total)}</div>
+          <div className="k">{isEdit ? "Unallocated wallet" : "Total budget"}</div>
+          <div className="v num">{inr(isEdit ? (state.unallocatedAtStart ?? total) : total)}</div>
         </div>
         <div className="card stat">
-          <div className="k">Allocated</div>
-          <div className="v num">{inr(alloc)}</div>
+          <div className="k">{isEdit ? "Adding from wallet" : "Allocated"}</div>
+          <div className="v num">{inr(isEdit ? fromPool : depts.reduce((s, d) => s + wizardTargetAllocation(d), 0))}</div>
         </div>
         <div className="card stat">
           <div className="k">Remaining</div>
@@ -72,10 +77,10 @@ export function Step5Review({ state, dispatch, account }: StepProps & { account:
                   </div>
                 </div>
                 <span className="num" style={{ fontWeight: 700, fontSize: 13 }}>
-                  {inr(d.allocated)}
+                  {inr(wizardTargetAllocation(d))}
                 </span>
                 <span className="pct-pill">
-                  {total ? Math.round((d.allocated / total) * 100) : 0}%
+                  {total ? Math.round((wizardTargetAllocation(d) / total) * 100) : 0}%
                 </span>
               </div>
             ))}
@@ -96,7 +101,7 @@ export function Step5Review({ state, dispatch, account }: StepProps & { account:
             Budget distribution
           </div>
           <Donut
-            segments={depts}
+            segments={depts.map((d) => ({ color: d.color, allocated: wizardTargetAllocation(d) }))}
             centerValue={depts.length}
             centerLabel="Departments"
             centerFontSize={26}
@@ -115,7 +120,7 @@ export function Step5Review({ state, dispatch, account }: StepProps & { account:
                   />
                   {d.name}
                 </span>
-                <b>{total ? Math.round((d.allocated / total) * 100) : 0}%</b>
+                <b>{total ? Math.round((wizardTargetAllocation(d) / total) * 100) : 0}%</b>
               </div>
             ))}
           </div>

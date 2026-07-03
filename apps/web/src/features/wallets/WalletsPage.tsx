@@ -41,18 +41,8 @@ export function WalletsPage() {
     setInWizard(true);
   }
 
-  if (role === "entity_manager") {
-    return (
-      <EntityManagerDashboard
-        account={account}
-        org={org}
-        primaryEntityId={workspace.primaryEntityId}
-      />
-    );
-  }
-
   if (inWizard) {
-    if (wizard.done) {
+    if (wizard.done && wizard.flow === "wallet") {
       return (
         <OrgDoneScreen
           account={account}
@@ -69,8 +59,17 @@ export function WalletsPage() {
         dispatch={dispatch}
         onExit={() => setInWizard(false)}
         onFinished={() => {
-          /* keep wizard mounted so the done screen can render */
+          /* wallet create — done screen renders via wizard.done */
         }}
+      />
+    );
+  }
+
+  if (role === "entity_manager" && workspace.wallets.length > 0) {
+    return (
+      <EntityManagerDashboard
+        account={account}
+        workspace={workspace}
       />
     );
   }

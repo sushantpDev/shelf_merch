@@ -84,7 +84,7 @@ describe('ledger.service', () => {
     expect(e.allocatedAmount).toBe(300_000);
   });
 
-  it('campaign_spend debits cash, releases earmark, and tracks entity spend', async () => {
+  it('campaign_spend debits cash and tracks entity spend without releasing earmarks', async () => {
     await ledger.createTransaction({ tenantId: tenant._id, walletId: wallet._id, type: 'fund_in', amount: 500_000 });
     await ledger.createTransaction({
       tenantId: tenant._id, walletId: wallet._id, type: 'allocation_to_entity', amount: 300_000, relatedEntityId: entity._id,
@@ -94,10 +94,10 @@ describe('ledger.service', () => {
     });
     const w = await reload();
     expect(w.balance).toBe(380_000);
-    expect(w.allocatedAmount).toBe(180_000);
+    expect(w.allocatedAmount).toBe(300_000);
     const e = await Entity.findOne({ _id: entity._id, tenantId: tenant._id });
     expect(e.spentAmount).toBe(120_000);
-    expect(e.allocatedAmount).toBe(180_000);
+    expect(e.allocatedAmount).toBe(300_000);
   });
 
   it('allocateToEntities is all-or-nothing across multiple entities', async () => {

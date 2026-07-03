@@ -432,6 +432,7 @@ export async function launchPointsCampaignFlow(payload: {
   shopId: string;
   name: string;
   creditsPerRecipient: number;
+  totalBudget?: number;
   message: { from: string; body: string };
   contactIds: string[];
   contacts: Array<{ id: string; name: string; email: string; phone?: string }>;
@@ -446,6 +447,7 @@ export async function launchPointsCampaignFlow(payload: {
     shopId: payload.shopId,
     name: payload.name,
     creditsPerRecipient: payload.creditsPerRecipient,
+    totalBudget: payload.totalBudget,
     message: payload.message,
     recipients,
   });
@@ -455,6 +457,7 @@ export async function launchKitCampaignFlow(payload: {
   entityId: string;
   kitId: string;
   name: string;
+  totalBudget?: number;
   fulfillmentMode?: "redeem" | "surprise" | "single";
   singleLocation?: {
     name: string;
@@ -481,6 +484,7 @@ export async function launchKitCampaignFlow(payload: {
     entityId: payload.entityId,
     kitId: payload.kitId,
     name: payload.name,
+    totalBudget: payload.totalBudget,
     fulfillmentMode: payload.fulfillmentMode,
     singleLocation: payload.singleLocation,
     message: payload.message,

@@ -1,4 +1,4 @@
-import { type ComponentType } from "react";
+import { type ComponentType, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowRight,
@@ -26,7 +26,6 @@ import scaleYourGiftingImg from "../../../assets/scale_your_gifting.png";
 import wellnessKitImg from "../../../assets/wellness-kit.png";
 import workFromHomeKitImg from "../../../assets/work-from-home-kit.png";
 import kitPreviewImg from "../../../assets/kit-preview.png";
-import { KitDetailDialog } from "./KitDetailDialog";
 import "./kits-page.css";
 
 
@@ -137,8 +136,14 @@ function StatCard({ label, value, delta, icon: Icon }: StatCardProps) {
   );
 }
 
-function kitRowsFromWorkspace(kits: UiKit[]): KitRow[] {
-  const mapped = kits.slice(0, 4).map((kit, index): KitRow => {
+function kitRowsFromWorkspace(
+  kits: UiKit[],
+  options?: { limit?: number; padWithSamples?: boolean },
+): KitRow[] {
+  const limit = options?.limit;
+  const padWithSamples = options?.padWithSamples ?? false;
+  const source = limit != null ? kits.slice(0, limit) : kits;
+  const mapped = source.map((kit, index): KitRow => {
     const sample = SAMPLE_ROWS[index] ?? SAMPLE_ROWS[0];
     return {
       ...sample,
@@ -152,11 +157,17 @@ function kitRowsFromWorkspace(kits: UiKit[]): KitRow[] {
     };
   });
 
-  return [...mapped, ...SAMPLE_ROWS.slice(mapped.length)].slice(0, 4);
+  if (padWithSamples && limit != null) {
+    return [...mapped, ...SAMPLE_ROWS.slice(mapped.length)].slice(0, limit);
+  }
+  return mapped;
 }
 
 export function KitsPage() {
   const { data: workspace, isLoading, isError, error } = useWorkspace();
+  const [showAll, setShowAll] = useState(false);
+
+  const previewLimit = 4;
 
   if (isLoading && !workspace) {
     return <LoadingState message="Loading kits..." fullScreen={false} />;
@@ -173,7 +184,11 @@ export function KitsPage() {
   const total = Math.max(kits.length, 24);
   const live = Math.max(kits.filter((k) => k.status === "live").length, 16);
   const drafts = Math.max(kits.filter((k) => k.status !== "live").length, 5);
-  const rows = kitRowsFromWorkspace(kits);
+  const rows = kitRowsFromWorkspace(
+    kits,
+    showAll ? undefined : { limit: previewLimit, padWithSamples: true },
+  );
+  const hasMoreKits = kits.length > previewLimit;
 
   return (
     <section className="kits-dashboard" aria-label="Kits and Items dashboard">
@@ -253,7 +268,13 @@ export function KitsPage() {
                     <img src={row.image} alt="" />
                     <div>
                       <div className="kits-kit-title">
-                        {row.name}
+                        {row.kit ? (
+                          <Link to="/app/kits/$id" params={{ id: row.id }} className="lnk">
+                            {row.name}
+                          </Link>
+                        ) : (
+                          row.name
+                        )}
                         {row.featured && (
                           <span className="kits-featured">
                             <Star size={11} fill="currentColor" />
@@ -287,15 +308,15 @@ export function KitsPage() {
 
                   <div className="kits-row-actions">
                     {row.kit ? (
-                      <button
-                        type="button"
+                      <Link
+                        to="/app/kits/$id"
+                        params={{ id: row.id }}
                         className="kits-row-btn"
-                        onClick={() => setDetail(row.kit ?? null)}
                       >
                         View
-                      </button>
+                      </Link>
                     ) : (
-                      <button type="button" className="kits-row-btn">
+                      <button type="button" className="kits-row-btn" disabled>
                         View
                       </button>
                     )}
@@ -337,10 +358,28 @@ export function KitsPage() {
             </div>
 
             <div className="kits-list-footer">
-              <span>Showing 1-4 of {total} kits</span>
-              <Link to="/app/kits" className="kits-view-all">
-                View all kits <ArrowRight size={17} />
-              </Link>
+              <span>
+                {showAll
+                  ? `Showing all ${kits.length} kit${kits.length === 1 ? "" : "s"}`
+                  : `Showing 1-${Math.min(previewLimit, rows.length)} of ${total} kits`}
+              </span>
+              {hasMoreKits && !showAll ? (
+                <button
+                  type="button"
+                  className="kits-view-all"
+                  onClick={() => setShowAll(true)}
+                >
+                  View all kits <ArrowRight size={17} />
+                </button>
+              ) : showAll && hasMoreKits ? (
+                <button
+                  type="button"
+                  className="kits-view-all"
+                  onClick={() => setShowAll(false)}
+                >
+                  Show fewer
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -365,43 +404,6 @@ export function KitsPage() {
                     <strong>{title}</strong>
                     <p>{meta}</p>
                   </div>
-
-                </td>
-                <td className="num">{kit.items}</td>
-                <td>
-                  {kit.status === "live" ? (
-                    <span className="tag tag-live">
-                      <span className="dot" />
-                      Live
-                    </span>
-                  ) : (
-                    <span className="tag tag-draft">Draft</span>
-                  )}
-                </td>
-                <td className="muted">{kit.sent ? "Recently" : "Not yet"}</td>
-                <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                  <Link
-                    to="/app/kits/$id"
-                    params={{ id: kit.id }}
-                    className="btn btn-ghost btn-sm"
-                  >
-                    Details
-                  </Link>{" "}
-                  <Link
-                    to="/app/kits/$id/send"
-                    params={{ id: kit.id }}
-                    className="btn btn-dark btn-sm"
-                  >
-                    Send
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-
                 </div>
               ))}
             </div>
@@ -451,13 +453,6 @@ export function KitsPage() {
           </section>
         </aside>
       </div>
-
-      <KitDetailDialog
-        kit={detail}
-        catalog={workspace.catalogProducts}
-        onOpenChange={(open) => !open && setDetail(null)}
-      />
     </section>
-
   );
 }

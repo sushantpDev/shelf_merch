@@ -1,6 +1,7 @@
 import { useState, type Dispatch } from "react";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Send, Wallet } from "lucide-react";
 import { toast } from "sonner";
+import { inr } from "@/components/platform/platform-ui";
 import {
   Dialog,
   DialogContent,
@@ -15,8 +16,9 @@ import {
   ALLOC_STEP_MIN,
   ALLOC_STEPS,
   ORG_STEPS,
-  selectedDepartments,
-  totalAlloc,
+  allocationFromPool,
+  departmentsToSync,
+  isAllocateEditFlow,
   wizardCommittedAllocations,
   type WizardState,
 } from "../types";
@@ -46,9 +48,15 @@ export function OrgWizard({
   const isWalletFlow = state.flow === "wallet";
   const busy = createWallet.isPending || sync.isPending;
   const n = state.step;
-  const alloc = totalAlloc(state.departments);
-  const walletAlloc = wizardCommittedAllocations(state.departments, state.mode);
-  const over = !isWalletFlow && n === 3 && walletAlloc > state.wallet.amount;
+  const isEditAllocate = isAllocateEditFlow(state.flow, state.mode);
+  const fromPool = allocationFromPool(state.departments);
+  const walletAlloc = wizardCommittedAllocations(state.departments);
+  const over =
+    !isWalletFlow &&
+    n === 3 &&
+    (isEditAllocate
+      ? fromPool > (state.unallocatedAtStart ?? state.wallet.amount)
+      : walletAlloc > state.wallet.amount);
 
   function validateWalletStep(): boolean {
     const w = state.wallet;
@@ -64,6 +72,10 @@ export function OrgWizard({
       toast.error("Upload your PO or agreement document");
       return false;
     }
+    if (w.funding === "upload" && !w.docNumber.trim()) {
+      toast.error("Enter the document number");
+      return false;
+    }
     return true;
   }
 
@@ -74,16 +86,16 @@ export function OrgWizard({
       return;
     }
 
-    if (n === 2 && selectedDepartments(state.departments).length === 0) {
+    if (n === 2 && departmentsToSync(state.departments).length === 0) {
       toast.error("Select at least one department to continue");
       return;
     }
-    if (n === 3 && walletAlloc > state.wallet.amount) {
+    if (n === 3 && over) {
       toast.error("Reduce allocations to continue");
       return;
     }
     if (n === ALLOC_STEP_MAX) {
-      if (alloc <= 0) {
+      if (walletAlloc <= 0) {
         toast.error("Allocate budget to at least one department before finishing");
         return;
       }
@@ -109,10 +121,10 @@ export function OrgWizard({
       const withLinks = result.invites.filter((i) => i.inviteToken).length;
       toast.success(
         withLinks
-          ? `Allocations saved — ${withLinks} invite link(s) shown below`
-          : "Budget allocation saved to your workspace",
+          ? `Allocations saved — ${withLinks} manager invite(s) sent`
+          : "Budget allocation saved",
       );
-      onFinished();
+      onExit();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save");
     }
@@ -232,13 +244,16 @@ export function OrgWizard({
       </div>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="sm-modal">
-          <div className="modal-pad">
-            <DialogHeader>
-              <DialogTitle style={{ fontSize: 22, fontFamily: "var(--disp)" }}>
+        <DialogContent className="sm-modal wallet-confirm-modal">
+          <div className="wallet-confirm">
+            <DialogHeader className="wallet-confirm-head">
+              <div className="wallet-confirm-icon" aria-hidden="true">
+                {isWalletFlow ? <Wallet size={22} /> : <CheckCircle2 size={23} />}
+              </div>
+              <DialogTitle className="wallet-confirm-title">
                 {isWalletFlow ? "Submit wallet for review?" : "Finish allocation?"}
               </DialogTitle>
-              <DialogDescription className="muted" style={{ fontSize: 13.5, margin: "6px 0 20px" }}>
+              <DialogDescription className="wallet-confirm-desc">
                 {isWalletFlow ? (
                   <>
                     This creates the <b>{state.wallet.name}</b> wallet and sends your PO to platform
@@ -253,15 +268,29 @@ export function OrgWizard({
                 )}
               </DialogDescription>
             </DialogHeader>
-            <div className="row" style={{ borderTop: "1px solid var(--line)", paddingTop: 16 }}>
+            <div className="wallet-confirm-summary">
+              <div>
+                <span>Wallet</span>
+                <b>{state.wallet.name}</b>
+              </div>
+              <div>
+                <span>{isWalletFlow ? "Submitted amount" : "Adding from wallet"}</span>
+                <b>{isWalletFlow ? inr(state.wallet.amount) : inr(fromPool)}</b>
+              </div>
+              <div>
+                <span>Next step</span>
+                <b>{isWalletFlow ? "Finance review" : "Manager access"}</b>
+              </div>
+            </div>
+            <div className="wallet-confirm-actions">
               <button
                 type="button"
-                className="btn btn-ghost btn-block"
+                className="btn btn-ghost"
                 onClick={() => setConfirmOpen(false)}
               >
                 Not yet
               </button>
-              <button type="button" className="btn btn-brand btn-block" onClick={handleFinish}>
+              <button type="button" className="btn btn-brand" onClick={handleFinish}>
                 {isWalletFlow ? "Submit for review" : "Finish allocation"}
               </button>
             </div>

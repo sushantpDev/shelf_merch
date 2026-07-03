@@ -1,7 +1,10 @@
 import { Wallet } from "lucide-react";
+import { useQueries } from "@tanstack/react-query";
 import { inr } from "@/components/platform/platform-ui";
-import { useWalletTransactions } from "../hooks";
-import type { WalletTransactionRow } from "@/services/mutations-api";
+import {
+  fetchWalletTransactionsApi,
+  type WalletTransactionRow,
+} from "@/services/mutations-api";
 
 function formatTxnDate(iso?: string): string {
   if (!iso) return "—";
@@ -12,35 +15,87 @@ function formatTxnDate(iso?: string): string {
   });
 }
 
-function txnLabel(type: string): string {
+function txnLabel(type: string, amount?: number): string {
   if (type === "fund_in") return "Funds added";
-  if (type === "allocation_to_entity") return "Budget allocated";
+  if (type === "allocation_to_entity") {
+    return amount != null && amount < 0 ? "Budget returned" : "Budget allocated";
+  }
   if (type === "transfer_between_wallets") return "Transfer";
   if (type === "campaign_spend" || type === "order_payment") return "Spend";
   if (type === "refund") return "Refund";
   return type.replace(/_/g, " ");
 }
 
-/** Running unallocated balance (cash − earmarked to departments) after each row. */
-function withAvailableBalance(txns: WalletTransactionRow[]) {
-  const chronological = [...txns].sort(
+/** Running department budget (allocated − spent) after each row. */
+function withEntityBudgetBalance(txns: WalletTransactionRow[], entityIds: string[]) {
+  const entitySet = new Set(entityIds.map(String));
+  const mine = txns.filter((t) => entitySet.has(String(t.relatedEntityId ?? "")));
+  const chronological = [...mine].sort(
     (a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime(),
   );
   let allocated = 0;
-  const availableByKey = new Map<string, number>();
+  let spent = 0;
+  const remainingByKey = new Map<string, number>();
 
   for (const t of chronological) {
     if (t.type === "allocation_to_entity") {
       allocated += t.amount;
     } else if (t.type === "campaign_spend" || t.type === "order_payment") {
+      spent += Math.abs(t.amount);
+    }
+    const key = t._id ?? `${t.createdAt}-${t.amount}-${t.type}`;
+    remainingByKey.set(key, allocated - spent);
+  }
+
+  return mine.map((t) => {
+    const key = t._id ?? `${t.createdAt}-${t.amount}-${t.type}`;
+    return { ...t, availableAfter: remainingByKey.get(key) };
+  });
+}
+
+function entityTxnAmountDisplay(t: WalletTransactionRow): { text: string; color: string } {
+  if (t.type === "allocation_to_entity") {
+    if (t.amount < 0) {
+      return { text: `-${inr(Math.abs(t.amount))}`, color: "var(--danger)" };
+    }
+    return { text: `+${inr(t.amount)}`, color: "var(--brand-d)" };
+  }
+  return {
+    text: `-${inr(Math.abs(t.amount))}`,
+    color: "var(--ink)",
+  };
+}
+
+/** Running unallocated balance (cash − earmarked to departments) after each row. */
+function isEntitySpend(t: WalletTransactionRow): boolean {
+  return t.type === "campaign_spend" || t.type === "order_payment";
+}
+
+function adminCashDelta(t: WalletTransactionRow): number {
+  if (t.type === "allocation_to_entity") return 0;
+  if (isEntitySpend(t)) return 0;
+  return t.amount;
+}
+
+function withAvailableBalance(txns: WalletTransactionRow[]) {
+  const adminTxns = txns.filter((t) => !isEntitySpend(t));
+  const chronological = [...adminTxns].sort(
+    (a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime(),
+  );
+  let cash = 0;
+  let allocated = 0;
+  const availableByKey = new Map<string, number>();
+
+  for (const t of chronological) {
+    cash += adminCashDelta(t);
+    if (t.type === "allocation_to_entity") {
       allocated += t.amount;
     }
-    const cash = t.balanceAfter ?? 0;
     const key = t._id ?? `${t.createdAt}-${t.amount}-${t.type}`;
     availableByKey.set(key, cash - allocated);
   }
 
-  return txns.map((t) => {
+  return adminTxns.map((t) => {
     const key = t._id ?? `${t.createdAt}-${t.amount}-${t.type}`;
     return { ...t, availableAfter: availableByKey.get(key) };
   });
@@ -48,38 +103,71 @@ function withAvailableBalance(txns: WalletTransactionRow[]) {
 
 function txnAmountDisplay(t: WalletTransactionRow): { text: string; color: string } {
   if (t.type === "allocation_to_entity") {
+    // Positive ledger amount = earmark to dept (less unallocated). Negative = return to wallet.
+    if (t.amount < 0) {
+      return { text: `+${inr(Math.abs(t.amount))}`, color: "var(--brand-d)" };
+    }
     return { text: `-${inr(t.amount)}`, color: "var(--danger)" };
   }
+  const sign = t.amount >= 0 ? "+" : "-";
   return {
-    text: `${t.amount >= 0 ? "+" : ""}${inr(Math.abs(t.amount))}`,
+    text: `${sign}${inr(Math.abs(t.amount))}`,
     color: t.amount >= 0 ? "var(--brand-d)" : "var(--ink)",
   };
 }
 
-export function WalletHistory({ walletId }: { walletId: string }) {
-  const { data: txns = [], isLoading } = useWalletTransactions(walletId);
-  const rows = withAvailableBalance(txns);
+export function WalletHistory({
+  walletId,
+  walletIds,
+  entityId,
+  entityIds,
+}: {
+  walletId?: string;
+  walletIds?: string[];
+  entityId?: string;
+  entityIds?: string[];
+}) {
+  const ids = walletIds?.length ? walletIds : walletId ? [walletId] : [];
+  const entityIdList = entityIds?.length ? entityIds : entityId ? [entityId] : [];
+  const entityMode = entityIdList.length > 0;
+  const limit = entityMode ? 50 : 20;
+  const queries = useQueries({
+    queries: ids.map((id) => ({
+      queryKey: ["wallet-transactions", id, limit],
+      queryFn: () => fetchWalletTransactionsApi(id, limit),
+      enabled: Boolean(id),
+    })),
+  });
+  const isLoading = queries.some((q) => q.isLoading);
+  const txns = queries.flatMap((q) => q.data ?? []);
+  const rows = (entityMode
+    ? withEntityBudgetBalance(txns, entityIdList)
+    : withAvailableBalance(txns)
+  ).sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+  const title = entityMode ? "Budget history" : "Wallet history";
+  const balanceColumn = entityMode ? "Remaining budget" : "Unallocated balance";
 
   return (
     <div className="card data-list-card wallet-history">
-      <div className="data-list-title">Wallet history</div>
+      <div className="data-list-title">{title}</div>
 
       {isLoading && <p className="muted" style={{ fontSize: 13 }}>Loading transactions…</p>}
 
-      {!isLoading && txns.length === 0 && (
+      {!isLoading && rows.length === 0 && (
         <div className="data-list-empty">
           <div className="data-list-empty-icon" aria-hidden="true">
             <Wallet size={28} color="var(--brand)" />
           </div>
-          <h4>No wallet history yet</h4>
+          <h4>{entityMode ? "No budget activity yet" : "No wallet history yet"}</h4>
           <p className="muted" style={{ fontSize: 13, maxWidth: 360, margin: "0 auto" }}>
-            Preload now for future campaigns. Add ₹1,00,000+ via bank transfer and get 5% bonus
-            funds.
+            {entityMode
+              ? "Allocations and campaign spend for your department will appear here."
+              : "Preload now for future campaigns. Add ₹1,00,000+ via bank transfer and get 5% bonus funds."}
           </p>
         </div>
       )}
 
-      {!isLoading && txns.length > 0 && (
+      {!isLoading && rows.length > 0 && (
         <table className="tbl data-list-table">
           <thead>
             <tr>
@@ -87,17 +175,17 @@ export function WalletHistory({ walletId }: { walletId: string }) {
               <th>Description</th>
               <th>Type</th>
               <th>Amount</th>
-              <th>Available balance</th>
+              <th>{balanceColumn}</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((t) => {
-              const amount = txnAmountDisplay(t);
+              const amount = entityMode ? entityTxnAmountDisplay(t) : txnAmountDisplay(t);
               return (
               <tr key={t._id ?? `${t.createdAt}-${t.amount}`}>
                 <td className="muted data-list-cell">{formatTxnDate(t.createdAt)}</td>
                 <td className="data-list-cell">{t.description || "—"}</td>
-                <td className="muted data-list-cell">{txnLabel(t.type)}</td>
+                <td className="muted data-list-cell">{txnLabel(t.type, t.amount)}</td>
                 <td
                   className="num data-list-cell data-list-amount"
                   style={{ color: amount.color }}

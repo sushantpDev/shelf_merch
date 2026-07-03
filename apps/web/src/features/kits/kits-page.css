@@ -479,6 +479,11 @@
   color: #00643f;
   font-weight: 900;
   text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
 }
 
 .kits-promo {

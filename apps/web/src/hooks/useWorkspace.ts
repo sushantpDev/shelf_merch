@@ -21,5 +21,5 @@ export function useWorkspace() {
 /** Imperative refresh of the workspace snapshot — call after a mutation. */
 export function useInvalidateWorkspace() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: WORKSPACE_QUERY_KEY });
+  return () => queryClient.refetchQueries({ queryKey: WORKSPACE_QUERY_KEY });
 }

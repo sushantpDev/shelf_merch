@@ -1,5 +1,5 @@
 import { inr } from "@/components/platform/platform-ui";
-import { ORG_ROLES, selectedDepartments } from "../../types";
+import { ORG_ROLES, selectedDepartments, wizardTargetAllocation } from "../../types";
 import type { StepProps } from "./StepProps";
 
 export function Step4Managers({ state, dispatch }: StepProps) {
@@ -24,7 +24,7 @@ export function Step4Managers({ state, dispatch }: StepProps) {
             </div>
             <div style={{ fontWeight: 700, fontSize: 15 }}>{d.name}</div>
             <div className="mb">
-              Budget <b>{inr(d.allocated)}</b>
+              Budget <b>{inr(wizardTargetAllocation(d))}</b>
             </div>
           </div>
           <div className="mgr-body" style={{ display: "block", padding: 18 }}>

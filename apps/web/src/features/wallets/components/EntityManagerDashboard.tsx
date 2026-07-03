@@ -1,21 +1,20 @@
 import { Wallet } from "lucide-react";
 import { inr } from "@/components/platform/platform-ui";
 import { PageHeader } from "@/components/tenant/PageHeader";
-import type { OrgSnapshot } from "../types";
+import { entityManagerDepartments } from "@/services/workspace-api";
+import type { WorkspaceSnapshot } from "@/services/workspace-api";
+import { WalletHistory } from "./WalletHistory";
 
 /** Department-budget view shown to an entity (department) manager. */
 export function EntityManagerDashboard({
   account,
-  org,
-  primaryEntityId,
+  workspace,
 }: {
   account: string;
-  org: OrgSnapshot;
-  primaryEntityId?: string;
+  workspace: WorkspaceSnapshot;
 }) {
-  const dept =
-    (primaryEntityId && org.departments.find((d) => String(d.id) === String(primaryEntityId))) ||
-    org.departments[0];
+  const departments = entityManagerDepartments(workspace);
+  const dept = departments[0];
 
   if (!dept) {
     return (
@@ -36,13 +35,20 @@ export function EntityManagerDashboard({
     );
   }
 
-  const alloc = dept.allocated || 0;
-  const spent = dept.spent || 0;
-  const rem = alloc - spent;
+  const alloc = departments.reduce((sum, d) => sum + (d.allocated || 0), 0);
+  const spent = departments.reduce((sum, d) => sum + (d.spent || 0), 0);
+  const rem = departments.reduce(
+    (sum, d) => sum + Math.max(0, (d.allocated || 0) - (d.spent || 0)),
+    0,
+  );
+  const subtitle =
+    departments.length === 1
+      ? `${account} - ${dept.name}`
+      : `${account} - ${departments.length} assigned budgets`;
 
   return (
     <>
-      <PageHeader title="My department budget" subtitle={`${account} · ${dept.name}`} />
+      <PageHeader title="My department budget" subtitle={subtitle} />
 
       {!alloc && (
         <div
@@ -60,62 +66,56 @@ export function EntityManagerDashboard({
         </div>
       )}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1.2fr 1fr",
-          gap: 18,
-          marginBottom: 18,
-        }}
-      >
-        <div className="card" style={{ padding: 22 }}>
-          <div
-            className="mut3"
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: ".04em",
-            }}
-          >
-            Allocated to you
-          </div>
-          <div
-            className="num"
-            style={{
-              fontFamily: "var(--disp)",
-              fontWeight: 800,
-              fontSize: 34,
-              margin: "12px 0 4px",
-            }}
-          >
-            {inr(alloc)}
-          </div>
-          <div className="muted" style={{ fontSize: 13 }}>
-            This is your department&apos;s merchandise budget for campaigns and orders.
-          </div>
-        </div>
-        <div className="card row" style={{ padding: 0 }}>
-          <div className="stat" style={{ flex: 1 }}>
-            <div className="k">Spent</div>
-            <div className="v num">{inr(spent)}</div>
+      <div className="card wallet-balance-strip" style={{ padding: 0, marginBottom: 18 }}>
+        <div className="row" style={{ alignItems: "stretch" }}>
+          <div className="stat" style={{ flex: 1, padding: "18px 22px" }}>
+            <div className="k">Total allocated</div>
+            <div className="v num" style={{ fontSize: 26 }}>
+              {inr(alloc)}
+            </div>
+            <div className="mut3" style={{ fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
+              Budget assigned to your department
+            </div>
           </div>
           <div style={{ width: 1, background: "var(--line)" }} />
-          <div className="stat" style={{ flex: 1 }}>
-            <div className="k">Remaining</div>
-            <div className="v num" style={{ color: "var(--brand-d)" }}>
+          <div className="stat" style={{ flex: 1, padding: "18px 22px" }}>
+            <div className="k">Spent</div>
+            <div className="v num" style={{ fontSize: 26 }}>
+              {inr(spent)}
+            </div>
+            <div className="mut3" style={{ fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
+              Used on campaigns and orders
+            </div>
+          </div>
+          <div style={{ width: 1, background: "var(--line)" }} />
+          <div className="stat" style={{ flex: 1, padding: "18px 22px" }}>
+            <div className="k">Available to spend</div>
+            <div className="v num" style={{ fontSize: 26, color: "var(--brand-d)" }}>
               {inr(rem)}
+            </div>
+            <div className="mut3" style={{ fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
+              Remaining department budget
             </div>
           </div>
         </div>
+        {alloc > 0 && (
+          <div className="muted" style={{ fontSize: 12.5, padding: "10px 22px 14px" }}>
+            {inr(spent)} spent + {inr(rem)} available = {inr(alloc)} total allocated
+          </div>
+        )}
       </div>
 
-      <div className="card" style={{ padding: "18px 22px" }}>
+      <div className="card" style={{ padding: "18px 22px", marginBottom: 18 }}>
         <div className="mut3" style={{ fontSize: 12 }}>
           You can create campaigns and send gifts from this budget. Company-wide wallet settings are
           managed by your admin.
         </div>
       </div>
+
+      <WalletHistory
+        walletIds={[...new Set(departments.map((d) => d.walletId).filter(Boolean) as string[])]}
+        entityIds={departments.map((d) => String(d.id))}
+      />
     </>
   );
 }

@@ -52,10 +52,14 @@ export const importRecipientsSchema = z.object({
       }),
     )
     .min(1),
+  /** Checkout total in INR — required for kit/items wallet debit on launch. */
+  totalBudget: z.number().positive().optional(),
 });
 
 export const allocateCreditsSchema = z.object({
   creditsPerRecipient: z.number().positive(),
+  /** Full checkout total in INR (incl. fees/tax). Falls back to credits × recipients. */
+  totalBudget: z.number().positive().optional(),
 });
 
 export const campaignIdParams = z.object({ id: objectId });

@@ -139,6 +139,7 @@ export type UiWallet = {
 
 export type UiOrgDept = {
   id: string | number;
+  walletId?: string;
   name: string;
   desc: string;
   users: number;
@@ -417,14 +418,14 @@ export function mapCampaign(c: ApiProduct): UiCampaign {
 }
 
 export function mapWallet(w: ApiProduct, owner?: ApiUser): UiWallet {
-  const balance = w.balance ?? 0;
+  const balance = w.totalAmount ?? w.balance ?? 0;
   const alloc = w.allocatedAmount ?? 0;
   return {
     id: String(w._id),
     name: w.name,
-    cur: w.currency || "INR",
+    cur: (w.currency || "INR").toUpperCase(),
     balance,
-    unalloc: w.unallocatedAmount ?? balance - alloc,
+    unalloc: balance - alloc,
     alloc,
     owner: owner?.name || "—",
     email: owner?.email || "",
@@ -453,6 +454,7 @@ export function mapEntityToDept(e: ApiEntity, usersById: Map<string, ApiUser>): 
   }
   return {
     id: String(e._id),
+    walletId: e.walletId ? String(e.walletId) : undefined,
     name: e.name,
     desc: e.description || "",
     users: e.expectedUsers ?? 0,

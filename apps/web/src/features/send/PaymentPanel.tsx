@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { inr } from "@/components/platform/platform-ui";
+import { formatWalletAmount, walletUnallocated } from "@/lib/walletFormat";
 import type { UiWallet } from "@/services/mappers";
 import type { PaymentMethod } from "./types";
+
+function defaultWalletAvailable(w: UiWallet): number {
+  return walletUnallocated(w);
+}
 
 /** Shared payment method picker (Send Items + Send Points). */
 export function PaymentPanel({
@@ -10,26 +14,41 @@ export function PaymentPanel({
   wallets,
   selected,
   onSelect,
+  selectedWalletId,
+  onWalletSelect,
+  walletAvailable = defaultWalletAvailable,
 }: {
   wallet: UiWallet | undefined;
   wallets?: UiWallet[];
   selected: PaymentMethod;
   onSelect: (method: PaymentMethod) => void;
+  selectedWalletId?: string;
+  onWalletSelect?: (walletId: string) => void;
+  /** Spendable balance for checkout — unallocated for admins, dept budget for managers. */
+  walletAvailable?: (wallet: UiWallet) => number;
 }) {
   const walletOptions = useMemo(
     () => (wallets?.length ? wallets : wallet ? [wallet] : []),
     [wallet, wallets],
   );
-  const [selectedWalletId, setSelectedWalletId] = useState(walletOptions[0]?.id ?? "");
+  const [internalWalletId, setInternalWalletId] = useState(walletOptions[0]?.id ?? "");
+  const activeWalletId = selectedWalletId ?? internalWalletId;
 
   useEffect(() => {
-    if (walletOptions.length && !walletOptions.some((item) => item.id === selectedWalletId)) {
-      setSelectedWalletId(walletOptions[0].id);
+    if (walletOptions.length && !walletOptions.some((item) => item.id === activeWalletId)) {
+      const next = walletOptions[0].id;
+      setInternalWalletId(next);
+      onWalletSelect?.(next);
     }
-  }, [selectedWalletId, walletOptions]);
+  }, [activeWalletId, onWalletSelect, walletOptions]);
 
   const selectedWallet =
-    walletOptions.find((item) => item.id === selectedWalletId) ?? walletOptions[0];
+    walletOptions.find((item) => item.id === activeWalletId) ?? walletOptions[0];
+
+  function pickWallet(walletId: string) {
+    setInternalWalletId(walletId);
+    onWalletSelect?.(walletId);
+  }
 
   const option = (key: PaymentMethod, title: string, sub: string, extra?: React.ReactNode) => (
     <button
@@ -89,13 +108,15 @@ export function PaymentPanel({
                       item.id === selectedWallet.id ? "on" : ""
                     }`}
                     onClick={() => {
-                      setSelectedWalletId(item.id);
+                      pickWallet(item.id);
                       onSelect("wallet");
                     }}
                   >
                     <span className="pay-wallet-check" aria-hidden="true" />
                     <span className="pay-wallet-name">{item.name}</span>
-                    <b>{inr(item.balance)} available</b>
+                    <b>
+                      {formatWalletAmount(walletAvailable(item), item.cur)} available
+                    </b>
                   </button>
                 ))}
               </div>
@@ -106,7 +127,7 @@ export function PaymentPanel({
         option(
           "wallet",
           "Wallet balance",
-          `${inr(0)} available`,
+          `${formatWalletAmount(0, "INR")} available`,
           <span className="tag tag-draft">Unavailable</span>,
         )
       )}

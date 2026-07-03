@@ -19,6 +19,10 @@ export type WizardDept = {
   };
   /** Included in budget setup when true (default). */
   selected?: boolean;
+  /** Allocated amount when the edit wizard opened (edit / allocate flow). */
+  seedAllocated?: number;
+  /** @deprecated Edit allocations are always top-ups from the unallocated pool. */
+  allocBaselineReset?: boolean;
 };
 
 /** A funding document selected in the wallet wizard. */
@@ -70,6 +74,8 @@ export type WizardState = {
   seq: number;
   colorIdx: number;
   sentInvites: SentInvite[];
+  /** Unallocated wallet cash when the allocate wizard opened. */
+  unallocatedAtStart?: number;
 };
 
 export type OrgSnapshot = WorkspaceSnapshot["org"];
@@ -102,6 +108,11 @@ export const ORG_FALLBACK = [
   "#EA580C",
   "#0D9488",
 ] as const;
+
+/** Distinct chart color per department index (wallets dashboard donut / legend). */
+export function deptPaletteColor(index: number): string {
+  return ORG_FALLBACK[index % ORG_FALLBACK.length];
+}
 
 export const ORG_STEPS = [
   "Create Wallet",
@@ -152,9 +163,58 @@ const MONGO_ID = /^[a-f0-9]{24}$/i;
 /** Department already stored on the API (vs a temporary wizard id). */
 export const isPersistedDept = (d: WizardDept): boolean => MONGO_ID.test(String(d.id));
 
+/** Collapse duplicate rows (same mongo id or same name). Selected row wins. */
+export function dedupeWizardDepartments(departments: WizardDept[]): WizardDept[] {
+  const byId = new Map<string, WizardDept>();
+  const byName = new Map<string, WizardDept>();
+
+  for (const d of departments) {
+    const nameKey = d.name.trim().toLowerCase();
+    const idKey = isPersistedDept(d) ? String(d.id) : "";
+    const prev = (idKey && byId.get(idKey)) || byName.get(nameKey);
+    if (!prev) {
+      if (idKey) byId.set(idKey, d);
+      byName.set(nameKey, d);
+      continue;
+    }
+    const take =
+      isDeptSelected(d) && !isDeptSelected(prev)
+        ? d
+        : !isDeptSelected(d) && isDeptSelected(prev)
+          ? prev
+          : (d.allocated || 0) >= (prev.allocated || 0)
+            ? d
+            : prev;
+    if (idKey) byId.set(idKey, take);
+    byName.set(nameKey, take);
+    if (isPersistedDept(take)) byId.set(String(take.id), take);
+  }
+
+  const seen = new Set<WizardDept>();
+  const out: WizardDept[] = [];
+  for (const d of byName.values()) {
+    if (seen.has(d)) continue;
+    seen.add(d);
+    out.push(d);
+  }
+  return out;
+}
+
+/** Rows to persist: selected top-ups only; existing unselected departments stay unchanged. */
+export function departmentsForSync(departments: WizardDept[]): WizardDept[] {
+  const selected = selectedDepartments(departments);
+  return dedupeWizardDepartments([
+    ...selected.map((d) => ({
+      ...d,
+      selected: true as const,
+      allocated: wizardTargetAllocation(d),
+    })),
+  ]);
+}
+
 /** Departments that should be created/updated when finishing setup. */
 export const departmentsToSync = (departments: WizardDept[]): WizardDept[] =>
-  departments.filter((d) => isDeptSelected(d) || isPersistedDept(d));
+  selectedDepartments(departments);
 
 /** Sum of active allocations for selected departments in the wizard. */
 export const totalAlloc = (departments: WizardDept[]): number =>
@@ -164,22 +224,46 @@ export const totalAlloc = (departments: WizardDept[]): number =>
 export const totalAllocatedAmount = (departments: WizardDept[]): number =>
   departments.reduce((sum, d) => sum + (d.allocated || 0), 0);
 
-/** Allocations that count against the wallet total inside the wizard. */
-export const wizardCommittedAllocations = (
+/** Allocations that count against the wallet total inside the wizard (selected depts only). */
+export const wizardCommittedAllocations = (departments: WizardDept[]): number =>
+  totalAlloc(departments);
+
+/** Extra amount drawn from the unallocated pool in edit / allocate flow. */
+export function allocationDeltaFromPool(d: WizardDept): number {
+  return d.allocated || 0;
+}
+
+/** Target allocation persisted on save (API compares to current entity budget). */
+export function wizardTargetAllocation(d: WizardDept): number {
+  const seed = d.seedAllocated ?? 0;
+  const amount = d.allocated || 0;
+  return seed + amount;
+}
+
+export function allocationFromPool(departments: WizardDept[]): number {
+  return selectedDepartments(departments).reduce((sum, d) => sum + allocationDeltaFromPool(d), 0);
+}
+
+export function isAllocateEditFlow(flow: WizardFlow, mode: WizardMode): boolean {
+  return flow === "allocate" || mode === "edit";
+}
+
+/** Remaining unallocated cash while editing allocations. */
+export function remainingWalletBalanceForWizard(
+  walletTotal: number,
   departments: WizardDept[],
-  mode: WizardMode,
-): number => (mode === "create" ? totalAlloc(departments) : totalAllocatedAmount(departments));
+  options?: { flow?: WizardFlow; mode?: WizardMode; unallocatedAtStart?: number },
+): number {
+  const { flow, mode, unallocatedAtStart } = options ?? {};
+  if (isAllocateEditFlow(flow ?? "wallet", mode ?? "create") && unallocatedAtStart != null) {
+    return unallocatedAtStart - allocationFromPool(departments);
+  }
+  return walletTotal - wizardCommittedAllocations(departments);
+}
 
 /** Unallocated balance on the dashboard: total − all department allocations. */
 export const remainingWalletBalance = (walletTotal: number, departments: WizardDept[]): number =>
   walletTotal - totalAllocatedAmount(departments);
-
-/** Unallocated balance during the wizard (create vs edit semantics). */
-export const remainingWalletBalanceForWizard = (
-  walletTotal: number,
-  departments: WizardDept[],
-  mode: WizardMode,
-): number => walletTotal - wizardCommittedAllocations(departments, mode);
 
 /** Percentage of wallet total, capped for display when over budget. */
 export const pctOfWalletTotal = (part: number, total: number): string => {

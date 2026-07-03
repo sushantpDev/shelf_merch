@@ -8,20 +8,27 @@ import {
   fetchWalletTransactionsApi,
 } from "@/services/mutations-api";
 import { useInvalidateWorkspace } from "@/hooks/useWorkspace";
-import { selectedDepartments, type WizardState } from "./types";
+import { departmentsForSync, type WizardState } from "./types";
 
 /**
  * Persist the allocate-funds wizard. Updates departments, allocations, and manager invites.
  */
 export function useSyncOrgWizard() {
   const invalidateWorkspace = useInvalidateWorkspace();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (state: WizardState) =>
       syncOrgWizard({
         wallet: state.wallet,
-        departments: selectedDepartments(state.departments),
+        departments: departmentsForSync(state.departments),
       }),
-    onSuccess: () => invalidateWorkspace(),
+    onSuccess: (_data, state) => {
+      invalidateWorkspace();
+      const walletId = state.wallet.id;
+      if (walletId) {
+        queryClient.invalidateQueries({ queryKey: ["wallet-transactions", walletId] });
+      }
+    },
   });
 }
 
@@ -74,10 +81,10 @@ export function useCreateRazorpayOrder() {
   });
 }
 
-export function useWalletTransactions(walletId: string | undefined) {
+export function useWalletTransactions(walletId: string | undefined, limit = 20) {
   return useQuery({
-    queryKey: ["wallet-transactions", walletId],
-    queryFn: () => fetchWalletTransactionsApi(walletId!),
+    queryKey: ["wallet-transactions", walletId, limit],
+    queryFn: () => fetchWalletTransactionsApi(walletId!, limit),
     enabled: Boolean(walletId),
   });
 }

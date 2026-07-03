@@ -36,6 +36,7 @@ export async function importRecipients(req, res) {
     campaignId: req.params.id,
     user: req.user,
     recipients: req.body.recipients,
+    totalBudget: req.body.totalBudget,
   });
   writeAudit({
     req,
@@ -55,6 +56,7 @@ export async function allocateCredits(req, res) {
     campaignId: req.params.id,
     user: req.user,
     creditsPerRecipient: req.body.creditsPerRecipient,
+    totalBudget: req.body.totalBudget,
   });
   writeAudit({
     req,

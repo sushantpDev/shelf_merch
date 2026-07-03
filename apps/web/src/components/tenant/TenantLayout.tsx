@@ -5,7 +5,13 @@ import { UserMenu } from "@/components/tenant/UserMenu";
 import { WalletBalanceMenu } from "@/components/tenant/WalletBalanceMenu";
 import { getStoredUser, isAuthenticated } from "@/services/api-bridge";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import type { WorkspaceSnapshot } from "@/services/workspace-api";
+import { formatWalletAmount, formatWalletsTotal } from "@/lib/walletFormat";
+import {
+  entityManagerBudgetRemaining,
+  entityManagerDepartments,
+  spendableForWallet,
+  type WorkspaceSnapshot,
+} from "@/services/workspace-api";
 import "@/styles/shelf-merch.css";
 
 // The workspace navigation now lives in <CollapsibleSidebar/>; this layout only
@@ -28,21 +34,11 @@ function truncTopbarName(name: string, max = 16) {
 }
 
 function formatWalletBalance(workspace: WorkspaceSnapshot | undefined) {
-  if (!workspace) return "₹0";
-  if (workspace.userPatch.role === "entity_manager" && workspace.primaryEntityId) {
-    const dept = workspace.org.departments.find(
-      (d) => String(d.id) === String(workspace.primaryEntityId),
-    );
-    if (dept) {
-      const rem = Math.max(0, (dept.allocated || 0) - (dept.spent || 0));
-      return `₹${Math.round(rem).toLocaleString("en-IN")}`;
-    }
+  if (!workspace) return formatWalletAmount(0, "INR");
+  if (workspace.userPatch.role === "entity_manager") {
+    return formatWalletAmount(entityManagerBudgetRemaining(workspace), "INR");
   }
-  const totalUnalloc = workspace.wallets.reduce(
-    (sum, w) => sum + Math.max(0, w.unalloc ?? w.balance ?? 0),
-    0,
-  );
-  return `₹${Math.round(totalUnalloc).toLocaleString("en-IN")}`;
+  return formatWalletsTotal(workspace.wallets);
 }
 
 export default function TenantLayout() {
@@ -69,6 +65,24 @@ export default function TenantLayout() {
   const userName = workspace?.userPatch?.name ?? user?.name ?? "User";
   const userEmail = workspace?.userPatch?.email ?? user?.email ?? "";
   const walletBalance = formatWalletBalance(workspace);
+  const isEntityManager = workspace?.userPatch.role === "entity_manager";
+  const entityManagerWalletIds =
+    isEntityManager && workspace
+      ? new Set(
+          entityManagerDepartments(workspace)
+            .map((d) => d.walletId)
+            .filter((id): id is string => Boolean(id)),
+        )
+      : undefined;
+  const headerWallets =
+    isEntityManager && entityManagerWalletIds
+      ? (workspace?.wallets ?? []).filter((w) => entityManagerWalletIds.has(w.id))
+      : (workspace?.wallets ?? []);
+  const walletItemBalance =
+    isEntityManager && workspace
+      ? (w: WorkspaceSnapshot["wallets"][number]) =>
+          formatWalletAmount(spendableForWallet(workspace, w.id), w.cur)
+      : undefined;
 
   return (
     <div className="tenant-shell">
@@ -93,9 +107,13 @@ export default function TenantLayout() {
         <div className="spacer" />
         <div className="topbar-right">
           <WalletBalanceMenu
-            wallets={workspace?.wallets ?? []}
+            wallets={headerWallets}
             totalLabel={walletBalance}
             currentWalletId={currentWalletId}
+            balanceCaption={isEntityManager ? "Available department budget" : "Available balance"}
+            itemBalance={
+              walletItemBalance
+            }
           />
           <UserMenu
             userName={userName}

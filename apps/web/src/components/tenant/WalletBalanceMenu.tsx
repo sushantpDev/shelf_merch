@@ -1,6 +1,7 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { UiWallet } from "@/services/mappers";
+import { formatWalletAmount, walletUnallocated } from "@/lib/walletFormat";
 import walletIconImg from "../../../assets/wallet-icon.svg";
 
 function TopbarChevron({ open }: { open: boolean }) {
@@ -21,23 +22,21 @@ function TopbarChevron({ open }: { open: boolean }) {
   );
 }
 
-function formatBalance(amount: number, currency: string) {
-  if (currency === "INR" || currency === "inr") {
-    return `₹${Math.round(amount).toLocaleString("en-IN")}`;
-  }
-  if (currency === "USD" || currency === "usd") {
-    return `$${Math.round(amount).toLocaleString("en-US")}`;
-  }
-  return `${Math.round(amount).toLocaleString()} ${currency}`;
-}
-
 type Props = {
   wallets: UiWallet[];
   totalLabel: string;
   currentWalletId?: string;
+  balanceCaption?: string;
+  itemBalance?: (wallet: UiWallet) => string;
 };
 
-export function WalletBalanceMenu({ wallets, totalLabel, currentWalletId }: Props) {
+export function WalletBalanceMenu({
+  wallets,
+  totalLabel,
+  currentWalletId,
+  balanceCaption = "Available balance",
+  itemBalance,
+}: Props) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -111,7 +110,10 @@ export function WalletBalanceMenu({ wallets, totalLabel, currentWalletId }: Prop
                       >
                         <span className="wallet-menu-item-name">{w.name}</span>
                         <span className="wallet-menu-item-bal">
-                          Available balance: {formatBalance(w.unalloc ?? w.balance, w.cur)}
+                          {balanceCaption}:{" "}
+                          {itemBalance
+                            ? itemBalance(w)
+                            : formatWalletAmount(walletUnallocated(w), w.cur)}
                         </span>
                       </button>
                       <button

@@ -1,24 +1,111 @@
 import { Entity } from './entity.model.js';
 import { Wallet } from '../wallets/wallet.model.js';
 import { Tenant } from '../tenants/tenant.model.js';
+import { User } from '../users/user.model.js';
 import { inviteUser } from '../users/users.service.js';
 import { RoleAssignment } from '../roles/roleAssignment.model.js';
 import { transitionState } from '../../services/stateMachine.service.js';
+import * as ledger from '../../services/ledger.service.js';
 import { ApiError, NotFoundError } from '../../utils/errors.js';
+
+/** Keep role assignments in sync when a user is set as entity.managerUserId. */
+export async function syncManagerEntityAccess({ tenantId, userId }) {
+  const managed = await Entity.find({ tenantId, managerUserId: userId }).select('_id').lean();
+  if (!managed.length) return;
+
+  let assignment = await RoleAssignment.findOne({ userId, tenantId });
+  if (!assignment) {
+    await RoleAssignment.create({
+      tenantId,
+      userId,
+      role: 'entity_manager',
+      scopeType: 'entity',
+      scopeId: managed[0]._id,
+      assignedEntityIds: managed.map((e) => e._id),
+    });
+    return;
+  }
+
+  let dirty = false;
+  const known = new Set(assignment.assignedEntityIds.map(String));
+  for (const entity of managed) {
+    if (!known.has(String(entity._id))) {
+      assignment.assignedEntityIds.push(entity._id);
+      dirty = true;
+    }
+  }
+  if (assignment.role !== 'entity_manager') {
+    assignment.role = 'entity_manager';
+    dirty = true;
+  }
+  if (assignment.scopeType !== 'entity') {
+    assignment.scopeType = 'entity';
+    dirty = true;
+  }
+  if (!assignment.scopeId && managed.length === 1) {
+    assignment.scopeId = managed[0]._id;
+    dirty = true;
+  }
+  if (dirty) await assignment.save();
+}
+
+async function managedEntitiesForUser({ tenantId, user }) {
+  const dbUser = await User.findOne({ _id: user.userId, tenantId }).select('email').lean();
+  const email = dbUser?.email?.toLowerCase();
+
+  const or = [{ managerUserId: user.userId }];
+  if (email) or.push({ managerEmail: email });
+
+  const managed = await Entity.find({ tenantId, $or: or }).select('_id managerUserId').lean();
+
+  for (const entity of managed) {
+    if (!entity.managerUserId || String(entity.managerUserId) !== String(user.userId)) {
+      await Entity.updateOne(
+        { _id: entity._id, tenantId },
+        { managerUserId: user.userId, managerInvitePending: false },
+      );
+    }
+  }
+
+  await syncManagerEntityAccess({ tenantId, userId: user.userId });
+
+  return managed.map((e) => String(e._id));
+}
+
+async function entityIdsVisibleToManager({ tenantId, user }) {
+  const isEntityManager = user.role === 'entity_manager' || user.scopeType === 'entity';
+  if (!isEntityManager) return null;
+
+  const managedIds = await managedEntitiesForUser({ tenantId, user });
+  const merged = [
+    ...new Set([...(user.assignedEntityIds ?? []).map(String), ...managedIds]),
+  ].filter(Boolean);
+
+  return merged;
+}
 
 export async function listEntities({ tenantId, user, walletId }) {
   const filter = { tenantId, ...(walletId ? { walletId } : {}) };
-  // ABAC: entity managers only see their assigned entities.
-  if (user.scopeType === 'entity') {
-    filter._id = { $in: user.assignedEntityIds };
+  const visibleIds = await entityIdsVisibleToManager({ tenantId, user });
+  if (visibleIds) {
+    filter._id = { $in: visibleIds };
   }
+
+  const walletsToRepair = walletId
+    ? await Wallet.find({ tenantId, _id: walletId }).select('_id').lean()
+    : await Wallet.find({ tenantId }).select('_id').lean();
+  await Promise.all(
+    walletsToRepair.map((w) => ledger.repairWalletCaches({ tenantId, walletId: w._id })),
+  );
+
   return Entity.find(filter).sort({ createdAt: 1 }).populate('managerUserId', 'name email phone status');
 }
 
 export async function getEntity({ tenantId, entityId }) {
   const entity = await Entity.findOne({ _id: entityId, tenantId });
   if (!entity) throw new NotFoundError('Entity not found');
-  return entity;
+  await ledger.repairWalletCaches({ tenantId, walletId: entity.walletId });
+  return Entity.findOne({ _id: entityId, tenantId });
 }
 
 export async function createEntity({ tenantId, data, userId }) {
@@ -96,6 +183,8 @@ export async function assignManager({ tenantId, entityId, data, userId }) {
   entity.managerName = data.name || user.name || '';
   entity.managerEmail = user.email || data.email || '';
   await entity.save();
+
+  await syncManagerEntityAccess({ tenantId, userId: user._id });
 
   // Wizard advance: all entities of the wallet managed → managers_assigned.
   const wallet = await Wallet.findOne({ _id: entity.walletId, tenantId });

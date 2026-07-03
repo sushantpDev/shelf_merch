@@ -21,6 +21,7 @@ import {
   type UiWallet,
 } from "./mappers";
 import { getStoredUser, type AuthUser } from "./auth-store";
+import { walletSpendable, walletUnallocated } from "@/lib/walletFormat";
 
 export type WalletOrgView = {
   active: boolean;
@@ -47,6 +48,7 @@ export type WorkspaceSnapshot = {
   primaryWalletId?: string;
   walletViews: Record<string, WalletOrgView>;
   primaryEntityId?: string;
+  primaryEntityWalletId?: string;
   org: {
     active: boolean;
     done: boolean;
@@ -119,7 +121,7 @@ function mapWalletOrgFields(
     status: w.status || "",
     amount: isEntityManager
       ? (myEntity?.allocatedAmount ?? 0)
-      : (w.balance ?? w.totalAmount ?? 0),
+      : (w.totalAmount ?? w.balance ?? 0),
     start: w.validFrom ? new Date(w.validFrom).toISOString().slice(0, 10) : "",
     end: w.validTo ? new Date(w.validTo).toISOString().slice(0, 10) : "",
     funding: w.fundingMethod === "online" ? "pay" : "upload",
@@ -139,6 +141,59 @@ function mapWalletOrgFields(
   };
 }
 
+/** Resolve the signed-in entity manager's department row from workspace data. */
+function allWorkspaceDepartments(
+  workspace: WorkspaceSnapshot,
+): WorkspaceSnapshot["org"]["departments"] {
+  const rows = [
+    ...workspace.org.departments,
+    ...Object.values(workspace.walletViews).flatMap((view) => view.departments),
+  ];
+  const seen = new Set<string>();
+  return rows.filter((d) => {
+    const key = `${d.walletId ?? ""}:${String(d.id)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** Resolve every department row assigned to the signed-in entity manager. */
+export function entityManagerDepartments(
+  workspace: WorkspaceSnapshot,
+): WorkspaceSnapshot["org"]["departments"] {
+  const id = workspace.primaryEntityId;
+  const email = workspace.userPatch.email?.toLowerCase();
+  const departments = allWorkspaceDepartments(workspace);
+  const matches = departments.filter((d) => {
+    if (id && String(d.id) === String(id)) return true;
+    return Boolean(email && d.mgr?.email?.toLowerCase() === email);
+  });
+  if (matches.length) return matches;
+
+  if (workspace.org.departments.length === 1) {
+    return workspace.org.departments;
+  }
+
+  return workspace.org.departments[0] ? [workspace.org.departments[0]] : [];
+}
+
+/** Resolve the signed-in entity manager's primary department row from workspace data. */
+export function entityManagerDepartment(
+  workspace: WorkspaceSnapshot,
+): WorkspaceSnapshot["org"]["departments"][number] | undefined {
+  return entityManagerDepartments(workspace)[0];
+}
+
+export function entityManagerBudgetRemaining(
+  workspace: WorkspaceSnapshot,
+): number {
+  return entityManagerDepartments(workspace).reduce(
+    (sum, dept) => sum + Math.max(0, (dept.allocated ?? 0) - (dept.spent ?? 0)),
+    0,
+  );
+}
+
 /** Resolve org snapshot for a specific wallet (defaults to primary). */
 export function orgForWallet(
   workspace: WorkspaceSnapshot,
@@ -156,6 +211,89 @@ export function orgForWallet(
     };
   }
   return workspace.org;
+}
+
+/** Map wallet id → department rows for spendable-balance UI. */
+export function walletDepartmentsMap(
+  workspace: WorkspaceSnapshot,
+): Record<string, WorkspaceSnapshot["org"]["departments"]> {
+  return Object.fromEntries(
+    Object.entries(workspace.walletViews).map(([id, view]) => [id, view.departments]),
+  );
+}
+
+export function spendableForWallet(workspace: WorkspaceSnapshot, walletId: string): number {
+  const wallet = workspace.wallets.find((w) => w.id === walletId);
+  if (!wallet) return 0;
+  let departments = workspace.walletViews[walletId]?.departments ?? [];
+  if (workspace.userPatch.role === "entity_manager") {
+    departments = entityManagerDepartments(workspace).filter(
+      (d) => String(d.walletId ?? "") === String(walletId),
+    );
+    if (!departments.length) return 0;
+    return walletSpendable(wallet, departments);
+  }
+  return walletUnallocated(wallet);
+}
+
+/** First department entity for a wallet — used when paying from a selected wallet. */
+export function entityIdForWallet(
+  workspace: WorkspaceSnapshot,
+  walletId: string,
+): string | undefined {
+  const view = workspace.walletViews[walletId];
+  const dept =
+    workspace.userPatch.role === "entity_manager"
+      ? entityManagerDepartments(workspace).find(
+          (d) => String(d.walletId ?? "") === String(walletId),
+        )
+      : view?.departments?.[0];
+  if (dept?.id == null || dept.id === "") return undefined;
+  return String(dept.id);
+}
+
+function managerUserIdFromEntity(entity: {
+  managerUserId?: { _id?: string; email?: string } | string;
+}): string {
+  const mgr = entity.managerUserId;
+  if (mgr && typeof mgr === "object" && mgr._id) return String(mgr._id);
+  if (mgr) return String(mgr);
+  return "";
+}
+
+function resolveMyEntityForManager(
+  me: AuthUser,
+  assignedEntities: never[],
+):
+  | { allocatedAmount?: number; spentAmount?: number; name?: string; walletId?: string; _id?: string }
+  | undefined {
+  const byManager = assignedEntities.find(
+    (e) => managerUserIdFromEntity(e as never) === String(me.id),
+  );
+  if (byManager) return byManager as never;
+
+  const email = me.email?.toLowerCase();
+  if (email) {
+    const byEmail = assignedEntities.find((e) => {
+      const row = e as {
+        managerEmail?: string;
+        managerUserId?: { email?: string };
+      };
+      const mgrEmail = String(row.managerEmail ?? "").toLowerCase();
+      const populated = row.managerUserId?.email?.toLowerCase();
+      return mgrEmail === email || populated === email;
+    });
+    if (byEmail) return byEmail as never;
+  }
+
+  if (me.assignedEntityIds?.length) {
+    const byJwt = assignedEntities.find((e) =>
+      me.assignedEntityIds.some((id) => String(id) === String((e as { _id: string })._id)),
+    );
+    if (byJwt) return byJwt as never;
+  }
+
+  return assignedEntities[0] as never;
 }
 
 export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Promise<WorkspaceSnapshot> {
@@ -277,16 +415,7 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
         )
       : (entities as never[]);
 
-  const myEntity = isEntityManager
-    ? ((me.assignedEntityIds?.length
-        ? assignedEntities.find(
-            (e) =>
-              String((e as { _id: string })._id) === String(me.assignedEntityIds[0]),
-          )
-        : assignedEntities[0]) as
-        | { allocatedAmount?: number; spentAmount?: number; name?: string; walletId?: string }
-        | undefined)
-    : undefined;
+  const myEntity = isEntityManager ? resolveMyEntityForManager(me, assignedEntities) : undefined;
 
   const orgActive = isEntityManager ? Boolean(myEntity) : Boolean(primaryWallet);
 
@@ -328,6 +457,10 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
       ? (myEntity ? String((myEntity as { _id: string })._id) : undefined)
       : walletEntities[0]
         ? String((walletEntities[0] as { _id: string })._id)
+        : undefined,
+    primaryEntityWalletId:
+      isEntityManager && myEntity
+        ? String((myEntity as { walletId: string }).walletId ?? "")
         : undefined,
     org: {
       active: orgActive,

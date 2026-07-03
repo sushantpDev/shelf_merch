@@ -145,6 +145,7 @@ export function Step1Wallet({ state, dispatch }: StepProps) {
                   className="inp"
                   id="org-docnum"
                   value={o.docNumber}
+                  required={o.funding === "upload"}
                   onChange={(e) => setField("docNumber", e.target.value)}
                 />
               </div>

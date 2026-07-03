@@ -1,13 +1,21 @@
 import { useState } from "react";
-import { Check, Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { isDeptSelected, ORG_SUGG, selectedDepartments, type WizardDept } from "../../types";
+import { inr } from "@/components/platform/platform-ui";
+import {
+  deptPaletteColor,
+  isDeptSelected,
+  ORG_SUGG,
+  selectedDepartments,
+  type WizardDept,
+} from "../../types";
 import { DepartmentModal } from "../DepartmentModal";
 import type { StepProps } from "./StepProps";
 
 export function Step2Departments({ state, dispatch }: StepProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<WizardDept | null>(null);
+  const isEdit = state.flow === "allocate";
 
   const used = state.departments.map((d) => d.name.toLowerCase());
   const selectedCount = selectedDepartments(state.departments).length;
@@ -39,109 +47,125 @@ export function Step2Departments({ state, dispatch }: StepProps) {
   }
 
   return (
-    <>
-      <div style={{ marginBottom: 8 }}>
-        <h3 style={{ fontSize: 18 }}>Create departments</h3>
-        <p className="muted" style={{ fontSize: 13, marginTop: 2 }}>
-          Departments act as cost centers that consume the merchandise budget. Add the teams that
-          will run campaigns and order swag, then select which ones to include.
+    <div className="dept-picker">
+      <header className="dept-picker-head">
+        <h3>{isEdit ? "Select departments" : "Create departments"}</h3>
+        <p className="muted">
+          {isEdit
+            ? "Choose cost centers for this allocation round."
+            : "Add teams that will run campaigns and order swag."}
         </p>
-      </div>
+      </header>
 
-      <label className="lbl">Quick add suggestions</label>
-      <div style={{ margin: "6px 0 10px" }}>
-        {ORG_SUGG.map((s) => (
-          <button
-            key={s}
-            type="button"
-            className={`chip ${used.includes(s.toLowerCase()) ? "used" : ""}`}
-            onClick={() => {
-              dispatch({ type: "quickAddDept", name: s });
-              if (!used.includes(s.toLowerCase())) toast.success(`${s} added`);
-            }}
-          >
-            <span className="plus">+</span> {s}
-          </button>
-        ))}
-      </div>
-
-      <div className="dept-select-summary">
-        {selectedCount === 0 ? (
-          <span>
-            Select at least one department to continue · <b>0</b> of {state.departments.length}{" "}
-            selected
-          </span>
-        ) : (
-          <span>
-            <b>{selectedCount}</b> of {state.departments.length} selected for setup
-          </span>
-        )}
-      </div>
-
-      <div className="dept-grid">
-        {state.departments.map((d) => {
-          const selected = isDeptSelected(d);
+      <div className="dept-picker-suggest">
+        <span className="dept-picker-suggest__label">Suggestions</span>
+        {ORG_SUGG.map((s, i) => {
+          const taken = used.includes(s.toLowerCase());
           return (
-            <div
-              key={d.id}
-              className={`dept-card${selected ? " dept-card--selected" : " dept-card--unselected"}`}
+            <button
+              key={s}
+              type="button"
+              className={`dept-picker-suggest__link${taken ? " is-added" : ""}`}
+              disabled={taken}
+              onClick={() => {
+                dispatch({ type: "quickAddDept", name: s });
+                toast.success(`${s} added`);
+              }}
             >
-              <div className="dept-card-head">
-                <div className="row" style={{ gap: 11, alignItems: "center", flex: 1, minWidth: 0 }}>
-                  <div className="dc-swatch" style={{ background: d.color }}>
-                    {d.name.charAt(0)}
-                  </div>
-                  <div className="dept-card-title">{d.name}</div>
-                </div>
-              </div>
-              <p className="muted dept-card-desc">{d.desc}</p>
-              <button
-                type="button"
-                className={`dept-select-btn${selected ? " dept-select-btn--on" : ""}`}
-                aria-pressed={selected}
-                onClick={() => handleToggleSelect(d)}
-              >
-                {selected ? (
-                  <>
-                    <Check size={15} strokeWidth={2.5} aria-hidden="true" />
-                    Selected
-                  </>
-                ) : (
-                  "Select"
-                )}
-              </button>
-              <div className="dept-card-foot">
-                <div className="mut3" style={{ fontSize: 12 }}>
-                  Expected users · <b style={{ color: "var(--ink)" }}>{d.users}</b>
-                </div>
-                <div className="row" style={{ gap: 4 }}>
-                  <button
-                    type="button"
-                    className="iconbtn"
-                    aria-label={`Edit ${d.name}`}
-                    onClick={() => openEdit(d)}
-                  >
-                    <Pencil size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    className="iconbtn"
-                    aria-label={`Delete ${d.name}`}
-                    onClick={() => handleDelete(d)}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
-            </div>
+              <span className="dept-dot" style={{ background: deptPaletteColor(i) }} aria-hidden />
+              {s}
+            </button>
           );
         })}
-        <button type="button" className="add-dept" onClick={openAdd}>
-          <div className="pc">
-            <Plus size={18} />
-          </div>
-          <span>Add another department</span>
-        </button>
+      </div>
+
+      <div className="dept-picker-shell">
+        <div className="dept-picker-toolbar">
+          <span className="dept-picker-count">
+            <b>{selectedCount}</b> of {state.departments.length} selected
+          </span>
+          <button type="button" className="btn btn-soft btn-sm" onClick={openAdd}>
+            <Plus size={15} />
+            Add department
+          </button>
+        </div>
+
+        <div className="dept-picker-table-wrap">
+          <table className="dept-picker-table">
+            <thead>
+              <tr>
+                <th className="dept-picker-th-check" aria-label="Select" />
+                <th>Department</th>
+                <th>Users</th>
+                {isEdit ? <th className="dept-picker-th-num">Current budget</th> : null}
+                <th className="dept-picker-th-actions" aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody>
+              {state.departments.map((d, i) => {
+                const selected = isDeptSelected(d);
+                const color = deptPaletteColor(i);
+                const currentBudget = isEdit ? (d.seedAllocated ?? 0) : d.allocated;
+                return (
+                  <tr
+                    key={d.id}
+                    className={`dept-picker-row${selected ? " is-selected" : ""}`}
+                    onClick={() => handleToggleSelect(d)}
+                  >
+                    <td className="dept-picker-td-check" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="dept-picker-check"
+                        checked={selected}
+                        aria-label={`Select ${d.name}`}
+                        onChange={() => handleToggleSelect(d)}
+                      />
+                    </td>
+                    <td>
+                      <div className="dept-picker-name">
+                        <span className="dept-dot dept-dot--lg" style={{ background: color }} aria-hidden />
+                        <div className="dept-picker-name__text">
+                          <span className="dept-picker-title">{d.name}</span>
+                          {d.desc ? (
+                            <span className="dept-picker-sub">{d.desc}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="dept-picker-td-muted">{d.users}</td>
+                    {isEdit ? (
+                      <td className="dept-picker-td-num num">
+                        {currentBudget > 0 ? inr(currentBudget) : "—"}
+                      </td>
+                    ) : null}
+                    <td className="dept-picker-td-actions" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        className="contacts-row-action"
+                        aria-label={`Edit ${d.name}`}
+                        onClick={() => openEdit(d)}
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="contacts-row-action"
+                        aria-label={`Remove ${d.name}`}
+                        onClick={() => handleDelete(d)}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {selectedCount === 0 ? (
+          <p className="dept-picker-hint muted">Select at least one department to continue.</p>
+        ) : null}
       </div>
 
       <DepartmentModal
@@ -150,6 +174,6 @@ export function Step2Departments({ state, dispatch }: StepProps) {
         dept={editing ?? undefined}
         onSave={handleSave}
       />
-    </>
+    </div>
   );
 }

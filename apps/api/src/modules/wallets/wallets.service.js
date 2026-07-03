@@ -18,13 +18,17 @@ function withMeta(wallet) {
 
 export async function listWallets({ tenantId }) {
   const wallets = await Wallet.find({ tenantId }).sort({ createdAt: -1 });
-  return wallets.map(withMeta);
+  const repaired = await Promise.all(
+    wallets.map((w) => ledger.repairWalletCaches({ tenantId, walletId: w._id })),
+  );
+  return repaired.filter(Boolean).map(withMeta);
 }
 
 export async function getWallet({ tenantId, walletId }) {
   const wallet = await Wallet.findOne({ _id: walletId, tenantId });
   if (!wallet) throw new NotFoundError('Wallet not found');
-  return wallet;
+  await ledger.repairWalletCaches({ tenantId, walletId });
+  return Wallet.findOne({ _id: walletId, tenantId });
 }
 
 export async function createWallet({ tenantId, userId, data }) {
@@ -195,7 +199,16 @@ export async function activate({ tenantId, walletId, userId }) {
     return withMeta(wallet);
   }
 
-  const entities = await Entity.find({ tenantId, walletId });
+  const walletEntityIds = await Entity.find({ tenantId, walletId }).distinct('_id');
+  const ledgerEntityIds = await WalletTransaction.find({
+    tenantId,
+    walletId,
+    relatedEntityId: { $ne: null },
+  }).distinct('relatedEntityId');
+  const entityIds = [...new Set([...walletEntityIds, ...ledgerEntityIds].map(String))];
+  const entities = entityIds.length
+    ? await Entity.find({ tenantId, _id: { $in: entityIds } })
+    : [];
   const fundedEntities = entities.filter((e) => e.allocatedAmount > 0);
   const hasManager = (e) =>
     Boolean(e.managerUserId || e.managerName?.trim() || e.managerEmail?.trim());
