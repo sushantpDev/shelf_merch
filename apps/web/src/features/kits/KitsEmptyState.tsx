@@ -116,7 +116,12 @@ function FlowStep({
   );
 }
 
-export function KitsEmptyState() {
+type KitsEmptyStateProps = {
+  /** Workspace contacts available to send kits to. */
+  contactCount?: number;
+};
+
+export function KitsEmptyState({ contactCount = 0 }: KitsEmptyStateProps) {
   return (
     <>
       <div
@@ -299,13 +304,13 @@ export function KitsEmptyState() {
               Create your first kit
             </Link>
             <div className="row" style={{ gap: 16, fontSize: 13, fontWeight: 600 }}>
-              <a
-                href="/?view=contacts"
+              <Link
+                to="/app/contacts"
                 className="lnk"
                 style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
               >
                 <UserPlus size={14} /> Import recipients
-              </a>
+              </Link>
               <span
                 className="lnk"
                 style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
@@ -327,7 +332,12 @@ export function KitsEmptyState() {
           <StatCard label="Total kits" value="0" hint="All created kits" icon={Package} />
           <StatCard label="Live kits" value="0" hint="Active and sending" icon={Radio} />
           <StatCard label="Kits sent" value="0" hint="Total sent" icon={Send} />
-          <StatCard label="Recipients reached" value="45" hint="Across all kits" icon={Users} />
+          <StatCard
+            label="Recipients reached"
+            value={String(contactCount)}
+            hint={contactCount === 1 ? "Contact in workspace" : "Contacts in workspace"}
+            icon={Users}
+          />
         </div>
 
       </div>

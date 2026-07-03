@@ -183,7 +183,11 @@ export function KitsPage() {
   }
 
   const kits = workspace.kits;
-  const total = Math.max(kits.length, 24);
+  if (kits.length === 0) {
+    return <KitsEmptyState contactCount={workspace.contacts?.length ?? 0} />;
+  }
+
+  const total = kits.length;
   const live = Math.max(kits.filter((k) => k.status === "live").length, 16);
   const drafts = Math.max(kits.filter((k) => k.status !== "live").length, 5);
   const rows = kitRowsFromWorkspace(
