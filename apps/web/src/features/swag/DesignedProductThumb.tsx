@@ -63,9 +63,8 @@ function LiveArtworkComposite({
 }
 
 /**
- * Saved-design thumbnail: prefer a live product + artwork composite when the
- * product base is available. Saved mockups are still used as a fallback, but
- * not trusted first because older records may contain artwork-only mockups.
+ * Saved-design thumbnail: prefer a stored baked mockup when available, then a
+ * live product + artwork composite, then the catalog base image.
  */
 export function DesignedProductThumb({
   product,
@@ -82,9 +81,7 @@ export function DesignedProductThumb({
   const overlay = artworkUrl ? resolveMediaUrl(artworkUrl) : "";
   const base = resolveMediaUrl(designImgUrl(product)) || productThumbUrl(product, true);
 
-  const inner = overlay && base ? (
-    <LiveArtworkComposite product={product} base={base} overlay={overlay} />
-  ) : baked ? (
+  const inner = baked ? (
     <div className="img img-mockup">
       <img
         src={baked}
@@ -93,6 +90,8 @@ export function DesignedProductThumb({
         style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
       />
     </div>
+  ) : overlay && base ? (
+    <LiveArtworkComposite product={product} base={base} overlay={overlay} />
   ) : (
     <div className={`img${base ? " img-mockup" : ""}`}>
       {base ? (
@@ -119,28 +118,35 @@ export function DesignedProductThumb({
 
 /** Map storefront product rows onto the shared mockup thumbnail shape. */
 export function storeProductAsUi(p: {
+  _id?: string;
   catalogProductId?: string;
   name: string;
   brand?: string;
   group?: string;
   maskImageUrl?: string;
+  baseImageUrl?: string;
   mockupUrl?: string;
   printAreas?: UiProduct["printAreas"];
   primaryImageUrl?: string;
   imageUrls?: string[];
 }): UiProduct {
+  const catalogId =
+    p.catalogProductId ||
+    (p._id?.includes(":") ? p._id.split(":").pop() : p._id) ||
+    undefined;
   const photo =
     resolveMediaUrl(p.primaryImageUrl) || resolveMediaUrl(p.imageUrls?.[0]) || "";
   const mask = resolveMediaUrl(p.maskImageUrl);
+  const base = resolveMediaUrl(p.baseImageUrl);
   return {
-    id: p.catalogProductId,
+    id: catalogId,
     g: p.group || "tee",
     brand: p.brand || "",
     nm: p.name,
     price: "",
     sw: 4,
     maskImageUrl: mask,
-    imgUrl: mask || photo,
+    imgUrl: mask || base || photo,
     photoUrl: photo,
     mockupUrl: p.mockupUrl,
     printAreas: p.printAreas,

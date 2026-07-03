@@ -3,6 +3,7 @@
   display: flex;
   position: relative;
   z-index: 25;
+  flex-shrink: 0;
 }
 
 .sidebar-rail {
@@ -28,9 +29,12 @@
   width: 225px;
 }
 
-/* Portaled to body — flush on sidebar edge, same fill as rail */
+/* Flush on the sidebar's right edge — sibling of .sidebar-rail so overflow does not clip it */
 .sidebar-rail__toggle {
-  position: fixed;
+  position: absolute;
+  top: 0;
+  left: 100%;
+  margin-left: -1px;
   z-index: 1001;
   width: 22px;
   height: 40px;
@@ -197,4 +201,10 @@
   .sidebar-rail__toggle {
     display: none;
   }
+}
+
+/* Full-screen wizards (send points, kit send, swag editor, etc.) — hide sidebar + toggle together */
+body:has(.sm-fullscreen) .sidebar-mount,
+body:has(.sm-fullscreen) .sidebar-rail__flyout {
+  display: none !important;
 }

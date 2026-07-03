@@ -524,6 +524,8 @@ export type StorefrontData = {
   shop: { id: string; name: string; logoUrl?: string; bannerTheme?: string; bannerPreset?: string; currencyMode: string };
   products: Array<{
     _id: string;
+    catalogProductId?: string;
+    collectionId?: string;
     name: string;
     brand?: string;
     group?: string;

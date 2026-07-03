@@ -1273,21 +1273,27 @@ button.thumb{font:inherit;color:inherit}
 }
 
 .swag-hero-banner{
-  margin-bottom:24px;
+  margin:0 auto 20px;
   width:100%;
-  height:clamp(140px, 16vw, 200px);
+  max-width:720px;
+  max-height:160px;
   border-radius:var(--r);
   overflow:hidden;
   border:1px solid var(--line);
   box-shadow:var(--sh-1);
   line-height:0;
+  background:#f5f6f5;
 }
 .swag-hero-banner img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  object-position:center;
   display:block;
+  width:100%;
+  height:160px;
+  object-fit:cover;
+  object-position:left center;
+}
+@media (min-width:900px){
+  .swag-hero-banner{max-height:180px}
+  .swag-hero-banner img{height:180px}
 }
 
 /* kit packaging step */
@@ -1736,8 +1742,102 @@ button.thumb{font:inherit;color:inherit}
   stroke-width:1px;
 }
 
+/* swag page */
+.swag-page-cta{
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  font-size:11px;
+  font-weight:700;
+  border-radius:var(--r-pill);
+  gap:8px;
+}
+.swag-page-toolbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:20px;
+  padding-bottom:14px;
+  border-bottom:1px solid var(--line-2);
+}
+.swag-page-tabs{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.swag-page-tab{
+  padding:0;
+  border:none;
+  background:none;
+  font:inherit;
+  font-size:14px;
+  font-weight:500;
+  color:var(--ink-2);
+  cursor:pointer;
+  transition:color .14s ease;
+}
+.swag-page-tab:hover{color:var(--ink)}
+.swag-page-tab.on{font-weight:700;color:var(--ink)}
+.swag-collections-list{display:flex;flex-direction:column;gap:16px}
+.swag-tag-ready{text-transform:uppercase;letter-spacing:.06em;font-size:10.5px}
+
 /* swag design cards */
-.swag-collection-block{border:1px solid var(--line);border-radius:var(--r);padding:18px 20px 20px;margin-bottom:16px;background:#fff}
+.swag-collection-block{
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  padding:20px 22px 22px;
+  margin-bottom:0;
+  background:#fff;
+  box-shadow:var(--sh-1);
+}
+.swag-collection-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:18px;
+  flex-wrap:wrap;
+}
+.swag-collection-head-main{min-width:0;flex:1}
+.swag-collection-title{
+  font-size:16px;
+  font-weight:700;
+  color:var(--ink);
+  margin:0 0 8px;
+  line-height:1.25;
+}
+.swag-collection-meta{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:6px 14px;
+  font-size:12.5px;
+  color:var(--ink-2);
+  line-height:1.4;
+}
+.swag-collection-code{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  font-weight:600;
+  color:var(--ink);
+}
+.swag-collection-tip{color:var(--ink-3);flex:none}
+.swag-collection-tip--on{
+  color:#e5a319;
+  filter:drop-shadow(0 0 4px rgba(229,163,25,.55));
+}
+.swag-collection-detail{color:var(--ink-2)}
+.swag-collection-count{font-weight:600;color:var(--ink-2)}
+.swag-collection-head-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex:none;
+}
+.swag-designs-grid--in-collection{
+  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  gap:16px;
+}
+.swag-designs-grid--in-collection:has(.swag-design-card:only-child){
+  grid-template-columns:minmax(0,260px);
+}
 .swag-designs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
 .shop-swag-content .swag-designs-grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;max-width:100%}
 .shop-swag-content .swag-designs-grid:has(.swag-design-card:only-child){grid-template-columns:minmax(0,240px)}
@@ -1780,7 +1880,7 @@ a.shop-collection-cell:hover{background:#eef1ee}
   flex:1;width:100%;height:100%;min-height:0;
   aspect-ratio:unset;display:block;position:relative;
 }
-.shop-collection-cell > .img img{
+.shop-collection-cell > .img img:not(.art-overlay-img){
   width:100%;height:100%;object-fit:contain;display:block;
 }
 .shop-collection-meta{padding:12px 14px 14px}
@@ -1791,7 +1891,7 @@ a.shop-collection-cell:hover{background:#eef1ee}
 .swag-design-card .img{position:relative}
 .swag-design-card--product-view{cursor:default}
 .swag-design-card--product-view:hover{transform:none}
-.swag-design-card-hit{position:relative;cursor:pointer}
+.swag-design-card-hit{position:relative;cursor:pointer;display:block}
 .swag-design-card-meta-hit{cursor:pointer}
 .swag-design-card-price{margin-top:6px;font-size:13px;line-height:1.35}
 .swag-design-card-price strong{font-weight:700;color:var(--ink)}
@@ -2352,16 +2452,13 @@ a.shop-collection-cell:hover{background:#eef1ee}
   position: sticky;
   top: 0;
   z-index: 100;
-  height: 64px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  height: 72px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
   transition: box-shadow 0.25s ease, border-color 0.25s ease;
 }
 .sf-topbar.scrolled {
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 8px 24px rgba(14, 30, 22, 0.03);
-  border-bottom-color: transparent;
 }
 .sf-topbar-inner {
   max-width: 1320px;
@@ -2372,6 +2469,104 @@ a.shop-collection-cell:hover{background:#eef1ee}
   display: flex;
   align-items: center;
   gap: 16px;
+}
+.sf-topbar-inner--stadium {
+  gap: 24px;
+}
+.sf-topbar-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 760px;
+  margin: 0 auto;
+}
+.sf-topbar-search-input {
+  width: 100%;
+  height: 44px;
+  border: none;
+  border-radius: 6px;
+  background: #f1f2f3;
+  padding: 0 16px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #0E1E16;
+  box-shadow: none;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.sf-topbar-search-input::placeholder {
+  color: #9aa3a0;
+}
+.sf-topbar-search-input:focus {
+  outline: none;
+  background: #ebeef0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+.sf-topbar-right--stadium {
+  gap: 2px;
+  flex: none;
+}
+.sf-topbar-wallet .k {
+  text-transform: uppercase;
+}
+.sf-topbar-wallet .topbar-wallet-icon {
+  background: transparent;
+}
+.sf-topbar-wallet .topbar-wallet-img {
+  width: 33px;
+  height: 33px;
+}
+.sf-topbar-user {
+  padding-right: 4px;
+}
+.sf-topbar-user-chevron {
+  margin-left: 0;
+}
+.sf-topbar-cart {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #0E1E16;
+  position: relative;
+  margin-left: 2px;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+.sf-topbar-cart:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.sf-topbar-cart svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.75;
+}
+.sf-topbar-cart-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #15784C;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  border: 2px solid #fff;
+}
+.sf-shopbrand--compact .sf-shopbrand-text {
+  display: none;
+}
+.sf-shopbrand--compact .sf-shopbrand-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  box-shadow: none;
 }
 
 /* shop brand in header */
@@ -2641,14 +2836,23 @@ a.shop-collection-cell:hover{background:#eef1ee}
   position: relative;
   width: 100%;
   line-height: 0;
-  background: #F4F5F4;
+  background: #000;
+}
+.sf-hero-banner-frame {
+  position: relative;
+  width: 100%;
+  line-height: 0;
 }
 .sf-hero-banner-img {
+  display: block;
   width: 100%;
   height: auto;
+}
+.sf-hero-banner-theme {
   display: block;
-  object-fit: cover;
-  object-position: center;
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  min-height: 180px;
 }
 .sf-hero-banner-overlay {
   position: absolute;
@@ -3857,10 +4061,32 @@ a.shop-collection-cell:hover{background:#eef1ee}
 }
 @media(max-width:640px) {
   .sf-topbar {
-    height: 56px;
+    height: 60px;
   }
   .sf-topbar-inner {
     padding: 0 16px;
+    gap: 10px;
+  }
+  .sf-topbar-inner--stadium {
+    gap: 10px;
+  }
+  .sf-topbar-search {
+    max-width: none;
+    margin: 0;
+  }
+  .sf-topbar-search-input {
+    height: 38px;
+    font-size: 13px;
+    padding: 0 12px;
+  }
+  .sf-topbar-wallet .topbar-wallet-copy,
+  .sf-topbar-user .topbar-user-copy,
+  .sf-topbar-user-chevron {
+    display: none;
+  }
+  .sf-topbar-wallet,
+  .sf-topbar-user {
+    padding: 4px;
   }
   .sf-content,
   .sf-hero-container {

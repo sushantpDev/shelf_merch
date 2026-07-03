@@ -27,12 +27,56 @@ function PriceLine({ price }: { price: string }) {
   );
 }
 
+function stop(e: MouseEvent | KeyboardEvent) {
+  e.stopPropagation();
+}
+
+function CardToolbar({
+  onEditDesign,
+  onViewProduct,
+  onAddToShop,
+  showMenu = true,
+}: {
+  onEditDesign?: () => void;
+  onViewProduct?: () => void;
+  onAddToShop?: () => void;
+  showMenu?: boolean;
+}) {
+  return (
+    <div className="swag-card-actions" onClick={stop} onKeyDown={stop}>
+      {showMenu && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="swag-card-menu"
+              aria-label="Product actions"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal size={14} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" side="bottom" className="shop-card-menu">
+            <DropdownMenuItem onSelect={() => onEditDesign?.()}>
+              <span>Edit design</span>
+              <span className="tag tag-beta">Beta</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onViewProduct?.()}>View product</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onAddToShop?.()}>Add to shop</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
+  );
+}
+
 /** A single branded design within a collection. */
 export function DesignCard({
   collection,
   product,
   onOpen,
   productView = false,
+  showToolbar = false,
   onEditDesign,
   onViewProduct,
   onAddToShop,
@@ -41,6 +85,7 @@ export function DesignCard({
   product: UiProduct;
   onOpen: () => void;
   productView?: boolean;
+  showToolbar?: boolean;
   onEditDesign?: () => void;
   onViewProduct?: () => void;
   onAddToShop?: () => void;
@@ -75,6 +120,47 @@ export function DesignCard({
   );
 
   if (!productView) {
+    if (showToolbar) {
+      return (
+        <article className="pcard swag-design-card">
+          <div
+            className="swag-design-card-hit"
+            role="button"
+            tabIndex={0}
+            onClick={onOpen}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen();
+              }
+            }}
+            aria-label={`View ${product.nm} design`}
+          >
+            <DesignedProductThumb product={product} artworkUrl={collection.artworkUrl} />
+            <CardToolbar
+              onEditDesign={onEditDesign}
+              onViewProduct={onViewProduct}
+              onAddToShop={onAddToShop}
+            />
+          </div>
+          <div
+            className="meta swag-design-card-meta-hit"
+            role="button"
+            tabIndex={0}
+            onClick={onOpen}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen();
+              }
+            }}
+          >
+            {meta}
+          </div>
+        </article>
+      );
+    }
+
     return (
       <button
         type="button"
@@ -87,10 +173,6 @@ export function DesignCard({
         <div className="meta">{meta}</div>
       </button>
     );
-  }
-
-  function stop(e: MouseEvent | KeyboardEvent) {
-    e.stopPropagation();
   }
 
   return (
@@ -109,28 +191,11 @@ export function DesignCard({
         aria-label={`View ${product.nm} design`}
       >
         <DesignedProductThumb product={product} artworkUrl={collection.artworkUrl} />
-        <div className="swag-card-actions" onClick={stop} onKeyDown={stop}>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="swag-card-menu"
-                aria-label="Product actions"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontal size={14} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="bottom" className="shop-card-menu">
-              <DropdownMenuItem onSelect={() => onEditDesign?.()}>
-                <span>Edit Design</span>
-                <span className="tag tag-beta">Beta</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => onViewProduct?.()}>View Product</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => onAddToShop?.()}>Add to Shop</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        <CardToolbar
+          onEditDesign={onEditDesign}
+          onViewProduct={onViewProduct}
+          onAddToShop={onAddToShop}
+        />
       </div>
       <div
         className="meta swag-design-card-meta-hit"

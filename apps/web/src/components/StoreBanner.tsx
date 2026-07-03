@@ -33,7 +33,7 @@ export function StoreBanner({ shop, eyebrow = "Welcome to" }: { shop: StoreShop;
         <img
           src={presetUrl}
           alt={shopBannerPresetLabel(shop.bannerPreset) || `${shop.name} banner`}
-          style={{ display: "block", width: "100%", height: "auto", aspectRatio: "4 / 1", objectFit: "cover" }}
+          style={{ display: "block", width: "100%", height: "auto" }}
         />
         {shop.logoUrl ? (
           <div

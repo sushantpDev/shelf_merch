@@ -166,6 +166,7 @@ function kitRowsFromWorkspace(
 
 export function KitsPage() {
   const { data: workspace, isLoading, isError, error } = useWorkspace();
+  const { canCreateKits, canSendKits } = useTenantAccess();
   const [showAll, setShowAll] = useState(false);
 
   const previewLimit = 4;

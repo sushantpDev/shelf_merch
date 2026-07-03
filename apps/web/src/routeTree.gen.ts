@@ -64,6 +64,7 @@ import { Route as AppCatalogIdRouteImport } from './routes/app.catalog.$id'
 import { Route as AppCampaignsSendPointsRouteImport } from './routes/app.campaigns.send-points'
 import { Route as AppShopsIdIndexRouteImport } from './routes/app.shops.$id.index'
 import { Route as AppKitsIdIndexRouteImport } from './routes/app.kits.$id.index'
+import { Route as AppSwagCollectionIdPIdxRouteImport } from './routes/app.swag.$collectionId.$pIdx'
 import { Route as AppKitsIdSendRouteImport } from './routes/app.kits.$id.send'
 import { Route as AppKitsIdEditRouteImport } from './routes/app.kits.$id.edit'
 import { Route as AppShopsIdDesignsCollectionIdRouteImport } from './routes/app.shops.$id.designs.$collectionId'
@@ -343,6 +344,11 @@ const AppKitsIdIndexRoute = AppKitsIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppKitsIdRoute,
 } as any)
+const AppSwagCollectionIdPIdxRoute = AppSwagCollectionIdPIdxRouteImport.update({
+  id: '/swag/$collectionId/$pIdx',
+  path: '/swag/$collectionId/$pIdx',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppKitsIdSendRoute = AppKitsIdSendRouteImport.update({
   id: '/send',
   path: '/send',
@@ -416,6 +422,7 @@ export interface FileRoutesByFullPath {
   '/platform/orders/': typeof PlatformOrdersIndexRoute
   '/app/kits/$id/edit': typeof AppKitsIdEditRoute
   '/app/kits/$id/send': typeof AppKitsIdSendRoute
+  '/app/swag/$collectionId/$pIdx': typeof AppSwagCollectionIdPIdxRoute
   '/app/kits/$id/': typeof AppKitsIdIndexRoute
   '/app/shops/$id/': typeof AppShopsIdIndexRoute
   '/app/shops/$id/designs/$collectionId': typeof AppShopsIdDesignsCollectionIdRoute
@@ -467,6 +474,7 @@ export interface FileRoutesByTo {
   '/platform/orders': typeof PlatformOrdersIndexRoute
   '/app/kits/$id/edit': typeof AppKitsIdEditRoute
   '/app/kits/$id/send': typeof AppKitsIdSendRoute
+  '/app/swag/$collectionId/$pIdx': typeof AppSwagCollectionIdPIdxRoute
   '/app/kits/$id': typeof AppKitsIdIndexRoute
   '/app/shops/$id': typeof AppShopsIdIndexRoute
   '/app/shops/$id/designs/$collectionId': typeof AppShopsIdDesignsCollectionIdRoute
@@ -528,6 +536,7 @@ export interface FileRoutesById {
   '/platform/orders/': typeof PlatformOrdersIndexRoute
   '/app/kits/$id/edit': typeof AppKitsIdEditRoute
   '/app/kits/$id/send': typeof AppKitsIdSendRoute
+  '/app/swag/$collectionId/$pIdx': typeof AppSwagCollectionIdPIdxRoute
   '/app/kits/$id/': typeof AppKitsIdIndexRoute
   '/app/shops/$id/': typeof AppShopsIdIndexRoute
   '/app/shops/$id/designs/$collectionId': typeof AppShopsIdDesignsCollectionIdRoute
@@ -590,6 +599,7 @@ export interface FileRouteTypes {
     | '/platform/orders/'
     | '/app/kits/$id/edit'
     | '/app/kits/$id/send'
+    | '/app/swag/$collectionId/$pIdx'
     | '/app/kits/$id/'
     | '/app/shops/$id/'
     | '/app/shops/$id/designs/$collectionId'
@@ -641,6 +651,7 @@ export interface FileRouteTypes {
     | '/platform/orders'
     | '/app/kits/$id/edit'
     | '/app/kits/$id/send'
+    | '/app/swag/$collectionId/$pIdx'
     | '/app/kits/$id'
     | '/app/shops/$id'
     | '/app/shops/$id/designs/$collectionId'
@@ -701,6 +712,7 @@ export interface FileRouteTypes {
     | '/platform/orders/'
     | '/app/kits/$id/edit'
     | '/app/kits/$id/send'
+    | '/app/swag/$collectionId/$pIdx'
     | '/app/kits/$id/'
     | '/app/shops/$id/'
     | '/app/shops/$id/designs/$collectionId'
@@ -1104,6 +1116,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppKitsIdIndexRouteImport
       parentRoute: typeof AppKitsIdRoute
     }
+    '/app/swag/$collectionId/$pIdx': {
+      id: '/app/swag/$collectionId/$pIdx'
+      path: '/swag/$collectionId/$pIdx'
+      fullPath: '/app/swag/$collectionId/$pIdx'
+      preLoaderRoute: typeof AppSwagCollectionIdPIdxRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/kits/$id/send': {
       id: '/app/kits/$id/send'
       path: '/send'
@@ -1204,6 +1223,7 @@ interface AppRouteChildren {
   AppCatalogIndexRoute: typeof AppCatalogIndexRoute
   AppShopsIndexRoute: typeof AppShopsIndexRoute
   AppSwagIndexRoute: typeof AppSwagIndexRoute
+  AppSwagCollectionIdPIdxRoute: typeof AppSwagCollectionIdPIdxRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -1223,6 +1243,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCatalogIndexRoute: AppCatalogIndexRoute,
   AppShopsIndexRoute: AppShopsIndexRoute,
   AppSwagIndexRoute: AppSwagIndexRoute,
+  AppSwagCollectionIdPIdxRoute: AppSwagCollectionIdPIdxRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

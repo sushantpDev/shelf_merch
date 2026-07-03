@@ -18,5 +18,7 @@ export function useTenantAccess() {
     canRead: (area: TenantArea) => canAccessTenantArea(role, area, "read"),
     canWrite: (area: TenantArea) => canAccessTenantArea(role, area, "write"),
     canOperateCampaigns: () => canAccessTenantArea(role, "campaignOps", "write"),
+    canCreateKits: canAccessTenantArea(role, "kits", "write"),
+    canSendKits: canAccessTenantArea(role, "campaignOps", "write"),
   };
 }

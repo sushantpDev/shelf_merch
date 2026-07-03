@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MoreHorizontal, Share2 } from "lucide-react";
+import { Lightbulb, MoreHorizontal, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -25,16 +25,21 @@ export function CollectionBlock({
   collection,
   onOpenDesign,
   onAddToShop,
+  onEditDesign,
+  onViewProduct,
 }: {
   collection: UiCollection;
   onOpenDesign: (product: UiProduct, pIdx: number) => void;
   onAddToShop: (collection: UiCollection) => void;
+  onEditDesign: () => void;
+  onViewProduct: (product: UiProduct, pIdx: number) => void;
 }) {
   const archive = useArchiveCollection();
   const restore = useRestoreCollection();
   const del = useDeleteCollection();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const archived = collection.status === "archived";
+  const productCount = collection.products.length;
 
   async function run(action: ReturnType<typeof useArchiveCollection>, msg: string, fail: string) {
     try {
@@ -46,55 +51,59 @@ export function CollectionBlock({
   }
 
   return (
-    <div className="swag-collection-block">
-      <div
-        className="row"
-        style={{
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: 14,
-          gap: 12,
-        }}
-      >
-        <div>
-          <div
-            className="row"
-            style={{ gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 4 }}
-          >
-            <h3 style={{ fontSize: 17 }}>{collection.name}</h3>
-            <span className="mut3" style={{ fontSize: 12 }}>
-              #{collection.code}
+    <article className="swag-collection-block">
+      <header className="swag-collection-head">
+        <div className="swag-collection-head-main">
+          <h2 className="swag-collection-title">{collection.name}</h2>
+          <div className="swag-collection-meta">
+            {collection.code && (
+              <span className="swag-collection-code">
+                #{collection.code}
+                <Lightbulb
+                  size={14}
+                  className="swag-collection-tip swag-collection-tip--on"
+                  aria-hidden
+                  fill="currentColor"
+                  strokeWidth={1.25}
+                />
+              </span>
+            )}
+            <span className="swag-collection-detail">
+              Created on {collection.created}
+              {collection.by ? ` by ${collection.by}` : ""}
+            </span>
+            <span className="swag-collection-count">
+              {productCount} {productCount === 1 ? "Product" : "Products"}
             </span>
           </div>
-          <div className="mut3" style={{ fontSize: 12 }}>
-            Created on {collection.created} by {collection.by} · {collection.products.length}{" "}
-            {collection.products.length === 1 ? "Product" : "Products"}
-          </div>
         </div>
-        <div className="row" style={{ gap: 8, alignItems: "center", flex: "none" }}>
+        <div className="swag-collection-head-actions">
           {archived ? (
             <span className="tag tag-draft">Archived</span>
           ) : (
-            <span className="tag tag-ready">Design ready</span>
+            <span className="tag tag-ready swag-tag-ready">
+              <span className="dot" />
+              Design ready
+            </span>
           )}
           <button
             type="button"
             className="iconbtn"
-            style={{ width: 30, height: 30 }}
+            style={{ width: 34, height: 34 }}
             aria-label="Share collection"
             onClick={() => toast.success("Share link copied")}
           >
-            <Share2 size={15} />
+            <Share2 size={16} />
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
                 className="iconbtn"
-                style={{ width: 30, height: 30 }}
+                style={{ width: 34, height: 34 }}
                 aria-label="Collection actions"
               >
-                <MoreHorizontal size={15} />
+                <MoreHorizontal size={18} />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" side="bottom" className="shop-card-menu">
@@ -137,18 +146,24 @@ export function CollectionBlock({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </div>
+      </header>
 
-      <div className="grid swag-designs-grid">
-        {collection.products.map((p, i) => (
-          <DesignCard
-            key={`${p.id ?? p.nm}-${i}`}
-            collection={collection}
-            product={p}
-            onOpen={() => onOpenDesign(p, i)}
-          />
-        ))}
-      </div>
+      {productCount > 0 && (
+        <div className="swag-designs-grid swag-designs-grid--in-collection">
+          {collection.products.map((p, i) => (
+            <DesignCard
+              key={`${p.id ?? p.nm}-${i}`}
+              collection={collection}
+              product={p}
+              showToolbar
+              onOpen={() => onOpenDesign(p, i)}
+              onEditDesign={onEditDesign}
+              onViewProduct={() => onViewProduct(p, i)}
+              onAddToShop={() => onAddToShop(collection)}
+            />
+          ))}
+        </div>
+      )}
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
@@ -175,6 +190,6 @@ export function CollectionBlock({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </article>
   );
 }

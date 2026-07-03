@@ -20,8 +20,8 @@ const MATRIX = {
   kits: { read: BOTH, write: [COMPANY_ADMIN] },
   /** Create / update campaign metadata — optional for company admins. */
   campaigns: { read: BOTH, write: BOTH },
-  /** Allocate credits, upload recipients, launch / close. */
-  campaignOps: { read: BOTH, write: [ENTITY_MANAGER] },
+  /** Allocate credits, upload recipients, launch / close — company admins and entity managers. */
+  campaignOps: { read: BOTH, write: BOTH },
   contacts: { read: BOTH, write: BOTH },
   settings: { read: BOTH, write: [COMPANY_ADMIN] },
   catalog: { read: BOTH, write: [] },

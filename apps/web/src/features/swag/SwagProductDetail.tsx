@@ -1,67 +1,43 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Store } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { ProductInfoTabs } from "@/features/catalog/ProductInfoTabs";
 import type { UiCollection, UiProduct } from "@/services/mappers";
 import { collectionProductColorNames, productColorHex } from "./colors";
 import { DesignedProductThumb } from "./DesignedProductThumb";
 
-export type DesignTarget = { collection: UiCollection; product: UiProduct; pIdx: number };
+export type SwagDesignTarget = { collection: UiCollection; product: UiProduct; pIdx: number };
 
-/** Read-only design detail with colour variants and an Add-to-shop action. */
-export function ProductDetailDialog({
+/** Full-page swag product detail (designed mockup + catalog info + add to shop). */
+export function SwagProductDetail({
   target,
-  onOpenChange,
   onAddToShop,
 }: {
-  target: DesignTarget | null;
-  onOpenChange: (open: boolean) => void;
-  onAddToShop: (target: DesignTarget) => void;
+  target: SwagDesignTarget;
+  onAddToShop: () => void;
 }) {
   const [sel, setSel] = useState(0);
-  useEffect(() => {
-    if (target) setSel(0);
-  }, [target]);
-
-  return (
-    <Dialog open={target !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="sm-modal" style={{ maxWidth: "min(820px,96vw)", width: "100%" }}>
-        {target && <Body target={target} sel={sel} setSel={setSel} onAddToShop={onAddToShop} />}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function Body({
-  target,
-  sel,
-  setSel,
-  onAddToShop,
-}: {
-  target: DesignTarget;
-  sel: number;
-  setSel: (i: number) => void;
-  onAddToShop: (target: DesignTarget) => void;
-}) {
   const { collection, product } = target;
   const title = product.brand ? `${product.brand} ${product.nm}` : product.nm;
   const names = collectionProductColorNames(collection, product);
 
   return (
-    <div className="modal-pad">
-      <DialogHeader>
-        <div className="eyebrow">{collection.name}</div>
-        <DialogTitle style={{ fontSize: 20 }}>{title}</DialogTitle>
-        <DialogDescription className="sr-only">Design detail for {title}</DialogDescription>
-      </DialogHeader>
+    <div>
+      <div className="eyebrow">{collection.name}</div>
+      <h1 style={{ fontSize: 22, margin: "4px 0 6px" }}>{title}</h1>
+      {product.price ? (
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+          {product.price}
+        </p>
+      ) : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 14 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.1fr)",
+          gap: 24,
+          marginTop: 20,
+        }}
+      >
         <div
           style={{
             background: "#f4f6f4",
@@ -104,15 +80,11 @@ function Body({
             </div>
           )}
 
-          <div style={{ marginBottom: 18 }}>
+          <div style={{ marginBottom: 20 }}>
             <ProductInfoTabs product={product} />
           </div>
 
-          <button
-            type="button"
-            className="btn btn-dark btn-block"
-            onClick={() => onAddToShop(target)}
-          >
+          <button type="button" className="btn btn-dark" style={{ minWidth: 200 }} onClick={onAddToShop}>
             <Store size={16} /> Add to shop
           </button>
         </div>

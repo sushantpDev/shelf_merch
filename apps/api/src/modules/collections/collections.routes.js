@@ -14,6 +14,7 @@ import { uploadFile } from '../../services/storage.service.js';
 import { writeAudit } from '../../services/audit.service.js';
 import { NotFoundError, ApiError } from '../../utils/errors.js';
 import { collectionsForShopFilter } from './collectionQueries.js';
+import { addCatalogProductsToShop } from '../shops/shopCatalogSync.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 const router = Router();
@@ -92,6 +93,10 @@ router.post(
       createdBy: req.user.userId,
       isShopSpecific: req.body.isShopSpecific || false,
     });
+    if (shopId && req.body.productRefs?.length) {
+      const catalogIds = req.body.productRefs.map((ref) => ref.catalogProductId).filter(Boolean);
+      await addCatalogProductsToShop(shopId, req.tenantId, catalogIds);
+    }
     writeAudit({ req, action: 'collection.create', entityType: 'Collection', entityId: collection._id, after: collection.toObject() });
     res.status(201).json(collection);
   }),
@@ -109,6 +114,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     const collection = await Collection.findOne({ _id: req.params.id, tenantId: req.tenantId });
     if (!collection) throw new NotFoundError('Collection not found');
+    let linkedShopId = null;
     if (req.body.shopId) {
       const shop = await Shop.findOne({ _id: req.body.shopId, tenantId: req.tenantId });
       if (!shop) throw new NotFoundError('Shop not found');
@@ -116,12 +122,19 @@ router.patch(
       let nextIds = [...(collection.shopIds || [])];
       const linked = nextIds.map(String);
       if (!linked.length && collection.shopId) nextIds = [collection.shopId];
-      if (!nextIds.map(String).includes(shopKey)) nextIds.push(shop._id);
+      if (!nextIds.map(String).includes(shopKey)) {
+        nextIds.push(shop._id);
+        linkedShopId = shop._id;
+      }
       collection.shopIds = nextIds;
       if (!collection.shopId) collection.shopId = shop._id;
     }
     if (req.body.status) collection.status = req.body.status;
     await collection.save();
+    if (linkedShopId) {
+      const catalogIds = (collection.productRefs || []).map((ref) => ref.catalogProductId).filter(Boolean);
+      await addCatalogProductsToShop(linkedShopId, req.tenantId, catalogIds);
+    }
     writeAudit({ req, action: 'collection.update', entityType: 'Collection', entityId: collection._id, after: collection.toObject() });
     res.json(collection);
   }),

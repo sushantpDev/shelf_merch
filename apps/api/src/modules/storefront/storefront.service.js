@@ -47,7 +47,24 @@ export async function getStorefront(shopId) {
   if (!shop || shop.status !== 'live') throw new NotFoundError('Shop not found');
 
   const selectedIds = (shop.selectedCatalogProductIds || []).map(String);
-  if (!selectedIds.length) {
+
+  const collections = await Collection.find({
+    ...collectionsForShopFilter(shop._id),
+    tenantId: shop.tenantId,
+    status: { $ne: 'archived' },
+  })
+    .setOptions({ skipTenantGuard: true })
+    .select('productRefs artworkUrl preferredColors')
+    .lean();
+
+  const collectionCatalogIds = [];
+  for (const col of collections) {
+    for (const ref of col.productRefs || []) {
+      if (ref.catalogProductId) collectionCatalogIds.push(String(ref.catalogProductId));
+    }
+  }
+  const effectiveIds = [...new Set([...selectedIds, ...collectionCatalogIds])];
+  if (!effectiveIds.length) {
     return {
       shop: {
         id: String(shop._id),
@@ -61,20 +78,11 @@ export async function getStorefront(shopId) {
     };
   }
 
-  const selectedSet = new Set(selectedIds);
-
-  const collections = await Collection.find({
-    ...collectionsForShopFilter(shop._id),
-    tenantId: shop.tenantId,
-    status: { $ne: 'archived' },
-  })
-    .setOptions({ skipTenantGuard: true })
-    .select('productRefs artworkUrl preferredColors')
-    .lean();
+  const selectedSet = new Set(effectiveIds);
 
   const catalogRows = await CatalogProduct.find({
     status: 'active',
-    _id: { $in: selectedIds },
+    _id: { $in: effectiveIds },
   })
     .setOptions({ skipTenantGuard: true })
     .select(CATALOG_SELECT)
@@ -96,7 +104,7 @@ export async function getStorefront(shopId) {
     }
   }
 
-  for (const id of selectedIds) {
+  for (const id of effectiveIds) {
     if (covered.has(id)) continue;
     const base = catalogById.get(id);
     if (!base) continue;

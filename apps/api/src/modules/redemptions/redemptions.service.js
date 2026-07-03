@@ -282,10 +282,17 @@ export async function getCatalog(token) {
       .setOptions({ skipTenantGuard: true })
       .lean();
     const shopSelected = (shop?.selectedCatalogProductIds || []).map(String);
-    if (!shopSelected.length) {
+    const collectionCatalogIds = [];
+    for (const col of shopCollections) {
+      for (const ref of col.productRefs || []) {
+        if (ref.catalogProductId) collectionCatalogIds.push(String(ref.catalogProductId));
+      }
+    }
+    const effectiveIds = [...new Set([...shopSelected, ...collectionCatalogIds])];
+    if (!effectiveIds.length) {
       return { products: [] };
     }
-    filter._id = { $in: shopSelected };
+    filter._id = { $in: effectiveIds };
   }
   const products = await CatalogProduct.find(filter)
     .select('name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas')

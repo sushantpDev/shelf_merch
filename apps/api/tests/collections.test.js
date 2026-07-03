@@ -121,6 +121,28 @@ describe('collection shop links', () => {
       .set('Authorization', `Bearer ${adminToken}`);
     expect(forA.body.some((c) => String(c._id) === String(collection._id))).toBe(true);
     expect(forB.body.some((c) => String(c._id) === String(collection._id))).toBe(true);
+
+    const shopARecord = await Shop.findById(shopA._id);
+    expect(shopARecord.selectedCatalogProductIds.map(String)).toContain(String(product._id));
+    const shopBRecord = await Shop.findById(shopB._id);
+    expect(shopBRecord.selectedCatalogProductIds.map(String)).toContain(String(product._id));
+  });
+
+  it('adds catalog products to the shop when creating a shop-linked collection', async () => {
+    const shop = await Shop.create({ tenantId: tenant._id, name: 'New Shop', status: 'live' });
+    const res = await request(app)
+      .post('/api/v1/collections')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        shopId: String(shop._id),
+        name: 'Onboarding Swag',
+        artworkUrl: '/uploads/test/art.png',
+        isShopSpecific: true,
+        productRefs: [{ catalogProductId: String(product._id), name: 'Core Cotton Tee', group: 'tee' }],
+      });
+    expect(res.status).toBe(201);
+    const updated = await Shop.findById(shop._id);
+    expect(updated.selectedCatalogProductIds.map(String)).toContain(String(product._id));
   });
 });
 

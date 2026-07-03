@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { type StoreShop } from "../StoreBanner";
 import { resolveColorHex } from "@/lib/colorMap";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { shopBannerPresetLabel, shopHeroBannerUrl } from "@/lib/shop-banners";
 import {
   DesignedProductThumb,
   storeProductAsUi,
 } from "@/features/swag/DesignedProductThumb";
-import heroBanner from "../../../assets/hero-banner.png";
+import walletIconImg from "../../../assets/wallet-icon.svg";
 
 type PrintArea = {
   key?: string;
@@ -17,6 +18,8 @@ type PrintArea = {
 
 export type StoreProduct = {
   _id: string;
+  catalogProductId?: string;
+  collectionId?: string;
   name: string;
   brand?: string;
   group?: string;
@@ -173,14 +176,6 @@ function ShelfMerchLogo() {
   );
 }
 
-function SearchIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-    </svg>
-  );
-}
-
 function HeartIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -231,12 +226,26 @@ function PlayCircleIcon() {
   );
 }
 
-function ChevronDown() {
+function ChevronDown({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className={className || "topbar-chevron"}
+      width={11}
+      height={11}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.6}
+      aria-hidden="true"
+    >
       <path d="M6 9l6 6 6-6" />
     </svg>
   );
+}
+
+function truncTopbarName(name: string, max = 8) {
+  const n = name.trim();
+  return n.length > max ? `${n.slice(0, max - 1)}…` : n;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -293,7 +302,6 @@ export default function StoreShell({
   }, []);
 
   const active = products.find((p) => p._id === activeId) || null;
-  const categories = useMemo(() => distinct(products.map((p) => p.category)), [products]);
   const cartCount = cart.reduce((n, l) => n + l.qty, 0);
   const cartTotalInr = cart.reduce((n, l) => n + l.priceInr * l.qty, 0);
   const overBudget = mode === "redeem" && creditInr != null && cartTotalInr > creditInr;
@@ -304,10 +312,16 @@ export default function StoreShell({
     return `₹${inr.toLocaleString("en-IN")}`;
   }
 
-  function fmtRaw(inr: number) {
-    if (currency === "priceless") return "Gift";
-    if (currency === "points") return Math.round(inr / 2).toLocaleString("en-IN");
-    return `₹${inr.toLocaleString("en-IN")}`;
+  function navBalanceLabel() {
+    if (currency === "points") return "Your points";
+    if (currency === "inr") return "You pay";
+    return "Your gift";
+  }
+
+  function navBalanceValue(inr: number) {
+    if (currency === "points") return `${Math.round(inr / 2).toLocaleString("en-IN")} pts`;
+    if (currency === "inr") return `₹${inr.toLocaleString("en-IN")}`;
+    return "Gift";
   }
 
   function openProduct(id: string) {
@@ -326,6 +340,14 @@ export default function StoreShell({
       window.setTimeout(scroll, 80);
     } else {
       scroll();
+    }
+  }
+
+  function onHeaderSearch(q: string) {
+    setSearchQuery(q);
+    const trimmed = q.trim();
+    if (trimmed && page !== "products" && page !== "product") {
+      setPage("products");
     }
   }
 
@@ -393,6 +415,12 @@ export default function StoreShell({
   const userInitials = recipientName
     ? recipientName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
     : "SM";
+  const displayName = truncTopbarName(recipientName || (mode === "preview" ? "Preview" : "Guest"));
+  const workspaceLabel = shop.name.toLowerCase();
+
+  const heroBannerUrl = shopHeroBannerUrl(shop) || "/images/hero-banner.png";
+  const heroBannerLabel =
+    shopBannerPresetLabel(shop.bannerPreset) || "Feliz Dia de los Muertos";
 
   /* ─── RENDER ─── */
   return (
@@ -407,9 +435,8 @@ export default function StoreShell({
 
       {/* ═══ TOP NAV ═══ */}
       <div className={`sf-topbar${scrolled ? " scrolled" : ""}`}>
-        <div className="sf-topbar-inner">
-          {/* Brand = the shop itself (Shelf Merch is credited in the footer) */}
-          <button type="button" className="sf-shopbrand" onClick={() => setPage("home")}>
+        <div className="sf-topbar-inner sf-topbar-inner--stadium">
+          <button type="button" className="sf-shopbrand sf-shopbrand--compact" onClick={() => setPage("home")}>
             <div className="sf-shopbrand-logo">
               {shop.logoUrl ? (
                 <img src={shop.logoUrl} alt={shop.name} />
@@ -423,43 +450,57 @@ export default function StoreShell({
             </span>
           </button>
 
-          <nav className="sf-nav">
-            <button type="button" className={`sf-nav-link${page === "home" ? " active" : ""}`} onClick={() => setPage("home")}>Home</button>
-            <button type="button" className={`sf-nav-link${page === "products" ? " active" : ""}`} onClick={() => setPage("products")}>
-             Products
-            </button>
-            <button type="button" className="sf-nav-link" onClick={goHowItWorks}>How it works</button>
-            {mode === "redeem" && (
-              <button type="button" className={`sf-nav-link${page === "cart" || page === "checkout" ? " active" : ""}`} onClick={() => setPage("cart")}>My Orders</button>
-            )}
-          </nav>
+          <div className="sf-topbar-search">
+            <input
+              type="search"
+              className="sf-topbar-search-input"
+              placeholder="Search all products"
+              value={searchQuery}
+              onChange={(e) => onHeaderSearch(e.target.value)}
+              aria-label="Search all products"
+            />
+          </div>
 
-          <div className="sf-topbar-right">
-            <button type="button" className="sf-icon-btn" title="Search" onClick={() => setPage("products")}>
-              <SearchIcon />
-            </button>
-
+          <div className="sf-topbar-right sf-topbar-right--stadium">
             {mode === "redeem" && creditInr != null && (
-              <div className="sf-points-pill">
-                <PointsIcon />
-                <span className="sf-pts-val">{fmtRaw(creditInr)}</span>
-                {currency === "points" ? " Points" : ""}
-              </div>
-            )}
-
-            {mode === "redeem" && cartCount > 0 && (
-              <button type="button" className="sf-icon-btn" onClick={() => setPage("cart")} style={{ position: "relative" }}>
-                <ShoppingBagIcon />
-                <span style={{
-                  position: "absolute", top: -4, right: -4, width: 20, height: 20,
-                  borderRadius: "50%", background: "#15784C", color: "#fff",
-                  fontSize: 11, fontWeight: 700, display: "grid", placeItems: "center",
-                  border: "2px solid #fff",
-                }}>{cartCount}</span>
+              <button
+                type="button"
+                className="topbar-wallet sf-topbar-wallet"
+                aria-label={currency === "points" ? "Your points balance" : "Available balance"}
+              >
+                <span className="topbar-wallet-icon">
+                  <img src={walletIconImg} alt="" className="topbar-wallet-img" aria-hidden="true" />
+                </span>
+                <span className="topbar-wallet-copy">
+                  <span className="k">{navBalanceLabel()}</span>
+                  <span className="v">
+                    {navBalanceValue(creditInr)}
+                    <ChevronDown />
+                  </span>
+                </span>
               </button>
             )}
 
-            <div className="sf-avatar" title={recipientName || "User"}>{userInitials}</div>
+            <button type="button" className="topbar-user sf-topbar-user" aria-label="Account">
+              <span className="topbar-user-avatar">{userInitials}</span>
+              <span className="topbar-user-copy">
+                <span className="topbar-user-name">{displayName}</span>
+                <span className="topbar-user-sub">{workspaceLabel}</span>
+              </span>
+              <ChevronDown className="topbar-chevron sf-topbar-user-chevron" />
+            </button>
+
+            {mode === "redeem" && (
+              <button
+                type="button"
+                className="sf-topbar-cart"
+                onClick={() => setPage("cart")}
+                aria-label={cartCount > 0 ? `Cart, ${cartCount} items` : "Cart"}
+              >
+                <ShoppingBagIcon />
+                {cartCount > 0 ? <span className="sf-topbar-cart-badge">{cartCount}</span> : null}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -477,40 +518,31 @@ export default function StoreShell({
         <>
           {/* Hero banner */}
           <div className="sf-hero-banner">
-            <img
-              src={heroBanner}
-              alt="Choose your reward — redeem exclusive merchandise for your achievement"
-              className="sf-hero-banner-img"
-            />
-            <div className="sf-hero-banner-overlay" aria-hidden="false">
-              <div className="sf-hero-banner-actions">
-                <button type="button" className="sf-hero-banner-btn sf-hero-banner-btn-primary" onClick={browseRewards}>
-                  <GiftIcon />
-                  Browse Rewards
-                </button>
-                <button type="button" className="sf-hero-banner-btn sf-hero-banner-btn-secondary" onClick={goHowItWorks}>
-                  <PlayCircleIcon />
-                  How it works
-                </button>
+            <div className="sf-hero-banner-frame">
+              <img
+                src={heroBannerUrl}
+                alt={heroBannerLabel}
+                className="sf-hero-banner-img"
+                loading="eager"
+                decoding="async"
+              />
+              <div className="sf-hero-banner-overlay" aria-hidden="false">
+                <div className="sf-hero-banner-actions">
+                  <button type="button" className="sf-hero-banner-btn sf-hero-banner-btn-primary" onClick={browseRewards}>
+                    <GiftIcon />
+                    Browse Rewards
+                  </button>
+                  <button type="button" className="sf-hero-banner-btn sf-hero-banner-btn-secondary" onClick={goHowItWorks}>
+                    <PlayCircleIcon />
+                    How it works
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Search & Filter */}
+          {/* Catalog */}
           <div className="sf-content" ref={catalogRef}>
-            <div className="sf-search-section">
-              <SearchFilterBar
-                categories={categories}
-                searchQuery={searchQuery}
-                onSearch={setSearchQuery}
-                selectedCategory={selectedCategory}
-                onCategorySelect={(c) => {
-                  setSelectedCategory(c);
-                  setPage("products");
-                }}
-              />
-            </div>
-
             {/* Featured — horizontal scroll when enough products */}
             {products.length > 4 && (
               <>
@@ -588,13 +620,10 @@ export default function StoreShell({
           </div>
           <ProductsPageWithFilters
             products={products}
-            categories={categories}
             searchQuery={searchQuery}
-            onSearch={setSearchQuery}
             onOpen={openProduct}
             fmt={fmt}
             selectedCategory={selectedCategory}
-            onCategorySelect={setSelectedCategory}
           />
         </div>
       )}
@@ -743,73 +772,18 @@ export default function StoreShell({
    SUB-COMPONENTS
    ═══════════════════════════════════════════════════════════════ */
 
-function SearchFilterBar({
-  categories,
-  searchQuery,
-  onSearch,
-  selectedCategory,
-  onCategorySelect,
-}: {
-  categories: string[];
-  searchQuery: string;
-  onSearch: (q: string) => void;
-  selectedCategory?: string;
-  onCategorySelect: (c: string) => void;
-}) {
-  return (
-    <div className="sf-search-bar">
-      <div className="sf-search-input-wrap">
-        <SearchIcon />
-        <input
-          className="sf-search-input"
-          placeholder="Search for products, categories..."
-          value={searchQuery}
-          onChange={(e) => onSearch(e.target.value)}
-        />
-      </div>
-      {/* <div className="sf-chip-row">
-        {["All", ...categories].map((c) => (
-          <button
-            key={c}
-            type="button"
-            className={`sf-category-chip${(selectedCategory || "All") === c ? " active" : ""}`}
-            onClick={() => onCategorySelect(c)}
-          >
-            {c}
-          </button>
-        ))}
-      </div> */}
-      <div className="sf-sort-wrap">
-        <span className="sf-sort-label">Sort by:</span>
-        <select className="sf-sort-select">
-          <option>Popular</option>
-          <option>Price: Low to High</option>
-          <option>Price: High to Low</option>
-          <option>Newest</option>
-        </select>
-      </div>
-    </div>
-  );
-}
-
 function ProductsPageWithFilters({
   products,
-  categories,
   searchQuery,
-  onSearch,
   onOpen,
   fmt,
   selectedCategory,
-  onCategorySelect,
 }: {
   products: StoreProduct[];
-  categories: string[];
   searchQuery: string;
-  onSearch: (q: string) => void;
   onOpen: (id: string) => void;
   fmt: (n: number) => string;
   selectedCategory: string;
-  onCategorySelect: (c: string) => void;
 }) {
   const q = searchQuery.toLowerCase();
   const filtered = products.filter((p) => {
@@ -819,18 +793,9 @@ function ProductsPageWithFilters({
   });
 
   return (
-    <>
-      <SearchFilterBar
-        categories={categories}
-        searchQuery={searchQuery}
-        onSearch={onSearch}
-        selectedCategory={selectedCategory}
-        onCategorySelect={onCategorySelect}
-      />
-      <div style={{ marginTop: 20 }}>
-        <PremiumProductGrid products={filtered} onOpen={onOpen} fmt={fmt} />
-      </div>
-    </>
+    <div style={{ marginTop: 20 }}>
+      <PremiumProductGrid products={filtered} onOpen={onOpen} fmt={fmt} />
+    </div>
   );
 }
 

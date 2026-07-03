@@ -1,5 +1,6 @@
 import { ApiError, apiFetch } from "./api";
 import { getStoredUser } from "./auth-store";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { mapCampaign, mapCollection, mapKit, type UiProduct } from "./mappers";
 
 const MONGO_ID = /^[a-f0-9]{24}$/i;
@@ -197,18 +198,19 @@ async function resolveWalletId(org: OrgWizardState, createNewWallet = false): Pr
 
 function productRefFromUi(p: UiProduct) {
   if (!p.id) throw new Error(`Product "${p.nm}" has no catalog id — reload the catalog`);
+  const mockupUrl = p.mockupUrl ? resolveMediaUrl(p.mockupUrl) : "";
   return {
     catalogProductId: p.id,
     brand: p.brand || "",
     name: p.nm,
     group: p.g || "tee",
-    ...(p.mockupUrl && /^https?:\/\//i.test(p.mockupUrl) ? { mockupUrl: p.mockupUrl } : {}),
+    ...(mockupUrl ? { mockupUrl } : {}),
   };
 }
 
-function remoteArtworkUrl(url?: string) {
-  if (!url) return "";
-  return /^https?:\/\//i.test(url) ? url : "";
+function collectionMediaUrl(url?: string) {
+  if (!url || url.startsWith("blob:")) return "";
+  return resolveMediaUrl(url);
 }
 
 function cleanPreferredColors(colors?: string[]) {
@@ -362,7 +364,12 @@ export async function addProductToShopApi(payload: {
     throw new Error("Could not match this product to the catalog");
   }
 
-  const productRef = productRefFromUi(catalogProduct);
+  const productRef = {
+    ...productRefFromUi(catalogProduct),
+    ...(payload.product.mockupUrl
+      ? { mockupUrl: resolveMediaUrl(payload.product.mockupUrl) }
+      : {}),
+  };
   const catalogById = new Map(
     payload.catalog.filter((p) => p.id).map((p) => [p.id as string, p]),
   );
@@ -371,7 +378,7 @@ export async function addProductToShopApi(payload: {
     productRefs: [productRef],
     preferredColors: cleanPreferredColors(payload.collection.preferredColors),
     shopId: payload.shopId,
-    artworkUrl: remoteArtworkUrl(payload.collection.artworkUrl),
+    artworkUrl: collectionMediaUrl(payload.collection.artworkUrl),
     isShopSpecific: true,
   };
 
@@ -381,7 +388,7 @@ export async function addProductToShopApi(payload: {
   });
   let result = mapCollection(col, "", catalogById);
 
-  const mockup = payload.product.mockupUrl;
+  const mockup = resolveMediaUrl(payload.product.mockupUrl);
   if (mockup?.startsWith("data:") && catalogProduct.id) {
     const withMockups = await uploadCollectionMockupsApi(
       result.id,
@@ -419,7 +426,7 @@ export async function createCollectionApi(payload: {
     preferredColors: cleanPreferredColors(payload.preferredColors),
   };
   if (payload.shopId) body.shopId = payload.shopId;
-  if (payload.artworkUrl) body.artworkUrl = remoteArtworkUrl(payload.artworkUrl);
+  if (payload.artworkUrl) body.artworkUrl = collectionMediaUrl(payload.artworkUrl);
   if (payload.isShopSpecific) body.isShopSpecific = true;
   const col = await apiFetch<Record<string, unknown>>("/collections", {
     method: "POST",
