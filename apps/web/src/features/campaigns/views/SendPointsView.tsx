@@ -1,118 +1,41 @@
-import { useMemo, useReducer, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
 import { ArrowLeftRight } from "lucide-react";
-import { toast } from "sonner";
 import { LoadingState } from "@/components/LoadingState";
 import { inr } from "@/components/platform/platform-ui";
-import { useWorkspace, useInvalidateWorkspace } from "@/hooks/useWorkspace";
-import { formatWalletAmount } from "@/lib/walletFormat";
-import type { UiContact } from "@/services/mappers";
-import { entityIdForWallet, spendableForWallet } from "@/services/workspace-api";
 import { WizardChrome } from "@/features/swag/wizard/WizardChrome";
 import { RecipientPicker } from "@/features/send/RecipientPicker";
 import { RecipientExperience } from "@/features/send/RecipientExperience";
 import { PaymentPanel } from "@/features/send/PaymentPanel";
-import { POINT_VALUE, pointsSendTotals } from "@/features/send/money";
-import { useLaunchPointsCampaign } from "../mutations";
-import { initialSendPointsDraft, sendPointsReducer } from "./pointsDraft";
+import { POINT_VALUE } from "@/features/send/money";
+import type { SendPointsVm } from "../controllers/useSendPointsController";
 
 const STEPS = ["Budget", "Recipients", "Message", "Checkout"];
 
-export function SendPointsWizard() {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const search = { shop: searchParams.get("shop") ?? undefined };
-  const { data: workspace, isLoading } = useWorkspace();
-  const refreshWorkspace = useInvalidateWorkspace();
-  const launch = useLaunchPointsCampaign();
-  const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
-  const [sending, setSending] = useState(false);
-  const [selectedWalletId, setSelectedWalletId] = useState("");
-
-  const contacts: UiContact[] = useMemo(() => workspace?.contacts ?? [], [workspace]);
-  const shops = workspace?.shops ?? [];
-  const shopId = search.shop || shops[0]?.id;
-  const shop = shops.find((s) => s.id === shopId);
-
-  const initial = useMemo(
-    () =>
-      initialSendPointsDraft(
-        contacts.slice(0, 2).map((c) => c.id),
-        workspace?.account ?? "Shelf Merch",
-      ),
-    [contacts, workspace?.account],
-  );
-  const [draft, dispatch] = useReducer(sendPointsReducer, initial);
-
-  if (isLoading && !workspace) {
+/** Pure wizard shell for the send-points flow; all state and actions come from the controller. */
+export function SendPointsView({
+  isLoading,
+  isSending,
+  step,
+  draft,
+  dispatch,
+  totals,
+  contacts,
+  shopName,
+  wallet,
+  wallets,
+  selectedWalletId,
+  onWalletSelect,
+  walletAvailable,
+  onExit,
+  onNext,
+  onBack,
+  onPayNow,
+  onApplyPromo,
+}: SendPointsVm) {
+  if (isLoading) {
     return <LoadingState message="Loading…" fullScreen={false} />;
   }
-  if (sending || launch.isPending) {
+  if (isSending) {
     return <LoadingState message="Sending points…" fullScreen={false} />;
-  }
-
-  const totals = pointsSendTotals(draft.ppr, draft.recips);
-  const wallet = workspace?.wallets.find((w) => w.id === selectedWalletId) ?? workspace?.wallets[0];
-
-  function exit() {
-    navigate("/app/campaigns");
-  }
-
-  function next() {
-    setStep((s) => Math.min(s + 1, 3) as 0 | 1 | 2 | 3);
-  }
-
-  async function payNow() {
-    const walletId = selectedWalletId || workspace?.wallets[0]?.id;
-    const entityId = walletId && workspace ? entityIdForWallet(workspace, walletId) : undefined;
-    if (!entityId) {
-      toast.error("No budget department found for this wallet — allocate funds first");
-      return;
-    }
-    if (!shopId) {
-      toast.error("Select a shop for this campaign");
-      return;
-    }
-    if (!draft.selRecips.length) {
-      toast.error("Select at least one recipient");
-      return;
-    }
-    const paymentTotal = Math.round(totals.total);
-    if (draft.pay === "wallet") {
-      const available =
-        walletId && workspace ? spendableForWallet(workspace, walletId) : 0;
-      const payWallet = walletId ? workspace?.wallets.find((w) => w.id === walletId) : undefined;
-      if (available < paymentTotal) {
-        toast.error(
-          `Insufficient wallet balance — ${formatWalletAmount(available, payWallet?.cur)} available`,
-        );
-        return;
-      }
-    }
-    setSending(true);
-    try {
-      await launch.mutateAsync({
-        entityId: String(entityId),
-        shopId: String(shopId),
-        name: draft.orderName || "Points campaign",
-        creditsPerRecipient: draft.ppr,
-        totalBudget: paymentTotal,
-        message: { from: draft.from, body: draft.msg },
-        contactIds: draft.selRecips,
-        contacts: contacts.map((c) => ({
-          id: c.id,
-          name: c.name,
-          email: c.email,
-          phone: c.phone,
-        })),
-      });
-      await refreshWorkspace();
-      toast.success(`Points sent to ${draft.selRecips.length} recipients! 🎉`);
-      navigate(`/app/shops/${String(shopId)}`);
-    } catch (err) {
-      setSending(false);
-      toast.error(err instanceof Error ? err.message : "Failed to launch campaign");
-    }
   }
 
   const footer = (
@@ -121,12 +44,12 @@ export function SendPointsWizard() {
         type="button"
         className="lnk"
         style={{ background: "none", border: "none", cursor: "pointer" }}
-        onClick={() => (step === 0 ? exit() : setStep((s) => (s - 1) as 0 | 1 | 2 | 3))}
+        onClick={() => (step === 0 ? onExit() : onBack())}
       >
         {step === 0 ? "Cancel" : "Back"}
       </button>
       {step < 3 ? (
-        <button type="button" className="btn btn-dark" onClick={next}>
+        <button type="button" className="btn btn-dark" onClick={onNext}>
           Next
         </button>
       ) : (
@@ -140,12 +63,15 @@ export function SendPointsWizard() {
       title="Send Points"
       steps={STEPS}
       activeIndex={step}
-      onExit={exit}
+      onExit={onExit}
       exitLabel="Cancel"
       footer={footer}
     >
       {step === 0 && (
-        <div className="card" style={{ padding: 24, maxWidth: 880, width: "100%", margin: "10px auto 0" }}>
+        <div
+          className="card"
+          style={{ padding: 24, maxWidth: 880, width: "100%", margin: "10px auto 0" }}
+        >
           <div
             className="row"
             style={{ justifyContent: "space-between", alignItems: "flex-start" }}
@@ -220,7 +146,7 @@ export function SendPointsWizard() {
       {step === 2 && (
         <RecipientExperience
           kind="points"
-          shopName={shop?.name}
+          shopName={shopName}
           pointsAmount={Math.round(draft.ppr / POINT_VALUE)}
           from={draft.from}
           message={draft.msg}
@@ -241,14 +167,12 @@ export function SendPointsWizard() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
             <PaymentPanel
               wallet={wallet}
-              wallets={workspace?.wallets ?? []}
+              wallets={wallets}
               selected={draft.pay}
               onSelect={(pay) => dispatch({ type: "setPay", pay })}
-              selectedWalletId={selectedWalletId || workspace?.wallets[0]?.id}
-              onWalletSelect={setSelectedWalletId}
-              walletAvailable={(w) =>
-                workspace ? spendableForWallet(workspace, w.id) : 0
-              }
+              selectedWalletId={selectedWalletId}
+              onWalletSelect={onWalletSelect}
+              walletAvailable={walletAvailable}
             />
             <div className="card" style={{ padding: 22, height: "fit-content" }}>
               <div
@@ -278,7 +202,7 @@ export function SendPointsWizard() {
                   padding: 0,
                   display: "block",
                 }}
-                onClick={() => toast("Promo applied")}
+                onClick={onApplyPromo}
               >
                 Apply promo code
               </button>
@@ -296,7 +220,7 @@ export function SendPointsWizard() {
                 type="button"
                 className="btn btn-brand btn-block btn-lg"
                 style={{ marginTop: 14 }}
-                onClick={payNow}
+                onClick={onPayNow}
               >
                 Pay now
               </button>

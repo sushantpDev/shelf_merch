@@ -1,30 +1,15 @@
-import { useState } from "react";
 import { Box, CalendarDays, Search, Settings2, Users } from "lucide-react";
-import type { UiCampaign } from "@/services/mappers";
+import { COMPLETE_STATUSES, isLiveCampaign, isPointsCampaign, isSentKitCampaign } from "../model";
+import type { UiCampaign } from "../model";
+import type { CampaignFilter, CampaignStats } from "../controllers/useCampaignsController";
+import { CAMPAIGN_FILTERS } from "../controllers/useCampaignsController";
 
-const PER_PAGE = 5;
-const TABS = ["all", "live", "draft", "completed"] as const;
-const TAB_LABELS: Record<(typeof TABS)[number], string> = {
+const TAB_LABELS: Record<CampaignFilter, string> = {
   all: "All",
   live: "Live",
   draft: "Draft",
   completed: "Completed",
 };
-
-const LIVE = ["live", "launched", "redemption_open"];
-const COMPLETE = ["completed", "redemption_closed", "fulfilled"];
-
-function isPointsCampaign(c: UiCampaign) {
-  return c.type === "send_points" || c.type === "points";
-}
-
-function isLiveCampaign(c: UiCampaign) {
-  return isPointsCampaign(c) && LIVE.includes(c.status);
-}
-
-function isSentKitCampaign(c: UiCampaign) {
-  return !isPointsCampaign(c) && LIVE.includes(c.status);
-}
 
 function statusTag(c: UiCampaign) {
   if (isSentKitCampaign(c))
@@ -55,7 +40,7 @@ function statusTag(c: UiCampaign) {
         Draft
       </span>
     );
-  if (COMPLETE.includes(c.status))
+  if (COMPLETE_STATUSES.includes(c.status))
     return (
       <span className="tag tag-completed">
         <span className="dot" />
@@ -116,43 +101,38 @@ function StatCard({
   );
 }
 
-import { useTenantAccess } from "@/hooks/useTenantAccess";
-
-/** Campaigns table with stats, filter tabs, search and pagination. */
-export function CampaignsTable({
-  campaigns,
+/** Campaigns table with stats, filter tabs, search and pagination — all state via props. */
+export function CampaignsTableView({
+  stats,
+  filter,
+  search,
+  pageItems,
+  page,
+  totalPages,
+  totalFiltered,
+  showingStart,
+  showingEnd,
+  canSend,
+  onFilter,
+  onSearch,
+  onPage,
   onSendGift,
 }: {
-  campaigns: UiCampaign[];
+  stats: CampaignStats;
+  filter: CampaignFilter;
+  search: string;
+  pageItems: UiCampaign[];
+  page: number;
+  totalPages: number;
+  totalFiltered: number;
+  showingStart: number;
+  showingEnd: number;
+  canSend: boolean;
+  onFilter: (filter: CampaignFilter) => void;
+  onSearch: (search: string) => void;
+  onPage: (page: number) => void;
   onSendGift: () => void;
 }) {
-  const [filter, setFilter] = useState<(typeof TABS)[number]>("all");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-
-  const totalCamp = campaigns.length;
-  const liveCount = campaigns.filter(isLiveCampaign).length;
-  const draftCount = campaigns.filter((c) => c.status === "draft").length;
-  const totalRecipients = campaigns.reduce((s, c) => s + (c.recipientCount || 0), 0);
-
-  let filtered = campaigns;
-  if (filter === "live") filtered = filtered.filter(isLiveCampaign);
-  else if (filter === "draft") filtered = filtered.filter((c) => c.status === "draft");
-  else if (filter === "completed") filtered = filtered.filter((c) => COMPLETE.includes(c.status));
-  const q = search.toLowerCase();
-  if (q) filtered = filtered.filter((c) => c.name.toLowerCase().includes(q));
-
-  const totalFiltered = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(totalFiltered / PER_PAGE));
-  const safePage = Math.min(page, totalPages);
-  const start = (safePage - 1) * PER_PAGE;
-  const pageItems = filtered.slice(start, start + PER_PAGE);
-  const showingStart = totalFiltered ? start + 1 : 0;
-  const showingEnd = Math.min(start + PER_PAGE, totalFiltered);
-
-  const { canOperateCampaigns } = useTenantAccess();
-  const canSend = canOperateCampaigns();
-
   return (
     <>
       <div className="page-h">
@@ -168,18 +148,18 @@ export function CampaignsTable({
       </div>
 
       <div className="camp-stats">
-        <StatCard icon={<CalendarDays size={18} />} label="Total campaigns" value={totalCamp} />
+        <StatCard icon={<CalendarDays size={18} />} label="Total campaigns" value={stats.total} />
         <StatCard
           icon={<span className="dot" style={{ background: "var(--brand-l)" }} />}
           label="Live"
-          value={liveCount}
+          value={stats.live}
           liveDot
         />
-        <StatCard icon={<Settings2 size={18} />} label="Draft" value={draftCount} />
+        <StatCard icon={<Settings2 size={18} />} label="Draft" value={stats.draft} />
         <StatCard
           icon={<Users size={18} />}
           label="Recipients reached"
-          value={totalRecipients.toLocaleString("en-IN")}
+          value={stats.recipients.toLocaleString("en-IN")}
         />
       </div>
 
@@ -189,22 +169,16 @@ export function CampaignsTable({
           <input
             placeholder="Search campaigns"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => onSearch(e.target.value)}
           />
         </div>
         <div className="camp-filter-tabs">
-          {TABS.map((t) => (
+          {CAMPAIGN_FILTERS.map((t) => (
             <button
               key={t}
               type="button"
               className={`camp-filter-btn${filter === t ? " on" : ""}`}
-              onClick={() => {
-                setFilter(t);
-                setPage(1);
-              }}
+              onClick={() => onFilter(t)}
             >
               {TAB_LABELS[t]}
             </button>
@@ -237,7 +211,10 @@ export function CampaignsTable({
                           {campaignTitle(c)}
                         </span>
                         {campaignSubtext(c) ? (
-                          <span className="muted" style={{ display: "block", fontSize: 12, marginTop: 2 }}>
+                          <span
+                            className="muted"
+                            style={{ display: "block", fontSize: 12, marginTop: 2 }}
+                          >
                             {campaignSubtext(c)}
                           </span>
                         ) : null}
@@ -271,9 +248,9 @@ export function CampaignsTable({
           <div className="camp-page-btns">
             <button
               type="button"
-              className={`camp-page-btn${safePage <= 1 ? " disabled" : ""}`}
-              disabled={safePage <= 1}
-              onClick={() => setPage(safePage - 1)}
+              className={`camp-page-btn${page <= 1 ? " disabled" : ""}`}
+              disabled={page <= 1}
+              onClick={() => onPage(page - 1)}
             >
               &lt;
             </button>
@@ -281,17 +258,17 @@ export function CampaignsTable({
               <button
                 key={n}
                 type="button"
-                className={`camp-page-btn${n === safePage ? " on" : ""}`}
-                onClick={() => setPage(n)}
+                className={`camp-page-btn${n === page ? " on" : ""}`}
+                onClick={() => onPage(n)}
               >
                 {n}
               </button>
             ))}
             <button
               type="button"
-              className={`camp-page-btn${safePage >= totalPages ? " disabled" : ""}`}
-              disabled={safePage >= totalPages}
-              onClick={() => setPage(safePage + 1)}
+              className={`camp-page-btn${page >= totalPages ? " disabled" : ""}`}
+              disabled={page >= totalPages}
+              onClick={() => onPage(page + 1)}
             >
               &gt;
             </button>

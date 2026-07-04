@@ -1,8 +1,6 @@
-import { useState } from "react";
-import { useNavigate } from "react-router";
 import { Box, Coins, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import type { UiKit } from "@/services/mappers";
+import type { SendGiftVm } from "../controllers/useCampaignsController";
 
 const ICON_CHIP: React.CSSProperties = {
   width: 42,
@@ -15,32 +13,18 @@ const ICON_CHIP: React.CSSProperties = {
 };
 
 /** "Send Gift" chooser: pick points or a kit, then a kit to send. */
-export function SendGiftDialog({
+export function SendGiftDialogView({
   open,
-  kits,
+  view,
+  availableKits,
   onOpenChange,
-}: {
-  open: boolean;
-  kits: UiKit[];
-  onOpenChange: (open: boolean) => void;
-}) {
-  const navigate = useNavigate();
-  const [view, setView] = useState<"choose" | "kit">("choose");
-  const availableKits = kits.filter((k) => k.id);
-
-  function close() {
-    onOpenChange(false);
-    setView("choose");
-  }
-
+  onPickKitView,
+  onSendPoints,
+  onSelectKit,
+  onCreateKit,
+}: SendGiftVm) {
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        onOpenChange(o);
-        if (!o) setView("choose");
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm-modal" style={{ maxWidth: view === "kit" ? 620 : 560 }}>
         <div className="modal-pad">
           {view === "choose" ? (
@@ -56,10 +40,7 @@ export function SendGiftDialog({
                   type="button"
                   className="optcard"
                   style={{ flexDirection: "column", alignItems: "flex-start", gap: 10 }}
-                  onClick={() => {
-                    close();
-                    navigate("/app/campaigns/send-points");
-                  }}
+                  onClick={onSendPoints}
                 >
                   <div style={ICON_CHIP}>
                     <Coins size={20} />
@@ -73,7 +54,7 @@ export function SendGiftDialog({
                   type="button"
                   className="optcard"
                   style={{ flexDirection: "column", alignItems: "flex-start", gap: 10 }}
-                  onClick={() => setView("kit")}
+                  onClick={onPickKitView}
                 >
                   <div style={ICON_CHIP}>
                     <Box size={20} />
@@ -117,10 +98,7 @@ export function SendGiftDialog({
                       <button
                         type="button"
                         className="btn btn-dark btn-sm"
-                        onClick={() => {
-                          close();
-                          navigate(`/app/kits/${k.id}/send`);
-                        }}
+                        onClick={() => onSelectKit(k.id)}
                       >
                         Select
                       </button>
@@ -137,10 +115,7 @@ export function SendGiftDialog({
                 type="button"
                 className="btn btn-brand btn-block"
                 style={{ marginTop: 16 }}
-                onClick={() => {
-                  close();
-                  navigate("/app/kits/new");
-                }}
+                onClick={onCreateKit}
               >
                 <Plus size={16} /> Create a new kit
               </button>
