@@ -13,13 +13,9 @@ import type { UiCollection, UiProduct } from "@/services/mappers";
 import { ProductInfoTabs } from "@/features/catalog/views/ProductInfoTabs";
 import { productUniqueId } from "@/features/catalog/types";
 import { catalogCategoryLabel } from "@/features/shops/types";
-import {
-  collectionProductColorNames,
-  productColorHex,
-  productDescription,
-} from "./colors";
+import { collectionProductColorNames, productColorHex, productDescription } from "./colors";
 import { DesignedProductThumb } from "./DesignedProductThumb";
-import { useUpdateCollectionArtwork } from "./hooks";
+import { useUpdateCollectionArtwork } from "./model";
 import { bakeMockup } from "./mockup-bake";
 
 const ARTWORK_ACCEPT = ".svg,.png,.jpg,.jpeg,image/svg+xml,image/png,image/jpeg";
@@ -119,8 +115,8 @@ export function SwagDesignDetail({
       await updateArtwork.mutateAsync({
         collectionId: collection.id,
         artwork: { file: artworkDraft.file },
-        mockups: mockups.filter(
-          (item): item is { catalogProductId: string; dataUrl: string } => Boolean(item),
+        mockups: mockups.filter((item): item is { catalogProductId: string; dataUrl: string } =>
+          Boolean(item),
         ),
         catalog: collection.products,
       });
@@ -214,9 +210,7 @@ export function SwagDesignDetail({
 
           <ProductInfoTabs
             product={product}
-            description={
-              product.description?.trim() ? undefined : productDescription(product)
-            }
+            description={product.description?.trim() ? undefined : productDescription(product)}
           />
         </div>
       </div>
@@ -294,7 +288,9 @@ export function SwagDesignDetail({
                 </div>
                 <div>
                   <strong style={{ display: "block" }}>{artworkDraft.name}</strong>
-                  <span className="muted">This artwork will replace the current design artwork.</span>
+                  <span className="muted">
+                    This artwork will replace the current design artwork.
+                  </span>
                 </div>
               </div>
             ) : null}

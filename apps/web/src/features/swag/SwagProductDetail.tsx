@@ -84,7 +84,12 @@ export function SwagProductDetail({
             <ProductInfoTabs product={product} />
           </div>
 
-          <button type="button" className="btn btn-dark" style={{ minWidth: 200 }} onClick={onAddToShop}>
+          <button
+            type="button"
+            className="btn btn-dark"
+            style={{ minWidth: 200 }}
+            onClick={onAddToShop}
+          >
             <Store size={16} /> Add to shop
           </button>
         </div>

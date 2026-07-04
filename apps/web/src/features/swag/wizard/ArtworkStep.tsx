@@ -5,7 +5,7 @@ import type { UiProduct } from "@/services/mappers";
 import { ProductThumb } from "@/features/shops/ProductThumb";
 import { MockupCanvas } from "../MockupCanvas";
 import { placementKey, type Placement } from "../mockup-bake";
-import type { ArtFile } from "./SwagWizard";
+import type { ArtFile } from "../swagDraft";
 
 const ART_ACCEPT = /\.(svg|png|jpe?g|ai)$/i;
 const ART_MAX = 5 * 1024 * 1024;

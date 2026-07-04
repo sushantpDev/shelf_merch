@@ -69,11 +69,7 @@ export function BrandedSwagTab({
               </p>
               <div className="grid shop-collection-grid">
                 {active.map((col) => (
-                  <CollectionCard
-                    key={col.id}
-                    shopId={shop.id}
-                    collection={col}
-                  />
+                  <CollectionCard key={col.id} shopId={shop.id} collection={col} />
                 ))}
               </div>
             </div>
@@ -128,11 +124,7 @@ export function BrandedSwagTab({
             <div className="card" style={{ padding: 22 }}>
               <div className="grid shop-collection-grid">
                 {archived.map((col) => (
-                  <CollectionCard
-                    key={col.id}
-                    shopId={shop.id}
-                    collection={col}
-                  />
+                  <CollectionCard key={col.id} shopId={shop.id} collection={col} />
                 ))}
               </div>
             </div>
@@ -162,13 +154,7 @@ export function BrandedSwagTab({
   }
 }
 
-function CollectionCard({
-  shopId,
-  collection,
-}: {
-  shopId: string;
-  collection: UiCollection;
-}) {
+function CollectionCard({ shopId, collection }: { shopId: string; collection: UiCollection }) {
   const products = collection.products.slice(0, 4);
   const cols = products.length <= 1 ? 1 : 2;
 

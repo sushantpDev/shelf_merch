@@ -10,6 +10,9 @@ import {
 import { useInvalidateWorkspace } from "@/hooks/useWorkspace";
 import type { UiCollection, UiProduct } from "@/services/mappers";
 
+// Ui types re-exported here so views/controllers never import services/ directly.
+export type { UiCollection, UiProduct, UiShop } from "@/services/mappers";
+
 export type CreateCollectionInput = {
   shopId?: string;
   name: string;

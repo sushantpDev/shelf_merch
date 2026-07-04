@@ -4,6 +4,9 @@ import { archiveShopApi, duplicateShopApi } from "@/services/workspace-api";
 import type { UiShop } from "@/services/mappers";
 import { useInvalidateWorkspace } from "@/hooks/useWorkspace";
 
+// Ui types re-exported here so views/controllers never import services/ directly.
+export type { UiShop, UiCollection, UiProduct } from "@/services/mappers";
+
 export type CreateShopInput = {
   name: string;
   currency: string;

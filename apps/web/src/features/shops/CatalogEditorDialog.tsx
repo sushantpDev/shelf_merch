@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { UiProduct, UiShop } from "@/services/mappers";
 import { ProductThumb } from "./ProductThumb";
-import { useUpdateShop } from "./hooks";
+import { useUpdateShop } from "./model";
 import { catalogCategoryLabel, catalogProductKey } from "./types";
 
 export function CatalogEditorDialog({
