@@ -1,5 +1,5 @@
 import { useMemo, useReducer, useState } from "react";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingState } from "@/components/LoadingState";
@@ -40,7 +40,8 @@ function templateIndices(items: Array<{ catalogProductId: string }>, catalog: Ui
 
 export function KitWizard() {
   const navigate = useNavigate();
-  const search = useSearch({ from: "/app/kits/new" }) as { template?: string };
+  const [searchParams] = useSearchParams();
+  const search = { template: searchParams.get("template") ?? undefined };
   const { data: workspace, isLoading } = useWorkspace();
   const { data: platformKits } = usePlatformKits();
   const createKit = useCreateKit();
@@ -77,7 +78,7 @@ export function KitWizard() {
   const pickedProducts = draft.picked.map((i) => catalog[i]).filter(Boolean) as UiProduct[];
 
   function exit() {
-    navigate({ to: "/app/kits" });
+    navigate("/app/kits");
   }
 
   function next() {
@@ -113,7 +114,7 @@ export function KitWizard() {
       });
       toast.success(`Kit "${created.name}" saved to your workspace`);
       // Publish & send: continue straight into the send-kit checkout.
-      navigate({ to: "/app/kits/$id/send", params: { id: created.id } });
+      navigate(`/app/kits/${created.id}/send`);
     } catch (err) {
       setPublishing(false);
       toast.error(err instanceof Error ? err.message : "Failed to save kit");

@@ -1,5 +1,5 @@
 import { useReducer, useRef } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "react-router";
 import { ArrowLeft, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { FullscreenOverlay } from "@/components/tenant/FullscreenOverlay";
@@ -55,7 +55,7 @@ export function CreateShopWizard() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   function exit() {
-    navigate({ to: "/app/shops" });
+    navigate("/app/shops");
   }
 
   function next() {
@@ -99,7 +99,7 @@ export function CreateShopWizard() {
         }),
       });
       toast.success(`"${shop.name}" shop published successfully!`);
-      navigate({ to: "/app/shops/$id", params: { id: shop.id } });
+      navigate(`/app/shops/${shop.id}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to publish shop");
     }

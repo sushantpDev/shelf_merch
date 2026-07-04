@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link } from "react-router";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import type { UiProduct } from "@/services/mappers";
 
@@ -51,8 +51,7 @@ export function ProductCard({ product }: { product: UiProduct }) {
   if (product.id) {
     return (
       <Link
-        to="/app/catalog/$id"
-        params={{ id: product.id }}
+        to={`/app/catalog/${product.id}`}
         className="pcard"
         aria-label={`View ${product.nm}`}
         style={{ textDecoration: "none", color: "inherit" }}

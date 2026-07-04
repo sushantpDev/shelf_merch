@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link } from "react-router";
 import {
   ChevronRight,
   Gift,
@@ -217,7 +217,7 @@ export function HomePage() {
                   <div className="home-shop-banner__name">{pinnedShop.name}</div>
                 </div>
                 <div className="home-card__footer">
-                  <Link to="/app/shops/$id" params={{ id: pinnedShop.id }} className="lnk">
+                  <Link to={`/app/shops/${pinnedShop.id}`} className="lnk">
                     Open shop
                   </Link>
                 </div>

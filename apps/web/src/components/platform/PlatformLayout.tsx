@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { Link, Outlet, useLocation } from "react-router";
 import {
   getStoredUser,
   isAuthenticated,
@@ -13,7 +13,7 @@ const LOGO = `<svg viewBox="0 0 32 32" fill="none"><path d="M16 3 4 9l12 6 12-6-
 
 export default function PlatformLayout() {
   const user = getStoredUser();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const pathname = useLocation().pathname;
   const navItems = navItemsForRole(user?.role);
 
   useEffect(() => {

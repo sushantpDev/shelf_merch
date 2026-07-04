@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "react-router";
 import { Box, Coins, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { UiKit } from "@/services/mappers";
@@ -58,7 +58,7 @@ export function SendGiftDialog({
                   style={{ flexDirection: "column", alignItems: "flex-start", gap: 10 }}
                   onClick={() => {
                     close();
-                    navigate({ to: "/app/campaigns/send-points" });
+                    navigate("/app/campaigns/send-points");
                   }}
                 >
                   <div style={ICON_CHIP}>
@@ -119,7 +119,7 @@ export function SendGiftDialog({
                         className="btn btn-dark btn-sm"
                         onClick={() => {
                           close();
-                          navigate({ to: "/app/kits/$id/send", params: { id: k.id } });
+                          navigate(`/app/kits/${k.id}/send`);
                         }}
                       >
                         Select
@@ -139,7 +139,7 @@ export function SendGiftDialog({
                 style={{ marginTop: 16 }}
                 onClick={() => {
                   close();
-                  navigate({ to: "/app/kits/new" });
+                  navigate("/app/kits/new");
                 }}
               >
                 <Plus size={16} /> Create a new kit

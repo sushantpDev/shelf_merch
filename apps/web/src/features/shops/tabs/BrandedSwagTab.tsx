@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link } from "react-router";
 import { Plus, Shirt } from "lucide-react";
 import { DesignedProductThumb } from "@/features/swag/DesignedProductThumb";
 import type { UiCollection, UiShop } from "@/services/mappers";
@@ -189,9 +189,7 @@ function CollectionCard({
     const label = product.brand ? `${product.brand} ${product.nm}` : product.nm;
     return (
       <Link
-        to="/app/shops/$id/designs/$collectionId"
-        params={{ id: shopId, collectionId: collection.id }}
-        search={{ p: 0 }}
+        to={`/app/shops/${shopId}/designs/${collection.id}?p=0`}
         className="shop-collection-card"
         aria-label={`View ${label}`}
       >
@@ -224,9 +222,7 @@ function CollectionCard({
           return (
             <Link
               key={`${p.id ?? p.nm}-${i}`}
-              to="/app/shops/$id/designs/$collectionId"
-              params={{ id: shopId, collectionId: collection.id }}
-              search={{ p: i }}
+              to={`/app/shops/${shopId}/designs/${collection.id}?p=${i}`}
               className="shop-collection-cell"
               aria-label={`View ${label}`}
             >

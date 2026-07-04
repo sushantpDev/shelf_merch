@@ -1,5 +1,5 @@
 import { type ComponentType, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link } from "react-router";
 import { BookOpen, Package, Radio, Send, UserPlus, Users } from "lucide-react";
 import { PreDesignedKits } from "./PreDesignedKits";
 import kitsAndItemsImg from "../../../assets/kits.png";

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "react-router";
 import {
   addVariant,
   createProduct,
@@ -475,7 +475,7 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
         await refresh();
       }
       await publishProduct(id);
-      navigate({ to: "/platform/catalog" });
+      navigate("/platform/catalog");
     } catch (e) {
       const body = (e as { details?: { error?: { details?: unknown } } }).details;
       const list = body?.error?.details;
@@ -492,7 +492,7 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
         title={mode === "edit" ? "Edit product" : "New product"}
         subtitle="Define a base catalog product, its variants, images, and design placeholders."
         actions={
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigate({ to: "/platform/catalog" })}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigate("/platform/catalog")}>
             Back to catalog
           </button>
         }
@@ -787,7 +787,7 @@ export function ProductWizard({ mode, productId }: { mode: "create" | "edit"; pr
             <div className="row" style={{ gap: 8, marginTop: 12 }}>
               <button type="button" className="btn btn-ghost" onClick={() => setStep(3)}>Back</button>
               <button type="button" className="btn btn-brand" disabled={busy} onClick={doPublish}>Publish product</button>
-              <button type="button" className="btn btn-soft" onClick={() => navigate({ to: "/platform/catalog" })}>Save as draft</button>
+              <button type="button" className="btn btn-soft" onClick={() => navigate("/platform/catalog")}>Save as draft</button>
             </div>
           </>
         )}

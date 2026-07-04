@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "react-router";
 import { Plus, Store } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { PageHeader } from "@/components/tenant/PageHeader";
@@ -51,7 +51,7 @@ export function ShopsPage() {
               type="button"
               className="btn btn-brand"
               style={{ marginTop: 14 }}
-              onClick={() => navigate({ to: "/app/shops/new" })}
+              onClick={() => navigate("/app/shops/new")}
             >
               Create your first shop
             </button>

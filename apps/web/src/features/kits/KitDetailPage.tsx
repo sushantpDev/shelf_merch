@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useParams } from "react-router";
 import { ArrowLeft, Box, CheckCircle2, Pencil, Send } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { PageHeader } from "@/components/tenant/PageHeader";
@@ -8,7 +8,7 @@ import { useWorkspace } from "@/hooks/useWorkspace";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 export function KitDetailPage() {
-  const { id } = useParams({ from: "/app/kits/$id/" });
+  const { id } = useParams() as { id: string };
   const { data: workspace, isLoading, isError, error } = useWorkspace();
   const kit = workspace?.kits.find((k) => k.id === id);
 
@@ -61,10 +61,10 @@ export function KitDetailPage() {
         subtitle={`A reusable ${kit.items}-item kit. Send it to new recipients any time without rebuilding.`}
         actions={
           <div className="row" style={{ gap: 10 }}>
-            <Link to="/app/kits/$id/edit" params={{ id: kit.id }} className="btn btn-ghost">
+            <Link to={`/app/kits/${kit.id}/edit`} className="btn btn-ghost">
               <Pencil size={15} /> Edit kit
             </Link>
-            <Link to="/app/kits/$id/send" params={{ id: kit.id }} className="btn btn-brand">
+            <Link to={`/app/kits/${kit.id}/send`} className="btn btn-brand">
               <Send size={15} /> Send this kit
             </Link>
           </div>

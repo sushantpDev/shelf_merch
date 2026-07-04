@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "react-router";
 import { importShopify, importShopifyKits, type ShopifyImportSummary, type ShopifyImportBreakdown } from "@/services/platform-api";
 import { PlatformError, PlatformPageHeader } from "./platform-ui";
 
@@ -69,7 +69,7 @@ export function ShopifyImport({ kind = "catalog" }: { kind?: "catalog" | "kits" 
             : "Pull catalog products from a Shopify store as drafts for review. Kit bundles are imported separately from the Kits page."
         }
         actions={
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigate({ to: kits ? "/platform/kits" : "/platform/catalog" })}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigate(kits ? "/platform/kits" : "/platform/catalog")}>
             {kits ? "Back to kits" : "Back to catalog"}
           </button>
         }
@@ -150,7 +150,7 @@ export function ShopifyImport({ kind = "catalog" }: { kind?: "catalog" | "kits" 
             </ul>
           )}
           <div className="row" style={{ gap: 8, marginTop: 8 }}>
-            <button type="button" className="btn btn-soft btn-sm" onClick={() => navigate({ to: kits ? "/platform/kits" : "/platform/catalog" })}>
+            <button type="button" className="btn btn-soft btn-sm" onClick={() => navigate(kits ? "/platform/kits" : "/platform/catalog")}>
               {kits ? "View kits" : "View catalog"}
             </button>
           </div>

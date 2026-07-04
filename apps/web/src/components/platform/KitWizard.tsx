@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "react-router";
 import {
   addKitItem,
   createKit,
@@ -170,7 +170,7 @@ export function KitWizard({ mode, kitId }: { mode: "create" | "edit"; kitId?: st
     setProblems([]);
     try {
       await publishKit(id);
-      navigate({ to: "/platform/kits" });
+      navigate("/platform/kits");
     } catch (e) {
       const body = (e as { details?: { error?: { details?: unknown } } }).details;
       if (Array.isArray(body?.error?.details)) setProblems(body!.error!.details as string[]);
@@ -192,7 +192,7 @@ export function KitWizard({ mode, kitId }: { mode: "create" | "edit"; kitId?: st
         title={mode === "edit" ? "Edit kit" : "New kit"}
         subtitle="Curate a predefined gift kit from catalog products, with rules company admins must follow."
         actions={
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigate({ to: "/platform/kits" })}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigate("/platform/kits")}>
             Back to kits
           </button>
         }
@@ -395,7 +395,7 @@ export function KitWizard({ mode, kitId }: { mode: "create" | "edit"; kitId?: st
             <div className="row" style={{ gap: 8, marginTop: 12 }}>
               <button type="button" className="btn btn-ghost" onClick={() => setStep(2)}>Back</button>
               <button type="button" className="btn btn-brand" disabled={busy} onClick={doPublish}>Publish kit</button>
-              <button type="button" className="btn btn-soft" onClick={() => navigate({ to: "/platform/kits" })}>Save as draft</button>
+              <button type="button" className="btn btn-soft" onClick={() => navigate("/platform/kits")}>Save as draft</button>
             </div>
           </>
         )}

@@ -1,16 +1,14 @@
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { LoadingState } from "@/components/LoadingState";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { SwagDesignDetail } from "@/features/swag/SwagDesignDetail";
-import { Route } from "@/routes/app.shops.$id.designs.$collectionId";
 import { mergeCatalogProductDetails } from "@/services/mappers";
 import { collectionLinkedToShop } from "./types";
 
 export function ShopDesignDetailPage() {
-  const { id: shopId, collectionId } = useParams({
-    from: "/app/shops/$id/designs/$collectionId",
-  });
-  const { p: productIndex } = Route.useSearch();
+  const { id: shopId, collectionId } = useParams() as { id: string; collectionId: string };
+  const rawP = Number(useSearchParams()[0].get("p"));
+  const productIndex = Number.isFinite(rawP) ? Math.max(0, Math.floor(rawP)) : 0;
   const { data: workspace, isLoading, isError, error } = useWorkspace();
 
   const shop = workspace?.shops.find((s) => s.id === shopId) ?? null;
@@ -43,9 +41,7 @@ export function ShopDesignDetailPage() {
         <h3>Design not found</h3>
         <p>This design may have been removed or is not linked to this shop.</p>
         <Link
-          to="/app/shops/$id"
-          params={{ id: shopId }}
-          search={{ tab: "branded-swag" }}
+          to={`/app/shops/${shopId}?tab=branded-swag`}
           className="btn btn-soft"
           style={{ marginTop: 14 }}
         >
@@ -62,9 +58,7 @@ export function ShopDesignDetailPage() {
       productIndex={productIndex}
       shopId={shopId}
       backLink={{
-        to: "/app/shops/$id",
-        params: { id: shopId },
-        search: { tab: "branded-swag" },
+        href: `/app/shops/${shopId}?tab=branded-swag`,
         label: "Back to shop",
       }}
     />

@@ -1,5 +1,5 @@
 import { useMemo, useReducer, useState } from "react";
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import { LoadingState } from "@/components/LoadingState";
 import { inr } from "@/components/platform/platform-ui";
@@ -27,7 +27,7 @@ function missingAddress(contacts: UiContact[], selected: string[]): UiContact[] 
 
 export function SendKitWizard() {
   const navigate = useNavigate();
-  const { id } = useParams({ from: "/app/kits/$id/send" });
+  const { id } = useParams() as { id: string };
   const { data: workspace, isLoading } = useWorkspace();
   const refreshWorkspace = useInvalidateWorkspace();
   const launch = useLaunchKitCampaign();
@@ -55,7 +55,7 @@ export function SendKitWizard() {
     return (
       <div className="card" style={{ padding: 16 }}>
         Kit not found.{" "}
-        <button type="button" className="lnk" onClick={() => navigate({ to: "/app/kits" })}>
+        <button type="button" className="lnk" onClick={() => navigate("/app/kits")}>
           Back to kits
         </button>
       </div>
@@ -71,7 +71,7 @@ export function SendKitWizard() {
     draft.mode === "surprise" ? missingAddress(contacts, draft.selRecips) : [];
 
   function exit() {
-    navigate({ to: "/app/kits" });
+    navigate("/app/kits");
   }
 
   function next() {
@@ -140,7 +140,7 @@ export function SendKitWizard() {
       });
       await refreshWorkspace();
       toast.success(`Order placed for ${draft.selRecips.length} recipients! 📦`);
-      navigate({ to: "/app/orders" });
+      navigate("/app/orders");
     } catch (err) {
       setSending(false);
       toast.error(err instanceof Error ? err.message : "Failed to send kit");

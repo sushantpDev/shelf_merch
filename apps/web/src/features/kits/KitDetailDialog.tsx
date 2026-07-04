@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "react-router";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DesignedProductThumb } from "@/features/swag/DesignedProductThumb";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
@@ -132,7 +132,7 @@ export function KitDetailDialog({
                 className="btn btn-ghost btn-block"
                 onClick={() => {
                   onOpenChange(false);
-                  navigate({ to: "/app/kits/$id/edit", params: { id: kit.id } });
+                  navigate(`/app/kits/${kit.id}/edit`);
                 }}
               >
                 Edit kit
@@ -142,7 +142,7 @@ export function KitDetailDialog({
                 className="btn btn-brand btn-block"
                 onClick={() => {
                   onOpenChange(false);
-                  navigate({ to: "/app/kits/$id/send", params: { id: kit.id } });
+                  navigate(`/app/kits/${kit.id}/send`);
                 }}
               >
                 Send this kit

@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link } from "react-router";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import type { PlatformKitTemplate } from "@/services/api-bridge";
 import { usePlatformKits } from "./hooks";
@@ -82,8 +82,7 @@ export function PreDesignedKits() {
             {templateItemLabel(kit)}
           </div>
           <Link
-            to="/app/kits/new"
-            search={{ template: kit._id }}
+            to={`/app/kits/new?template=${encodeURIComponent(kit._id)}`}
             className="btn btn-ghost btn-sm btn-block"
             style={{ border: "1px solid var(--line)", fontWeight: 600, fontSize: 12, height: 32 }}
           >

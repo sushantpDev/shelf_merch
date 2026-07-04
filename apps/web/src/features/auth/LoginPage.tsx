@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link } from "react-router";
 import { toast } from "sonner";
 import { ChevronRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { login, isPlatformUser, ApiError } from "@/services/api-bridge";

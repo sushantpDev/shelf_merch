@@ -1,5 +1,5 @@
 import { useEffect, useState, type MouseEvent } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "react-router";
 import type { UiWallet } from "@/services/mappers";
 import { formatWalletAmount, walletUnallocated } from "@/lib/walletFormat";
 import walletIconImg from "../../../assets/wallet-icon.svg";
@@ -55,14 +55,14 @@ export function WalletBalanceMenu({
 
   function openWallet(walletId: string) {
     close();
-    void navigate({ to: "/app/wallets", search: { wallet: walletId } });
+    void navigate(`/app/wallets?wallet=${encodeURIComponent(walletId)}`);
   }
 
   function openAddFunds(e: MouseEvent, walletId: string) {
     e.preventDefault();
     e.stopPropagation();
     close();
-    void navigate({ to: "/app/wallets", search: { wallet: walletId, addFunds: "1" } });
+    void navigate(`/app/wallets?wallet=${encodeURIComponent(walletId)}&addFunds=1`);
   }
 
   return (

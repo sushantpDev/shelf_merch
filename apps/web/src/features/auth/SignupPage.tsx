@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Building2, ChevronRight, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import { register, isPlatformUser } from "@/services/api-bridge";
@@ -36,9 +36,9 @@ export function SignupPage() {
       const user = await register({ name, email, password, companyName: company });
       toast.success(`Welcome to SwagStore, ${user.name.split(" ")[0]}!`);
       if (isPlatformUser(user)) {
-        navigate({ to: "/platform/dashboard" });
+        navigate("/platform/dashboard");
       } else {
-        navigate({ to: "/app/orders" });
+        navigate("/app/orders");
       }
     } catch (err) {
       setBusy(false);

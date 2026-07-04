@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link } from "react-router";
 import { getStoredUser } from "@/services/auth-store";
 import { canAccessArea } from "@/services/platform-access";
 import {
@@ -257,8 +257,7 @@ export function OrdersPage() {
       label: "Order #",
       render: (r) => (
         <Link
-          to="/platform/orders/$id"
-          params={{ id: String(r._id) }}
+          to={`/platform/orders/${String(r._id)}`}
           style={{ color: "var(--brand)", fontWeight: 600, textDecoration: "none" }}
         >
           {String(r.orderNumber ?? "—")}
@@ -280,7 +279,7 @@ export function OrdersPage() {
       key: "open",
       label: "",
       render: (r) => (
-        <Link to="/platform/orders/$id" params={{ id: String(r._id) }} className="btn btn-ghost btn-sm">
+        <Link to={`/platform/orders/${String(r._id)}`} className="btn btn-ghost btn-sm">
           Open
         </Link>
       ),
@@ -955,7 +954,7 @@ export function CatalogPage() {
               key: "name",
               label: "Product",
               render: (r) => (
-                <Link to="/platform/catalog/$id" params={{ id: String(r._id) }} className="lnk">
+                <Link to={`/platform/catalog/${String(r._id)}`} className="lnk">
                   {String(r.name)}
                 </Link>
               ),
@@ -1229,7 +1228,7 @@ export function KitsPage() {
               key: "name",
               label: "Kit",
               render: (r) => (
-                <Link to="/platform/kits/$id" params={{ id: String(r._id) }} className="lnk">
+                <Link to={`/platform/kits/${String(r._id)}`} className="lnk">
                   {String(r.name)}
                 </Link>
               ),

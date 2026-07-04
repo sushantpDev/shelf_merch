@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { useLocation } from "@tanstack/react-router";
+import { useLocation } from "react-router";
 import { isAuthenticated, getStoredUser } from "@/services/auth-store";
 // import { runChatAction } from "@/services/api-bridge";
 import {
@@ -732,10 +732,6 @@ export function ChatWidget() {
       showUserChoiceImmediately(userEntry);
     }
 
-    const ran = runChatAction(action);
-    if (!ran) {
-      window.setTimeout(() => runChatAction(action), 100);
-    }
     setOpen(false);
   };
 

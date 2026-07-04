@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { ArrowLeft, Coins } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import { Route } from "@/routes/app.shops.$id";
 import { ShopBanner } from "./banner";
 import { collectionLinkedToShop, SHOP_TABS, shopTabFromSearch, type ShopTab } from "./types";
 import { BrandedSwagTab } from "./tabs/BrandedSwagTab";
@@ -13,8 +12,8 @@ import { ShopLayoutTab } from "./tabs/ShopLayoutTab";
 import { ReportsTab } from "./tabs/ReportsTab";
 
 export function ShopDetailPage() {
-  const { id } = useParams({ from: "/app/shops/$id" });
-  const { tab: tabSearch } = Route.useSearch();
+  const { id } = useParams() as { id: string };
+  const tabSearch = useSearchParams()[0].get("tab") ?? undefined;
   const navigate = useNavigate();
   const { data: workspace, isLoading, isError, error } = useWorkspace();
   const [tab, setTab] = useState<ShopTab>(() => shopTabFromSearch(tabSearch) ?? "Branded Swag");
@@ -34,12 +33,7 @@ export function ShopDetailPage() {
   function selectTab(next: ShopTab) {
     setTab(next);
     const slug = next.toLowerCase().replace(/\s+/g, "-");
-    void navigate({
-      to: "/app/shops/$id",
-      params: { id },
-      search: { tab: slug },
-      replace: true,
-    });
+    void navigate(`/app/shops/${id}?tab=${encodeURIComponent(slug)}`, { replace: true });
   }
 
   if (isLoading && !workspace) {
@@ -65,10 +59,10 @@ export function ShopDetailPage() {
   }
 
   const sendPoints = () => {
-    navigate({ to: "/app/campaigns/send-points", search: { shop: shop.id } });
+    navigate(`/app/campaigns/send-points?shop=${encodeURIComponent(shop.id)}`);
   };
   const startDesigning = () => {
-    navigate({ to: "/app/swag/new", search: { shop: shop.id } });
+    navigate(`/app/swag/new?shop=${encodeURIComponent(shop.id)}`);
   };
 
   return (

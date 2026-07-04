@@ -220,8 +220,9 @@ export function applyWorkspaceToState(S: Record<string, unknown>, data: Workspac
     step: prevOrg.step ?? 1,
     seq: prevOrg.seq ?? 6,
     _c: prevOrg._c,
-    inWizard: prevOrg.inWizard ?? false,
     ...data.org,
+    // Preserve in-progress wizard navigation state over the API snapshot.
+    inWizard: prevOrg.inWizard ?? false,
   };
 }
 

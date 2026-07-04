@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "react-router";
 import { MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import type { UiShop } from "@/services/mappers";
@@ -59,8 +59,7 @@ export function ShopCard({
       <div className="card shop-card">
         <div className="shop-card-banner-wrap">
           <Link
-            to="/app/shops/$id"
-            params={{ id: shop.id }}
+            to={`/app/shops/${shop.id}`}
             aria-label={`Open ${shop.name}`}
             style={{ display: "block", color: "inherit", textDecoration: "none" }}
           >
@@ -79,17 +78,11 @@ export function ShopCard({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" side="bottom" className="shop-card-menu">
               <DropdownMenuItem
-                onSelect={() =>
-                  navigate({
-                    to: "/app/shops/$id",
-                    params: { id: shop.id },
-                    search: { tab: "layout" },
-                  })
-                }
+                onSelect={() => navigate(`/app/shops/${shop.id}?tab=layout`)}
               >
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => navigate({ to: "/app/contacts" })}>
+              <DropdownMenuItem onSelect={() => navigate("/app/contacts")}>
                 Add Users
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={onDuplicate} disabled={duplicate.isPending}>
@@ -121,7 +114,7 @@ export function ShopCard({
           </div>
           <div className="shop-card-meta">{shopCardMeta(shop, fallbackUser)}</div>
           <div style={{ marginTop: 14, textAlign: "right" }}>
-            <Link to="/app/shops/$id" params={{ id: shop.id }} className="btn btn-soft btn-sm">
+            <Link to={`/app/shops/${shop.id}`} className="btn btn-soft btn-sm">
               Open
             </Link>
           </div>

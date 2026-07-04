@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import { Box, Check, Send, Store, Users, Wallet } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { Link } from "react-router";
 import { toast } from "sonner";
 import { inr } from "@/components/platform/platform-ui";
 import { selectedDepartments, type WizardState } from "../types";

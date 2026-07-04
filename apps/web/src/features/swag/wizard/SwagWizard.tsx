@@ -1,5 +1,5 @@
 import { useReducer, useState } from "react";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { LoadingState } from "@/components/LoadingState";
 import { useWorkspace } from "@/hooks/useWorkspace";
@@ -62,7 +62,8 @@ function reducer(state: SwagDraft, action: Action): SwagDraft {
 
 export function SwagWizard() {
   const navigate = useNavigate();
-  const search = useSearch({ from: "/app/swag/new" }) as { shop?: string };
+  const [searchParams] = useSearchParams();
+  const search = { shop: searchParams.get("shop") ?? undefined };
   const shopId = search.shop;
   const { data: workspace, isLoading } = useWorkspace();
   const createCollection = useCreateCollection();
@@ -82,8 +83,8 @@ export function SwagWizard() {
   const catalog: UiProduct[] = workspace?.catalogProducts ?? [];
 
   function exit() {
-    if (shopId) navigate({ to: "/app/shops/$id", params: { id: shopId } });
-    else navigate({ to: "/app/swag" });
+    if (shopId) navigate(`/app/shops/${shopId}`);
+    else navigate("/app/swag");
   }
 
   const pickedProducts = draft.picked.map((i) => catalog[i]).filter(Boolean) as UiProduct[];

@@ -1,5 +1,5 @@
 import { useMemo, useReducer, useState } from "react";
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import { LoadingState } from "@/components/LoadingState";
 import { useWorkspace } from "@/hooks/useWorkspace";
@@ -15,7 +15,7 @@ const STEPS = ["Products", "Branding"];
 
 export function EditKitWizard() {
   const navigate = useNavigate();
-  const { id } = useParams({ from: "/app/kits/$id/edit" });
+  const { id } = useParams() as { id: string };
   const { data: workspace, isLoading } = useWorkspace();
   const updateKit = useUpdateKit();
   const [step, setStep] = useState<0 | 1>(0);
@@ -56,7 +56,7 @@ export function EditKitWizard() {
     return (
       <div className="card" style={{ padding: 16 }}>
         Kit not found.{" "}
-        <button type="button" className="lnk" onClick={() => navigate({ to: "/app/kits" })}>
+        <button type="button" className="lnk" onClick={() => navigate("/app/kits")}>
           Back to kits
         </button>
       </div>
@@ -70,7 +70,7 @@ export function EditKitWizard() {
   const pickedProducts = selected;
 
   function exit() {
-    navigate({ to: "/app/kits" });
+    navigate("/app/kits");
   }
 
   async function save() {

@@ -1,4 +1,4 @@
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { useWorkspace } from "@/hooks/useWorkspace";
@@ -6,7 +6,7 @@ import { ProductDetail } from "./ProductDetail";
 import { useCatalogProduct } from "./hooks";
 
 export function CatalogProductPage() {
-  const { id } = useParams({ from: "/app/catalog/$id" });
+  const { id } = useParams() as { id: string };
   const { data: workspace } = useWorkspace();
   const { data: product, isLoading, isError, error } = useCatalogProduct(id, workspace);
 

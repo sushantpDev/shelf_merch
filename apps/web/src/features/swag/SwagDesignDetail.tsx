@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link } from "react-router";
 import { ArrowLeft, Loader2, Pencil, UploadCloud, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -57,9 +57,7 @@ export type SwagDesignDetailProps = {
   productIndex: number;
   shopId?: string;
   backLink: {
-    to: "/app/shops/$id";
-    params: { id: string };
-    search?: { tab?: string };
+    href: string;
     label?: string;
   };
 };
@@ -137,9 +135,7 @@ export function SwagDesignDetail({
   return (
     <div className="pd-page">
       <Link
-        to={backLink.to}
-        params={backLink.params}
-        search={backLink.search}
+        to={backLink.href}
         className="lnk"
         style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 20 }}
       >

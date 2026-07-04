@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link } from "react-router";
 import { Check, Globe, HelpCircle, User } from "lucide-react";
 import { toast } from "sonner";
 import { logout } from "@/services/api-bridge";

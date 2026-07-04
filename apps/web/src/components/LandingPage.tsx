@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import "./landing-page.css";
-import { Link } from "@tanstack/react-router";
+import { Link } from "react-router";
 import type { LucideIcon } from "lucide-react";
 import arrowAsset from "../../assets/arrow.avif";
 import bottleAsset from "../../assets/bottle.png";
@@ -1028,7 +1028,7 @@ export default function LandingPage() {
                   key={c.title}
                   to="/app/catalog"
                   className="lp-cat-card lp-cat-card--tile"
-                  style={{ background: "bg" in c ? c.bg : undefined }}
+                  style={{ background: "bg" in c ? (c.bg as string) : undefined }}
                 >
                   <h3>{c.title}</h3>
                   <div className="lp-cat-card__media">

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Outlet, useRouterState } from "@tanstack/react-router";
+import { Outlet, useLocation, useSearchParams } from "react-router";
 import { CollapsibleSidebar } from "@/components/tenant/CollapsibleSidebar";
 import { UserMenu } from "@/components/tenant/UserMenu";
 import { WalletBalanceMenu } from "@/components/tenant/WalletBalanceMenu";
@@ -44,12 +44,11 @@ function formatWalletBalance(workspace: WorkspaceSnapshot | undefined) {
 export default function TenantLayout() {
   const user = getStoredUser();
   const { data: workspace } = useWorkspace();
-  const routerState = useRouterState();
-  const walletSearch =
-    routerState.location.pathname === "/app/wallets"
-      ? (routerState.location.search as { wallet?: string })
-      : undefined;
-  const currentWalletId = walletSearch?.wallet || workspace?.primaryWalletId;
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const walletParam =
+    location.pathname === "/app/wallets" ? (searchParams.get("wallet") ?? undefined) : undefined;
+  const currentWalletId = walletParam || workspace?.primaryWalletId;
 
   useEffect(() => {
     if (!isAuthenticated()) {

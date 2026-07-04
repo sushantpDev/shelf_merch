@@ -1,8 +1,8 @@
 import { useReducer, useState } from "react";
+import { useSearchParams } from "react-router";
 import { LoadingState } from "@/components/LoadingState";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { orgForWallet } from "@/services/workspace-api";
-import { Route } from "@/routes/app.wallets";
 import { seedAllocateWizard, seedNewWizard, wizardReducer } from "./reducer";
 import { EntityManagerDashboard } from "./components/EntityManagerDashboard";
 import { OrgDashboard } from "./components/OrgDashboard";
@@ -10,7 +10,9 @@ import { OrgDoneScreen } from "./components/OrgDoneScreen";
 import { OrgWizard } from "./components/OrgWizard";
 
 export function WalletsPage() {
-  const { wallet: walletId, addFunds } = Route.useSearch();
+  const [searchParams] = useSearchParams();
+  const walletId = searchParams.get("wallet") ?? undefined;
+  const addFunds = searchParams.get("addFunds") ?? undefined;
   const { data: workspace, isLoading, isError, error } = useWorkspace();
   const [inWizard, setInWizard] = useState(false);
   const [wizard, dispatch] = useReducer(wizardReducer, undefined, seedNewWizard);

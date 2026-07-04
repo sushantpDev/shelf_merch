@@ -1,5 +1,5 @@
 import { useMemo, useReducer, useState } from "react";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { ArrowLeftRight } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingState } from "@/components/LoadingState";
@@ -20,7 +20,8 @@ const STEPS = ["Budget", "Recipients", "Message", "Checkout"];
 
 export function SendPointsWizard() {
   const navigate = useNavigate();
-  const search = useSearch({ from: "/app/campaigns/send-points" }) as { shop?: string };
+  const [searchParams] = useSearchParams();
+  const search = { shop: searchParams.get("shop") ?? undefined };
   const { data: workspace, isLoading } = useWorkspace();
   const refreshWorkspace = useInvalidateWorkspace();
   const launch = useLaunchPointsCampaign();
@@ -54,7 +55,7 @@ export function SendPointsWizard() {
   const wallet = workspace?.wallets.find((w) => w.id === selectedWalletId) ?? workspace?.wallets[0];
 
   function exit() {
-    navigate({ to: "/app/campaigns" });
+    navigate("/app/campaigns");
   }
 
   function next() {
@@ -107,7 +108,7 @@ export function SendPointsWizard() {
       });
       await refreshWorkspace();
       toast.success(`Points sent to ${draft.selRecips.length} recipients! 🎉`);
-      navigate({ to: "/app/shops/$id", params: { id: String(shopId) } });
+      navigate(`/app/shops/${String(shopId)}`);
     } catch (err) {
       setSending(false);
       toast.error(err instanceof Error ? err.message : "Failed to launch campaign");
