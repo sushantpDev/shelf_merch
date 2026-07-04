@@ -44,6 +44,8 @@ export type UiShop = {
   id: string;
   name: string;
   currency: string;
+  currencyMode: "points" | "inr" | "priceless";
+  pointsConversionEnabled: boolean;
   live: boolean;
   categories: string[];
   collections: string[];
@@ -122,9 +124,23 @@ export type UiCampaign = {
   name: string;
   status: string;
   type: string;
+  shopId?: string;
+  senderName?: string;
+  createdAt?: string;
   recipientCount: number;
   totalBudget: number;
   creditsPerRecipient: number;
+  pointsScope?: "stadium" | "shop";
+  messageBody?: string;
+  draftState?: {
+    step?: 0 | 1 | 2 | 3;
+    selectedWalletId?: string;
+    selRecips?: string[];
+    recips?: number;
+    pay?: "wallet" | "card";
+    preview?: "landing" | "email";
+    when?: "now" | "scheduled" | "self";
+  };
 };
 
 export type UiWallet = {
@@ -309,6 +325,8 @@ export function mapShop(s: ApiProduct): UiShop {
     id: String(s._id),
     name: s.name,
     currency: currencyMap[s.currencyMode] || "Points",
+    currencyMode: s.currencyMode === "inr" || s.currencyMode === "priceless" ? s.currencyMode : "points",
+    pointsConversionEnabled: Boolean(s.pointsConversionEnabled),
     live: s.status === "live",
     categories: s.categories || [],
     collections: [],
@@ -412,14 +430,74 @@ export function mapOrder(o: any, campaignName = ""): UiOrder {
 }
 
 export function mapCampaign(c: ApiProduct): UiCampaign {
+  const raw = c as {
+    draftState?: UiCampaign["draftState"];
+    schedule?: { mode?: string; timezone?: string; sendAt?: string };
+  };
+  const draftState = raw.draftState
+    ? {
+        step:
+          raw.draftState.step === 0 ||
+          raw.draftState.step === 1 ||
+          raw.draftState.step === 2 ||
+          raw.draftState.step === 3
+            ? raw.draftState.step
+            : undefined,
+        selectedWalletId:
+          typeof raw.draftState.selectedWalletId === "string"
+            ? raw.draftState.selectedWalletId
+            : undefined,
+        selRecips: Array.isArray(raw.draftState.selRecips)
+          ? raw.draftState.selRecips.map(String)
+          : undefined,
+        recips: typeof raw.draftState.recips === "number" ? raw.draftState.recips : undefined,
+        pay: raw.draftState.pay === "wallet" || raw.draftState.pay === "card" ? raw.draftState.pay : undefined,
+        preview:
+          raw.draftState.preview === "landing" || raw.draftState.preview === "email"
+            ? raw.draftState.preview
+            : undefined,
+        when:
+          raw.draftState.when === "now" ||
+          raw.draftState.when === "scheduled" ||
+          raw.draftState.when === "self"
+            ? raw.draftState.when
+            : undefined,
+      }
+    : undefined;
   return {
     id: String(c._id),
     name: c.name,
     status: c.status,
     type: c.type,
-    recipientCount: c.recipientCount ?? 0,
+    shopId: c.shopId ? String(c.shopId) : "",
+    senderName:
+      typeof (c as { message?: { from?: unknown } }).message?.from === "string"
+        ? String((c as { message?: { from?: string } }).message?.from || "")
+        : "",
+    createdAt:
+      typeof (c as { createdAt?: unknown }).createdAt === "string"
+        ? String((c as { createdAt?: string }).createdAt || "")
+        : undefined,
+    recipientCount: (() => {
+      const incomplete = ["draft", "recipients_uploaded", "credits_allocated", "approved"].includes(
+        String(c.status),
+      );
+      const planned = draftState?.recips;
+      if (incomplete && typeof planned === "number" && planned > 0) return planned;
+      return c.recipientCount ?? 0;
+    })(),
     totalBudget: c.totalBudget ?? 0,
     creditsPerRecipient: c.creditsPerRecipient ?? 0,
+    pointsScope:
+      (c as { pointsScope?: string }).pointsScope === "stadium" ||
+      (c as { pointsScope?: string }).pointsScope === "shop"
+        ? ((c as { pointsScope?: "stadium" | "shop" }).pointsScope as "stadium" | "shop")
+        : undefined,
+    messageBody:
+      typeof (c as { message?: { body?: unknown } }).message?.body === "string"
+        ? String((c as { message?: { body?: string } }).message?.body || "")
+        : undefined,
+    draftState,
   };
 }
 

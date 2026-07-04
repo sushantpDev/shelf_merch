@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { COMPLETE_STATUSES, isLiveCampaign } from "../model";
-import type { UiCampaign, UiKit } from "../model";
+import type { UiCampaign, UiKit, UiShop } from "../model";
 
 const PER_PAGE = 5;
 
@@ -17,15 +17,21 @@ export type CampaignStats = {
   recipients: number;
 };
 
+export type SendGiftView = "choose" | "points" | "kit";
+
 export type SendGiftVm = {
   open: boolean;
-  view: "choose" | "kit";
+  view: SendGiftView;
   availableKits: UiKit[];
+  availableShops: UiShop[];
   onOpenChange: (open: boolean) => void;
   onPickKitView: () => void;
-  onSendPoints: () => void;
+  onStartSendPoints: () => void;
+  onSelectShopForPoints: (shopId: string) => void;
+  onBackToChoose: () => void;
   onSelectKit: (kitId: string) => void;
   onCreateKit: () => void;
+  onCreateShop: () => void;
 };
 
 export type CampaignsVm = {
@@ -56,12 +62,13 @@ export function useCampaignsController(): CampaignsVm {
   const { canOperateCampaigns } = useTenantAccess();
 
   const [giftOpen, setGiftOpen] = useState(false);
-  const [giftView, setGiftView] = useState<"choose" | "kit">("choose");
+  const [giftView, setGiftView] = useState<SendGiftView>("choose");
   const [filter, setFilter] = useState<CampaignFilter>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
   const campaigns = workspace?.campaigns ?? [];
+  const shops = workspace?.shops ?? [];
   const stats: CampaignStats = {
     total: campaigns.length,
     live: campaigns.filter(isLiveCampaign).length,
@@ -83,9 +90,16 @@ export function useCampaignsController(): CampaignsVm {
   const start = (safePage - 1) * PER_PAGE;
   const pageItems = filtered.slice(start, start + PER_PAGE);
 
+  const availableShops = shops.filter((s) => s.id);
+
   function closeGift() {
     setGiftOpen(false);
     setGiftView("choose");
+  }
+
+  function goToSendPoints(shopId: string) {
+    closeGift();
+    navigate(`/app/campaigns/send-points?shop=${encodeURIComponent(shopId)}`);
   }
 
   return {
@@ -121,15 +135,21 @@ export function useCampaignsController(): CampaignsVm {
       open: giftOpen,
       view: giftView,
       availableKits: (workspace?.kits ?? []).filter((k) => k.id),
+      availableShops,
       onOpenChange: (o) => {
         setGiftOpen(o);
         if (!o) setGiftView("choose");
       },
       onPickKitView: () => setGiftView("kit"),
-      onSendPoints: () => {
-        closeGift();
-        navigate("/app/campaigns/send-points");
+      onStartSendPoints: () => {
+        if (availableShops.length === 1) {
+          goToSendPoints(availableShops[0].id);
+          return;
+        }
+        setGiftView("points");
       },
+      onSelectShopForPoints: goToSendPoints,
+      onBackToChoose: () => setGiftView("choose"),
       onSelectKit: (kitId) => {
         closeGift();
         navigate(`/app/kits/${kitId}/send`);
@@ -137,6 +157,10 @@ export function useCampaignsController(): CampaignsVm {
       onCreateKit: () => {
         closeGift();
         navigate("/app/kits/new");
+      },
+      onCreateShop: () => {
+        closeGift();
+        navigate("/app/shops/new");
       },
     },
   };

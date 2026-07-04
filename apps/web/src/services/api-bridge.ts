@@ -254,6 +254,9 @@ export async function createShopFlow(payload: {
 export async function updateShopFlow(
   shopId: string,
   payload: {
+    name?: string;
+    currencyMode?: "points" | "inr" | "priceless";
+    pointsConversionEnabled?: boolean;
     logoUrl?: string;
     bannerConfig?: Record<string, unknown>;
     selectedCatalogProductIds?: string[];
@@ -429,9 +432,11 @@ export async function addProductToShopFlow(payload: {
 }
 
 export async function launchPointsCampaignFlow(payload: {
+  campaignId?: string;
   entityId: string;
   shopId: string;
   name: string;
+  pointsScope?: "stadium" | "shop";
   creditsPerRecipient: number;
   totalBudget?: number;
   message: { from: string; body: string };
@@ -441,12 +446,14 @@ export async function launchPointsCampaignFlow(payload: {
   const recipients = payload.contactIds
     .map((id) => payload.contacts.find((c) => c.id === id))
     .filter(Boolean)
-    .map((c) => ({ name: c!.name, email: c!.email, phone: c!.phone }));
+    .map((c) => ({ contactId: c!.id, name: c!.name, email: c!.email, phone: c!.phone }));
   if (!recipients.length) throw new Error("Select at least one recipient");
   return launchPointsCampaignApi({
+    campaignId: payload.campaignId,
     entityId: payload.entityId,
     shopId: payload.shopId,
     name: payload.name,
+    pointsScope: payload.pointsScope,
     creditsPerRecipient: payload.creditsPerRecipient,
     totalBudget: payload.totalBudget,
     message: payload.message,

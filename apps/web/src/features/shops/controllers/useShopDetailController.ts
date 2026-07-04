@@ -12,7 +12,7 @@ export type ShopDetailVm = {
   catalogProducts: UiProduct[];
   tab: ShopTab;
   onSelectTab: (tab: ShopTab) => void;
-  onSendPoints: () => void;
+  onSendPoints: (campaignId?: string) => void;
   onStartDesigning: () => void;
   onViewLiveShop: () => void;
 };
@@ -43,6 +43,13 @@ export function useShopDetailController(): ShopDetailVm {
     void navigate(`/app/shops/${id}?tab=${encodeURIComponent(slug)}`, { replace: true });
   }
 
+  function onSendPoints(campaignId?: string) {
+    if (!shop) return;
+    const params = new URLSearchParams({ shop: shop.id });
+    if (campaignId) params.set("campaign", campaignId);
+    navigate(`/app/campaigns/send-points?${params}`);
+  }
+
   return {
     isLoading: isLoading && !workspace,
     errorMessage:
@@ -56,8 +63,7 @@ export function useShopDetailController(): ShopDetailVm {
     catalogProducts: workspace?.catalogProducts ?? [],
     tab,
     onSelectTab,
-    onSendPoints: () =>
-      shop && navigate(`/app/campaigns/send-points?shop=${encodeURIComponent(shop.id)}`),
+    onSendPoints,
     onStartDesigning: () => shop && navigate(`/app/swag/new?shop=${encodeURIComponent(shop.id)}`),
     onViewLiveShop: () => shop && window.open(`/shop/${shop.id}`, "_blank", "noopener"),
   };

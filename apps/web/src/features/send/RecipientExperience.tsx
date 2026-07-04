@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { ReactNode } from "react";
+import { ShopBanner } from "@/features/shops/banner";
 import type { SendMode, ScheduleDraft, WhenMode } from "./types";
 
 const LOGO_DECO = (
@@ -44,6 +45,21 @@ function LogoBanner() {
   );
 }
 
+type PreviewShopBrand = {
+  name: string;
+  logoUrl?: string;
+  bannerConfig?: Record<string, unknown>;
+};
+
+function PreviewBrandBanner({ shopBrand }: { shopBrand?: PreviewShopBrand }) {
+  if (!shopBrand) return <LogoBanner />;
+  return (
+    <div style={{ overflow: "hidden" }}>
+      <ShopBanner source={shopBrand} height={96} radius={0} logoSize={40} layout="center" />
+    </div>
+  );
+}
+
 /**
  * Shared recipient-experience step: from/message editor, schedule picker, and
  * live landing-page / email previews. `kind` adapts copy for kit (items) sends;
@@ -52,6 +68,8 @@ function LogoBanner() {
 export function RecipientExperience({
   kind = "items",
   shopName = "Rubix",
+  shopBrand,
+  pointsScope = "shop",
   mode = "redeem",
   itemCount = 3,
   pointsAmount = 0,
@@ -65,10 +83,14 @@ export function RecipientExperience({
   onSchedule,
   preview,
   onPreview,
+  fromPlaceholder,
+  messagePlaceholder,
   extraLeft,
 }: {
   kind?: "items" | "points";
   shopName?: string;
+  shopBrand?: PreviewShopBrand;
+  pointsScope?: "stadium" | "shop";
   mode?: SendMode;
   itemCount?: number;
   pointsAmount?: number;
@@ -82,11 +104,16 @@ export function RecipientExperience({
   onSchedule: (key: keyof ScheduleDraft, value: string) => void;
   preview: "landing" | "email";
   onPreview: (tab: "landing" | "email") => void;
+  fromPlaceholder?: string;
+  messagePlaceholder?: string;
   extraLeft?: ReactNode;
 }) {
   const isPoints = kind === "points";
+  const previewFrom = from.trim() || fromPlaceholder || "";
+  const previewMessage = message.trim() || messagePlaceholder || "";
   // surprise / single-location item sends ship directly; points always redeem
   const shipMode = !isPoints && mode !== "redeem";
+  const useAnywhere = isPoints && pointsScope === "stadium";
 
   const { track, eta } = useMemo(() => {
     const t = "SM" + (740000000 + Math.floor(Math.random() * 9999999));
@@ -98,15 +125,24 @@ export function RecipientExperience({
   }, []);
 
   const headline = isPoints
-    ? `You've been gifted ${pointsAmount} Pts to ${shopName}!`
+    ? useAnywhere
+      ? `You've been gifted ${pointsAmount} Pts from ${shopName}!`
+      : `You've been gifted ${pointsAmount} Pts to ${shopName}!`
     : shipMode
-      ? `Your gift from ${from} is on its way!`
-      : `${from} sent you a gift!`;
+      ? `Your gift from ${previewFrom} is on its way!`
+      : `${previewFrom} sent you a gift!`;
   const cta = isPoints
-    ? "Redeem your points"
+    ? useAnywhere
+      ? "Use your points"
+      : "Redeem your points"
     : shipMode
       ? "Track your shipment"
       : "Choose your gift";
+  const pointsScopeCaption = isPoints
+    ? useAnywhere
+      ? "These points can be used in this shop or any connected points store."
+      : "These points can only be redeemed in this shop."
+    : "";
   const tab1 = shipMode ? "Tracking page" : "Landing page";
   const tab2 = shipMode ? "Shipping email" : "Invitation email";
   const cap1 = shipMode
@@ -139,7 +175,7 @@ export function RecipientExperience({
       <div className="bar">
         <i />
       </div>
-      <LogoBanner />
+      <PreviewBrandBanner shopBrand={shopBrand} />
       <div style={{ padding: 18, textAlign: "center" }}>
         <div
           className="mut3"
@@ -150,23 +186,28 @@ export function RecipientExperience({
             fontWeight: 700,
           }}
         >
-          {shipMode ? `A gift from ${from}` : `${from} created a gift for you`}
+          {shipMode ? `A gift from ${previewFrom}` : `${previewFrom} created a gift for you`}
         </div>
         <h3 style={{ fontSize: 16, margin: "8px 0", lineHeight: 1.25 }}>{headline}</h3>
         {shipMode ? (
           shipBlock
         ) : (
           <p className="muted" style={{ fontSize: 11.5 }}>
-            {message}
+            {previewMessage}
           </p>
         )}
         {shipMode && (
           <p className="muted" style={{ fontSize: 11.5, marginTop: 8 }}>
-            {message}
+            {previewMessage}
           </p>
         )}
         {!shipMode && (
           <div style={{ height: 3, borderRadius: 3, margin: "12px 0", background: RAINBOW }} />
+        )}
+        {pointsScopeCaption && (
+          <p className="muted" style={{ fontSize: 10.5, marginBottom: 10 }}>
+            {pointsScopeCaption}
+          </p>
         )}
         <div
           className="btn btn-brand btn-block btn-sm"
@@ -191,7 +232,7 @@ export function RecipientExperience({
           inbox · {shopName} {shipMode ? "shipping" : "gift"}
         </span>
       </div>
-      <LogoBanner />
+      <PreviewBrandBanner shopBrand={shopBrand} />
       <div style={{ padding: 20, textAlign: "center" }}>
         <div
           className="mut3"
@@ -202,7 +243,7 @@ export function RecipientExperience({
             fontWeight: 700,
           }}
         >
-          {shipMode ? `${from} · shipping update` : `${from} sent you something`}
+          {shipMode ? `${previewFrom} · shipping update` : `${previewFrom} sent you something`}
         </div>
         <h3 style={{ fontSize: 17, margin: "8px 0" }}>{headline}</h3>
         {shipMode && shipBlock}
@@ -215,11 +256,16 @@ export function RecipientExperience({
           }}
         >
           <p className="muted" style={{ fontSize: 12 }}>
-            {message}
+            {previewMessage}
           </p>
+          {pointsScopeCaption && (
+            <p className="muted" style={{ fontSize: 10.5, marginTop: 8 }}>
+              {pointsScopeCaption}
+            </p>
+          )}
           <div style={{ height: 3, borderRadius: 3, margin: "12px 0", background: RAINBOW }} />
           <div className="mut3" style={{ fontSize: 10, fontWeight: 700 }}>
-            FROM {(from || "").toUpperCase()}
+            FROM {(previewFrom || "").toUpperCase()}
           </div>
         </div>
         <div
@@ -248,7 +294,12 @@ export function RecipientExperience({
             <h3 style={{ fontSize: 15, marginBottom: 10 }}>Your message</h3>
             <div className="field">
               <label className="lbl">From</label>
-              <input className="inp" value={from} onChange={(e) => onFrom(e.target.value)} />
+              <input
+                className="inp"
+                value={from}
+                placeholder={fromPlaceholder}
+                onChange={(e) => onFrom(e.target.value)}
+              />
             </div>
             <div className="field">
               <label className="lbl">
@@ -264,6 +315,7 @@ export function RecipientExperience({
                 className="inp"
                 rows={4}
                 value={message}
+                placeholder={messagePlaceholder}
                 onChange={(e) => onMessage(e.target.value)}
               />
             </div>

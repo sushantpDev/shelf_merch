@@ -50,6 +50,12 @@ export async function deliverNotification({
         companyName: meta.companyName ?? 'your company',
         link,
         campaignType: meta.campaignType ?? 'kit',
+        pointsScope: meta.pointsScope ?? 'shop',
+        shopName: meta.shopName ?? '',
+        shopLogoUrl: meta.shopLogoUrl ?? '',
+        shopBannerTheme: meta.shopBannerTheme ?? '',
+        shopBannerPreset: meta.shopBannerPreset ?? '',
+        shopCurrencyMode: meta.shopCurrencyMode ?? 'points',
       });
     } else {
       await sendNotificationEmail({ to: email, title, body, link });

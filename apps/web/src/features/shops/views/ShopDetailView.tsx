@@ -8,6 +8,7 @@ import { ShopCatalogTab } from "../tabs/ShopCatalogTab";
 import { SentGiftsTab } from "../tabs/SentGiftsTab";
 import { ShopLayoutTab } from "../tabs/ShopLayoutTab";
 import { ReportsTab } from "../tabs/ReportsTab";
+import { GeneralSettingsTab } from "../tabs/GeneralSettingsTab";
 import type { ShopDetailVm } from "../controllers/useShopDetailController";
 
 /** Shop detail page: banner header, tab bar, and the active tab's content. */
@@ -80,7 +81,7 @@ export function ShopDetailView(vm: ShopDetailVm) {
             )}
           </div>
         </div>
-        <button type="button" className="btn btn-brand" onClick={vm.onSendPoints}>
+        <button type="button" className="btn btn-brand" onClick={() => vm.onSendPoints()}>
           <Coins size={16} /> Send points
         </button>
       </div>
@@ -111,14 +112,7 @@ export function ShopDetailView(vm: ShopDetailVm) {
       {vm.tab === "Sent Gifts" && <SentGiftsTab shop={shop} onSendPoints={vm.onSendPoints} />}
       {vm.tab === "Layout" && <ShopLayoutTab shop={shop} />}
       {vm.tab === "Reports" && <ReportsTab />}
-      {vm.tab === "Settings" && (
-        <div className="card" style={{ padding: 26 }}>
-          <h3 style={{ fontSize: 17, marginBottom: 8 }}>Settings</h3>
-          <p className="muted">
-            Configure settings for {shop.name}. Custom domain and visibility options live here.
-          </p>
-        </div>
-      )}
+      {vm.tab === "Settings" && <GeneralSettingsTab shop={shop} />}
     </>
   );
 }

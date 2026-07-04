@@ -94,3 +94,35 @@ export async function report(req, res) {
     await campaignsService.campaignReport({ tenantId: req.tenantId, campaignId: req.params.id, user: req.user }),
   );
 }
+
+export async function savePointsDraft(req, res) {
+  const campaign = await campaignsService.savePointsDraft({
+    tenantId: req.tenantId,
+    userId: req.user.userId,
+    user: req.user,
+    data: req.body,
+  });
+  writeAudit({
+    req,
+    action: 'campaign.save_points_draft',
+    entityType: 'Campaign',
+    entityId: campaign._id,
+    after: { status: campaign.status },
+  });
+  res.status(req.body.campaignId ? 200 : 201).json(campaign);
+}
+
+export async function remove(req, res) {
+  await campaignsService.deleteCampaign({
+    tenantId: req.tenantId,
+    campaignId: req.params.id,
+    user: req.user,
+  });
+  writeAudit({
+    req,
+    action: 'campaign.delete',
+    entityType: 'Campaign',
+    entityId: req.params.id,
+  });
+  res.json({ ok: true });
+}

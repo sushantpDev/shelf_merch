@@ -13,6 +13,7 @@ import {
   importRecipientsSchema,
   allocateCreditsSchema,
   campaignIdParams,
+  savePointsDraftSchema,
 } from './campaigns.validation.js';
 import { Campaign } from './campaign.model.js';
 
@@ -29,6 +30,12 @@ const entityScope = requireScope(async (req) => {
 
 router.get('/', canRead, asyncHandler(controller.list));
 router.post('/', canWrite, validate({ body: createCampaignSchema }), asyncHandler(controller.create));
+router.post(
+  '/points-draft',
+  canWrite,
+  validate({ body: savePointsDraftSchema }),
+  asyncHandler(controller.savePointsDraft),
+);
 router.get('/:id', canRead, entityScope, validate({ params: campaignIdParams }), asyncHandler(controller.getOne));
 router.patch(
   '/:id',
@@ -72,6 +79,13 @@ router.get(
   entityScope,
   validate({ params: campaignIdParams }),
   asyncHandler(controller.report),
+);
+router.delete(
+  '/:id',
+  canWrite,
+  entityScope,
+  validate({ params: campaignIdParams }),
+  asyncHandler(controller.remove),
 );
 
 export default router;

@@ -23,6 +23,7 @@ export const createCampaignSchema = z.object({
   selectedProductIds: z.array(objectId).optional().default([]),
   kitId: objectId.nullable().optional().default(null),
   shopId: objectId.nullable().optional().default(null),
+  pointsScope: z.enum(['stadium', 'shop']).optional().default('shop'),
   message: z
     .object({
       from: z.string().optional(),
@@ -63,3 +64,46 @@ export const allocateCreditsSchema = z.object({
 });
 
 export const campaignIdParams = z.object({ id: objectId });
+
+export const savePointsDraftSchema = z.object({
+  campaignId: objectId.optional(),
+  entityId: objectId,
+  shopId: objectId,
+  name: z.string().min(1),
+  pointsScope: z.enum(['stadium', 'shop']).optional().default('shop'),
+  creditsPerRecipient: z.number().nonnegative().optional().default(0),
+  message: z
+    .object({
+      from: z.string().optional(),
+      body: z.string().optional(),
+    })
+    .optional(),
+  schedule: z
+    .object({
+      mode: z.enum(['now', 'scheduled', 'self']).optional(),
+      sendAt: z.coerce.date().nullable().optional(),
+      timezone: z.string().optional(),
+    })
+    .optional(),
+  draftState: z
+    .object({
+      step: z.number().int().min(0).max(3).optional(),
+      selectedWalletId: z.string().optional(),
+      selRecips: z.array(z.string()).optional(),
+      recips: z.number().nonnegative().optional(),
+      pay: z.enum(['wallet', 'card']).optional(),
+      preview: z.enum(['landing', 'email']).optional(),
+      when: z.enum(['now', 'scheduled', 'self']).optional(),
+    })
+    .optional(),
+  recipients: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        email: z.string().email(),
+        phone: z.string().optional().default(''),
+        contactId: objectId.optional(),
+      }),
+    )
+    .optional(),
+});

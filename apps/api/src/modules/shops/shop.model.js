@@ -6,6 +6,7 @@ const shopSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     currencyMode: { type: String, enum: ['points', 'inr', 'priceless'], default: 'points' },
+    pointsConversionEnabled: { type: Boolean, default: false },
     logoUrl: { type: String, default: '' },
     bannerConfig: { type: Object, default: () => ({}) },
     categories: { type: [String], default: [] },

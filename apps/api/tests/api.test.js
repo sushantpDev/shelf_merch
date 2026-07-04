@@ -7,6 +7,7 @@ import { User } from '../src/modules/users/user.model.js';
 import { RoleAssignment } from '../src/modules/roles/roleAssignment.model.js';
 import { Wallet } from '../src/modules/wallets/wallet.model.js';
 import { Entity } from '../src/modules/entities/entity.model.js';
+import { Campaign } from '../src/modules/campaigns/campaign.model.js';
 import { WalletTransaction } from '../src/modules/wallets/walletTransaction.model.js';
 import { signAccessToken } from '../src/modules/auth/auth.service.js';
 import * as ledger from '../src/services/ledger.service.js';
@@ -170,6 +171,46 @@ describe('RBAC + ABAC (must-have §11.1)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ entityId: String(entity2._id), name: 'Cross dept', type: 'points' });
     expect(res.status).toBe(403);
+  });
+
+  it('company admin can delete incomplete points draft and it disappears from list', async () => {
+    const entity = await Entity.create({ tenantId: tenantA._id, walletId: walletA._id, name: 'HR' });
+    const created = await request(app)
+      .post('/api/v1/campaigns/points-draft')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({
+        entityId: String(entity._id),
+        shopId: String(
+          (
+            await request(app)
+              .post('/api/v1/shops')
+              .set('Authorization', `Bearer ${tokenA}`)
+              .send({ name: 'Draft shop', slug: `draft-${Date.now()}` })
+          ).body._id,
+        ),
+        name: 'Draft to delete',
+        creditsPerRecipient: 500,
+        draftState: { recips: 10, step: 0 },
+      });
+    expect(created.status).toBe(201);
+    const id = created.body._id;
+
+    const deleted = await request(app)
+      .delete(`/api/v1/campaigns/${id}`)
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(deleted.status).toBe(200);
+    expect(deleted.body.ok).toBe(true);
+
+    const list = await request(app)
+      .get('/api/v1/campaigns')
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(list.status).toBe(200);
+    expect(list.body.find((c) => String(c._id) === String(id))).toBeUndefined();
+
+    const inDb = await Campaign.findOne({ _id: id, tenantId: tenantA._id }).setOptions({
+      includeDeleted: true,
+    });
+    expect(inDb).toBeNull();
   });
 
   it('unauthenticated requests are rejected', async () => {

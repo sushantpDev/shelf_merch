@@ -447,46 +447,110 @@ export async function createCollectionApi(payload: {
   return result;
 }
 
-export async function launchPointsCampaignApi(payload: {
+export async function getCampaignApi(campaignId: string) {
+  const campaign = await apiFetch<Record<string, unknown>>(`/campaigns/${campaignId}`);
+  return mapCampaign(campaign);
+}
+
+export async function savePointsCampaignDraftApi(payload: {
+  campaignId?: string;
   entityId: string;
   shopId: string;
   name: string;
+  pointsScope?: "stadium" | "shop";
+  creditsPerRecipient: number;
+  message: { from: string; body: string };
+  schedule?: { mode: "now" | "scheduled" | "self"; sendAt?: string | null; timezone?: string };
+  draftState: {
+    step: 0 | 1 | 2 | 3;
+    selectedWalletId: string;
+    selRecips: string[];
+    recips: number;
+    pay: "wallet" | "card";
+    preview: "landing" | "email";
+    when: "now" | "scheduled" | "self";
+  };
+  recipients?: Array<{ name: string; email: string; phone?: string; contactId?: string }>;
+}) {
+  const campaign = await apiFetch<Record<string, unknown>>("/campaigns/points-draft", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return mapCampaign(campaign);
+}
+
+export async function deleteCampaignApi(campaignId: string) {
+  return apiFetch<{ ok: boolean }>(`/campaigns/${campaignId}`, { method: "DELETE" });
+}
+
+export async function launchPointsCampaignApi(payload: {
+  campaignId?: string;
+  entityId: string;
+  shopId: string;
+  name: string;
+  pointsScope?: "stadium" | "shop";
   creditsPerRecipient: number;
   totalBudget?: number;
   message: { from: string; body: string };
-  recipients: Array<{ name: string; email: string; phone?: string }>;
+  recipients: Array<{ name: string; email: string; phone?: string; contactId?: string }>;
 }) {
-  const campaign = await apiFetch<Record<string, unknown>>("/campaigns", {
-    method: "POST",
-    body: JSON.stringify({
-      entityId: payload.entityId,
-      name: payload.name,
-      type: "points",
-      shopId: payload.shopId,
-      message: payload.message,
-      schedule: { mode: "now" },
-    }),
-  });
-  const campaignId = String(campaign._id);
+  let campaignId = payload.campaignId;
+  let existingStatus: string | undefined;
 
-  await apiFetch(`/campaigns/${campaignId}/recipients/import`, {
-    method: "POST",
-    body: JSON.stringify({
-      recipients: payload.recipients.map((r) => ({
-        name: r.name,
-        email: r.email,
-        phone: r.phone || "",
-      })),
-    }),
-  });
+  if (campaignId) {
+    const existing = await apiFetch<Record<string, unknown>>(`/campaigns/${campaignId}`);
+    existingStatus = String(existing.status ?? "");
+    await apiFetch(`/campaigns/${campaignId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: payload.name,
+        pointsScope: payload.pointsScope ?? "shop",
+        message: payload.message,
+        schedule: { mode: "now" },
+      }),
+    });
+  } else {
+    const campaign = await apiFetch<Record<string, unknown>>("/campaigns", {
+      method: "POST",
+      body: JSON.stringify({
+        entityId: payload.entityId,
+        name: payload.name,
+        type: "points",
+        shopId: payload.shopId,
+        pointsScope: payload.pointsScope ?? "shop",
+        message: payload.message,
+        schedule: { mode: "now" },
+      }),
+    });
+    campaignId = String(campaign._id);
+    existingStatus = String(campaign.status ?? "draft");
+  }
 
-  await apiFetch(`/campaigns/${campaignId}/allocate-credits`, {
-    method: "POST",
-    body: JSON.stringify({
-      creditsPerRecipient: payload.creditsPerRecipient,
-      ...(payload.totalBudget != null ? { totalBudget: payload.totalBudget } : {}),
-    }),
-  });
+  const canImport = !existingStatus || ["draft", "recipients_uploaded"].includes(existingStatus);
+  if (canImport && payload.recipients.length) {
+    await apiFetch(`/campaigns/${campaignId}/recipients/import`, {
+      method: "POST",
+      body: JSON.stringify({
+        recipients: payload.recipients.map((r) => ({
+          name: r.name,
+          email: r.email,
+          phone: r.phone || "",
+          ...(r.contactId ? { contactId: r.contactId } : {}),
+        })),
+      }),
+    });
+    existingStatus = "recipients_uploaded";
+  }
+
+  if (!existingStatus || existingStatus === "recipients_uploaded" || existingStatus === "draft") {
+    await apiFetch(`/campaigns/${campaignId}/allocate-credits`, {
+      method: "POST",
+      body: JSON.stringify({
+        creditsPerRecipient: payload.creditsPerRecipient,
+        ...(payload.totalBudget != null ? { totalBudget: payload.totalBudget } : {}),
+      }),
+    });
+  }
 
   const launched = await apiFetch<Record<string, unknown>>(`/campaigns/${campaignId}/launch`, {
     method: "POST",

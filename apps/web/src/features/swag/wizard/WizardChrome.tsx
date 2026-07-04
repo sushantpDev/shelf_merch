@@ -9,6 +9,8 @@ export function WizardChrome({
   activeIndex,
   onExit,
   exitLabel = "Save and exit",
+  showExit = true,
+  exitDisabled = false,
   footer,
   children,
 }: {
@@ -17,6 +19,8 @@ export function WizardChrome({
   activeIndex: number;
   onExit: () => void;
   exitLabel?: string;
+  showExit?: boolean;
+  exitDisabled?: boolean;
   footer?: ReactNode;
   children: ReactNode;
 }) {
@@ -35,14 +39,19 @@ export function WizardChrome({
             </div>
           ))}
         </div>
-        <button
-          type="button"
-          className="lnk"
-          style={{ background: "none", border: "none", cursor: "pointer" }}
-          onClick={onExit}
-        >
-          {exitLabel}
-        </button>
+        {showExit ? (
+          <button
+            type="button"
+            className="btn btn-soft"
+            style={{ cursor: exitDisabled ? "wait" : "pointer" }}
+            disabled={exitDisabled}
+            onClick={onExit}
+          >
+            {exitLabel}
+          </button>
+        ) : (
+          <span />
+        )}
       </div>
       <div className="main scroll" style={{ flex: 1 }}>
         <div style={{ maxWidth: 1180, margin: "0 auto", padding: 34 }} className="fade-in">

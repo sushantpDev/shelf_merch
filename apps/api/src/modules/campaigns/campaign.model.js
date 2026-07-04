@@ -34,6 +34,7 @@ const campaignSchema = new mongoose.Schema(
     selectedProductIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'CatalogProduct' }],
     kitId: { type: mongoose.Schema.Types.ObjectId, ref: 'Kit', default: null },
     shopId: { type: mongoose.Schema.Types.ObjectId, ref: 'Shop', default: null },
+    pointsScope: { type: String, enum: ['stadium', 'shop'], default: 'shop' },
     creditsPerRecipient: { type: Number, default: 0 }, // INR
     recipientCount: { type: Number, default: 0 }, // cached
     totalBudget: { type: Number, default: 0 }, // creditsPerRecipient * recipientCount
@@ -47,6 +48,15 @@ const campaignSchema = new mongoose.Schema(
       timezone: { type: String, default: 'Asia/Kolkata' },
     },
     status: { type: String, enum: CAMPAIGN_STATUSES, default: 'draft' },
+    draftState: {
+      step: { type: Number, default: 0 },
+      selectedWalletId: { type: String, default: '' },
+      selRecips: [{ type: String }],
+      recips: { type: Number, default: 0 },
+      pay: { type: String, enum: ['wallet', 'card'], default: 'wallet' },
+      preview: { type: String, enum: ['landing', 'email'], default: 'landing' },
+      when: { type: String, enum: ['now', 'scheduled', 'self'], default: 'now' },
+    },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },
   { timestamps: true },

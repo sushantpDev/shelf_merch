@@ -50,13 +50,18 @@ export function PaymentPanel({
     onWalletSelect?.(walletId);
   }
 
+  function selectWalletPayment() {
+    onSelect("wallet");
+    if (walletOptions.length && !activeWalletId) {
+      pickWallet(walletOptions[0].id);
+    }
+  }
+
   const option = (key: PaymentMethod, title: string, sub: string, extra?: React.ReactNode) => (
     <button
       type="button"
       className={`pay-opt ${selected === key ? "on" : ""}`}
-      onClick={() => {
-        onSelect(key);
-      }}
+      onClick={() => onSelect(key)}
     >
       <div className="rd" />
       <div style={{ flex: 1, textAlign: "left" }}>
@@ -76,12 +81,12 @@ export function PaymentPanel({
         Pay from your wallet balance, or add a new payment method.
       </p>
 
-      {selectedWallet ? (
-        <>
+      {walletOptions.length ? (
+        <div className={`pay-wallet-group ${selected === "wallet" ? "is-active" : ""}`}>
           <button
             type="button"
             className={`pay-opt pay-opt--wallet ${selected === "wallet" ? "on" : ""}`}
-            onClick={() => onSelect("wallet")}
+            onClick={selectWalletPayment}
           >
             <div className="rd" />
             <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
@@ -91,7 +96,8 @@ export function PaymentPanel({
               </div>
             </div>
           </button>
-          {selected === "wallet" && (
+
+          {selected === "wallet" ? (
             <div className="pay-wallet-picker">
               <div className="pay-wallet-picker-head">
                 <span>Choose wallet</span>
@@ -103,9 +109,9 @@ export function PaymentPanel({
                     key={item.id}
                     type="button"
                     role="option"
-                    aria-selected={item.id === selectedWallet.id}
+                    aria-selected={item.id === selectedWallet?.id}
                     className={`pay-wallet-list-item ${
-                      item.id === selectedWallet.id ? "on" : ""
+                      item.id === selectedWallet?.id ? "on" : ""
                     }`}
                     onClick={() => {
                       pickWallet(item.id);
@@ -114,15 +120,13 @@ export function PaymentPanel({
                   >
                     <span className="pay-wallet-check" aria-hidden="true" />
                     <span className="pay-wallet-name">{item.name}</span>
-                    <b>
-                      {formatWalletAmount(walletAvailable(item), item.cur)} available
-                    </b>
+                    <b>{formatWalletAmount(walletAvailable(item), item.cur)} available</b>
                   </button>
                 ))}
               </div>
             </div>
-          )}
-        </>
+          ) : null}
+        </div>
       ) : (
         option(
           "wallet",

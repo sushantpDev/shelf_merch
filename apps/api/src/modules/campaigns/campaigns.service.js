@@ -19,6 +19,8 @@ function withCampaignMeta(campaign) {
   return { ...obj, validNextStatuses: validNextStatuses('campaign', obj.status) };
 }
 
+const INCOMPLETE_CAMPAIGN_STATUSES = ['draft', 'recipients_uploaded', 'credits_allocated', 'approved'];
+
 async function assertWalletCanSpend({ tenantId, entityId, amount, user }) {
   const budget = Math.round(amount ?? 0);
   if (budget <= 0) return;
@@ -114,6 +116,7 @@ export async function createCampaign({ tenantId, userId, user, data }) {
     selectedProductIds: data.selectedProductIds ?? [],
     kitId: data.kitId ?? null,
     shopId: data.shopId ?? null,
+    pointsScope: data.pointsScope ?? 'shop',
     message: data.message ?? {},
     schedule: data.schedule ?? { mode: 'now' },
     createdBy: userId,
@@ -132,6 +135,96 @@ export async function updateCampaign({ tenantId, campaignId, user, patch }) {
   Object.assign(campaign, rest);
   await campaign.save();
   return withCampaignMeta(campaign);
+}
+
+/** Save or update an incomplete points send wizard draft. */
+export async function savePointsDraft({ tenantId, userId, user, data }) {
+  const entity = await Entity.findOne({ _id: data.entityId, tenantId });
+  if (!entity) throw new NotFoundError('Entity not found');
+  assertEntityAccess(user, entity._id);
+
+  const shop = await Shop.findOne({ _id: data.shopId, tenantId });
+  if (!shop) throw new NotFoundError('Shop not found');
+
+  let campaign;
+  if (data.campaignId) {
+    campaign = await Campaign.findOne({ _id: data.campaignId, tenantId });
+    if (!campaign) throw new NotFoundError('Campaign not found');
+    if (!INCOMPLETE_CAMPAIGN_STATUSES.includes(campaign.status)) {
+      throw new ApiError(422, 'Only incomplete campaigns can be saved as drafts', 'CAMPAIGN_LOCKED');
+    }
+    if (String(campaign.shopId) !== String(data.shopId)) throw new ForbiddenError();
+    if (campaign.type !== 'points') {
+      throw new ApiError(422, 'Only points campaigns support wizard drafts', 'INVALID_CAMPAIGN_TYPE');
+    }
+  } else {
+    campaign = await Campaign.create({
+      tenantId,
+      entityId: data.entityId,
+      name: data.name,
+      type: 'points',
+      shopId: data.shopId,
+      pointsScope: data.pointsScope ?? 'shop',
+      message: data.message ?? {},
+      schedule: data.schedule ?? { mode: 'now' },
+      createdBy: userId,
+      status: 'draft',
+    });
+  }
+
+  campaign.name = data.name;
+  campaign.pointsScope = data.pointsScope ?? campaign.pointsScope;
+  campaign.creditsPerRecipient = data.creditsPerRecipient ?? 0;
+  if (data.message) {
+    campaign.message = { ...campaign.message, ...data.message };
+  }
+  if (data.schedule) {
+    campaign.schedule = { ...campaign.schedule, ...data.schedule };
+  }
+  if (data.draftState) {
+    const prev = campaign.draftState?.toObject?.() ?? campaign.draftState ?? {};
+    campaign.draftState = { ...prev, ...data.draftState };
+  }
+
+  const plannedRecips = Number(
+    data.draftState?.recips ?? campaign.draftState?.recips ?? 0,
+  );
+  const selectedRecips = data.draftState?.selRecips?.length ?? campaign.draftState?.selRecips?.length ?? 0;
+
+  await campaign.save();
+
+  if (data.recipients?.length) {
+    await upsertRecipientsFromList({ tenantId, campaign, rows: data.recipients });
+    const uploadedCount = await Recipient.countDocuments({ tenantId, campaignId: campaign._id });
+    campaign.recipientCount = plannedRecips > 0 ? plannedRecips : Math.max(uploadedCount, selectedRecips);
+    if (campaign.status === 'draft') {
+      transitionState('campaign', campaign, 'recipients_uploaded', { userId: user.userId });
+    }
+    await campaign.save();
+  } else {
+    campaign.recipientCount = plannedRecips > 0 ? plannedRecips : selectedRecips;
+    await campaign.save();
+  }
+
+  return withCampaignMeta(campaign);
+}
+
+export async function deleteCampaign({ tenantId, campaignId, user }) {
+  const campaign = await Campaign.findOne({ _id: campaignId, tenantId });
+  if (!campaign) throw new NotFoundError('Campaign not found');
+  if (user?.scopeType === 'entity') {
+    const allowed = (user.assignedEntityIds ?? []).map(String);
+    if (!allowed.includes(String(campaign.entityId))) throw new ForbiddenError();
+  }
+  if (!INCOMPLETE_CAMPAIGN_STATUSES.includes(campaign.status)) {
+    throw new ApiError(422, 'Only incomplete campaigns can be deleted', 'CAMPAIGN_LOCKED');
+  }
+
+  // Incomplete drafts are permanently removed — nothing launched yet to retain for audit.
+  await Recipient.deleteMany({ tenantId, campaignId: campaign._id });
+  await Campaign.deleteOne({ _id: campaignId, tenantId });
+
+  return { ok: true };
 }
 
 async function upsertRecipientsFromList({ tenantId, campaign, rows }) {
@@ -323,12 +416,17 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
       : `You're invited: ${campaign.name}`;
 
   if (sendInvites) {
-    const [tenant, kit] = await Promise.all([
+    const [tenant, kit, shop] = await Promise.all([
       Tenant.findById(tenantId).select('name').lean(),
       campaign.kitId ? Kit.findOne({ _id: campaign.kitId, tenantId }).select('name').lean() : null,
+      campaign.shopId
+        ? Shop.findOne({ _id: campaign.shopId, tenantId })
+          .select('name logoUrl bannerConfig currencyMode')
+          .lean()
+        : null,
     ]);
     const companyName = tenant?.name || 'your company';
-    const giftName = kit?.name || campaign.name;
+    const giftName = campaign.type === 'points' ? `${shop?.name || campaign.name} points` : (kit?.name || campaign.name);
     if (isSingle) {
       await notify({
         type: 'single_location_gift',
@@ -356,6 +454,12 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
             companyName,
             campaignType: campaign.type,
             fulfillmentMode: campaign.fulfillmentMode,
+            pointsScope: campaign.pointsScope ?? 'shop',
+            shopName: shop?.name ?? '',
+            shopLogoUrl: shop?.logoUrl ?? '',
+            shopBannerTheme: shop?.bannerConfig?.theme ?? '',
+            shopBannerPreset: shop?.bannerConfig?.preset ?? '',
+            shopCurrencyMode: shop?.currencyMode ?? 'points',
           },
         });
       }

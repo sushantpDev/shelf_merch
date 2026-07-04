@@ -6,6 +6,30 @@ function appUrl(path = '') {
   return `${base}${suffix}`;
 }
 
+function absoluteUrl(url = '') {
+  if (!url) return '';
+  if (/^(https?:|data:)/i.test(url)) return url;
+  return appUrl(url.startsWith('/') ? url : `/${url}`);
+}
+
+function emailSafeImageUrl(url = '') {
+  if (!url) return '';
+  if (!/^https?:/i.test(url)) return '';
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return '';
+    return url;
+  } catch {
+    return '';
+  }
+}
+
+function presetBannerUrl(preset = '') {
+  if (!preset || !/^[a-z0-9-]+$/i.test(preset)) return '';
+  return emailSafeImageUrl(absoluteUrl(`/shop-banners/${preset}.png`));
+}
+
 function escapeHtml(value = '') {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -13,18 +37,6 @@ function escapeHtml(value = '') {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-function initials(name = '') {
-  const parts = String(name).trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return 'SM';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function truncateLink(url, max = 48) {
-  if (url.length <= max) return url;
-  return `${url.slice(0, max)}…`;
 }
 
 /**
@@ -39,6 +51,12 @@ export function buildRedemptionInviteEmail({
   companyName = 'your company',
   link = '',
   campaignType = 'kit',
+  pointsScope = 'shop',
+  shopName = '',
+  shopBannerTheme = '',
+  shopBannerPreset = '',
+  shopBannerCid = '',
+  shopCurrencyMode = 'points',
 }) {
   const fullLink = link ? (link.startsWith('http') ? link : appUrl(link)) : '';
   const safeRecipient = escapeHtml(recipientName);
@@ -47,75 +65,33 @@ export function buildRedemptionInviteEmail({
   const safeGift = escapeHtml(giftName);
   const safeCompany = escapeHtml(companyName);
   const safeLink = escapeHtml(fullLink);
-  const safeLinkShort = escapeHtml(truncateLink(fullLink));
-  const avatar = escapeHtml(initials(senderName));
-
+  const safeShopName = escapeHtml(shopName || giftName || companyName);
+  const bannerImageUrl = shopBannerCid ? `cid:${shopBannerCid}` : presetBannerUrl(shopBannerPreset);
+  const themeBg =
+    shopBannerTheme === 'brand'
+      ? '#15784C'
+      : shopBannerTheme === 'dark'
+        ? '#0E1E16'
+        : shopBannerTheme === 'blue'
+          ? '#2563C9'
+          : shopBannerTheme === 'purple'
+            ? '#7a3fb0'
+            : '#F4F7F5';
+  const themeText = shopBannerTheme === 'light' ? '#1A1A1A' : '#FFFFFF';
   const isPoints = campaignType === 'points';
+  const isUniversalPoints = isPoints && pointsScope === 'stadium';
   const heroHeading = isPoints
-    ? `${safeCompany} sent you<br>reward points.`
+    ? `You've been gifted reward points<br>to ${safeShopName}!`
     : `${safeCompany} is sending<br>you something special.`;
-  const heroSub = isPoints
-    ? 'Your team has gifted you points to spend at the company store. Redeem them on items you actually want.'
-    : 'Your team has put together a welcome kit. Choose your preferences and we\'ll ship it straight to you — completely on them.';
-  const giftSub = isPoints
-    ? 'Browse the store and pick what you like'
-    : 'You pick size, colour &amp; shipping address';
   const ctaLabel = isPoints ? 'Redeem your points →' : 'Claim your gift →';
+  const scopeCopy = isPoints
+    ? isUniversalPoints
+      ? 'These points can be used in this shop or anywhere Shelf Merch points are accepted.'
+      : `These points can only be redeemed in ${safeShopName}.`
+    : '';
   const subject = isPoints
-    ? `${senderName} sent you reward points`
+    ? `${senderName} sent you points to ${shopName || giftName}`
     : `${senderName} sent you a gift`;
-
-  const steps = isPoints
-    ? `
-      <tr><td style="padding:0 0 12px 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-          <td width="28" valign="top" style="padding-top:1px;">
-            <div style="width:22px;height:22px;border-radius:50%;background:#1B4332;color:#fff;font-size:10px;font-weight:700;line-height:22px;text-align:center;">1</div>
-          </td>
-          <td style="font-size:13px;color:#444;line-height:1.55;padding-left:4px;"><b style="color:#1A1A1A;font-weight:600;">Click "${ctaLabel.replace(' →', '')}"</b> — opens your secure personal page</td>
-        </tr></table>
-      </td></tr>
-      <tr><td style="padding:0 0 12px 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-          <td width="28" valign="top" style="padding-top:1px;">
-            <div style="width:22px;height:22px;border-radius:50%;background:#1B4332;color:#fff;font-size:10px;font-weight:700;line-height:22px;text-align:center;">2</div>
-          </td>
-          <td style="font-size:13px;color:#444;line-height:1.55;padding-left:4px;"><b style="color:#1A1A1A;font-weight:600;">Browse the catalog</b> — choose items within your point balance</td>
-        </tr></table>
-      </td></tr>
-      <tr><td style="padding:0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-          <td width="28" valign="top" style="padding-top:1px;">
-            <div style="width:22px;height:22px;border-radius:50%;background:#1B4332;color:#fff;font-size:10px;font-weight:700;line-height:22px;text-align:center;">3</div>
-          </td>
-          <td style="font-size:13px;color:#444;line-height:1.55;padding-left:4px;"><b style="color:#1A1A1A;font-weight:600;">Enter your address</b> — we handle shipping from there</td>
-        </tr></table>
-      </td></tr>`
-  : `
-      <tr><td style="padding:0 0 12px 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-          <td width="28" valign="top" style="padding-top:1px;">
-            <div style="width:22px;height:22px;border-radius:50%;background:#1B4332;color:#fff;font-size:10px;font-weight:700;line-height:22px;text-align:center;">1</div>
-          </td>
-          <td style="font-size:13px;color:#444;line-height:1.55;padding-left:4px;"><b style="color:#1A1A1A;font-weight:600;">Click "Claim your gift"</b> — opens your secure personal page</td>
-        </tr></table>
-      </td></tr>
-      <tr><td style="padding:0 0 12px 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-          <td width="28" valign="top" style="padding-top:1px;">
-            <div style="width:22px;height:22px;border-radius:50%;background:#1B4332;color:#fff;font-size:10px;font-weight:700;line-height:22px;text-align:center;">2</div>
-          </td>
-          <td style="font-size:13px;color:#444;line-height:1.55;padding-left:4px;"><b style="color:#1A1A1A;font-weight:600;">Pick your preferences</b> — size, colour, and any available options</td>
-        </tr></table>
-      </td></tr>
-      <tr><td style="padding:0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-          <td width="28" valign="top" style="padding-top:1px;">
-            <div style="width:22px;height:22px;border-radius:50%;background:#1B4332;color:#fff;font-size:10px;font-weight:700;line-height:22px;text-align:center;">3</div>
-          </td>
-          <td style="font-size:13px;color:#444;line-height:1.55;padding-left:4px;"><b style="color:#1A1A1A;font-weight:600;">Enter your address</b> — we handle shipping from there</td>
-        </tr></table>
-      </td></tr>`;
 
   const greeting = safeRecipient ? `Hi ${safeRecipient},` : 'Hi there,';
 
@@ -135,112 +111,69 @@ export function buildRedemptionInviteEmail({
 
           <!-- Header -->
           <tr>
-            <td style="background:#1B4332;border-radius:10px 10px 0 0;padding:20px 32px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-                <td valign="middle" style="padding-right:10px;">
-                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
-                    <path d="M4 22L4 10C4 8.9 4.9 8 6 8L22 8C23.1 8 24 8.9 24 10L24 22C24 23.1 23.1 24 22 24L6 24C4.9 24 4 23.1 4 22Z" fill="rgba(255,255,255,0.15)"/>
-                    <path d="M9 8V6C9 4.9 9.9 4 11 4H17C18.1 4 19 4.9 19 6V8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-                    <rect x="11" y="13" width="6" height="5" rx="1" fill="rgba(255,255,255,0.7)"/>
-                    <line x1="4" y1="13" x2="24" y2="13" stroke="white" stroke-width="1.5"/>
-                  </svg>
-                </td>
-                <td valign="middle" style="color:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:-0.3px;">Shelf Merch</td>
-              </tr></table>
+            <td style="background:${themeBg};border-radius:10px 10px 0 0;padding:0;border:1px solid #E8E6E1;border-bottom:none;overflow:hidden;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                ${bannerImageUrl ? `
+                <tr>
+                  <td align="center" style="padding:0;">
+                    <img
+                      src="${escapeHtml(bannerImageUrl)}"
+                      alt="${safeShopName} banner"
+                      width="578"
+                      style="display:block;width:100%;max-width:578px;height:auto;border:0;outline:none;text-decoration:none;"
+                    >
+                  </td>
+                </tr>
+                ` : ''}
+                <tr>
+                  <td align="center" style="padding:${bannerImageUrl ? '16px 24px 18px' : '22px 24px 18px'};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;font-weight:700;color:${themeText};">
+                    ${safeShopName}
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
           <!-- Hero -->
           <tr>
-            <td style="background:#1B4332;padding:0 32px 40px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                <tr><td style="height:1px;background:rgba(255,255,255,0.12);font-size:0;line-height:0;">&nbsp;</td></tr>
-                <tr><td style="padding-top:36px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-                  <div style="font-size:11px;font-weight:600;color:#6EE7A0;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px;">You have a gift waiting</div>
-                  <div style="font-size:28px;font-weight:700;color:#ffffff;line-height:1.25;letter-spacing:-0.6px;margin-bottom:12px;">${heroHeading}</div>
-                  <div style="font-size:14px;color:rgba(255,255,255,0.65);line-height:1.65;">${heroSub}</div>
-                </td></tr>
-              </table>
+            <td style="background:#ffffff;padding:24px 32px 0;border-left:1px solid #E8E6E1;border-right:1px solid #E8E6E1;">
+              <div style="font-size:11px;font-weight:700;color:#9AA39C;letter-spacing:0.08em;text-transform:uppercase;text-align:center;">${safeSender.toUpperCase()} SENT YOU SOMETHING</div>
+              <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;font-weight:700;color:#1A1A1A;line-height:1.35;text-align:center;margin:10px 0 8px;">${heroHeading}</div>
             </td>
           </tr>
 
           <!-- Body -->
           <tr>
-            <td style="background:#ffffff;padding:36px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-              <div style="font-size:14px;color:#444;margin-bottom:20px;">${greeting}</div>
-
-              <!-- Sender -->
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:20px;border-bottom:1px solid #F0EFED;">
+            <td style="background:#ffffff;padding:16px 32px 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;border-left:1px solid #E8E6E1;border-right:1px solid #E8E6E1;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #E8E6E1;border-radius:14px;">
                 <tr>
-                  <td width="56" valign="top" style="padding-bottom:20px;">
-                    <div style="width:42px;height:42px;border-radius:50%;background:#1B4332;color:#fff;font-size:13px;font-weight:700;line-height:42px;text-align:center;">${avatar}</div>
-                  </td>
-                  <td valign="middle" style="padding-bottom:20px;">
-                    <div style="font-size:14px;font-weight:600;color:#1A1A1A;">${safeSender}</div>
-                    <div style="font-size:12px;color:#9C9C9C;margin-top:2px;">Sending via Shelf Merch · Corporate Gifting</div>
+                  <td style="padding:18px 18px 16px;">
+                    ${!isPoints ? `
+                      <div style="font-size:11px;font-weight:700;color:#9AA39C;letter-spacing:0.07em;text-transform:uppercase;text-align:center;margin-bottom:6px;">Your gift</div>
+                      <div style="font-size:16px;font-weight:700;color:#1A1A1A;line-height:1.35;text-align:center;margin-bottom:10px;">${safeGift}</div>
+                    ` : ''}
+                    ${safeMessage ? `<div style="font-size:14px;color:#555;line-height:1.7;text-align:center;">${safeMessage}</div>` : ''}
+                    ${scopeCopy ? `<div style="font-size:12px;color:#6C756F;line-height:1.6;text-align:center;margin-top:12px;">${scopeCopy}</div>` : ''}
+                    <div style="height:3px;border-radius:3px;margin:16px 0 14px;background:linear-gradient(90deg,#7a3fb0,#2b54d6,#f5d000,#d33b30,#15784c);"></div>
+                    <div style="font-size:12px;font-weight:700;color:#8A938D;letter-spacing:0.03em;text-transform:uppercase;text-align:center;">FROM ${safeSender.toUpperCase()}</div>
                   </td>
                 </tr>
               </table>
 
-              ${safeMessage ? `<div style="font-size:14px;color:#555;line-height:1.65;font-style:italic;padding:16px;background:#F8F7F5;border-left:3px solid #1B4332;border-radius:0 6px 6px 0;margin-bottom:28px;">&ldquo;${safeMessage}&rdquo;</div>` : ''}
-
-              <!-- Gift card -->
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #E8E6E1;border-radius:10px;margin-bottom:24px;">
-                <tr>
-                  <td style="padding:20px;">
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-                      <td width="68" valign="middle">
-                        <div style="width:52px;height:52px;background:#F0F7F3;border-radius:10px;text-align:center;line-height:52px;">
-                          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1B4332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;">
-                            <polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>
-                          </svg>
-                        </div>
-                      </td>
-                      <td valign="middle" style="padding-left:8px;">
-                        <div style="font-size:11px;font-weight:600;color:#9C9C9C;letter-spacing:0.07em;text-transform:uppercase;margin-bottom:4px;">Your gift</div>
-                        <div style="font-size:15px;font-weight:700;color:#1A1A1A;margin-bottom:3px;">${safeGift}</div>
-                        <div style="font-size:12px;color:#888;">${giftSub}</div>
-                      </td>
-                      <td align="right" valign="middle" style="white-space:nowrap;">
-                        <span style="display:inline-block;background:#F0FDF4;color:#166534;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #BBF7D0;">✦ Ready to claim</span>
-                      </td>
-                    </tr></table>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Steps -->
-              <div style="font-size:11px;font-weight:600;color:#9C9C9C;letter-spacing:0.07em;text-transform:uppercase;margin-bottom:14px;">How to claim</div>
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${steps}</table>
-
-              <!-- Notice -->
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:24px 0;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;">
-                <tr>
-                  <td width="36" valign="middle" style="padding:11px 0 11px 14px;">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#92400E" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l3 1.5"/></svg>
-                  </td>
-                  <td style="padding:11px 14px 11px 0;font-size:12px;color:#92400E;line-height:1.5;">
-                    <b style="font-weight:600;">Link expires in 30 days.</b> This is a personal, one-time-use link — please don&rsquo;t share it.
-                  </td>
-                </tr>
-              </table>
+              ${fullLink ? '' : `<div style="font-size:14px;color:#444;margin-top:20px;">${greeting}</div>`}
 
               <!-- CTA -->
               ${fullLink ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                <tr><td align="center" style="border-radius:8px;background:#1B4332;">
+                <tr><td align="center" style="border-radius:999px;background:#0E1E16;">
                   <a href="${safeLink}" target="_blank" style="display:block;padding:15px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:-0.2px;">${ctaLabel}</a>
                 </td></tr>
-              </table>
-              <div style="text-align:center;margin-top:10px;font-size:11px;color:#9C9C9C;line-height:1.5;">
-                Or use your link:<br>
-                <a href="${safeLink}" target="_blank" style="color:#1B4332;font-weight:500;text-decoration:underline;word-break:break-all;">${safeLinkShort}</a>
-              </div>` : ''}
+              </table>` : ''}
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
-            <td style="background:#F8F7F5;border-radius:0 0 10px 10px;padding:24px 32px;border-top:1px solid #E8E6E1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+            <td style="background:#F8F7F5;border-radius:0 0 10px 10px;padding:24px 32px;border:1px solid #E8E6E1;border-top:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
               <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:8px;">Shelf Merch · Corporate Gifting Platform</div>
               <div style="font-size:11px;color:#999;line-height:1.65;">
                 This gift was sent by your employer through Shelf Merch. Your redemption link is private and tied to you only.
@@ -270,17 +203,17 @@ export function buildRedemptionInviteEmail({
     greeting,
     '',
     isPoints
-      ? `${companyName} sent you reward points.`
+      ? `You've been gifted points to ${shopName || giftName}.`
       : `${companyName} is sending you something special.`,
     '',
     message ? `"${message}"` : '',
     message ? '' : null,
+    scopeCopy || '',
+    scopeCopy ? '' : null,
     `From: ${senderName}`,
     `Gift: ${giftName}`,
     '',
     fullLink ? `${ctaLabel.replace(' →', '')}: ${fullLink}` : '',
-    '',
-    'Link expires in 30 days. This is a personal, one-time-use link — please do not share it.',
     '',
     '— Shelf Merch · Corporate Gifting Platform',
   ]

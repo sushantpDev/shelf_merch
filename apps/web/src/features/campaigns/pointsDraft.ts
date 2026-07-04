@@ -5,6 +5,7 @@ export type SendPointsDraft = {
   ppr: number; // budget per recipient, in INR
   recips: number; // headline recipient count (budget step)
   selRecips: string[];
+  pointsScope: "stadium" | "shop";
   from: string;
   msg: string;
   when: WhenMode;
@@ -14,11 +15,13 @@ export type SendPointsDraft = {
 };
 
 export type SendPointsAction =
+  | { type: "replace"; draft: SendPointsDraft }
   | { type: "setOrderName"; orderName: string }
   | { type: "setPpr"; ppr: number }
   | { type: "setRecips"; recips: number }
   | { type: "toggleRecip"; id: string }
   | { type: "deselectRecips" }
+  | { type: "setPointsScope"; pointsScope: "stadium" | "shop" }
   | { type: "setFrom"; from: string }
   | { type: "setMsg"; msg: string }
   | { type: "setWhen"; when: WhenMode }
@@ -31,6 +34,8 @@ export function sendPointsReducer(
   action: SendPointsAction,
 ): SendPointsDraft {
   switch (action.type) {
+    case "replace":
+      return action.draft;
     case "setOrderName":
       return { ...state, orderName: action.orderName };
     case "setPpr":
@@ -48,6 +53,8 @@ export function sendPointsReducer(
     }
     case "deselectRecips":
       return { ...state, selRecips: [] };
+    case "setPointsScope":
+      return { ...state, pointsScope: action.pointsScope };
     case "setFrom":
       return { ...state, from: action.from };
     case "setMsg":
@@ -65,18 +72,93 @@ export function sendPointsReducer(
   }
 }
 
-export function initialSendPointsDraft(firstRecips: string[], account: string): SendPointsDraft {
+export const SEND_POINTS_PLACEHOLDERS = {
+  orderName: "Order R249681093",
+  recips: "100",
+  ppr: "1500",
+  points: "750.00",
+  from: "shelfmerch",
+  msg: "Appreciate your turnaround completing the key project, which is critical to company revenue.",
+} as const;
+
+export function suggestOrderName() {
+  return "Order R" + (200000000 + Math.floor(Math.random() * 99_999_999));
+}
+
+export function resolveOrderName(orderName: string) {
+  return orderName.trim() || suggestOrderName();
+}
+
+export function resolveFrom(from: string, placeholder = SEND_POINTS_PLACEHOLDERS.from) {
+  return from.trim() || placeholder;
+}
+
+export function resolveMessage(msg: string, placeholder = SEND_POINTS_PLACEHOLDERS.msg) {
+  return msg.trim() || placeholder;
+}
+
+export function initialSendPointsDraft(
+  pointsScope: "stadium" | "shop" = "shop",
+): SendPointsDraft {
   const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
   return {
-    orderName: "Order R" + (200000000 + Math.floor(Math.random() * 99999999)),
-    ppr: 1500,
-    recips: 100,
-    selRecips: firstRecips,
-    from: `People Team, ${account}`,
-    msg: "Appreciate your turnaround completing the key project, which is critical to company revenue.",
+    orderName: "",
+    ppr: 0,
+    recips: 0,
+    selRecips: [],
+    pointsScope,
+    from: "",
+    msg: "",
     when: "now",
     schedule: { date: tomorrow, time: "10:00", tz: "Asia/Kolkata (IST)" },
     preview: "landing",
     pay: "wallet",
+  };
+}
+
+export function sendPointsDraftFromCampaign(
+  campaign: {
+    name: string;
+    creditsPerRecipient?: number;
+    recipientCount?: number;
+    pointsScope?: "stadium" | "shop";
+    senderName?: string;
+    messageBody?: string;
+    draftState?: {
+      step?: 0 | 1 | 2 | 3;
+      selectedWalletId?: string;
+      selRecips?: string[];
+      recips?: number;
+      pay?: "wallet" | "card";
+      preview?: "landing" | "email";
+      when?: "now" | "scheduled" | "self";
+    };
+  },
+  fallback: SendPointsDraft,
+): { draft: SendPointsDraft; step: 0 | 1 | 2 | 3; selectedWalletId: string } {
+  const ds = campaign.draftState ?? {};
+  const step =
+    ds.step === 0 || ds.step === 1 || ds.step === 2 || ds.step === 3 ? ds.step : 0;
+  return {
+    draft: {
+      ...fallback,
+      orderName: campaign.name || "",
+      ppr: campaign.creditsPerRecipient ?? 0,
+      recips: ds.recips ?? campaign.recipientCount ?? 0,
+      selRecips: ds.selRecips ?? [],
+      pointsScope: campaign.pointsScope ?? fallback.pointsScope,
+      from: campaign.senderName || "",
+      msg: campaign.messageBody || "",
+      when:
+        ds.when === "scheduled"
+          ? "sched"
+          : ds.when === "now" || ds.when === "self"
+            ? ds.when
+            : fallback.when,
+      preview: ds.preview ?? fallback.preview,
+      pay: ds.pay ?? fallback.pay,
+    },
+    step,
+    selectedWalletId: ds.selectedWalletId ?? "",
   };
 }

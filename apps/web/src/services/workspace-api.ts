@@ -507,6 +507,8 @@ export async function updateShopApi(
   shopId: string,
   payload: {
     name?: string;
+    currencyMode?: "points" | "inr" | "priceless";
+    pointsConversionEnabled?: boolean;
     logoUrl?: string;
     bannerConfig?: Record<string, unknown>;
     categories?: string[];

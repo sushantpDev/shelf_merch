@@ -254,7 +254,7 @@ export function CatalogEditorDialog({
               </button>
               <button
                 type="button"
-                className="btn btn-dark"
+                className="btn btn-brand"
                 disabled={updateShop.isPending}
                 onClick={save}
               >

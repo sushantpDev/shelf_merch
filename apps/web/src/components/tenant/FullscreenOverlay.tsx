@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -15,6 +15,17 @@ export function FullscreenOverlay({
   children: ReactNode;
   style?: CSSProperties;
 }) {
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("sm:view-change", { detail: { fullscreenFlow: true } }),
+    );
+    return () => {
+      window.dispatchEvent(
+        new CustomEvent("sm:view-change", { detail: { fullscreenFlow: false } }),
+      );
+    };
+  }, []);
+
   return createPortal(
     <div className="sm-fullscreen" style={style}>
       {children}

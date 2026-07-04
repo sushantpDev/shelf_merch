@@ -16,6 +16,9 @@ export type CreateShopInput = {
 };
 
 export type UpdateShopInput = {
+  name?: string;
+  currencyMode?: "points" | "inr" | "priceless";
+  pointsConversionEnabled?: boolean;
   logoUrl?: string;
   bannerConfig?: Record<string, unknown>;
   selectedCatalogProductIds?: string[];

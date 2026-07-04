@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import nodemailer from 'nodemailer';
 import { env, emailConfigured } from '../config/env.js';
 import { logger } from '../config/logger.js';
@@ -10,6 +13,18 @@ import {
 } from './email-templates/managerEmails.template.js';
 
 let transporter;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function presetBannerAttachment(preset = '') {
+  if (!preset || !/^[a-z0-9-]+$/i.test(preset)) return null;
+  const filePath = path.resolve(__dirname, '../../../web/public/shop-banners', `${preset}.png`);
+  if (!fs.existsSync(filePath)) return null;
+  return {
+    filename: `shop-banner-${preset}.png`,
+    path: filePath,
+    cid: `shop-banner-${preset}@shelfmerch`,
+  };
+}
 
 function getTransporter() {
   if (!transporter) {
@@ -34,14 +49,14 @@ export function appUrl(path = '') {
  * Send a transactional email via SMTP (Gmail when EMAIL_SERVICE=gmail).
  * Falls back to structured logging when credentials are not set (tests/dev).
  */
-export async function sendEmail({ to, subject, text, html }) {
+export async function sendEmail({ to, subject, text, html, attachments }) {
   if (!emailConfigured()) {
     logger.info({ to, subject, text }, 'EMAIL (stub — set EMAIL_USER + EMAIL_PASSWORD)');
     return { success: true, provider: 'stub' };
   }
 
   const from = env.EMAIL_FROM || env.EMAIL_USER;
-  const info = await getTransporter().sendMail({ from, to, subject, text, html });
+  const info = await getTransporter().sendMail({ from, to, subject, text, html, attachments });
 
   logger.info({ to, subject, messageId: info.messageId }, 'Email sent');
   return { success: true, provider: 'smtp', messageId: info.messageId };
@@ -128,7 +143,14 @@ export async function sendRedemptionInviteEmail({
   companyName = 'your company',
   link = '',
   campaignType = 'kit',
+  pointsScope = 'shop',
+  shopName = '',
+  shopLogoUrl = '',
+  shopBannerTheme = '',
+  shopBannerPreset = '',
+  shopCurrencyMode = 'points',
 }) {
+  const bannerAttachment = presetBannerAttachment(shopBannerPreset);
   const { subject, html, text } = buildRedemptionInviteEmail({
     recipientName,
     senderName,
@@ -137,10 +159,22 @@ export async function sendRedemptionInviteEmail({
     companyName,
     link,
     campaignType,
+    pointsScope,
+    shopName,
+    shopBannerTheme,
+    shopBannerPreset,
+    shopBannerCid: bannerAttachment?.cid ?? '',
+    shopCurrencyMode,
   });
 
   try {
-    return await sendEmail({ to, subject, text, html });
+    return await sendEmail({
+      to,
+      subject,
+      text,
+      html,
+      attachments: bannerAttachment ? [bannerAttachment] : undefined,
+    });
   } catch (err) {
     logger.warn({ err, to, subject }, 'Redemption invite email send failed');
     return { success: false, provider: 'smtp' };
