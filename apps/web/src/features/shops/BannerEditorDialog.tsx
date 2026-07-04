@@ -17,7 +17,7 @@ import {
   bannerPresetKey,
   bannerThemeKey,
 } from "./banner";
-import { useUpdateShop } from "./hooks";
+import { useUpdateShop } from "./model";
 
 const LOGO_ACCEPT = /\.(svg|png|webp|jpe?g)$/i;
 const LOGO_MAX = 5 * 1024 * 1024;

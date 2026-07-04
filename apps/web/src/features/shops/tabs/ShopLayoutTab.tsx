@@ -1,11 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { Pencil } from "lucide-react";
 import type { UiShop } from "@/services/mappers";
-import {
-  BANNER_THEMES,
-  SHOP_BANNER_PRESETS,
-  ShopBanner,
-} from "../banner";
+import { BANNER_THEMES, SHOP_BANNER_PRESETS, ShopBanner } from "../banner";
 import { useShopLookEditor } from "../useShopLookEditor";
 
 export function ShopLayoutTab({ shop }: { shop: UiShop }) {
@@ -70,7 +66,9 @@ export function ShopLayoutTab({ shop }: { shop: UiShop }) {
           <div className="shop-layout-field">
             <div className="shop-layout-field-head">
               <span className="shop-layout-lbl">Top banner</span>
-              <span className="shop-layout-spec muted">Library presets · max 10 MB upload soon</span>
+              <span className="shop-layout-spec muted">
+                Library presets · max 10 MB upload soon
+              </span>
             </div>
             <p className="shop-layout-hint muted">
               Browse our library of custom banners or pick a solid brand colour.
@@ -80,10 +78,7 @@ export function ShopLayoutTab({ shop }: { shop: UiShop }) {
                 {bannerThumb ? (
                   <img src={bannerThumb} alt="" className="shop-layout-banner-thumb" />
                 ) : (
-                  <div
-                    className="shop-layout-banner-solid"
-                    style={solidSwatchStyle(state.theme)}
-                  />
+                  <div className="shop-layout-banner-solid" style={solidSwatchStyle(state.theme)} />
                 )}
               </div>
               <button

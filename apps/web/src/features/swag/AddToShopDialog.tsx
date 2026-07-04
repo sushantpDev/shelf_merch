@@ -10,7 +10,7 @@ import {
 import { useWorkspace } from "@/hooks/useWorkspace";
 import type { UiCollection, UiProduct } from "@/services/mappers";
 import { ShopBanner } from "@/features/shops/banner";
-import { useAddProductToShop } from "./hooks";
+import { useAddProductToShop } from "./model";
 
 export type AddToShopTarget = { collection: UiCollection; product?: UiProduct };
 
@@ -73,13 +73,7 @@ export function AddToShopDialog({
                 onClick={() => add(shop.id)}
               >
                 <div className="add-to-shop-row-thumb">
-                  <ShopBanner
-                    source={shop}
-                    height={36}
-                    layout="center"
-                    logoSize={22}
-                    radius={6}
-                  />
+                  <ShopBanner source={shop} height={36} layout="center" logoSize={22} radius={6} />
                 </div>
                 <div className="add-to-shop-row-body">
                   <div className="add-to-shop-row-name">{shop.name}</div>

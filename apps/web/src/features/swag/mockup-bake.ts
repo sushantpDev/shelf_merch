@@ -72,7 +72,9 @@ export function loadImageEl(src: string, forCanvas = false): Promise<HTMLImageEl
       reject(new Error("no src"));
       return;
     }
-    const resolved = forCanvas ? mediaUrlForCanvas(src) || resolveMediaSrc(src) : resolveMediaSrc(src);
+    const resolved = forCanvas
+      ? mediaUrlForCanvas(src) || resolveMediaSrc(src)
+      : resolveMediaSrc(src);
     const im = new Image();
     if (forCanvas) im.crossOrigin = "anonymous";
     im.onload = () => resolve(im);

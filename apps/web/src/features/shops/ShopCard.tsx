@@ -20,16 +20,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ShopBanner } from "./banner";
-import { useArchiveShop, useDuplicateShop } from "./hooks";
+import { useArchiveShop, useDuplicateShop } from "./model";
 import { shopCardMeta } from "./types";
 
-export function ShopCard({
-  shop,
-  fallbackUser,
-}: {
-  shop: UiShop;
-  fallbackUser: string;
-}) {
+export function ShopCard({ shop, fallbackUser }: { shop: UiShop; fallbackUser: string }) {
   const navigate = useNavigate();
   const duplicate = useDuplicateShop();
   const archive = useArchiveShop();
@@ -77,9 +71,7 @@ export function ShopCard({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" side="bottom" className="shop-card-menu">
-              <DropdownMenuItem
-                onSelect={() => navigate(`/app/shops/${shop.id}?tab=layout`)}
-              >
+              <DropdownMenuItem onSelect={() => navigate(`/app/shops/${shop.id}?tab=layout`)}>
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => navigate("/app/contacts")}>

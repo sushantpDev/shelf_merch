@@ -8,7 +8,7 @@ import {
   bannerBackgroundStyle,
   type BannerSource,
 } from "./banner";
-import type { ShopDraft, ShopDraftAction } from "./CreateShopWizard";
+import type { ShopDraft, ShopDraftAction } from "./shopDraft";
 import { BUILDER_CATEGORIES } from "./types";
 
 const GROUP_ICON: Record<string, typeof Coffee> = {

@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { UiCollection, UiProduct } from "@/services/mappers";
 import { DesignCard } from "./DesignCard";
-import { useArchiveCollection, useDeleteCollection, useRestoreCollection } from "./hooks";
+import { useArchiveCollection, useDeleteCollection, useRestoreCollection } from "./model";
 
 export function CollectionBlock({
   collection,
