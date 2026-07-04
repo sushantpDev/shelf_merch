@@ -34,9 +34,12 @@ features/campaigns/
 
 ## Views (`views/*.tsx`)
 
-- **Props only.** No react-query, no router, no `services/` imports, no toasts.
-- Anything that navigates, mutates, or notifies surfaces as a **callback prop** supplied by
-  the controller (`onSendGift`, `onSelectKit`, `onPayNow`, `onApplyPromo`, …).
+- **Props only.** No react-query, no `services/` imports, no toasts, no imperative routing
+  (`useNavigate`/`useParams`/`useSearchParams` live in controllers). Declarative `<Link>` is
+  allowed — it renders an anchor, which is presentation.
+- Anything that navigates imperatively, mutates, or notifies surfaces as a **callback prop**
+  supplied by the controller (`onSendGift`, `onSelectKit`, `onPayNow`, `onApplyPromo`, …).
+- Local DOM wiring (e.g. a `useRef` to a hidden file input) may stay in the view.
 - Views may import: other views, shared presentational components (`components/LoadingState`,
   `components/ui/*`), icons, pure formatters (`inr`, `POINT_VALUE`), and types/predicates from
   the feature's `model.ts` or controller (types only).
@@ -64,6 +67,10 @@ export function CampaignsPage() {
   return <CampaignsView {...vm} />;
 }
 ```
+
+Self-contained widgets embedded in another screen (e.g. `settings/TransferOwnershipDialog.tsx`)
+follow the same shape: a thin binding at the feature root that calls a parametrized controller
+(`useTransferOwnershipController(props)`) and renders its view.
 
 ## Routing (`src/app/router.tsx`)
 

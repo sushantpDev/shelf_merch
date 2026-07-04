@@ -1,5 +1,4 @@
 import { Truck } from "lucide-react";
-import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -8,15 +7,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { inr } from "@/components/platform/platform-ui";
-import type { UiOrder } from "@/services/mappers";
+import type { UiOrder } from "../model";
 
 type Props = {
   order: UiOrder | null;
   onOpenChange: (open: boolean) => void;
+  onDownloadInvoice: () => void;
+  onTrackShipment: () => void;
 };
 
 /** Read-only order detail (shipment status + items + invoice/tracking actions). */
-export function OrderDetailDialog({ order, onOpenChange }: Props) {
+export function OrderDetailDialogView({
+  order,
+  onOpenChange,
+  onDownloadInvoice,
+  onTrackShipment,
+}: Props) {
   return (
     <Dialog open={order !== null} onOpenChange={onOpenChange}>
       <DialogContent className="sm-modal">
@@ -58,19 +64,11 @@ export function OrderDetailDialog({ order, onOpenChange }: Props) {
             </div>
 
             <div className="row" style={{ marginTop: 18, gap: 10 }}>
-              <button
-                type="button"
-                className="btn btn-ghost btn-block"
-                onClick={() => toast.success("Invoice downloaded")}
-              >
+              <button type="button" className="btn btn-ghost btn-block" onClick={onDownloadInvoice}>
                 Download invoice
               </button>
               {order.track && (
-                <button
-                  type="button"
-                  className="btn btn-dark btn-block"
-                  onClick={() => toast("Opening carrier tracking…")}
-                >
+                <button type="button" className="btn btn-dark btn-block" onClick={onTrackShipment}>
                   Track shipment
                 </button>
               )}

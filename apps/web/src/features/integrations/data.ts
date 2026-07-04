@@ -1,3 +1,6 @@
+import googleChatIcon from "../../../assets/integrations/google-chat.svg";
+import microsoftTeamsIcon from "../../../assets/integrations/microsoft-teams.svg";
+import zapierIcon from "../../../assets/integrations/zapier.png";
 import darwinboxIcon from "../../../assets/integrations/darwinbox.jpg";
 import kekaIcon from "../../../assets/integrations/keka.png";
 import bamboohrIcon from "../../../assets/integrations/bamboohr.svg";
@@ -129,3 +132,54 @@ export function categoryMeta(key: string): { total: number; connected: number } 
   const apps = INTEGRATIONS.filter((i) => i.category === key);
   return { total: apps.length, connected: apps.filter((i) => i.connected).length };
 }
+
+/* ── Tile catalog for the integrations screen ─────────────────────── */
+
+export type Tile = {
+  id: string;
+  name: string;
+  desc?: string;
+  icon?: string;
+  mark?: string;
+  tone?: string;
+  recommended?: boolean;
+};
+
+const app = (id: string) => INTEGRATIONS.find((item) => item.id === id);
+
+export function asTile(item: Integration | Tile): Tile {
+  return {
+    id: item.id,
+    name: item.name,
+    desc: "desc" in item ? item.desc : undefined,
+    icon: "icon" in item ? item.icon : undefined,
+    mark: "mark" in item ? item.mark : undefined,
+    tone: "tone" in item ? item.tone : undefined,
+    recommended: "recommended" in item ? item.recommended : undefined,
+  };
+}
+
+export const COLLABORATION_TOOLS: Tile[] = [
+  app("slack"),
+  { id: "microsoft-teams", name: "Microsoft Teams", icon: microsoftTeamsIcon },
+  { id: "google-chat", name: "Google Chat", icon: googleChatIcon },
+  { id: "zapier", name: "Zapier", icon: zapierIcon },
+  { id: "jostle", name: "Jostle", mark: "J", tone: "#242424" },
+].filter(Boolean) as Tile[];
+
+export const USER_MANAGEMENT_TOOLS: Tile[] = [
+  {
+    id: "hris-connect",
+    name: "Connect HRIS or HRMS software",
+    desc: "Seamlessly integrate your Human Resources Information or Management System.",
+    recommended: true,
+  },
+  app("darwinbox"),
+  app("keka"),
+].filter(Boolean) as Tile[];
+
+export const DISPLAY_TOOLS: Tile[] = [
+  app("google-workspace"),
+  app("razorpay"),
+  app("shiprocket"),
+].filter(Boolean) as Tile[];

@@ -13,10 +13,10 @@ import {
   Shield,
   Headphones,
 } from "lucide-react";
-import heroImage from "../../../assets/auth.png";
+import heroImage from "../../../../assets/auth.png";
 
 const localTrustLogoModules = import.meta.glob<{ default: string }>(
-  "../../../assets/{spotify,notion,webflow,ramp,deel}.{png,svg,jpg,jpeg,webp}",
+  "../../../../assets/{spotify,notion,webflow,ramp,deel}.{png,svg,jpg,jpeg,webp}",
   { eager: true },
 );
 
@@ -44,7 +44,7 @@ const perks = [
 
 function resolveTrustLogoSrc(slug: string, color: string): string {
   for (const ext of ["png", "svg", "jpg", "jpeg", "webp"] as const) {
-    const assetPath = `../../../assets/${slug}.${ext}`;
+    const assetPath = `../../../../assets/${slug}.${ext}`;
     const module = localTrustLogoModules[assetPath];
     if (module) return module.default;
   }

@@ -1,0 +1,149 @@
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { useInvalidateWorkspace, useWorkspace } from "@/hooks/useWorkspace";
+import { useTenantAccess } from "@/hooks/useTenantAccess";
+import {
+  getStoredUser,
+  logout,
+  updateWorkspaceSettingsApi,
+  uploadWorkspaceLogoApi,
+} from "../model";
+import type { WorkspaceOwner } from "../model";
+
+export type SettingsTab = "workspace" | "sso";
+
+const LOGO_ACCEPT = /\.(svg|png|webp|jpe?g)$/i;
+const LOGO_MAX = 5 * 1024 * 1024;
+
+export type SettingsVm = {
+  tab: SettingsTab;
+  onTab: (tab: SettingsTab) => void;
+  onLogout: () => void;
+  // workspace form
+  name: string;
+  slug: string;
+  logoUrl: string;
+  isSaving: boolean;
+  isUploading: boolean;
+  canEditWorkspace: boolean;
+  displayOwner: WorkspaceOwner | undefined;
+  isCurrentOwner: boolean;
+  transferOpen: boolean;
+  onName: (name: string) => void;
+  onSlug: (slug: string) => void;
+  onPickLogo: (file: File) => void;
+  onSave: () => void;
+  onTransferOpenChange: (open: boolean) => void;
+  onChangeCurrency: () => void;
+  // sso section demo actions
+  onSsoLearnMore: () => void;
+  onSsoContact: () => void;
+};
+
+/** Controller for the settings screen: tabs, logout, workspace form, ownership. */
+export function useSettingsController(): SettingsVm {
+  const { data: workspace } = useWorkspace();
+  const invalidateWorkspace = useInvalidateWorkspace();
+  const { canWrite } = useTenantAccess();
+  const canEditWorkspace = canWrite("settings");
+
+  const account = workspace?.account ?? "";
+  const savedLogoUrl = workspace?.logoUrl ?? "";
+  const owner = workspace?.owner;
+  const userId = getStoredUser()?.id;
+  const userPatch = workspace?.userPatch;
+
+  const [tab, setTab] = useState<SettingsTab>("workspace");
+  const [name, setName] = useState(account);
+  const [logoUrl, setLogoUrl] = useState(savedLogoUrl);
+  const [slug, setSlug] = useState(account.toLowerCase());
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+
+  const displayOwner: WorkspaceOwner | undefined =
+    owner ??
+    (userId && userPatch
+      ? { id: userId, name: userPatch.name, email: userPatch.email }
+      : undefined);
+  const isCurrentOwner = Boolean(displayOwner && userId && displayOwner.id === userId);
+
+  // Keep local fields in sync once the workspace snapshot resolves.
+  useEffect(() => {
+    setName(account);
+    setSlug(account.toLowerCase());
+    setLogoUrl(savedLogoUrl);
+  }, [account, savedLogoUrl]);
+
+  async function onPickLogo(file: File) {
+    if (!LOGO_ACCEPT.test(file.name)) {
+      toast.error("Accepted formats: SVG, PNG, WEBP, JPEG, JPG");
+      return;
+    }
+    if (file.size > LOGO_MAX) {
+      toast.error("File must be 5 MB or smaller");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const uploadedLogoUrl = await uploadWorkspaceLogoApi(file);
+      await updateWorkspaceSettingsApi({ logoUrl: uploadedLogoUrl });
+      setLogoUrl(uploadedLogoUrl);
+      await invalidateWorkspace();
+      toast.success("Workspace icon updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not update workspace icon");
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  async function onSave() {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      toast.error("Enter a workspace name");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await updateWorkspaceSettingsApi({ name: trimmedName, logoUrl });
+      setName(trimmedName);
+      await invalidateWorkspace();
+      toast.success("Workspace settings saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save workspace settings");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function onLogout() {
+    await logout().catch(() => {});
+    window.location.href = "/login";
+  }
+
+  return {
+    tab,
+    onTab: setTab,
+    onLogout,
+    name,
+    slug,
+    logoUrl,
+    isSaving,
+    isUploading,
+    canEditWorkspace,
+    displayOwner,
+    isCurrentOwner,
+    transferOpen,
+    onName: setName,
+    onSlug: setSlug,
+    onPickLogo,
+    onSave,
+    onTransferOpenChange: setTransferOpen,
+    onChangeCurrency: () => toast("Change currency"),
+    onSsoLearnMore: () => toast("SSO docs opened"),
+    onSsoContact: () => toast("Support contacted"),
+  };
+}
