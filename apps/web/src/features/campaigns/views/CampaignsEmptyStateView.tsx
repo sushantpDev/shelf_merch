@@ -1,12 +1,14 @@
 import { BarChart3, Box, LayoutGrid, ShieldCheck, Star, Users } from "lucide-react";
-import { useTenantAccess } from "@/hooks/useTenantAccess";
-import megaphoneBox from "../../../assets/megaphone_box.png";
+import megaphoneBox from "../../../../assets/megaphone_box.png";
 
 /** Campaigns page with no campaigns yet: hero + "ways to get started" + "why". */
-export function CampaignsEmptyState({ onSendGift }: { onSendGift: () => void }) {
-  const { canOperateCampaigns } = useTenantAccess();
-  const canSend = canOperateCampaigns();
-
+export function CampaignsEmptyStateView({
+  canSend,
+  onSendGift,
+}: {
+  canSend: boolean;
+  onSendGift: () => void;
+}) {
   return (
     <>
       <div className="page-h">
@@ -50,53 +52,53 @@ export function CampaignsEmptyState({ onSendGift }: { onSendGift: () => void }) 
       </div>
 
       {canSend ? (
-      <div className="camp-ways">
-        <h2 className="camp-section-title">Ways to get started</h2>
-        <div className="camp-ways-grid">
-          <div className="card camp-way-card">
-            <div
-              className="camp-way-icon"
-              style={{ background: "var(--brand-50)", color: "var(--brand)" }}
-            >
-              <LayoutGrid size={20} />
+        <div className="camp-ways">
+          <h2 className="camp-section-title">Ways to get started</h2>
+          <div className="camp-ways-grid">
+            <div className="card camp-way-card">
+              <div
+                className="camp-way-icon"
+                style={{ background: "var(--brand-50)", color: "var(--brand)" }}
+              >
+                <LayoutGrid size={20} />
+              </div>
+              <div className="camp-way-body">
+                <h3>Send a gift</h3>
+                <p>Let recipients choose their own swag from your branded shop.</p>
+                <button type="button" className="camp-way-link" onClick={onSendGift}>
+                  Send points campaign →
+                </button>
+              </div>
             </div>
-            <div className="camp-way-body">
-              <h3>Send a gift</h3>
-              <p>Let recipients choose their own swag from your branded shop.</p>
-              <button type="button" className="camp-way-link" onClick={onSendGift}>
-                Send points campaign →
-              </button>
+            <div className="card camp-way-card">
+              <div
+                className="camp-way-icon"
+                style={{ background: "var(--brand-50)", color: "var(--brand)" }}
+              >
+                <Box size={20} />
+              </div>
+              <div className="camp-way-body">
+                <h3>Send a kit</h3>
+                <p>Ship a curated bundle of branded items to recipients.</p>
+                <button type="button" className="camp-way-link" onClick={onSendGift}>
+                  Send kit campaign →
+                </button>
+              </div>
             </div>
-          </div>
-          <div className="card camp-way-card">
-            <div
-              className="camp-way-icon"
-              style={{ background: "var(--brand-50)", color: "var(--brand)" }}
-            >
-              <Box size={20} />
-            </div>
-            <div className="camp-way-body">
-              <h3>Send a kit</h3>
-              <p>Ship a curated bundle of branded items to recipients.</p>
-              <button type="button" className="camp-way-link" onClick={onSendGift}>
-                Send kit campaign →
-              </button>
-            </div>
-          </div>
-          <div className="card camp-way-card camp-way-light-bg">
-            <div className="camp-way-icon" style={{ background: "#fff", color: "var(--brand)" }}>
-              <Star size={20} />
-            </div>
-            <div className="camp-way-body">
-              <h3>New to campaigns?</h3>
-              <p>Launch, track and optimize your employee gifting in just a few steps.</p>
-              <button type="button" className="camp-way-link" onClick={onSendGift}>
-                View quick guide →
-              </button>
+            <div className="card camp-way-card camp-way-light-bg">
+              <div className="camp-way-icon" style={{ background: "#fff", color: "var(--brand)" }}>
+                <Star size={20} />
+              </div>
+              <div className="camp-way-body">
+                <h3>New to campaigns?</h3>
+                <p>Launch, track and optimize your employee gifting in just a few steps.</p>
+                <button type="button" className="camp-way-link" onClick={onSendGift}>
+                  View quick guide →
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
       ) : null}
 
       <div className="camp-why">

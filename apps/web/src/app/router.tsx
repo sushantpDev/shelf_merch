@@ -56,6 +56,10 @@ const tenantChildren: RouteObject[] = [
         loader: () => (requireTenantArea("swag", "write"), null),
         lazy: page(() => import("@/features/swag/wizard/SwagWizard"), "SwagWizard"),
       },
+      {
+        path: ":collectionId/:pIdx",
+        lazy: page(() => import("@/features/swag/SwagProductPage"), "SwagProductPage"),
+      },
     ],
   },
   {
@@ -98,10 +102,7 @@ const tenantChildren: RouteObject[] = [
       {
         path: "send-points",
         loader: () => (requireTenantArea("campaignOps", "write"), null),
-        lazy: page(
-          () => import("@/features/campaigns/send-points/SendPointsWizard"),
-          "SendPointsWizard",
-        ),
+        lazy: page(() => import("@/features/campaigns/SendPointsPage"), "SendPointsPage"),
       },
     ],
   },

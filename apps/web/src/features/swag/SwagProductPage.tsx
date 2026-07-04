@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { useWorkspace } from "@/hooks/useWorkspace";
@@ -7,7 +7,10 @@ import { AddToShopDialog } from "./AddToShopDialog";
 import { SwagProductDetail } from "./SwagProductDetail";
 
 export function SwagProductPage() {
-  const { collectionId, pIdx: pIdxParam } = useParams({ from: "/app/swag/$collectionId/$pIdx" });
+  const { collectionId, pIdx: pIdxParam } = useParams() as {
+    collectionId: string;
+    pIdx: string;
+  };
   const pIdx = Number.parseInt(pIdxParam, 10);
   const { data: workspace, isLoading, isError, error } = useWorkspace();
   const [addOpen, setAddOpen] = useState(false);

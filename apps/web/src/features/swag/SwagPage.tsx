@@ -17,7 +17,6 @@ import { CollectionBlock } from "./CollectionBlock";
 import { DesignCard } from "./DesignCard";
 import { ProductDetailDialog, type DesignTarget } from "./ProductDetailDialog";
 import { AddToShopDialog, type AddToShopTarget } from "./AddToShopDialog";
-import swagBannerImg from "../../../assets/swag-banner.png";
 import startDesigningImg from "../../../assets/start_designing.png";
 
 type Tab = "All Products" | "Saved Designs" | "Archived";
@@ -98,12 +97,8 @@ export function SwagPage() {
         }
       />
 
-      <div
-        className="swag-hero-banner"
-        style={{ backgroundImage: `url(${swagBannerImg})` }}
-        role="img"
-        aria-label="Build your swag collection"
-      />
+      {/* TODO: assets/swag-banner.png was never committed — add it and restore the backgroundImage here. */}
+      <div className="swag-hero-banner" role="img" aria-label="Build your swag collection" />
 
       <div
         className="row"
@@ -234,6 +229,14 @@ export function SwagPage() {
             collection={col}
             onOpenDesign={(product, pIdx) => setDesign({ collection: col, product, pIdx })}
             onAddToShop={(collection) => setAddTarget({ collection })}
+            onEditDesign={() => navigate("/app/swag/new")}
+            onViewProduct={(product, pIdx) => {
+              if (product.id) {
+                navigate(`/app/catalog/${product.id}`);
+              } else {
+                setDesign({ collection: col, product, pIdx });
+              }
+            }}
           />
         ))
       )}
