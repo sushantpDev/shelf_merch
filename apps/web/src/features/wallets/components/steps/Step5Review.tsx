@@ -1,5 +1,12 @@
 import { inr } from "@/components/platform/platform-ui";
-import { fmtDate, allocationFromPool, isAllocateEditFlow, remainingWalletBalanceForWizard, selectedDepartments, wizardTargetAllocation } from "../../types";
+import {
+  fmtDate,
+  allocationFromPool,
+  isAllocateEditFlow,
+  remainingWalletBalanceForWizard,
+  selectedDepartments,
+  wizardTargetAllocation,
+} from "../../types";
 import { Donut } from "../Donut";
 import type { StepProps } from "./StepProps";
 
@@ -31,7 +38,9 @@ export function Step5Review({ state, dispatch, account }: StepProps & { account:
         </div>
         <div className="card stat">
           <div className="k">{isEdit ? "Adding from wallet" : "Allocated"}</div>
-          <div className="v num">{inr(isEdit ? fromPool : depts.reduce((s, d) => s + wizardTargetAllocation(d), 0))}</div>
+          <div className="v num">
+            {inr(isEdit ? fromPool : depts.reduce((s, d) => s + wizardTargetAllocation(d), 0))}
+          </div>
         </div>
         <div className="card stat">
           <div className="k">Remaining</div>

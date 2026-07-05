@@ -12,7 +12,7 @@ import { inr } from "@/components/platform/platform-ui";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 import { useInvalidateWorkspace } from "@/hooks/useWorkspace";
 import { parseAmt, type WalletUploadFile } from "../types";
-import { useCreateRazorpayOrder, useFundWallet } from "../hooks";
+import { useCreateRazorpayOrder, useFundWallet } from "../model";
 import { DocumentUploadZone } from "./DocumentUploadZone";
 
 const PRESET_AMOUNTS = [10_000, 25_000, 50_000, 1_00_000, 2_00_000];
@@ -352,7 +352,8 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
                 <DialogHeader className="add-funds-header">
                   <DialogTitle>Pay with Razorpay</DialogTitle>
                   <DialogDescription>
-                    You&apos;ll be redirected to Razorpay&apos;s secure checkout to complete payment.
+                    You&apos;ll be redirected to Razorpay&apos;s secure checkout to complete
+                    payment.
                   </DialogDescription>
                 </DialogHeader>
 
@@ -390,7 +391,9 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
               <div className="add-funds-body add-funds-step">
                 <DialogHeader className="add-funds-header">
                   <DialogTitle>Review and confirm</DialogTitle>
-                  <DialogDescription>Check the details before adding funds to your wallet.</DialogDescription>
+                  <DialogDescription>
+                    Check the details before adding funds to your wallet.
+                  </DialogDescription>
                 </DialogHeader>
 
                 <AmountSummary

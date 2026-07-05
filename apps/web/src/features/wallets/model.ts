@@ -10,6 +10,9 @@ import {
 import { useInvalidateWorkspace } from "@/hooks/useWorkspace";
 import { departmentsForSync, type WizardState } from "./types";
 
+// Ui types re-exported here so views/controllers never import services/ directly.
+export type { UiWallet } from "@/services/mappers";
+
 /**
  * Persist the allocate-funds wizard. Updates departments, allocations, and manager invites.
  */

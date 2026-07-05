@@ -55,10 +55,7 @@ export function CardBrandIcons({ cardNumber }: { cardNumber: string }) {
   const brands = detected ? [detected] : ALL_BRANDS;
 
   return (
-    <span
-      className={`add-funds-card-brands${detected ? " detected" : ""}`}
-      aria-hidden="true"
-    >
+    <span className={`add-funds-card-brands${detected ? " detected" : ""}`} aria-hidden="true">
       {brands.map((brand) => (
         <span key={brand} className="add-funds-card-brand" title={BRAND_ASSETS[brand].alt}>
           <CardBrandLogo brand={brand} />

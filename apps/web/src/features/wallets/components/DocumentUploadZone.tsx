@@ -125,7 +125,11 @@ export function DocumentUploadZone({
             <span className="wallet-doc-file-status-dot" />
             Ready for review
           </span>
-          <button type="button" className="wallet-doc-replace" onClick={() => inputRef.current?.click()}>
+          <button
+            type="button"
+            className="wallet-doc-replace"
+            onClick={() => inputRef.current?.click()}
+          >
             Replace file
           </button>
         </div>
@@ -203,24 +207,24 @@ export function DocumentUploadZone({
       </div>
 
       {!isModal && (
-      <div className="wallet-doc-sources">
-        <span className="wallet-doc-sources-label">Cloud</span>
-        {CLOUD_SOURCES.map((src) => {
-          const Icon = src.icon;
-          return (
-            <button
-              key={src.id}
-              type="button"
-              className="wallet-doc-chip wallet-doc-chip--soon"
-              onClick={() => onSourcePick(true)}
-            >
-              <Icon size={14} strokeWidth={2} aria-hidden />
-              {src.label}
-              <span className="wallet-doc-soon-badge">Soon</span>
-            </button>
-          );
-        })}
-      </div>
+        <div className="wallet-doc-sources">
+          <span className="wallet-doc-sources-label">Cloud</span>
+          {CLOUD_SOURCES.map((src) => {
+            const Icon = src.icon;
+            return (
+              <button
+                key={src.id}
+                type="button"
+                className="wallet-doc-chip wallet-doc-chip--soon"
+                onClick={() => onSourcePick(true)}
+              >
+                <Icon size={14} strokeWidth={2} aria-hidden />
+                {src.label}
+                <span className="wallet-doc-soon-badge">Soon</span>
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );

@@ -22,7 +22,7 @@ import {
   wizardCommittedAllocations,
   type WizardState,
 } from "../types";
-import { useCreateWallet, useSyncOrgWizard } from "../hooks";
+import { useCreateWallet, useSyncOrgWizard } from "../model";
 import { Step1Wallet } from "./steps/Step1Wallet";
 import { Step2Departments } from "./steps/Step2Departments";
 import { Step3Allocate } from "./steps/Step3Allocate";
@@ -203,7 +203,9 @@ export function OrgWizard({
       {!isWalletFlow && n === 2 && <Step2Departments state={state} dispatch={dispatch} />}
       {!isWalletFlow && n === 3 && <Step3Allocate state={state} dispatch={dispatch} />}
       {!isWalletFlow && n === 4 && <Step4Managers state={state} dispatch={dispatch} />}
-      {!isWalletFlow && n === 5 && <Step5Review state={state} dispatch={dispatch} account={account} />}
+      {!isWalletFlow && n === 5 && (
+        <Step5Review state={state} dispatch={dispatch} account={account} />
+      )}
 
       <div className="org-foot">
         <span style={{ visibility: isWalletFlow || n === ALLOC_STEP_MIN ? "hidden" : undefined }}>
@@ -283,11 +285,7 @@ export function OrgWizard({
               </div>
             </div>
             <div className="wallet-confirm-actions">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setConfirmOpen(false)}
-              >
+              <button type="button" className="btn btn-ghost" onClick={() => setConfirmOpen(false)}>
                 Not yet
               </button>
               <button type="button" className="btn btn-brand" onClick={handleFinish}>

@@ -220,9 +220,7 @@ export function wizardReducer(state: WizardState, action: WizardState | WizardAc
         return {
           ...state,
           departments: state.departments.map((d) =>
-            String(d.id) === String(action.id)
-              ? { ...d, selected: false, allocated: 0 }
-              : d,
+            String(d.id) === String(action.id) ? { ...d, selected: false, allocated: 0 } : d,
           ),
         };
       }

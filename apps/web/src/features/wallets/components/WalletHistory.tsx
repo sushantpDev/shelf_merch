@@ -1,10 +1,7 @@
 import { Wallet } from "lucide-react";
 import { useQueries } from "@tanstack/react-query";
 import { inr } from "@/components/platform/platform-ui";
-import {
-  fetchWalletTransactionsApi,
-  type WalletTransactionRow,
-} from "@/services/mutations-api";
+import { fetchWalletTransactionsApi, type WalletTransactionRow } from "@/services/mutations-api";
 
 function formatTxnDate(iso?: string): string {
   if (!iso) return "—";
@@ -140,9 +137,8 @@ export function WalletHistory({
   });
   const isLoading = queries.some((q) => q.isLoading);
   const txns = queries.flatMap((q) => q.data ?? []);
-  const rows = (entityMode
-    ? withEntityBudgetBalance(txns, entityIdList)
-    : withAvailableBalance(txns)
+  const rows = (
+    entityMode ? withEntityBudgetBalance(txns, entityIdList) : withAvailableBalance(txns)
   ).sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
   const title = entityMode ? "Budget history" : "Wallet history";
   const balanceColumn = entityMode ? "Remaining budget" : "Unallocated balance";
@@ -151,7 +147,11 @@ export function WalletHistory({
     <div className="card data-list-card wallet-history">
       <div className="data-list-title">{title}</div>
 
-      {isLoading && <p className="muted" style={{ fontSize: 13 }}>Loading transactions…</p>}
+      {isLoading && (
+        <p className="muted" style={{ fontSize: 13 }}>
+          Loading transactions…
+        </p>
+      )}
 
       {!isLoading && rows.length === 0 && (
         <div className="data-list-empty">
@@ -182,21 +182,21 @@ export function WalletHistory({
             {rows.map((t) => {
               const amount = entityMode ? entityTxnAmountDisplay(t) : txnAmountDisplay(t);
               return (
-              <tr key={t._id ?? `${t.createdAt}-${t.amount}`}>
-                <td className="muted data-list-cell">{formatTxnDate(t.createdAt)}</td>
-                <td className="data-list-cell">{t.description || "—"}</td>
-                <td className="muted data-list-cell">{txnLabel(t.type, t.amount)}</td>
-                <td
-                  className="num data-list-cell data-list-amount"
-                  style={{ color: amount.color }}
-                >
-                  {amount.text}
-                </td>
-                <td className="num muted data-list-cell">
-                  {t.availableAfter != null ? inr(t.availableAfter) : "—"}
-                </td>
-              </tr>
-            );
+                <tr key={t._id ?? `${t.createdAt}-${t.amount}`}>
+                  <td className="muted data-list-cell">{formatTxnDate(t.createdAt)}</td>
+                  <td className="data-list-cell">{t.description || "—"}</td>
+                  <td className="muted data-list-cell">{txnLabel(t.type, t.amount)}</td>
+                  <td
+                    className="num data-list-cell data-list-amount"
+                    style={{ color: amount.color }}
+                  >
+                    {amount.text}
+                  </td>
+                  <td className="num muted data-list-cell">
+                    {t.availableAfter != null ? inr(t.availableAfter) : "—"}
+                  </td>
+                </tr>
+              );
             })}
           </tbody>
         </table>

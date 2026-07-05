@@ -123,12 +123,14 @@ export function Step2Departments({ state, dispatch }: StepProps) {
                     </td>
                     <td>
                       <div className="dept-picker-name">
-                        <span className="dept-dot dept-dot--lg" style={{ background: color }} aria-hidden />
+                        <span
+                          className="dept-dot dept-dot--lg"
+                          style={{ background: color }}
+                          aria-hidden
+                        />
                         <div className="dept-picker-name__text">
                           <span className="dept-picker-title">{d.name}</span>
-                          {d.desc ? (
-                            <span className="dept-picker-sub">{d.desc}</span>
-                          ) : null}
+                          {d.desc ? <span className="dept-picker-sub">{d.desc}</span> : null}
                         </div>
                       </div>
                     </td>

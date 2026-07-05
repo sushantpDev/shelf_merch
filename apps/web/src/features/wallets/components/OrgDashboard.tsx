@@ -3,7 +3,13 @@ import { Plus, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { inr } from "@/components/platform/platform-ui";
 import { PageHeader } from "@/components/tenant/PageHeader";
-import { fmtDate, deptPaletteColor, remainingWalletBalance, totalAllocatedAmount, type OrgSnapshot } from "../types";
+import {
+  fmtDate,
+  deptPaletteColor,
+  remainingWalletBalance,
+  totalAllocatedAmount,
+  type OrgSnapshot,
+} from "../types";
 import { AddFundsDialog } from "./AddFundsDialog";
 import { Donut } from "./Donut";
 import { WalletHistory } from "./WalletHistory";
@@ -131,8 +137,8 @@ export function OrgDashboard({
         <div className="banner" style={{ marginBottom: 18 }}>
           <Wallet size={16} aria-hidden="true" />
           <div>
-            <b>Wallet funded — allocation not finished.</b> Split your balance across departments and
-            assign managers.{" "}
+            <b>Wallet funded — allocation not finished.</b> Split your balance across departments
+            and assign managers.{" "}
             <span className="lnk" role="button" tabIndex={0} onClick={handleAllocateClick}>
               Allocate funds
             </span>
@@ -269,7 +275,12 @@ export function OrgDashboard({
                     <span className="row" style={{ gap: 6, alignItems: "center" }}>
                       <span
                         className="lc"
-                        style={{ width: 9, height: 9, borderRadius: 3, background: deptPaletteColor(i) }}
+                        style={{
+                          width: 9,
+                          height: 9,
+                          borderRadius: 3,
+                          background: deptPaletteColor(i),
+                        }}
                       />
                       {d.name}
                     </span>
@@ -290,7 +301,10 @@ export function OrgDashboard({
             <div className="v num">
               {managersActive} / {depts.length || "—"}
               {managersPending > 0 ? (
-                <span className="mut3" style={{ display: "block", fontSize: 11, fontWeight: 500, marginTop: 2 }}>
+                <span
+                  className="mut3"
+                  style={{ display: "block", fontSize: 11, fontWeight: 500, marginTop: 2 }}
+                >
                   {managersPending} invite{managersPending === 1 ? "" : "s"} pending
                 </span>
               ) : null}
@@ -335,7 +349,12 @@ export function OrgDashboard({
                     <div className="row" style={{ gap: 9, alignItems: "center" }}>
                       <span
                         className="lc"
-                        style={{ width: 11, height: 11, borderRadius: 3, background: deptPaletteColor(i) }}
+                        style={{
+                          width: 11,
+                          height: 11,
+                          borderRadius: 3,
+                          background: deptPaletteColor(i),
+                        }}
                       />
                       <span style={{ fontWeight: 600 }}>{d.name}</span>
                     </div>

@@ -202,8 +202,7 @@ export function OrgDoneScreen({
                 <div className="wallet-done-next__k">Recommended next step</div>
                 <div className="wallet-done-next__title">Create your company store</div>
                 <p className="wallet-done-next__body">
-                  Set up a storefront so departments can send kits, points, and gifts to
-                  recipients.
+                  Set up a storefront so departments can send kits, points, and gifts to recipients.
                 </p>
               </div>
             </div>

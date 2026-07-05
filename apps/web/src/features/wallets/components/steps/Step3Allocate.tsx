@@ -173,14 +173,20 @@ export function Step3Allocate({ state, dispatch }: StepProps) {
                       <input
                         className="alloc-money-input"
                         inputMode="numeric"
-                        aria-label={isEdit ? `Additional allocation for ${d.name}` : `Allocation for ${d.name}`}
+                        aria-label={
+                          isEdit
+                            ? `Additional allocation for ${d.name}`
+                            : `Allocation for ${d.name}`
+                        }
                         value={amtInput(d.allocated)}
                         onChange={(e) =>
                           dispatch({ type: "setAlloc", id: d.id, amount: parseAmt(e.target.value) })
                         }
                       />
                     </div>
-                    <span className={`alloc-pct${d.allocated > 0 ? " alloc-pct--on" : ""}`}>{pct}</span>
+                    <span className={`alloc-pct${d.allocated > 0 ? " alloc-pct--on" : ""}`}>
+                      {pct}
+                    </span>
                   </div>
                 </div>
               );
@@ -189,7 +195,9 @@ export function Step3Allocate({ state, dispatch }: StepProps) {
         )}
 
         <div className={`alloc-total${over ? " alloc-total--over" : ""}`}>
-          <span className="alloc-total-label">{isEdit ? "Adding from wallet" : "Total allocated"}</span>
+          <span className="alloc-total-label">
+            {isEdit ? "Adding from wallet" : "Total allocated"}
+          </span>
           <span className="alloc-total-amt num">{inr(isEdit ? fromPool : deptTotal)}</span>
           <span className="alloc-total-pct">
             {pctOfWalletTotal(isEdit ? fromPool : deptTotal, isEdit ? unallocatedStart : total)}
