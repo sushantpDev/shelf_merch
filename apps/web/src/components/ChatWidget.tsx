@@ -489,6 +489,7 @@ export function ChatWidget() {
   const isPublicRoute =
     location.pathname.startsWith("/redeem/") ||
     location.pathname.startsWith("/shop/") ||
+    location.pathname.startsWith("/s/") ||
     location.pathname.startsWith("/accept-invite");
   const [fullscreenFlow, setFullscreenFlow] = useState(false);
 

@@ -9,6 +9,7 @@ import { idempotency } from '../../middleware/idempotency.middleware.js';
 import * as controller from './wallets.controller.js';
 import {
   createWalletSchema,
+  setupWalletSchema,
   updateWalletSchema,
   fundWalletSchema,
   allocateSchema,
@@ -27,8 +28,16 @@ const canRead = tenantArea('wallets', 'read');
 
 router.get('/', canRead, asyncHandler(controller.list));
 router.post('/', canWrite, validate({ body: createWalletSchema }), asyncHandler(controller.create));
+router.post(
+  '/setup',
+  canWrite,
+  upload.single('document'),
+  validate({ body: setupWalletSchema }),
+  asyncHandler(controller.setup),
+);
 router.get('/:id', canRead, validate({ params: walletIdParams }), asyncHandler(controller.getOne));
 router.patch('/:id', canWrite, validate({ params: walletIdParams, body: updateWalletSchema }), asyncHandler(controller.update));
+router.delete('/:id', canWrite, validate({ params: walletIdParams }), asyncHandler(controller.remove));
 router.post(
   '/:id/funding-document',
   canWrite,

@@ -1,7 +1,11 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { launchPointsCampaignFlow } from "@/services/api-bridge";
 import { useInvalidateWorkspace, WORKSPACE_QUERY_KEY } from "@/hooks/useWorkspace";
-import { deleteCampaignApi, savePointsCampaignDraftApi } from "@/services/mutations-api";
+import {
+  deleteCampaignApi,
+  fetchCampaignReportApi,
+  savePointsCampaignDraftApi,
+} from "@/services/mutations-api";
 import type { WorkspaceSnapshot } from "@/services/workspace-api";
 import type { UiCampaign } from "@/services/mappers";
 
@@ -43,6 +47,14 @@ export function useDeleteCampaign() {
         refetchType: "active",
       });
     },
+  });
+}
+
+export function useCampaignRecipients(campaignId: string | null) {
+  return useQuery({
+    queryKey: ["campaign-recipients", campaignId],
+    queryFn: () => fetchCampaignReportApi(campaignId!),
+    enabled: Boolean(campaignId),
   });
 }
 

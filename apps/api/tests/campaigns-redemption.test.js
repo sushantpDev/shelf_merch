@@ -409,6 +409,81 @@ describe('redemption portal (§11.1)', () => {
     expect(updated.redemptionStatus).toBe('order_created');
   });
 
+  it('aggregates open point credits across multiple sends to the same employee', async () => {
+    const tokenA = 'aggregatePointsTokenCampaignA123456!';
+    const tokenB = 'aggregatePointsTokenCampaignB123456!';
+
+    const campaignA = await Campaign.create({
+      tenantId: tenant._id,
+      entityId: entity._id,
+      name: 'First Points Send',
+      type: 'points',
+      shopId: shop._id,
+      status: 'redemption_open',
+      creditsPerRecipient: 2500,
+    });
+    const campaignB = await Campaign.create({
+      tenantId: tenant._id,
+      entityId: entity._id,
+      name: 'Second Points Send',
+      type: 'points',
+      shopId: shop._id,
+      status: 'redemption_open',
+      creditsPerRecipient: 100,
+    });
+
+    await Recipient.create({
+      tenantId: tenant._id,
+      campaignId: campaignA._id,
+      name: 'Sushant',
+      email: 'sushant@test.io',
+      creditAmount: 2500,
+      redemptionToken: tokenA,
+      redemptionStatus: 'verified',
+      invitedAt: new Date('2026-07-05'),
+    });
+    await Recipient.create({
+      tenantId: tenant._id,
+      campaignId: campaignB._id,
+      name: 'Sushant',
+      email: 'sushant@test.io',
+      creditAmount: 100,
+      redemptionToken: tokenB,
+      redemptionStatus: 'verified',
+      invitedAt: new Date('2026-07-06'),
+    });
+
+    const portalA = await request(app).get(`/api/v1/redemptions/${tokenA}`);
+    expect(portalA.status).toBe(200);
+    expect(portalA.body.recipient.creditAmount).toBe(2600);
+
+    const portalB = await request(app).get(`/api/v1/redemptions/${tokenB}`);
+    expect(portalB.status).toBe(200);
+    expect(portalB.body.recipient.creditAmount).toBe(2600);
+
+    const campaignC = await Campaign.create({
+      tenantId: tenant._id,
+      entityId: entity._id,
+      name: 'Unopened send',
+      type: 'points',
+      shopId: shop._id,
+      status: 'redemption_open',
+      creditsPerRecipient: 100,
+    });
+    await Recipient.create({
+      tenantId: tenant._id,
+      campaignId: campaignC._id,
+      name: 'Sushant',
+      email: 'sushant@test.io',
+      creditAmount: 100,
+      redemptionToken: 'unopenedPointsTokenCampaignC12!',
+      redemptionStatus: 'invited',
+    });
+
+    const portalAfterUnopened = await request(app).get(`/api/v1/redemptions/${tokenA}`);
+    expect(portalAfterUnopened.body.recipient.creditAmount).toBe(2600);
+  });
+
   it('store order item image is the baked design mockup, not the bare mask', async () => {
     await Collection.create({
       tenantId: tenant._id,

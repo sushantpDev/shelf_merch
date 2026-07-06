@@ -32,10 +32,11 @@ type OrgWizardState = {
 
 function walletIdFromResponse(wallet: Record<string, unknown>): string {
   const id = wallet._id ?? wallet.id;
-  if (!id || !MONGO_ID.test(String(id))) {
+  const normalized = normalizeMongoId(id);
+  if (!normalized || !MONGO_ID.test(normalized)) {
     throw new Error("Wallet create response missing a valid id");
   }
-  return String(id);
+  return normalized;
 }
 
 function normalizeMongoId(value: unknown): string {
@@ -80,16 +81,7 @@ async function ensureWalletFunded(
     return;
   }
 
-  if (Number(existing.balance ?? 0) === 0) {
-    await apiFetch(`/wallets/${walletId}/fund`, {
-      method: "POST",
-      idempotencyKey: `fund-${walletId}-setup`,
-      body: JSON.stringify({
-        amount,
-        description: "Organization wallet setup funding",
-      }),
-    });
-  }
+  // Online funding uses Razorpay checkout — not POST /fund.
 }
 
 async function tryResolveExistingWalletId(id: string): Promise<string | null> {
@@ -112,33 +104,59 @@ export async function uploadWalletFundingDocumentApi(walletId: string, file: Fil
   });
 }
 
-async function createWalletAndFund(org: OrgWizardState): Promise<string> {
-  const wallet = await apiFetch<Record<string, unknown>>("/wallets", {
-    method: "POST",
-    body: JSON.stringify({
-      name: org.wallet.name,
-      currency: "INR",
-      validFrom: org.wallet.start || null,
-      validTo: org.wallet.end || null,
-      fundingMethod: org.wallet.funding === "pay" ? "online" : "po_upload",
-      fundingDocument: {
-        docType: org.wallet.docType || "",
-        docNumber: org.wallet.docNumber || "",
-      },
-    }),
-  });
-  const walletId = walletIdFromResponse(wallet);
-  const fundingMethod = org.wallet.funding === "pay" ? "online" : "po_upload";
+async function rollbackIncompleteWallet(walletId: string): Promise<void> {
   try {
-    if (fundingMethod === "po_upload" && org.wallet.uploadFile?.file) {
-      await uploadWalletFundingDocumentApi(walletId, org.wallet.uploadFile.file);
-    }
-    await ensureWalletFunded(walletId, org.wallet.amount, fundingMethod);
-  } catch (err) {
-    await apiFetch(`/wallets/${walletId}`);
-    return walletId;
+    await apiFetch(`/wallets/${walletId}`, { method: "DELETE" });
+  } catch {
+    // Best-effort cleanup; the original error is still thrown to the caller.
   }
-  return walletId;
+}
+
+async function cleanupOrphanDraftByName(name: string): Promise<void> {
+  const nameKey = name.trim().toLowerCase();
+  if (!nameKey) return;
+  try {
+    const wallets = await apiFetch<Array<Record<string, unknown>>>("/wallets");
+    for (const row of wallets) {
+      const rowName = String(row.name ?? "").trim().toLowerCase();
+      const status = String(row.status ?? "draft");
+      const approval = (row.fundingDocument as { approvalStatus?: string } | undefined)
+        ?.approvalStatus;
+      if (rowName !== nameKey || status !== "draft" || approval === "pending") continue;
+      const id = normalizeMongoId(row._id ?? row.id);
+      if (MONGO_ID.test(id)) await rollbackIncompleteWallet(id);
+    }
+  } catch {
+    // Best-effort only.
+  }
+}
+
+async function createWalletAndFund(org: OrgWizardState): Promise<string> {
+  const fundingMethod = org.wallet.funding === "pay" ? "online" : "po_upload";
+  const form = new FormData();
+  form.append("name", org.wallet.name);
+  form.append("currency", "INR");
+  if (org.wallet.start) form.append("validFrom", org.wallet.start);
+  if (org.wallet.end) form.append("validTo", org.wallet.end);
+  form.append("fundingMethod", fundingMethod);
+  form.append("docType", org.wallet.docType || "");
+  form.append("docNumber", org.wallet.docNumber || "");
+  form.append("amount", String(org.wallet.amount));
+  if (fundingMethod === "po_upload" && org.wallet.uploadFile?.file) {
+    form.append("document", org.wallet.uploadFile.file);
+  }
+
+  try {
+    const wallet = await apiFetch<Record<string, unknown>>("/wallets/setup", {
+      method: "POST",
+      body: form,
+    });
+    const walletId = walletIdFromResponse(wallet);
+    return walletId;
+  } catch (err) {
+    await cleanupOrphanDraftByName(org.wallet.name);
+    throw err;
+  }
 }
 
 /** Step 1 only — create wallet, upload PO, submit funding request for finance review. */
@@ -481,6 +499,18 @@ export async function savePointsCampaignDraftApi(payload: {
 
 export async function deleteCampaignApi(campaignId: string) {
   return apiFetch<{ ok: boolean }>(`/campaigns/${campaignId}`, { method: "DELETE" });
+}
+
+export type CampaignRecipientRow = {
+  _id?: string;
+  name: string;
+  email: string;
+  creditAmount?: number;
+  redemptionStatus?: string;
+};
+
+export async function fetchCampaignReportApi(campaignId: string) {
+  return apiFetch<{ recipients: CampaignRecipientRow[] }>(`/campaigns/${campaignId}/report`);
 }
 
 export async function launchPointsCampaignApi(payload: {

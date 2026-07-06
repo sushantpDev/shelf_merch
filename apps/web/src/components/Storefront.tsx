@@ -4,5 +4,5 @@ import "@/styles/shelf-merch.css";
 
 export default function Storefront({ shopId }: { shopId: string }) {
   const vm = useStorefrontController(shopId);
-  return <StorefrontView {...vm} />;
+  return <StorefrontView {...vm} shopId={shopId} />;
 }

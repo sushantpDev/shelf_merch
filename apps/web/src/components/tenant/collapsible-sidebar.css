@@ -35,7 +35,7 @@
   top: 0;
   left: 100%;
   margin-left: -1px;
-  z-index: 1001;
+  z-index: 30;
   width: 22px;
   height: 40px;
   border-radius: 0 0 8px 0;
@@ -162,7 +162,7 @@
   line-height: 1.2;
   white-space: nowrap;
   pointer-events: none;
-  z-index: 1000;
+  z-index: 30;
   box-shadow: 0 1px 4px rgba(14, 30, 22, 0.08);
 }
 
@@ -203,7 +203,11 @@
   }
 }
 
-/* Full-screen wizards (send points, kit send, swag editor, etc.) — hide sidebar + toggle together */
+/* Modals, drawers, and full-screen flows sit above the sidebar rail (z-50+). */
+body:has(.fixed.inset-0.z-50[data-state="open"]) .sidebar-rail__toggle,
+body:has(.fixed.inset-0.z-50[data-state="open"]) .sidebar-rail__flyout,
+body:has(.scrim) .sidebar-rail__toggle,
+body:has(.drawer-scrim) .sidebar-rail__toggle,
 body:has(.sm-fullscreen) .sidebar-mount,
 body:has(.sm-fullscreen) .sidebar-rail__toggle,
 body:has(.sm-fullscreen) .sidebar-rail__flyout {

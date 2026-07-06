@@ -5,6 +5,8 @@ import { softDeletePlugin } from '../../plugins/softDelete.plugin.js';
 const shopSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
+    /** Public vanity URL — globally unique (e.g. salesforce → salesforce.store). */
+    slug: { type: String, trim: true, lowercase: true },
     currencyMode: { type: String, enum: ['points', 'inr', 'priceless'], default: 'points' },
     pointsConversionEnabled: { type: Boolean, default: false },
     logoUrl: { type: String, default: '' },
@@ -20,5 +22,9 @@ const shopSchema = new mongoose.Schema(
 shopSchema.plugin(tenantScopePlugin);
 shopSchema.plugin(softDeletePlugin);
 shopSchema.index({ tenantId: 1, status: 1 });
+shopSchema.index({ slug: 1 }, {
+  unique: true,
+  partialFilterExpression: { slug: { $type: 'string', $gt: '' } },
+});
 
 export const Shop = mongoose.model('Shop', shopSchema);

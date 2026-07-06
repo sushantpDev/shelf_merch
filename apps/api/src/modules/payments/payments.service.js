@@ -60,6 +60,99 @@ export async function createRazorpayOrder({ tenantId, userId, walletId, amountIn
   };
 }
 
+export function verifyCheckoutSignature(orderId, paymentId, signature) {
+  if (!env.RAZORPAY_KEY_SECRET) {
+    throw new ApiError(503, 'Razorpay is not configured', 'RAZORPAY_NOT_CONFIGURED');
+  }
+  const expected = crypto
+    .createHmac('sha256', env.RAZORPAY_KEY_SECRET)
+    .update(`${orderId}|${paymentId}`)
+    .digest('hex');
+  if (expected !== signature) {
+    throw new ApiError(400, 'Invalid Razorpay payment signature', 'INVALID_PAYMENT_SIGNATURE');
+  }
+}
+
+/** Razorpay order for redemption checkout (points + UPI top-up). */
+export async function createCampaignCheckoutOrder({ tenantId, recipientId, amountInr }) {
+  if (amountInr < 1) throw new ApiError(422, 'Amount must be at least ₹1', 'INVALID_AMOUNT');
+
+  const amountPaise = Math.round(amountInr * 100);
+  const receipt = `redeem_${recipientId}_${Date.now()}`;
+
+  const razorpay = getRazorpay();
+  const order = await razorpay.orders.create({
+    amount: amountPaise,
+    currency: 'INR',
+    receipt,
+    notes: {
+      tenantId: String(tenantId),
+      recipientId: String(recipientId),
+      purpose: 'redemption_checkout',
+    },
+  });
+
+  const payment = await Payment.create({
+    tenantId,
+    relatedType: 'campaign_checkout',
+    relatedId: recipientId,
+    provider: 'razorpay',
+    providerRefId: order.id,
+    amount: amountInr,
+    status: 'pending',
+  });
+
+  return {
+    orderId: order.id,
+    amount: amountInr,
+    amountPaise,
+    currency: 'INR',
+    keyId: env.RAZORPAY_KEY_ID,
+    paymentId: String(payment._id),
+  };
+}
+
+/** Verify a captured Razorpay payment for redemption checkout. */
+export async function verifyCampaignCheckoutPayment({
+  tenantId,
+  recipientId,
+  expectedAmountInr,
+  razorpayPayment,
+}) {
+  const { orderId, paymentId, signature } = razorpayPayment;
+  verifyCheckoutSignature(orderId, paymentId, signature);
+
+  const payment = await Payment.findOne({
+    tenantId,
+    relatedType: 'campaign_checkout',
+    relatedId: recipientId,
+    providerRefId: orderId,
+    status: 'pending',
+  }).setOptions({ skipTenantGuard: true });
+
+  if (!payment) throw new NotFoundError('Payment not found');
+  if (Math.abs(payment.amount - expectedAmountInr) > 0.01) {
+    throw new ApiError(422, 'Payment amount does not match order balance', 'PAYMENT_AMOUNT_MISMATCH');
+  }
+
+  const razorpay = getRazorpay();
+  const rzPayment = await razorpay.payments.fetch(paymentId);
+  if (rzPayment.status !== 'captured') {
+    throw new ApiError(422, 'Payment was not captured', 'PAYMENT_NOT_CAPTURED');
+  }
+  if (rzPayment.order_id !== orderId) {
+    throw new ApiError(422, 'Payment order mismatch', 'PAYMENT_ORDER_MISMATCH');
+  }
+  if (rzPayment.amount !== Math.round(expectedAmountInr * 100)) {
+    throw new ApiError(422, 'Payment amount does not match order balance', 'PAYMENT_AMOUNT_MISMATCH');
+  }
+
+  payment.providerRefId = paymentId;
+  payment.status = 'succeeded';
+  await payment.save();
+  return payment;
+}
+
 export function verifyWebhookSignature(rawBody, signature) {
   if (!env.RAZORPAY_WEBHOOK_SECRET) {
     throw new ApiError(503, 'Webhook secret not configured', 'RAZORPAY_NOT_CONFIGURED');

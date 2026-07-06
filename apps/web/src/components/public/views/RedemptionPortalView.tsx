@@ -63,8 +63,14 @@ export function RedemptionPortalView(vm: RedemptionVm) {
         currency={vm.portal.campaign.shop?.currencyMode || "points"}
         creditInr={vm.portal.recipient.creditAmount}
         recipientName={vm.portal.recipient.name}
+        recipientEmail={vm.portal.recipient.email}
         welcome={vm.portal.campaign.message?.body}
         onCheckout={vm.onCheckout}
+        onLogout={vm.onLogout}
+        onFetchOrders={vm.onFetchOrders}
+        redemptionToken={vm.token}
+        sessionToken={vm.sessionToken}
+        cartPersistId={vm.token}
       />
     );
   }

@@ -3,6 +3,12 @@ import { objectId } from '../users/users.validation.js';
 
 export const createShopSchema = z.object({
   name: z.string().min(1),
+  slug: z
+    .string()
+    .min(2)
+    .max(48)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use lowercase letters, numbers, and hyphens')
+    .optional(),
   currencyMode: z.enum(['points', 'inr', 'priceless']).optional().default('points'),
   pointsConversionEnabled: z.boolean().optional().default(false),
   logoUrl: z.string().optional().default(''),
@@ -13,6 +19,12 @@ export const createShopSchema = z.object({
 export const updateShopSchema = z
   .object({
     name: z.string().min(1),
+    slug: z
+      .string()
+      .min(2)
+      .max(48)
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use lowercase letters, numbers, and hyphens')
+      .optional(),
     currencyMode: z.enum(['points', 'inr', 'priceless']),
     pointsConversionEnabled: z.boolean(),
     logoUrl: z.string(),

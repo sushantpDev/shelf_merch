@@ -20,11 +20,16 @@ import { computeAmountBreakdown } from '../../services/pricing.service.js';
 import { env } from '../../config/env.js';
 import { sendOtpSms } from '../../services/msg91.service.js';
 import { sendOtpEmail } from '../../services/email.service.js';
+import {
+  createCampaignCheckoutOrder,
+  verifyCampaignCheckoutPayment,
+} from '../payments/payments.service.js';
 import { ApiError, NotFoundError } from '../../utils/errors.js';
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL = '30m';
 const sha256 = (v) => crypto.createHash('sha256').update(v).digest('hex');
+const POOLED_REDEMPTION_STATUSES = ['opened', 'verified'];
 
 function isKitFulfillment(campaign) {
   return ['kit', 'items'].includes(campaign.type) && !!campaign.kitId;
@@ -100,22 +105,136 @@ async function loadCampaignContext(recipient) {
   return { campaign, shop };
 }
 
-export async function getRedemptionPortal(token) {
-  const recipient = await findRecipientByToken(token);
-
-  if (['redeemed', 'order_created'].includes(recipient.redemptionStatus)) {
-    const order = await Order.findOne({ recipientId: recipient._id, tenantId: recipient.tenantId });
-    throw new ApiError(409, 'Already redeemed', 'ALREADY_REDEEMED', {
-      orderNumber: order?.orderNumber,
-      trackUrl: order ? `/api/v1/redemptions/${token}/track` : null,
-    });
+/** Points sends to the same employee accumulate — sum open credits per shop (or tenant-wide for stadium). */
+async function findActivePointsRecipients({ tenantId, email, shopId, pointsScope = 'shop' }) {
+  const campaignFilter = {
+    tenantId,
+    type: 'points',
+    status: { $in: ['launched', 'redemption_open'] },
+  };
+  if (pointsScope === 'shop' && shopId) {
+    campaignFilter.shopId = shopId;
   }
 
+  const campaigns = await Campaign.find(campaignFilter).select('_id');
+  if (!campaigns.length) return [];
+
+  return Recipient.find({
+    tenantId,
+    campaignId: { $in: campaigns.map((c) => c._id) },
+    email: email.toLowerCase(),
+    creditAmount: { $gt: 0 },
+    redemptionStatus: { $in: POOLED_REDEMPTION_STATUSES },
+  })
+    .sort({ invitedAt: 1, createdAt: 1 })
+    .setOptions({ skipTenantGuard: true });
+}
+
+async function aggregatedPointsCredit({ tenantId, email, shopId, pointsScope = 'shop' }) {
+  const rows = await findActivePointsRecipients({ tenantId, email, shopId, pointsScope });
+  return rows.reduce((sum, r) => sum + Number(r.creditAmount || 0), 0);
+}
+
+async function resolveRecipientCreditAmount(recipient, campaign) {
+  if (campaign.type !== 'points') return recipient.creditAmount;
+  const scope = campaign.pointsScope ?? 'shop';
+  if (scope === 'stadium') {
+    return aggregatedPointsCredit({
+      tenantId: recipient.tenantId,
+      email: recipient.email,
+      pointsScope: 'stadium',
+    });
+  }
+  if (campaign.shopId) {
+    return aggregatedPointsCredit({
+      tenantId: recipient.tenantId,
+      email: recipient.email,
+      shopId: campaign.shopId,
+      pointsScope: 'shop',
+    });
+  }
+  return recipient.creditAmount;
+}
+
+/** Debit a checkout total across the employee's open point credits (oldest send first). */
+async function debitPointsCreditPool({
+  tenantId,
+  email,
+  shopId,
+  pointsScope,
+  spendAmount,
+  allowPartial = false,
+}) {
+  const recipients = await findActivePointsRecipients({ tenantId, email, shopId, pointsScope });
+  const available = recipients.reduce((sum, r) => sum + Number(r.creditAmount || 0), 0);
+  const targetDebit = allowPartial ? Math.min(spendAmount, available) : spendAmount;
+
+  if (!allowPartial && spendAmount > available) {
+    throw new ApiError(
+      422,
+      `Order total ₹${spendAmount} exceeds your available credit of ₹${available}`,
+      'CREDIT_EXCEEDED',
+    );
+  }
+  if (targetDebit <= 0) {
+    return { debited: 0, remainingDue: spendAmount };
+  }
+
+  let remaining = targetDebit;
+  for (const row of recipients) {
+    if (remaining <= 0) break;
+    const debit = Math.min(Number(row.creditAmount || 0), remaining);
+    row.creditAmount = Number(row.creditAmount || 0) - debit;
+    remaining -= debit;
+
+    if (row.creditAmount <= 0) {
+      if (row.redemptionStatus === 'verified') {
+        transitionRedemption(row, 'redeemed');
+        transitionRedemption(row, 'order_created');
+      } else if (!['redeemed', 'order_created'].includes(row.redemptionStatus)) {
+        transitionRedemption(row, 'redeemed');
+        transitionRedemption(row, 'order_created');
+      }
+    }
+    await row.save();
+  }
+
+  return { debited: targetDebit, remainingDue: Math.max(0, spendAmount - targetDebit) };
+}
+
+export async function createRedemptionRazorpayOrder(token, { amountInr }) {
+  const recipient = await Recipient.findOne({ redemptionToken: token }).setOptions({ skipTenantGuard: true });
+  if (!recipient) throw new NotFoundError('Invalid redemption link');
+  if (recipient.redemptionStatus !== 'verified') {
+    throw new ApiError(403, 'Verify OTP before paying', 'NOT_VERIFIED');
+  }
+  return createCampaignCheckoutOrder({
+    tenantId: recipient.tenantId,
+    recipientId: recipient._id,
+    amountInr,
+  });
+}
+
+export async function getRedemptionPortal(token) {
+  const recipient = await findRecipientByToken(token);
   const { campaign, shop } = await loadCampaignContext(recipient);
 
   if (recipient.redemptionStatus === 'invited') {
     transitionRedemption(recipient, 'opened');
     await recipient.save();
+  }
+
+  const availableCredit = await resolveRecipientCreditAmount(recipient, campaign);
+
+  if (
+    availableCredit <= 0 &&
+    ['redeemed', 'order_created'].includes(recipient.redemptionStatus)
+  ) {
+    const order = await Order.findOne({ recipientId: recipient._id, tenantId: recipient.tenantId });
+    throw new ApiError(409, 'Already redeemed', 'ALREADY_REDEEMED', {
+      orderNumber: order?.orderNumber,
+      trackUrl: order ? `/api/v1/redemptions/${token}/track` : null,
+    });
   }
 
   const shopPayload = shop
@@ -140,13 +259,13 @@ export async function getRedemptionPortal(token) {
       alreadyVerified: true,
       sessionToken: signRedemptionSession(recipient),
       campaign: campaignPayload,
-      recipient: { name: recipient.name, creditAmount: recipient.creditAmount },
+      recipient: { name: recipient.name, email: recipient.email, creditAmount: availableCredit },
     };
   }
 
   return {
     campaign: campaignPayload,
-    recipient: { name: recipient.name, creditAmount: recipient.creditAmount },
+    recipient: { name: recipient.name, email: recipient.email, creditAmount: availableCredit },
   };
 }
 
@@ -534,7 +653,10 @@ export async function createSingleLocationOrderForCampaign({ tenantId, campaign 
 }
 
 /** §7.9 /submit — idempotent order creation from redemption. */
-export async function submitRedemption(token, { items, shippingAddress }) {
+export async function submitRedemption(
+  token,
+  { items, shippingAddress, paymentMode = 'points', razorpayPayment },
+) {
   const recipient = await Recipient.findOne({ redemptionToken: token }).setOptions({ skipTenantGuard: true });
   if (!recipient) throw new NotFoundError('Invalid redemption link');
   const { campaign } = await loadCampaignContext(recipient);
@@ -629,12 +751,54 @@ export async function submitRedemption(token, { items, shippingAddress }) {
   }
 
   const breakdown = computeAmountBreakdown(lineItems);
-  if (!kitFulfillment && breakdown.total > recipient.creditAmount) {
-    throw new ApiError(
-      422,
-      `Order total ₹${breakdown.total} exceeds your credit of ₹${recipient.creditAmount}`,
-      'CREDIT_EXCEEDED',
-    );
+  if (!kitFulfillment) {
+    if (campaign.type === 'points') {
+      if (paymentMode === 'upi') {
+        if (!razorpayPayment?.orderId || !razorpayPayment?.paymentId || !razorpayPayment?.signature) {
+          throw new ApiError(422, 'UPI payment is required to complete this order', 'PAYMENT_REQUIRED');
+        }
+        await verifyCampaignCheckoutPayment({
+          tenantId: recipient.tenantId,
+          recipientId: recipient._id,
+          expectedAmountInr: breakdown.total,
+          razorpayPayment,
+        });
+      } else if (paymentMode === 'points_upi') {
+        const { remainingDue } = await debitPointsCreditPool({
+          tenantId: recipient.tenantId,
+          email: recipient.email,
+          shopId: campaign.shopId,
+          pointsScope: campaign.pointsScope ?? 'shop',
+          spendAmount: breakdown.total,
+          allowPartial: true,
+        });
+        if (remainingDue > 0) {
+          if (!razorpayPayment?.orderId || !razorpayPayment?.paymentId || !razorpayPayment?.signature) {
+            throw new ApiError(422, 'UPI payment is required for the remaining balance', 'PAYMENT_REQUIRED');
+          }
+          await verifyCampaignCheckoutPayment({
+            tenantId: recipient.tenantId,
+            recipientId: recipient._id,
+            expectedAmountInr: remainingDue,
+            razorpayPayment,
+          });
+        }
+      } else {
+        await debitPointsCreditPool({
+          tenantId: recipient.tenantId,
+          email: recipient.email,
+          shopId: campaign.shopId,
+          pointsScope: campaign.pointsScope ?? 'shop',
+          spendAmount: breakdown.total,
+        });
+      }
+    } else if (breakdown.total > recipient.creditAmount) {
+      throw new ApiError(
+        422,
+        `Order total ₹${breakdown.total} exceeds your credit of ₹${recipient.creditAmount}`,
+        'CREDIT_EXCEEDED',
+      );
+    }
   }
 
   const orderNumber = await nextOrderNumber();
@@ -650,15 +814,72 @@ export async function submitRedemption(token, { items, shippingAddress }) {
     statusHistory: [{ status: 'created', at: new Date(), actorUserId: null, note: 'Redemption submit' }],
   });
 
-  transitionRedemption(recipient, 'redeemed');
-  transitionRedemption(recipient, 'order_created');
-  await recipient.save();
+  if (!kitFulfillment && campaign.type !== 'points') {
+    transitionRedemption(recipient, 'redeemed');
+    transitionRedemption(recipient, 'order_created');
+    await recipient.save();
+  }
 
   // §3.2 reservation hook — redemption consumes stock. Best-effort: an
   // inventory bookkeeping error must never block a recipient's order.
   await applyOrderInventory(order, campaign);
 
-  return { orderNumber: order.orderNumber, estimatedDelivery: '7-10 business days', orderId: String(order._id) };
+  let remainingCredit = null;
+  if (campaign.type === 'points') {
+    remainingCredit = await resolveRecipientCreditAmount(recipient, campaign);
+  }
+
+  return {
+    orderNumber: order.orderNumber,
+    estimatedDelivery: '7-10 business days',
+    orderId: String(order._id),
+    remainingCredit,
+  };
+}
+
+/** Orders placed by this recipient (all shop sends for pooled points). */
+export async function listRedemptionOrders(token) {
+  const recipient = await findRecipientByToken(token);
+  const { campaign } = await loadCampaignContext(recipient);
+
+  let recipientIds = [recipient._id];
+  if (campaign.type === 'points' && campaign.shopId) {
+    const shopCampaigns = await Campaign.find({
+      tenantId: recipient.tenantId,
+      shopId: campaign.shopId,
+      type: 'points',
+    })
+      .select('_id')
+      .lean();
+    const ids = await Recipient.find({
+      tenantId: recipient.tenantId,
+      email: recipient.email,
+      campaignId: { $in: shopCampaigns.map((c) => c._id) },
+    })
+      .distinct('_id')
+      .setOptions({ skipTenantGuard: true });
+    if (ids.length) recipientIds = ids;
+  }
+
+  const orders = await Order.find({
+    tenantId: recipient.tenantId,
+    recipientId: { $in: recipientIds },
+  })
+    .sort({ createdAt: -1 })
+    .setOptions({ skipTenantGuard: true })
+    .lean();
+
+  return {
+    orders: orders.map((o) => ({
+      orderNumber: o.orderNumber,
+      status: o.status,
+      total: o.amountBreakdown?.total ?? 0,
+      itemCount: o.items?.length ?? 0,
+      createdAt: o.createdAt,
+      items: sanitizeOrderItems(o.items),
+    })),
+    creditAmount: await resolveRecipientCreditAmount(recipient, campaign),
+  };
 }
 
 export async function trackRedemption(token) {

@@ -87,6 +87,20 @@ router.get(
 );
 
 router.post(
+  '/:token/razorpay/order',
+  validate({
+    params: tokenParams,
+    body: z.object({ amountInr: z.number().positive() }),
+  }),
+  requireRedemptionSession,
+  asyncHandler(async (req, res) => {
+    res.status(201).json(
+      await redemptionsService.createRedemptionRazorpayOrder(req.params.token, req.body),
+    );
+  }),
+);
+
+router.post(
   '/:token/submit',
   validate({ params: tokenParams }),
   requireRedemptionSession,
@@ -114,10 +128,27 @@ router.post(
         pincode: z.string().min(1),
         country: z.string().optional().default('IN'),
       }),
+      paymentMode: z.enum(['points', 'points_upi', 'upi']).optional().default('points'),
+      razorpayPayment: z
+        .object({
+          orderId: z.string().min(1),
+          paymentId: z.string().min(1),
+          signature: z.string().min(1),
+        })
+        .optional(),
     }),
   }),
   asyncHandler(async (req, res) => {
     res.status(201).json(await redemptionsService.submitRedemption(req.params.token, req.body));
+  }),
+);
+
+router.get(
+  '/:token/orders',
+  validate({ params: tokenParams }),
+  requireRedemptionSession,
+  asyncHandler(async (req, res) => {
+    res.json(await redemptionsService.listRedemptionOrders(req.params.token));
   }),
 );
 

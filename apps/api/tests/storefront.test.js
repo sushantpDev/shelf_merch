@@ -325,4 +325,27 @@ describe('public storefront (no auth)', () => {
     const res = await request(app).get('/api/v1/storefront/not-an-objectid');
     expect(res.status).toBe(400);
   });
+
+  it('returns live shop by vanity slug', async () => {
+    await Shop.create({
+      tenantId: tenant._id,
+      name: 'Salesforce',
+      slug: 'salesforce',
+      status: 'live',
+      logoUrl: 'https://cdn.test/sf.png',
+    });
+
+    const res = await request(app).get('/api/v1/storefront/by-slug/salesforce');
+    expect(res.status).toBe(200);
+    expect(res.body.shop).toMatchObject({
+      name: 'Salesforce',
+      slug: 'salesforce',
+      logoUrl: 'https://cdn.test/sf.png',
+    });
+  });
+
+  it('404s unknown vanity slug', async () => {
+    const res = await request(app).get('/api/v1/storefront/by-slug/unknown-shop');
+    expect(res.status).toBe(404);
+  });
 });

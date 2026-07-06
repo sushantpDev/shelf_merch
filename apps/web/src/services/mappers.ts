@@ -43,6 +43,7 @@ export type UiProduct = {
 export type UiShop = {
   id: string;
   name: string;
+  slug?: string;
   currency: string;
   currencyMode: "points" | "inr" | "priceless";
   pointsConversionEnabled: boolean;
@@ -324,6 +325,7 @@ export function mapShop(s: ApiProduct): UiShop {
   return {
     id: String(s._id),
     name: s.name,
+    slug: String((s as { slug?: string }).slug || ""),
     currency: currencyMap[s.currencyMode] || "Points",
     currencyMode: s.currencyMode === "inr" || s.currencyMode === "priceless" ? s.currencyMode : "points",
     pointsConversionEnabled: Boolean(s.pointsConversionEnabled),
