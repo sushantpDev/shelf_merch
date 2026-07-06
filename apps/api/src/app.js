@@ -160,7 +160,7 @@ export function createApp() {
     app.get('*', (req, res, next) => {
       if (req.method !== 'GET' && req.method !== 'HEAD') return next();
       if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) return next();
-      res.sendFile(path.join(WEB_DIST, 'index.html'));
+      res.sendFile('index.html', { root: WEB_DIST });
     });
   }
 
