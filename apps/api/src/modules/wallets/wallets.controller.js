@@ -26,6 +26,23 @@ export async function create(req, res) {
   res.status(201).json(wallet);
 }
 
+export async function setup(req, res) {
+  const wallet = await walletsService.setupWallet({
+    tenantId: req.tenantId,
+    userId: req.user.userId,
+    data: req.body,
+    file: req.file,
+  });
+  writeAudit({
+    req,
+    action: 'wallet.setup',
+    entityType: 'Wallet',
+    entityId: wallet._id,
+    after: wallet,
+  });
+  res.status(201).json(wallet);
+}
+
 export async function update(req, res) {
   const { before, wallet } = await walletsService.updateWallet({
     tenantId: req.tenantId,
@@ -132,4 +149,13 @@ export async function activate(req, res) {
   });
   writeAudit({ req, action: 'wallet.activate', entityType: 'Wallet', entityId: wallet._id, after: { status: wallet.status } });
   res.json(wallet);
+}
+
+export async function remove(req, res) {
+  const wallet = await walletsService.deleteIncompleteWallet({
+    tenantId: req.tenantId,
+    walletId: req.params.id,
+  });
+  writeAudit({ req, action: 'wallet.delete_incomplete', entityType: 'Wallet', entityId: wallet._id });
+  res.json({ success: true });
 }

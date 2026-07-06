@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { MoreHorizontal } from "lucide-react";
+import { Copy, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import type { UiShop } from "@/services/mappers";
+import { shopRedeemDisplayHost, shopRedeemHref, slugifyShopName } from "@/lib/shopRedeemUrl";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +46,18 @@ export function ShopCard({ shop, fallbackUser }: { shop: UiShop; fallbackUser: s
       setConfirmArchive(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not archive shop");
+    }
+  }
+
+  const slug = shop.slug || slugifyShopName(shop.name);
+  const redeemHost = shopRedeemDisplayHost(slug);
+
+  async function copyRedeemLink() {
+    try {
+      await navigator.clipboard.writeText(shopRedeemHref(slug));
+      toast.success("Employee link copied");
+    } catch {
+      toast.error("Could not copy link");
     }
   }
 
@@ -105,6 +118,29 @@ export function ShopCard({ shop, fallbackUser }: { shop: UiShop; fallbackUser: s
             )}
           </div>
           <div className="shop-card-meta">{shopCardMeta(shop, fallbackUser)}</div>
+          {shop.live ? (
+            <button
+              type="button"
+              className="shop-card-redeem-link"
+              onClick={() => void copyRedeemLink()}
+              style={{
+                marginTop: 10,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                color: "var(--brand-d)",
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              <Copy size={14} aria-hidden />
+              {redeemHost}
+            </button>
+          ) : null}
           <div style={{ marginTop: 14, textAlign: "right" }}>
             <Link to={`/app/shops/${shop.id}`} className="btn btn-soft btn-sm">
               Open

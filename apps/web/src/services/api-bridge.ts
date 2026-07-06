@@ -634,6 +634,43 @@ export async function submitRedemption(
   });
 }
 
+export type RedemptionRazorpayOrder = {
+  orderId: string;
+  amount: number;
+  amountPaise: number;
+  currency: string;
+  keyId: string;
+  paymentId: string;
+};
+
+export async function createRedemptionRazorpayOrder(
+  token: string,
+  sessionToken: string,
+  amountInr: number,
+) {
+  return publicFetch<RedemptionRazorpayOrder>(`/redemptions/${token}/razorpay/order`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${sessionToken}` },
+    body: JSON.stringify({ amountInr }),
+  });
+}
+
 export async function trackRedemption(token: string) {
   return publicFetch(`/redemptions/${token}/track`);
+}
+
+export type RedemptionOrderSummary = {
+  orderNumber: string;
+  status: string;
+  total: number;
+  itemCount: number;
+  createdAt?: string;
+  items?: Array<{ name: string; qty: number; unitPriceInr?: number }>;
+};
+
+export async function listRedemptionOrders(token: string, sessionToken: string) {
+  return publicFetch<{ orders: RedemptionOrderSummary[]; creditAmount: number }>(
+    `/redemptions/${token}/orders`,
+    { headers: { Authorization: `Bearer ${sessionToken}` } },
+  );
 }

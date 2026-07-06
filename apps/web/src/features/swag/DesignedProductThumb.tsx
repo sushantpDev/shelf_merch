@@ -175,7 +175,12 @@ export function DesignedProductThumb({
   return (
     <div
       className={className}
-      style={{ position: "relative", width: "100%", height: "100%", ...style }}
+      style={{
+        position: "relative",
+        width: "100%",
+        ...(className === "sf-pdp-thumb" ? {} : { height: "100%" }),
+        ...style,
+      }}
     >
       {inner}
     </div>

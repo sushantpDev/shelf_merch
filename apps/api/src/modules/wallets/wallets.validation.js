@@ -17,6 +17,18 @@ export const createWalletSchema = z.object({
     .optional(),
 });
 
+/** Multipart wallet wizard — create + optional PO upload + funding request in one call. */
+export const setupWalletSchema = z.object({
+  name: z.string().min(1),
+  currency: z.enum(['INR', 'USD']).optional().default('INR'),
+  validFrom: z.coerce.date().optional().nullable().default(null),
+  validTo: z.coerce.date().optional().nullable().default(null),
+  fundingMethod: z.enum(['po_upload', 'online']).optional().default('po_upload'),
+  docType: z.string().optional().default(''),
+  docNumber: z.string().optional().default(''),
+  amount: z.coerce.number().nonnegative().optional().default(0),
+});
+
 export const updateWalletSchema = z
   .object({
     name: z.string().min(1),

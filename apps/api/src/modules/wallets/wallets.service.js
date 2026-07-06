@@ -45,6 +45,81 @@ export async function createWallet({ tenantId, userId, data }) {
   return withMeta(wallet);
 }
 
+async function removeOrphanDraft({ tenantId, name }) {
+  const orphan = await Wallet.findOne({
+    tenantId,
+    name: name.trim(),
+    status: 'draft',
+    balance: 0,
+    allocatedAmount: 0,
+    $or: [
+      { 'fundingDocument.approvalStatus': '' },
+      { 'fundingDocument.approvalStatus': { $exists: false } },
+    ],
+  });
+  if (!orphan) return;
+  const txnCount = await WalletTransaction.countDocuments({ tenantId, walletId: orphan._id });
+  if (txnCount > 0) return;
+  await orphan.softDelete();
+}
+
+/**
+ * Atomic wallet wizard setup — create, upload PO, and submit funding in one
+ * request. Rolls back the draft wallet if any step fails.
+ */
+export async function setupWallet({ tenantId, userId, data, file }) {
+  await removeOrphanDraft({ tenantId, name: data.name });
+
+  let wallet = null;
+  try {
+    wallet = await Wallet.create({
+      tenantId,
+      ownerUserId: userId,
+      name: data.name,
+      currency: data.currency ?? 'INR',
+      validFrom: data.validFrom,
+      validTo: data.validTo,
+      fundingMethod: data.fundingMethod ?? 'po_upload',
+      fundingDocument: {
+        docType: data.docType ?? '',
+        docNumber: data.docNumber ?? '',
+      },
+    });
+
+    const walletId = wallet._id;
+    const fundingMethod = data.fundingMethod ?? 'po_upload';
+
+    if (fundingMethod === 'po_upload' && file) {
+      const { url } = await uploadFile({ tenantId, kind: 'document', file });
+      wallet.fundingDocument.fileUrl = url;
+      await wallet.save();
+    }
+
+    if (data.amount > 0 && fundingMethod === 'po_upload') {
+      await fundWallet({
+        tenantId,
+        walletId,
+        userId,
+        amount: data.amount,
+        description: 'Organization wallet setup funding',
+        docType: data.docType,
+        docNumber: data.docNumber,
+      });
+    }
+
+    return withMeta(await getWallet({ tenantId, walletId }));
+  } catch (err) {
+    if (wallet?._id) {
+      try {
+        await deleteIncompleteWallet({ tenantId, walletId: wallet._id });
+      } catch {
+        // Best-effort cleanup; surface the original failure to the caller.
+      }
+    }
+    throw err;
+  }
+}
+
 export async function updateWallet({ tenantId, walletId, patch }) {
   const wallet = await getWallet({ tenantId, walletId });
   const before = wallet.toObject();
@@ -193,6 +268,23 @@ export async function listTransactions({ tenantId, walletId, query }) {
 }
 
 /** §7.4 /activate — only allowed once every setup step is complete. */
+/** Remove a wallet that was created but never funded (wizard rollback). */
+export async function deleteIncompleteWallet({ tenantId, walletId }) {
+  const wallet = await getWallet({ tenantId, walletId });
+  if (wallet.status !== 'draft') {
+    throw new ApiError(422, 'Only incomplete draft wallets can be removed', 'WALLET_NOT_DELETABLE');
+  }
+  if (wallet.balance !== 0 || wallet.allocatedAmount !== 0) {
+    throw new ApiError(422, 'Wallet has funds or allocations', 'WALLET_NOT_DELETABLE');
+  }
+  const txnCount = await WalletTransaction.countDocuments({ tenantId, walletId });
+  if (txnCount > 0) {
+    throw new ApiError(422, 'Wallet has ledger activity', 'WALLET_NOT_DELETABLE');
+  }
+  await wallet.softDelete();
+  return wallet;
+}
+
 export async function activate({ tenantId, walletId, userId }) {
   const wallet = await getWallet({ tenantId, walletId });
   if (wallet.status === 'active') {

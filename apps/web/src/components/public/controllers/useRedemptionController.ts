@@ -4,14 +4,16 @@ import {
   getRedemptionCatalog,
   getRedemptionKit,
   getRedemptionPortal,
+  listRedemptionOrders,
   sendRedemptionOtp,
   submitRedemption,
   trackRedemption,
   verifyRedemptionOtp,
   type KitRedemptionData,
+  type RedemptionOrderSummary,
 } from "@/services/api-bridge";
 import type { StoreShop } from "@/components/StoreBanner";
-import type { CheckoutItem, ShippingAddress, StoreProduct } from "@/components/store/StoreShell";
+import type { CheckoutItem, CheckoutPayment, ShippingAddress, StoreProduct } from "@/components/store/StoreShell";
 
 export type RedemptionStep = "loading" | "portal" | "otp" | "shop" | "kit" | "track" | "error";
 
@@ -24,7 +26,7 @@ export type PortalData = {
     message?: { body?: string };
     shop?: Shop | null;
   };
-  recipient: { name: string; creditAmount: number };
+  recipient: { name: string; email?: string; creditAmount: number };
   alreadyVerified?: boolean;
   sessionToken?: string;
 };
@@ -48,8 +50,11 @@ export type RedemptionVm = {
   onCheckout: (
     items: CheckoutItem[],
     shippingAddress: ShippingAddress,
-  ) => Promise<{ orderNumber: string }>;
+    payment?: CheckoutPayment,
+  ) => Promise<{ orderNumber: string; remainingCredit?: number }>;
   onKitAccepted: (orderNumber: string) => void;
+  onLogout: () => void;
+  onFetchOrders: () => Promise<{ orders: RedemptionOrderSummary[]; creditAmount: number }>;
 };
 
 export function isKitCampaign(portal: PortalData | null) {
@@ -133,17 +138,50 @@ export function useRedemptionController(token: string): RedemptionVm {
   }
 
   const onCheckout = useCallback(
-    async (items: CheckoutItem[], shippingAddress: ShippingAddress) => {
+    async (items: CheckoutItem[], shippingAddress: ShippingAddress, payment?: CheckoutPayment) => {
       const result = (await submitRedemption(
         token,
         sessionToken,
-        { items, shippingAddress },
+        {
+          items,
+          shippingAddress,
+          paymentMode: payment?.mode ?? "points",
+          razorpayPayment: payment?.razorpay,
+        },
         `redeem-${token}-${Date.now()}`,
-      )) as { orderNumber: string };
-      return { orderNumber: result.orderNumber };
+      )) as { orderNumber: string; remainingCredit?: number | null };
+      if (result.remainingCredit != null && portal) {
+        setPortal({
+          ...portal,
+          recipient: { ...portal.recipient, creditAmount: result.remainingCredit },
+        });
+      }
+      return {
+        orderNumber: result.orderNumber,
+        remainingCredit: result.remainingCredit ?? undefined,
+      };
     },
-    [token, sessionToken],
+    [token, sessionToken, portal],
   );
+
+  const onFetchOrders = useCallback(async () => {
+    if (!sessionToken) return { orders: [], creditAmount: portal?.recipient.creditAmount ?? 0 };
+    const data = await listRedemptionOrders(token, sessionToken);
+    if (portal && data.creditAmount != null) {
+      setPortal({
+        ...portal,
+        recipient: { ...portal.recipient, creditAmount: data.creditAmount },
+      });
+    }
+    return data;
+  }, [token, sessionToken, portal]);
+
+  function onLogout() {
+    setSessionToken("");
+    setProducts([]);
+    setStep("portal");
+    setError("");
+  }
 
   return {
     step,
@@ -166,5 +204,7 @@ export function useRedemptionController(token: string): RedemptionVm {
       setOrder({ orderNumber, status: "created" });
       setStep("track");
     },
+    onLogout,
+    onFetchOrders,
   };
 }

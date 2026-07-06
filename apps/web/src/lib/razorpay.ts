@@ -50,12 +50,14 @@ export type RazorpayOrderPayload = {
   currency: string;
   keyId: string;
   paymentId: string;
-  walletId: string;
+  walletId?: string;
 };
 
 export async function openRazorpayCheckout(opts: {
-  order: RazorpayOrderPayload;
-  walletName: string;
+  order: RazorpayOrderPayload | Omit<RazorpayOrderPayload, "walletId">;
+  walletName?: string;
+  title?: string;
+  description?: string;
   onSuccess: (response: RazorpayHandlerResponse) => void;
   onDismiss?: () => void;
 }): Promise<void> {
@@ -71,8 +73,8 @@ export async function openRazorpayCheckout(opts: {
       amount: opts.order.amountPaise,
       currency: opts.order.currency,
       order_id: opts.order.orderId,
-      name: "Shelf Merch",
-      description: `Add funds to ${opts.walletName}`,
+      name: opts.title ?? "Shelf Merch",
+      description: opts.description ?? (opts.walletName ? `Add funds to ${opts.walletName}` : "Complete your order"),
       theme: { color: "#1a5c45" },
       handler: (response) => {
         opts.onSuccess(response);

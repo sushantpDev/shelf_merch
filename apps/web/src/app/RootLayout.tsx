@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Link, Outlet, useRouteError, useRevalidator } from "react-router";
 import { ChatWidget } from "@/components/ChatWidget";
 import { Toaster } from "@/components/ui/sonner";
+import { ShopSubdomainGate } from "./ShopSubdomainGate";
 
 const queryClient = new QueryClient();
 
@@ -9,8 +10,7 @@ const queryClient = new QueryClient();
 export function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Matched child routes render here. */}
-      <Outlet />
+      <ShopSubdomainGate />
       <ChatWidget />
       <Toaster />
     </QueryClientProvider>

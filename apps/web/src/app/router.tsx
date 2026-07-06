@@ -205,6 +205,7 @@ export const appRouter = createBrowserRouter([
         lazy: page(() => import("./publicRoutes"), "AcceptInviteRoute"),
       },
       { path: "shop/:id", lazy: page(() => import("./publicRoutes"), "ShopRoute") },
+      { path: "s/:slug", lazy: page(() => import("./publicRoutes"), "ShopRedeemRoute") },
       { path: "redeem/:token", lazy: page(() => import("./publicRoutes"), "RedeemRoute") },
       {
         path: "app",

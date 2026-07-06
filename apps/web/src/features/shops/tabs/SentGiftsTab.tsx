@@ -4,7 +4,8 @@ import { toast } from "sonner";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { inr } from "@/components/platform/platform-ui";
 import { POINT_VALUE } from "@/features/send/money";
-import { useDeleteCampaign } from "@/features/campaigns/model";
+import { useCampaignRecipients, useDeleteCampaign } from "@/features/campaigns/model";
+import type { CampaignRecipientRow } from "@/services/mutations-api";
 import type { UiCampaign, UiShop } from "@/services/mappers";
 import sentGiftsEmptyImg from "../../../../assets/sent-gifts-empty.png";
 
@@ -131,6 +132,124 @@ function campaignSubtext(campaign: UiCampaign) {
   return campaign.type === "points" ? "Points send" : "Campaign";
 }
 
+function recipientAmount(creditAmount: number | undefined, shop: UiShop) {
+  const amount = creditAmount ?? 0;
+  if (amount <= 0) return "—";
+  if (shop.currencyMode === "inr") return inr(amount);
+  if (shop.currencyMode === "priceless") return "Priceless";
+  return `${(amount / POINT_VALUE).toFixed(2)} Pts`;
+}
+
+function recipientStatusLabel(status?: string) {
+  switch (status) {
+    case "invited":
+      return "Invited";
+    case "opened":
+      return "Opened";
+    case "verified":
+      return "Verified";
+    case "redeemed":
+      return "Redeemed";
+    case "order_created":
+      return "Order placed";
+    case "expired":
+      return "Expired";
+    default:
+      return status || "—";
+  }
+}
+
+function CampaignRecipientsPanel({
+  campaignId,
+  shop,
+  isDraft,
+  deleting,
+  onDelete,
+}: {
+  campaignId: string;
+  shop: UiShop;
+  isDraft: boolean;
+  deleting: boolean;
+  onDelete: () => void;
+}) {
+  const { data, isLoading, isError } = useCampaignRecipients(campaignId);
+  const recipients = data?.recipients ?? [];
+
+  return (
+    <div style={{ padding: "14px 16px" }}>
+      <div
+        className="mut3"
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: ".04em",
+          marginBottom: 10,
+        }}
+      >
+        Recipients
+      </div>
+      {isLoading ? (
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+          Loading recipients…
+        </p>
+      ) : isError ? (
+        <p style={{ fontSize: 13, margin: 0, color: "var(--danger)" }}>
+          Could not load recipients.
+        </p>
+      ) : recipients.length === 0 ? (
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+          No recipients added yet.
+        </p>
+      ) : (
+        <table className="tbl" style={{ marginBottom: isDraft ? 12 : 0 }}>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Amount</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recipients.map((r: CampaignRecipientRow) => (
+              <tr key={String(r._id ?? r.email)}>
+                <td style={{ fontWeight: 500 }}>{r.name || "—"}</td>
+                <td className="muted">{r.email || "—"}</td>
+                <td className="num">{recipientAmount(r.creditAmount, shop)}</td>
+                <td className="muted" style={{ fontSize: 13 }}>
+                  {recipientStatusLabel(r.redemptionStatus)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {isDraft ? (
+        <button
+          type="button"
+          className="lnk"
+          style={{
+            background: "none",
+            border: "none",
+            cursor: deleting ? "wait" : "pointer",
+            padding: 0,
+            color: "var(--danger)",
+            fontWeight: 600,
+            letterSpacing: ".03em",
+            textTransform: "uppercase",
+            fontSize: 12,
+          }}
+          disabled={deleting}
+          onClick={onDelete}
+        >
+          {deleting ? "Deleting…" : "Delete incomplete order"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 const centerHeadStyle = { textAlign: "center" } as const;
 const centerCellStyle = {
   textAlign: "center",
@@ -146,7 +265,7 @@ export function SentGiftsTab({
 }) {
   const { data: workspace } = useWorkspace();
   const deleteCampaign = useDeleteCampaign();
-  const [expandedDraftId, setExpandedDraftId] = useState<string | null>(null);
+  const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const campaigns = useMemo(
@@ -161,7 +280,7 @@ export function SentGiftsTab({
     setDeletingId(campaignId);
     try {
       await deleteCampaign.mutateAsync(campaignId);
-      setExpandedDraftId(null);
+      setExpandedCampaignId(null);
       toast.success("Draft deleted");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not delete draft");
@@ -207,7 +326,9 @@ export function SentGiftsTab({
           <tbody>
             {campaigns.map((campaign) => {
               const isDraft = isIncompleteCampaign(campaign);
-              const expanded = expandedDraftId === campaign.id;
+              const expanded = expandedCampaignId === campaign.id;
+              const recipientCount = displayRecipientCount(campaign);
+              const canExpand = recipientCount > 0 || isDraft;
               return (
                 <Fragment key={campaign.id}>
                   <tr>
@@ -227,22 +348,22 @@ export function SentGiftsTab({
                       </div>
                     </td>
                     <td className="num data-list-cell" style={centerCellStyle}>
-                      {displayRecipientCount(campaign).toLocaleString("en-IN")}
+                      {recipientCount.toLocaleString("en-IN")}
                     </td>
                     <td className="muted data-list-cell" style={centerCellStyle}>
                       {formatCampaignDate(campaign.createdAt)}
                     </td>
                     <td className="data-list-cell" style={centerCellStyle}>
-                      {isDraft ? (
-                        <div
-                          style={{
-                            display: "inline-flex",
-                            gap: 10,
-                            alignItems: "center",
-                            justifyContent: "center",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          gap: 10,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {isDraft ? (
                           <button
                             type="button"
                             className="lnk"
@@ -257,29 +378,35 @@ export function SentGiftsTab({
                           >
                             Finish sending
                           </button>
+                        ) : null}
+                        {canExpand ? (
                           <button
                             type="button"
-                            aria-label={expanded ? "Collapse draft actions" : "Expand draft actions"}
+                            aria-label={expanded ? "Hide recipients" : "Show recipients"}
+                            aria-expanded={expanded}
                             style={{
                               background: "none",
                               border: "none",
                               cursor: "pointer",
-                              padding: 0,
+                              padding: 4,
                               display: "inline-flex",
                               alignItems: "center",
                               color: "var(--ink-2)",
+                              borderRadius: 6,
                             }}
                             onClick={() =>
-                              setExpandedDraftId((id) => (id === campaign.id ? null : campaign.id))
+                              setExpandedCampaignId((id) =>
+                                id === campaign.id ? null : campaign.id,
+                              )
                             }
                           >
                             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                           </button>
-                        </div>
-                      ) : null}
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
-                  {isDraft && expanded ? (
+                  {expanded && canExpand ? (
                     <tr>
                       <td
                         colSpan={7}
@@ -289,25 +416,13 @@ export function SentGiftsTab({
                           borderBottom: "1px solid var(--line-2)",
                         }}
                       >
-                        <button
-                          type="button"
-                          className="lnk"
-                          style={{
-                            background: "none",
-                            border: "none",
-                            cursor: deletingId === campaign.id ? "wait" : "pointer",
-                            padding: "12px 16px",
-                            color: "var(--danger)",
-                            fontWeight: 600,
-                            letterSpacing: ".03em",
-                            textTransform: "uppercase",
-                            fontSize: 12,
-                          }}
-                          disabled={deletingId === campaign.id}
-                          onClick={() => void deleteIncompleteOrder(campaign.id)}
-                        >
-                          {deletingId === campaign.id ? "Deleting…" : "Delete incomplete order"}
-                        </button>
+                        <CampaignRecipientsPanel
+                          campaignId={campaign.id}
+                          shop={shop}
+                          isDraft={isDraft}
+                          deleting={deletingId === campaign.id}
+                          onDelete={() => void deleteIncompleteOrder(campaign.id)}
+                        />
                       </td>
                     </tr>
                   ) : null}

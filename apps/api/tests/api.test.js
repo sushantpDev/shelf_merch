@@ -327,6 +327,47 @@ describe('wallet setup wizard + state machine', () => {
     expect(activated.body.status).toBe('active');
     expect(activated.body.validNextStatuses).toEqual([]);
   });
+
+  it('POST /wallets/setup creates, uploads, and submits funding atomically', async () => {
+    const pdf = Buffer.from('%PDF-1.4 test');
+    const res = await request(app)
+      .post('/api/v1/wallets/setup')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .field('name', 'FY2026 Setup Budget')
+      .field('fundingMethod', 'po_upload')
+      .field('docType', 'Purchase Order')
+      .field('docNumber', 'PO-SETUP-01')
+      .field('amount', '500000')
+      .attach('document', pdf, { filename: 'po.pdf', contentType: 'application/pdf' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe('wallet_created');
+    expect(res.body.fundingDocument.approvalStatus).toBe('pending');
+    expect(res.body.fundingDocument.requestedAmount).toBe(500_000);
+    expect(res.body.fundingDocument.fileUrl).toBeTruthy();
+
+    const count = await Wallet.countDocuments({ tenantId: tenantA._id, name: 'FY2026 Setup Budget' });
+    expect(count).toBe(1);
+  });
+
+  it('POST /wallets/setup rolls back draft wallet when document upload fails', async () => {
+    const res = await request(app)
+      .post('/api/v1/wallets/setup')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .field('name', 'Broken Setup')
+      .field('fundingMethod', 'po_upload')
+      .field('docNumber', 'PO-BAD')
+      .field('amount', '1000')
+      .attach('document', Buffer.from('not-a-pdf'), {
+        filename: 'bad.png',
+        contentType: 'image/png',
+      });
+
+    expect(res.status).toBe(415);
+
+    const visible = await Wallet.find({ tenantId: tenantA._id, name: 'Broken Setup' });
+    expect(visible).toHaveLength(0);
+  });
 });
 
 describe('auth flow', () => {

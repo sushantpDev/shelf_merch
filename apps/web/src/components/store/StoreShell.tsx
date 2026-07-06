@@ -7,7 +7,13 @@ import {
   DesignedProductThumb,
   storeProductAsUi,
 } from "@/features/swag/DesignedProductThumb";
+import { POINT_VALUE } from "@/features/send/money";
+import { createRedemptionRazorpayOrder } from "@/services/api-bridge";
+import { openRazorpayCheckout } from "@/lib/razorpay";
 import walletIconImg from "../../../assets/wallet-icon.svg";
+import { StoreAccountMenu, type StoreOrderSummary } from "./StoreAccountMenu";
+import { StoreEmptyState } from "./StoreEmptyState";
+import { StorePageShell } from "./StorePageShell";
 
 type PrintArea = {
   key?: string;
@@ -132,6 +138,14 @@ function ColorSwatches({
 }
 
 export type CheckoutItem = { productId: string; qty: number; variant?: { size?: string; color?: string } };
+export type CheckoutPayment = {
+  mode: "points" | "points_upi" | "upi";
+  razorpay?: {
+    orderId: string;
+    paymentId: string;
+    signature: string;
+  };
+};
 export type ShippingAddress = {
   name: string;
   phone: string;
@@ -143,18 +157,81 @@ export type ShippingAddress = {
   country?: string;
 };
 
+type AddedToBagInfo = {
+  name: string;
+  brand: string;
+  linePriceInr: number;
+  qty: number;
+  image?: string;
+};
+
 type Mode = "preview" | "redeem";
-type Page = "home" | "products" | "product" | "cart" | "checkout" | "done";
+type Page = "home" | "products" | "product" | "cart" | "checkout" | "done" | "orders";
 
 type CartLine = {
   key: string;
   productId: string;
   name: string;
+  brand?: string;
   priceInr: number;
   qty: number;
   variant?: { size?: string; color?: string };
   image?: string;
 };
+
+const CART_STORAGE_PREFIX = "shelf-merch:cart:v1:";
+
+function cartStorageKey(persistId?: string) {
+  return persistId ? `${CART_STORAGE_PREFIX}${persistId}` : null;
+}
+
+function readStoredCart(key: string): CartLine[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (line): line is CartLine =>
+        !!line &&
+        typeof line === "object" &&
+        typeof (line as CartLine).key === "string" &&
+        typeof (line as CartLine).productId === "string" &&
+        typeof (line as CartLine).qty === "number" &&
+        (line as CartLine).qty > 0,
+    );
+  } catch {
+    return [];
+  }
+}
+
+function reconcileCartLines(lines: CartLine[], products: StoreProduct[], shopName: string): CartLine[] {
+  if (!products.length) return lines;
+  return lines
+    .filter((line) => products.some((p) => p._id === line.productId))
+    .map((line) => {
+      const product = products.find((p) => p._id === line.productId);
+      if (!product) return line;
+      return {
+        ...line,
+        name: product.name,
+        brand: product.brand || shopName,
+        priceInr: product.basePriceInr,
+        image: storeProductThumb(product),
+      };
+    });
+}
+
+function persistStoredCart(key: string, cart: CartLine[]) {
+  if (typeof window === "undefined") return;
+  try {
+    if (cart.length === 0) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, JSON.stringify(cart));
+  } catch {
+    // Private mode / quota — cart still works for this session.
+  }
+}
 
 function productImage(p: StoreProduct) {
   return resolveMediaUrl(p.primaryImageUrl || p.imageUrls?.[0] || p.maskImageUrl || "");
@@ -176,18 +253,59 @@ function ShelfMerchLogo() {
   );
 }
 
-function HeartIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
-    </svg>
-  );
-}
-
 function PointsIcon() {
   return (
     <svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" style={{ flex: "none" }}>
       <circle cx="12" cy="12" r="10" opacity=".15" /><path d="M12 2a10 10 0 1010 10A10 10 0 0012 2zm0 18a8 8 0 118-8 8 8 0 01-8 8z" /><path d="M15.09 11.41l-2.59-1.5V7a.5.5 0 00-1 0v3.18a.5.5 0 00.25.43l2.84 1.64a.5.5 0 00.5-.87z" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+    </svg>
+  );
+}
+
+function MinusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function CheckCircleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M8 12l3 3 5-6" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M18 6L6 18M6 6l12 12" />
     </svg>
   );
 }
@@ -243,6 +361,19 @@ function ChevronDown({ className }: { className?: string }) {
   );
 }
 
+function TruckIcon() {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 18V6a2 2 0 00-2-2H4a2 2 0 00-2 2v11a1 1 0 001 1h2" />
+      <path d="M15 18h2" />
+      <path d="M19 18h2v-3.34a1 1 0 00-.76-.97L16.5 12.5" />
+      <path d="M16 18H6" />
+      <circle cx="17" cy="18" r="2" />
+      <circle cx="7" cy="18" r="2" />
+    </svg>
+  );
+}
+
 function truncTopbarName(name: string, max = 8) {
   const n = name.trim();
   return n.length > max ? `${n.slice(0, max - 1)}…` : n;
@@ -259,8 +390,14 @@ export default function StoreShell({
   currency = "inr",
   creditInr,
   recipientName,
+  recipientEmail,
   welcome,
+  redemptionToken,
+  sessionToken,
+  cartPersistId,
   onCheckout,
+  onLogout,
+  onFetchOrders,
 }: {
   shop: StoreShop;
   products: StoreProduct[];
@@ -268,15 +405,34 @@ export default function StoreShell({
   currency?: "points" | "inr" | "priceless";
   creditInr?: number;
   recipientName?: string;
+  recipientEmail?: string;
   welcome?: string;
-  onCheckout?: (items: CheckoutItem[], address: ShippingAddress) => Promise<{ orderNumber: string }>;
+  redemptionToken?: string;
+  sessionToken?: string;
+  /** Scope cart persistence across page refreshes (redemption token or shop id). */
+  cartPersistId?: string;
+  onCheckout?: (
+    items: CheckoutItem[],
+    address: ShippingAddress,
+    payment?: CheckoutPayment,
+  ) => Promise<{
+    orderNumber: string;
+    remainingCredit?: number;
+  }>;
+  onLogout?: () => void;
+  onFetchOrders?: () => Promise<{ orders: StoreOrderSummary[]; creditAmount: number }>;
 }) {
+  const storageKey = cartStorageKey(cartPersistId);
   const [page, setPage] = useState<Page>("home");
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [cart, setCart] = useState<CartLine[]>([]);
+  const [cart, setCart] = useState<CartLine[]>(() => (storageKey ? readStoredCart(storageKey) : []));
   const [error, setError] = useState("");
   const [placing, setPlacing] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
+  const [balanceInr, setBalanceInr] = useState(creditInr);
+  const [orders, setOrders] = useState<StoreOrderSummary[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
   const [address, setAddress] = useState<ShippingAddress>({
     name: recipientName || "",
     phone: "",
@@ -284,16 +440,71 @@ export default function StoreShell({
     city: "",
     state: "",
     pincode: "",
+    country: "IN",
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [scrolled, setScrolled] = useState(false);
-  const trendingRef = useRef<HTMLDivElement>(null);
+  const [checkoutFirst, setCheckoutFirst] = useState("");
+  const [checkoutLast, setCheckoutLast] = useState("");
+  const [checkoutBusiness, setCheckoutBusiness] = useState("");
+  const [addressSaved, setAddressSaved] = useState(false);
+  const [shippingConfirmed, setShippingConfirmed] = useState(false);
+  const [itemsExpanded, setItemsExpanded] = useState(false);
+  const [useRewardPoints, setUseRewardPoints] = useState(true);
+  const [addedToBag, setAddedToBag] = useState<AddedToBagInfo | null>(null);
   const catalogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setBalanceInr(creditInr);
+  }, [creditInr]);
+
+  useEffect(() => {
+    if (!storageKey || products.length === 0) return;
+    setCart((prev) => reconcileCartLines(prev.length ? prev : readStoredCart(storageKey), products, shop.name));
+  }, [storageKey, products, shop.name]);
+
+  useEffect(() => {
+    if (!storageKey) return;
+    persistStoredCart(storageKey, cart);
+  }, [storageKey, cart]);
+
+  useEffect(() => {
+    if (page === "orders") void refreshOrders();
+  }, [page]);
+
+  useEffect(() => {
+    if (page === "cart" && cart.length === 0) {
+      setPage("products");
+    }
+  }, [page, cart.length]);
 
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [page]);
+
+  useEffect(() => {
+    if (!addedToBag) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAddedToBag(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [addedToBag]);
+
+  useEffect(() => {
+    if (page !== "checkout") {
+      setAddressSaved(false);
+      setShippingConfirmed(false);
+      setItemsExpanded(false);
+      return;
+    }
+    const full = (address.name || recipientName || "").trim();
+    if (!full) return;
+    const parts = full.split(/\s+/);
+    setCheckoutFirst(parts[0] || "");
+    setCheckoutLast(parts.slice(1).join(" ") || "");
+  }, [page, recipientName, address.name]);
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 10);
@@ -304,24 +515,110 @@ export default function StoreShell({
   const active = products.find((p) => p._id === activeId) || null;
   const cartCount = cart.reduce((n, l) => n + l.qty, 0);
   const cartTotalInr = cart.reduce((n, l) => n + l.priceInr * l.qty, 0);
-  const overBudget = mode === "redeem" && creditInr != null && cartTotalInr > creditInr;
+  const usesPointsDisplay = currency === "points" || (mode === "redeem" && currency !== "priceless");
+  const pointsAvailable = balanceInr ?? 0;
+  const pointsApplied = useRewardPoints ? Math.min(pointsAvailable, cartTotalInr) : 0;
+  const upiDueInr = useRewardPoints ? Math.max(0, cartTotalInr - pointsApplied) : cartTotalInr;
+  const hasEnoughPoints = balanceInr != null && cartTotalInr <= balanceInr;
+  const paysWithUpi = mode === "redeem" && upiDueInr > 0;
+  const canCheckout = mode !== "redeem" || cart.length > 0;
+
+  function inrToPoints(inr: number) {
+    return Math.round(inr / POINT_VALUE);
+  }
 
   function fmt(inr: number) {
     if (currency === "priceless") return "Gift";
-    if (currency === "points") return `${Math.round(inr / 2).toLocaleString("en-IN")} pts`;
+    if (usesPointsDisplay) return `${inrToPoints(inr).toLocaleString("en-IN")} pts`;
+    return `₹${inr.toLocaleString("en-IN")}`;
+  }
+
+  /** Stadium-style product price — bold "Pts" or ₹ on cards. */
+  function fmtCardPrice(inr: number) {
+    if (currency === "priceless") return "Gift";
+    if (usesPointsDisplay) return `${inrToPoints(inr).toLocaleString("en-IN")} Pts`;
     return `₹${inr.toLocaleString("en-IN")}`;
   }
 
   function navBalanceLabel() {
-    if (currency === "points") return "Your points";
-    if (currency === "inr") return "You pay";
-    return "Your gift";
+    if (currency === "priceless") return "Your gift";
+    if (usesPointsDisplay) return "Points";
+    return mode === "redeem" ? "Points" : "You pay";
   }
 
   function navBalanceValue(inr: number) {
-    if (currency === "points") return `${Math.round(inr / 2).toLocaleString("en-IN")} pts`;
-    if (currency === "inr") return `₹${inr.toLocaleString("en-IN")}`;
-    return "Gift";
+    if (currency === "priceless") return "Gift";
+    if (usesPointsDisplay) return `${inrToPoints(inr).toLocaleString("en-IN")} Pts`;
+    return `₹${inr.toLocaleString("en-IN")}`;
+  }
+
+  function fmtUpiAmount(inr: number) {
+    return `₹${inr.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  async function collectRazorpayPayment(amountInr: number) {
+    if (!redemptionToken || !sessionToken) {
+      throw new Error("Payment session expired — refresh and try again.");
+    }
+    const order = await createRedemptionRazorpayOrder(redemptionToken, sessionToken, amountInr);
+    const response = await new Promise<{
+      razorpay_order_id: string;
+      razorpay_payment_id: string;
+      razorpay_signature: string;
+    }>((resolve, reject) => {
+      void openRazorpayCheckout({
+        order: { ...order, walletId: order.paymentId },
+        description: `Pay ${fmtUpiAmount(amountInr)} via UPI`,
+        onSuccess: resolve,
+        onDismiss: () => reject(new Error("Payment cancelled")),
+      }).catch(reject);
+    });
+    return {
+      orderId: response.razorpay_order_id,
+      paymentId: response.razorpay_payment_id,
+      signature: response.razorpay_signature,
+    };
+  }
+
+  function fmtCheckoutInr(inr: number) {
+    return `INR ${inr.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  function checkoutPaymentMode(): CheckoutPayment["mode"] {
+    if (!useRewardPoints) return "upi";
+    if (hasEnoughPoints) return "points";
+    return "points_upi";
+  }
+
+  function resetCheckoutProgress() {
+    setAddressSaved(false);
+    setShippingConfirmed(false);
+  }
+
+  function buildAddressFromCheckout(): ShippingAddress {
+    return {
+      ...address,
+      name: [checkoutFirst, checkoutLast].filter(Boolean).join(" ").trim(),
+    };
+  }
+
+  function saveShipping() {
+    const next = buildAddressFromCheckout();
+    const missing = (["name", "phone", "line1", "city", "state", "pincode"] as const).filter(
+      (k) => !(k === "name" ? next.name : next[k]).trim(),
+    );
+    if (missing.length) {
+      setError("Please complete all required shipping fields.");
+      return;
+    }
+    setAddress(next);
+    setError("");
+    setAddressSaved(true);
+  }
+
+  function confirmShipping() {
+    if (!addressSaved) return;
+    setShippingConfirmed(true);
   }
 
   function openProduct(id: string) {
@@ -353,23 +650,44 @@ export default function StoreShell({
 
   function addToCart(p: StoreProduct, variant: { size?: string; color?: string }, qty: number) {
     const key = `${p._id}|${variant.size || ""}|${variant.color || ""}`;
-    setCart((prev) => {
-      const existing = prev.find((l) => l.key === key);
-      if (existing) return prev.map((l) => (l.key === key ? { ...l, qty: l.qty + qty } : l));
-      return [
-        ...prev,
-        {
-          key,
-          productId: p._id,
-          name: p.name,
-          priceInr: p.basePriceInr,
-          qty,
-          variant: variant.size || variant.color ? variant : undefined,
-          image: storeProductThumb(p),
-        },
-      ];
+    const existing = cart.find((l) => l.key === key);
+    const next = existing
+      ? cart.map((l) => (l.key === key ? { ...l, qty: l.qty + qty } : l))
+      : [
+          ...cart,
+          {
+            key,
+            productId: p._id,
+            name: p.name,
+            brand: p.brand || shop.name,
+            priceInr: p.basePriceInr,
+            qty,
+            variant: variant.size || variant.color ? variant : undefined,
+            image: storeProductThumb(p),
+          },
+        ];
+    setCart(next);
+    setAddedToBag({
+      name: p.name,
+      brand: p.brand || shop.name,
+      linePriceInr: p.basePriceInr * qty,
+      qty,
+      image: storeProductThumb(p),
     });
+  }
+
+  function closeAddedToBag() {
+    setAddedToBag(null);
+  }
+
+  function viewBagFromModal() {
+    setAddedToBag(null);
     setPage("cart");
+  }
+
+  function checkoutFromModal() {
+    setAddedToBag(null);
+    setPage("checkout");
   }
 
   function setLineQty(key: string, qty: number) {
@@ -378,10 +696,58 @@ export default function StoreShell({
     );
   }
 
+  function bumpLineQty(key: string, delta: number) {
+    const line = cart.find((l) => l.key === key);
+    if (!line) return;
+    setLineQty(key, line.qty + delta);
+  }
+
+  function clearCart() {
+    setCart([]);
+  }
+
+  function editCartLine(productId: string) {
+    setActiveId(productId);
+    setPage("product");
+  }
+
+  async function refreshOrders() {
+    if (!onFetchOrders) return;
+    setOrdersLoading(true);
+    setOrdersError("");
+    try {
+      const data = await onFetchOrders();
+      setOrders(data.orders);
+      if (data.creditAmount != null) setBalanceInr(data.creditAmount);
+    } catch (err) {
+      setOrdersError(err instanceof Error ? err.message : "Could not load orders");
+    } finally {
+      setOrdersLoading(false);
+    }
+  }
+
+  function openCart() {
+    if (cart.length === 0) {
+      setPage("products");
+      return;
+    }
+    setPage("cart");
+  }
+
+  function continueShopping() {
+    setCart([]);
+    setOrderNumber("");
+    setError("");
+    setPage("home");
+    void refreshOrders();
+  }
+
   async function placeOrder() {
     setError("");
+    const next = buildAddressFromCheckout();
+    setAddress(next);
     const missing = (["name", "phone", "line1", "city", "state", "pincode"] as const).filter(
-      (k) => !address[k].trim(),
+      (k) => !(k === "name" ? next.name : next[k]).trim(),
     );
     if (missing.length) {
       setError("Please complete your shipping details (name, phone and full address).");
@@ -391,8 +757,17 @@ export default function StoreShell({
     setPlacing(true);
     try {
       const items: CheckoutItem[] = cart.map((l) => ({ productId: l.productId, qty: l.qty, variant: l.variant }));
-      const res = await onCheckout(items, address);
+      const paymentMode = checkoutPaymentMode();
+      let razorpay: CheckoutPayment["razorpay"];
+
+      if (mode === "redeem" && upiDueInr > 0) {
+        razorpay = await collectRazorpayPayment(upiDueInr);
+      }
+
+      const res = await onCheckout(items, next, { mode: paymentMode, razorpay });
       setOrderNumber(res.orderNumber);
+      if (res.remainingCredit != null) setBalanceInr(res.remainingCredit);
+      setCart([]);
       setPage("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not place your order");
@@ -462,25 +837,42 @@ export default function StoreShell({
           </div>
 
           <div className="sf-topbar-right sf-topbar-right--stadium">
-            {mode === "redeem" && creditInr != null && (
+            {mode === "redeem" && balanceInr != null && (
               <button
                 type="button"
                 className="topbar-wallet sf-topbar-wallet"
-                aria-label={currency === "points" ? "Your points balance" : "Available balance"}
+                aria-label={currency === "points" || (mode === "redeem" && currency === "inr") ? "Your points balance" : "Available balance"}
+                onClick={() => setPage("home")}
               >
                 <span className="topbar-wallet-icon">
                   <img src={walletIconImg} alt="" className="topbar-wallet-img" aria-hidden="true" />
                 </span>
                 <span className="topbar-wallet-copy">
                   <span className="k">{navBalanceLabel()}</span>
-                  <span className="v">
-                    {navBalanceValue(creditInr)}
-                    <ChevronDown />
-                  </span>
+                  <span className="v">{navBalanceValue(balanceInr)}</span>
                 </span>
               </button>
             )}
 
+            {mode === "redeem" && onLogout ? (
+              <StoreAccountMenu
+                recipientName={recipientName || "Guest"}
+                recipientEmail={recipientEmail}
+                shopName={shop.name}
+                initials={userInitials}
+                truncName={displayName}
+                balanceLabel={navBalanceLabel()}
+                balanceValue={balanceInr != null ? navBalanceValue(balanceInr) : "—"}
+                orders={orders}
+                ordersLoading={ordersLoading}
+                onOpenOrders={() => {
+                  setPage("orders");
+                  void refreshOrders();
+                }}
+                onLogout={onLogout}
+                onRefreshOrders={() => void refreshOrders()}
+              />
+            ) : (
             <button type="button" className="topbar-user sf-topbar-user" aria-label="Account">
               <span className="topbar-user-avatar">{userInitials}</span>
               <span className="topbar-user-copy">
@@ -489,12 +881,13 @@ export default function StoreShell({
               </span>
               <ChevronDown className="topbar-chevron sf-topbar-user-chevron" />
             </button>
+            )}
 
             {mode === "redeem" && (
               <button
                 type="button"
                 className="sf-topbar-cart"
-                onClick={() => setPage("cart")}
+                onClick={openCart}
                 aria-label={cartCount > 0 ? `Cart, ${cartCount} items` : "Cart"}
               >
                 <ShoppingBagIcon />
@@ -504,6 +897,65 @@ export default function StoreShell({
           </div>
         </div>
       </div>
+
+      {addedToBag ? (
+        <>
+          <button
+            type="button"
+            className="sf-bag-added-scrim"
+            aria-label="Close"
+            onClick={closeAddedToBag}
+          />
+          <div
+            className="sf-bag-added"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sf-bag-added-title"
+          >
+            <div className="sf-bag-added-panel">
+              <div className="sf-bag-added-head">
+                <div className="sf-bag-added-head-left">
+                  <span className="sf-bag-added-check" aria-hidden="true">
+                    <CheckCircleIcon />
+                  </span>
+                  <h2 id="sf-bag-added-title" className="sf-bag-added-title">
+                    Added to bag
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  className="sf-bag-added-close"
+                  aria-label="Close"
+                  onClick={closeAddedToBag}
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+
+              <div className="sf-bag-added-item">
+                <div className="sf-bag-added-item-img">
+                  {addedToBag.image ? <img src={addedToBag.image} alt="" /> : null}
+                </div>
+                <div className="sf-bag-added-item-body">
+                  <div className="sf-bag-added-item-brand">{addedToBag.brand.toUpperCase()}</div>
+                  <div className="sf-bag-added-item-name">{addedToBag.name}</div>
+                  <div className="sf-bag-added-item-qty">QTY: {addedToBag.qty}</div>
+                </div>
+                <div className="sf-bag-added-item-price">{fmtCardPrice(addedToBag.linePriceInr)}</div>
+              </div>
+
+              <div className="sf-bag-added-actions">
+                <button type="button" className="sf-bag-added-view" onClick={viewBagFromModal}>
+                  View bag ({cartCount})
+                </button>
+                <button type="button" className="sf-bag-added-checkout" onClick={checkoutFromModal}>
+                  Checkout
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : null}
 
       {/* ═══ MAIN CONTENT ═══ */}
 
@@ -543,70 +995,45 @@ export default function StoreShell({
 
           {/* Catalog */}
           <div className="sf-content" ref={catalogRef}>
-            {/* Featured — horizontal scroll when enough products */}
-            {products.length > 4 && (
+            {products.length > 0 ? (
               <>
-                <div className="sf-section-header">
-                  <div className="sf-section-title-wrap">
-                    <h2 className="sf-section-title">Featured</h2>
-                    <p className="sf-section-subtitle">Popular picks from your catalog</p>
-                  </div>
-                  <div className="sf-section-actions">
+                <div className="sf-section-header sf-section-header--stadium">
+                  <h2 className="sf-section-title sf-section-title--stadium">Featured Products</h2>
+                  {products.length > 5 ? (
                     <button type="button" className="sf-view-all" onClick={() => setPage("products")}>
                       View all <ArrowRightIcon />
                     </button>
-                    <button type="button" className="sf-scroll-btn" onClick={() => trendingRef.current?.scrollBy({ left: -240, behavior: "smooth" })}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
-                    </button>
-                    <button type="button" className="sf-scroll-btn" onClick={() => trendingRef.current?.scrollBy({ left: 240, behavior: "smooth" })}>
-                      <ArrowRightIcon />
-                    </button>
-                  </div>
+                  ) : null}
                 </div>
-                <div className="sf-trending-track" ref={trendingRef}>
-                  {products.slice(0, 8).map((p) => (
-                    <button key={p._id} type="button" className="sf-trending-card" onClick={() => openProduct(p._id)}>
-                      <div className="sf-trending-img">
-                        <ArtworkMockup product={p} />
-                      </div>
-                      <div className="sf-trending-meta">
-                        <div className="sf-trending-name">{p.name}</div>
-                        <div className="sf-trending-cat">{p.category || p.group || "Merchandise"}</div>
-                        <div className="sf-trending-price">
-                          <PointsIcon /> {fmt(p.basePriceInr)}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* All Products */}
-            {products.length > 0 ? (
-              <>
-                <div className="sf-section-header">
-                  <div className="sf-section-title-wrap">
-                    <h2 className="sf-section-title">{products.length > 4 ? "All Products" : "Shop collection"}</h2>
-                    <p className="sf-section-subtitle">{products.length} reward{products.length !== 1 ? "s" : ""} available to redeem</p>
-                  </div>
-                </div>
-                <PremiumProductGrid products={filteredBySearch.slice(0, 8)} onOpen={openProduct} fmt={fmt} />
+                <StadiumProductGrid
+                  products={filteredBySearch.slice(0, 5)}
+                  shopBrand={shop.name}
+                  onOpen={openProduct}
+                  priceLabel={fmtCardPrice}
+                />
+                {products.length > 5 ? (
+                  <>
+                    <div className="sf-section-header sf-section-header--stadium" style={{ marginTop: 48 }}>
+                      <h2 className="sf-section-title sf-section-title--stadium">All Products</h2>
+                      <p className="sf-section-subtitle sf-section-subtitle--stadium">
+                        {products.length} items available
+                      </p>
+                    </div>
+                    <StadiumProductGrid
+                      products={filteredBySearch.slice(5)}
+                      shopBrand={shop.name}
+                      onOpen={openProduct}
+                      priceLabel={fmtCardPrice}
+                    />
+                  </>
+                ) : null}
               </>
             ) : (
-              <div className="sf-empty" style={{ marginTop: 24 }}>
-                <div className="sf-empty-icon">🛍️</div>
-                <h3>No products in this shop yet</h3>
-                <p>Check back soon — new rewards are on the way.</p>
-              </div>
-            )}
-
-            {filteredBySearch.length > 8 && (
-              <div style={{ textAlign: "center", padding: "8px 0 40px" }}>
-                <button type="button" className="sf-hero-btn sf-hero-btn-primary" onClick={() => setPage("products")}>
-                  View All Products <ArrowRightIcon />
-                </button>
-              </div>
+              <StoreEmptyState
+                variant="search"
+                title="No products yet"
+                description="Your reward catalog will appear here once products are added to this shop."
+              />
             )}
           </div>
         </>
@@ -615,14 +1042,15 @@ export default function StoreShell({
       {/* ────── PRODUCTS ────── */}
       {page === "products" && (
         <div className="sf-content" style={{ paddingTop: 8 }}>
-          <div className="sf-section-header" style={{ paddingTop: 20 }}>
-            <h1 className="sf-section-title" style={{ fontSize: 28 }}>Products</h1>
+          <div className="sf-section-header sf-section-header--stadium" style={{ paddingTop: 20 }}>
+            <h1 className="sf-section-title sf-section-title--stadium">All Products</h1>
           </div>
           <ProductsPageWithFilters
             products={products}
             searchQuery={searchQuery}
             onOpen={openProduct}
-            fmt={fmt}
+            priceLabel={fmtCardPrice}
+            shopBrand={shop.name}
             selectedCategory={selectedCategory}
           />
         </div>
@@ -630,11 +1058,11 @@ export default function StoreShell({
 
       {/* ────── PRODUCT DETAIL ────── */}
       {page === "product" && active && (
-        <div className="sf-content" style={{ paddingTop: 24, paddingBottom: 60 }}>
+        <div className="sf-content sf-pdp-page">
           <ProductDetail
             product={active}
             mode={mode}
-            fmt={fmt}
+            priceLabel={fmtCardPrice}
             onBack={() => setPage("products")}
             onAdd={(variant, qty) => addToCart(active, variant, qty)}
           />
@@ -642,118 +1070,540 @@ export default function StoreShell({
       )}
 
       {/* ────── CART ────── */}
-      {page === "cart" && (
-        <div className="sf-cart-container">
-          <h1 className="sf-cart-title">Your cart</h1>
-          {cart.length === 0 ? (
-            <div className="sf-empty">
-              <div className="sf-empty-icon">🛒</div>
-              <h3>Your cart is empty</h3>
-              <p style={{ marginBottom: 20 }}>Browse our collection and add items you love.</p>
-              <button className="sf-add-btn" onClick={() => setPage("products")}>Browse products</button>
-            </div>
-          ) : (
-            <>
-              <div className="sf-cart-card">
-                {cart.map((l) => (
-                  <div key={l.key} className="sf-cart-item">
-                    <div className="sf-cart-item-img">
-                      {l.image ? <img src={l.image} alt={l.name} /> : null}
-                    </div>
-                    <div className="sf-cart-item-info">
-                      <div className="sf-cart-item-name">{l.name}</div>
-                      {l.variant && (
-                        <div className="sf-cart-item-variant">
-                          {[l.variant.color, l.variant.size].filter(Boolean).join(" · ")}
-                        </div>
-                      )}
-                      <div className="sf-cart-item-price">{fmt(l.priceInr)} each</div>
-                    </div>
+      {page === "cart" && cart.length > 0 && (
+        <div className="sf-content sf-bag-page">
+          <button type="button" className="sf-bag-back" onClick={() => setPage("home")}>
+            ← CONTINUE SHOPPING
+          </button>
+
+          <div className="sf-bag-layout">
+            <div className="sf-bag-main">
+              <h1 className="sf-bag-title">My Bag ({cartCount})</h1>
+
+              {mode === "redeem" && balanceInr != null ? (
+                <div className={`sf-bag-funds${useRewardPoints ? "" : " sf-bag-funds--off"}`}>
+                  <div className="sf-bag-funds-label">My Reward Points</div>
+                  <label className="sf-bag-funds-wallet">
                     <input
-                      className="sf-cart-qty-input"
-                      type="number"
-                      min={0}
-                      value={l.qty}
-                      onChange={(e) => setLineQty(l.key, Math.max(0, Number(e.target.value)))}
+                      type="checkbox"
+                      checked={useRewardPoints}
+                      onChange={(e) => setUseRewardPoints(e.target.checked)}
                     />
-                    <div className="sf-cart-item-total">{fmt(l.priceInr * l.qty)}</div>
+                    <span>
+                      {recipientName ? `${recipientName}'s ` : ""}
+                      {shop.name} Wallet
+                    </span>
+                  </label>
+                  <div className="sf-bag-funds-balance">
+                    Available: <b>{navBalanceValue(balanceInr)}</b>
                   </div>
-                ))}
-              </div>
-              <div className="sf-summary-card">
-                <div className="sf-summary-row">
-                  <span>Subtotal</span>
-                  <b>{fmt(cartTotalInr)}</b>
+                  {!useRewardPoints ? (
+                    <p className="sf-bag-funds-hint">Pay at checkout via UPI, cards, or net banking.</p>
+                  ) : !hasEnoughPoints ? (
+                    <p className="sf-bag-funds-warning">
+                      Insufficient points — remaining balance can be paid via UPI at checkout.
+                    </p>
+                  ) : (
+                    <p className="sf-bag-funds-hint">Reward points will be applied at checkout.</p>
+                  )}
                 </div>
-                {mode === "redeem" && creditInr != null && (
-                  <div className="sf-summary-row" style={{ color: overBudget ? "var(--danger)" : "inherit" }}>
-                    <span>Remaining balance after order</span>
-                    <b>{fmt(Math.max(0, creditInr - cartTotalInr))}</b>
+              ) : null}
+
+              <div className="sf-bag-items">
+                {cart.map((l) => {
+                  const variantLabel = [l.variant?.size, l.variant?.color].filter(Boolean).join(" · ");
+                  return (
+                    <div key={l.key} className="sf-bag-item">
+                      <div className="sf-bag-item-img">
+                        {l.image ? <img src={l.image} alt={l.name} /> : null}
+                      </div>
+                      <div className="sf-bag-item-body">
+                        <div className="sf-bag-item-brand">{(l.brand || shop.name).toUpperCase()}</div>
+                        <div className="sf-bag-item-name">{l.name}</div>
+                        {variantLabel ? <span className="sf-bag-item-tag">{variantLabel.toUpperCase()}</span> : null}
+                        <div className="sf-bag-item-price">{fmtCardPrice(l.priceInr * l.qty)}</div>
+                        <div className="sf-bag-item-actions">
+                          <div className="sf-bag-qty">
+                            <button
+                              type="button"
+                              className="sf-bag-qty-btn"
+                              aria-label="Decrease quantity"
+                              onClick={() => bumpLineQty(l.key, -1)}
+                            >
+                              <MinusIcon />
+                            </button>
+                            <span className="sf-bag-qty-val">{l.qty}</span>
+                            <button
+                              type="button"
+                              className="sf-bag-qty-btn"
+                              aria-label="Increase quantity"
+                              onClick={() => bumpLineQty(l.key, 1)}
+                            >
+                              <PlusIcon />
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            className="sf-bag-icon-btn"
+                            aria-label="Edit item"
+                            onClick={() => editCartLine(l.productId)}
+                          >
+                            <PencilIcon />
+                          </button>
+                          <button
+                            type="button"
+                            className="sf-bag-icon-btn sf-bag-icon-btn--danger"
+                            aria-label="Remove item"
+                            onClick={() => setLineQty(l.key, 0)}
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button type="button" className="sf-bag-remove-all" onClick={clearCart}>
+                Remove all items
+              </button>
+            </div>
+
+            <aside className="sf-bag-sidebar">
+              <div className="sf-bag-summary">
+                <h2 className="sf-bag-summary-title">Order Summary</h2>
+                <div className="sf-bag-summary-row">
+                  <span>Bag total</span>
+                  <b>{fmtCardPrice(cartTotalInr)}</b>
+                </div>
+                <div className="sf-bag-summary-row sf-bag-summary-row--muted">
+                  <span>Estimated taxes</span>
+                  <b>TBD</b>
+                </div>
+                {mode === "redeem" && balanceInr != null && useRewardPoints && pointsApplied > 0 ? (
+                  <div className="sf-bag-summary-row sf-bag-summary-row--muted">
+                    <span>Points applied</span>
+                    <b>{fmtCardPrice(pointsApplied)}</b>
                   </div>
-                )}
-                {overBudget && (
-                  <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 8, fontWeight: 500 }}>
-                    Your cart exceeds your balance. Remove an item or lower a quantity.
-                  </p>
-                )}
+                ) : null}
+                {mode === "redeem" && paysWithUpi ? (
+                  <div className="sf-bag-summary-row sf-bag-summary-row--muted">
+                    <span>Pay via UPI</span>
+                    <b>{fmtUpiAmount(upiDueInr)}</b>
+                  </div>
+                ) : null}
+                {mode === "redeem" && balanceInr != null && useRewardPoints && hasEnoughPoints ? (
+                  <div className="sf-bag-summary-row sf-bag-summary-row--muted">
+                    <span>Remaining after order</span>
+                    <b>{fmtCardPrice(Math.max(0, balanceInr - cartTotalInr))}</b>
+                  </div>
+                ) : null}
+                <div className="sf-bag-summary-total">
+                  <span>{paysWithUpi ? "You pay" : navBalanceLabel()}</span>
+                  <b>
+                    {paysWithUpi
+                      ? fmtUpiAmount(upiDueInr)
+                      : canCheckout
+                        ? fmtCardPrice(cartTotalInr)
+                        : "—"}
+                  </b>
+                </div>
                 {mode === "redeem" ? (
-                  <button className="sf-add-btn" style={{ width: "100%", marginTop: 16, height: 46 }} disabled={overBudget} onClick={() => setPage("checkout")}>
-                    Proceed to checkout
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="sf-bag-checkout-btn"
+                      disabled={!canCheckout}
+                      onClick={() => setPage("checkout")}
+                    >
+                      Proceed to checkout
+                    </button>
+                  </>
                 ) : (
-                  <p className="mut3" style={{ fontSize: 12, marginTop: 12 }}>Open your invite link to check out.</p>
+                  <p className="sf-bag-preview-note">Open your invite link to check out.</p>
                 )}
               </div>
-            </>
-          )}
+            </aside>
+          </div>
         </div>
       )}
 
       {/* ────── CHECKOUT ────── */}
       {page === "checkout" && (
-        <div className="sf-cart-container">
-          <button type="button" className="sf-back-btn" onClick={() => setPage("cart")} style={{ marginBottom: 16 }}>← Back to cart</button>
-          <h1 className="sf-cart-title">Checkout</h1>
-          {error && <div className="sf-summary-card" style={{ padding: 14, marginBottom: 16, color: "var(--danger)" }}>{error}</div>}
-          <div className="sf-summary-card" style={{ marginBottom: 16 }}>
-            <h3 style={{ fontSize: 16, marginBottom: 16, fontWeight: 700 }}>Shipping Address</h3>
-            <div className="row" style={{ gap: 12 }}>
-              <input className="inp" placeholder="Full name" value={address.name} onChange={(e) => setAddress({ ...address, name: e.target.value })} style={{ borderRadius: 12 }} />
-              <input className="inp" placeholder="Phone number" value={address.phone} onChange={(e) => setAddress({ ...address, phone: e.target.value })} style={{ borderRadius: 12 }} />
-            </div>
-            <input className="inp" placeholder="Address line" style={{ marginTop: 10, borderRadius: 12 }} value={address.line1} onChange={(e) => setAddress({ ...address, line1: e.target.value })} />
-            <div className="row" style={{ gap: 12, marginTop: 10 }}>
-              <input className="inp" placeholder="City" value={address.city} onChange={(e) => setAddress({ ...address, city: e.target.value })} style={{ borderRadius: 12 }} />
-              <input className="inp" placeholder="State" value={address.state} onChange={(e) => setAddress({ ...address, state: e.target.value })} style={{ borderRadius: 12 }} />
-              <input className="inp" placeholder="PIN" value={address.pincode} onChange={(e) => setAddress({ ...address, pincode: e.target.value })} style={{ borderRadius: 12 }} />
+        <div className="sf-content sf-checkout-page">
+          <button type="button" className="sf-bag-back" onClick={() => setPage("cart")}>
+            ← BACK
+          </button>
+
+          <div className="sf-checkout-titlebar">
+            <h1 className="sf-checkout-title">Checkout</h1>
+            <div className="sf-checkout-currency" aria-label="Currency">
+              {usesPointsDisplay ? "Pts" : "INR"}
+              <ChevronDown className="sf-checkout-currency-chevron" />
             </div>
           </div>
-          <div className="sf-summary-card">
-            <div className="sf-summary-row" style={{ marginBottom: 16 }}>
-              <span>{cartCount} item(s)</span>
-              <b>{fmt(cartTotalInr)}</b>
+
+          {error ? <div className="sf-checkout-error">{error}</div> : null}
+
+          <div className="sf-checkout-layout">
+            <div className="sf-checkout-main">
+              <div className="sf-checkout-shipping-card">
+                <div className="sf-checkout-section-head">
+                  <TruckIcon />
+                  <span>Shipping</span>
+                </div>
+                <h2 className="sf-checkout-subhead">— Add new address</h2>
+
+                <div className="sf-checkout-form">
+                  <div className="sf-checkout-form-row sf-checkout-form-row--2">
+                    <label className="sf-checkout-field">
+                      <span className="sf-checkout-label">First name</span>
+                      <input
+                        className="sf-checkout-inp"
+                        value={checkoutFirst}
+                        onChange={(e) => {
+                          setCheckoutFirst(e.target.value);
+                          resetCheckoutProgress();
+                        }}
+                      />
+                    </label>
+                    <label className="sf-checkout-field">
+                      <span className="sf-checkout-label">Last name</span>
+                      <input
+                        className="sf-checkout-inp"
+                        value={checkoutLast}
+                        onChange={(e) => {
+                          setCheckoutLast(e.target.value);
+                          resetCheckoutProgress();
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  <label className="sf-checkout-field">
+                    <span className="sf-checkout-label">Business name (optional)</span>
+                    <input
+                      className="sf-checkout-inp"
+                      placeholder="Company name"
+                      value={checkoutBusiness}
+                      onChange={(e) => {
+                        setCheckoutBusiness(e.target.value);
+                        resetCheckoutProgress();
+                      }}
+                    />
+                  </label>
+
+                  <div className="sf-checkout-form-row sf-checkout-form-row--2">
+                    <label className="sf-checkout-field">
+                      <span className="sf-checkout-label">Country</span>
+                      <select
+                        className="sf-checkout-inp sf-checkout-select"
+                        value={address.country || "IN"}
+                        onChange={(e) => {
+                          setAddress({ ...address, country: e.target.value });
+                          resetCheckoutProgress();
+                        }}
+                      >
+                        <option value="IN">India</option>
+                        <option value="US">United States</option>
+                      </select>
+                    </label>
+                    <label className="sf-checkout-field">
+                      <span className="sf-checkout-label">Phone number</span>
+                      <div className="sf-checkout-phone">
+                        <span className="sf-checkout-phone-prefix">
+                          {address.country === "US" ? "+1" : "+91"}
+                        </span>
+                        <input
+                          className="sf-checkout-inp sf-checkout-inp--phone"
+                          placeholder={address.country === "US" ? "(555) 555-5555" : "98765 43210"}
+                          value={address.phone}
+                          onChange={(e) => {
+                            setAddress({ ...address, phone: e.target.value });
+                            resetCheckoutProgress();
+                          }}
+                        />
+                      </div>
+                    </label>
+                  </div>
+
+                  <label className="sf-checkout-field">
+                    <span className="sf-checkout-label">Address</span>
+                    <input
+                      className="sf-checkout-inp"
+                      placeholder="Street address"
+                      value={address.line1}
+                      onChange={(e) => {
+                        setAddress({ ...address, line1: e.target.value });
+                        resetCheckoutProgress();
+                      }}
+                    />
+                  </label>
+
+                  <div className="sf-checkout-form-row sf-checkout-form-row--2">
+                    <label className="sf-checkout-field">
+                      <span className="sf-checkout-label">Suite / Apt / Other</span>
+                      <input
+                        className="sf-checkout-inp"
+                        placeholder="Apt 000"
+                        value={address.line2 || ""}
+                        onChange={(e) => {
+                          setAddress({ ...address, line2: e.target.value });
+                          resetCheckoutProgress();
+                        }}
+                      />
+                    </label>
+                    <label className="sf-checkout-field">
+                      <span className="sf-checkout-label">City</span>
+                      <input
+                        className="sf-checkout-inp"
+                        value={address.city}
+                        onChange={(e) => {
+                          setAddress({ ...address, city: e.target.value });
+                          resetCheckoutProgress();
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="sf-checkout-form-row sf-checkout-form-row--2">
+                    <label className="sf-checkout-field">
+                      <span className="sf-checkout-label">State / County / Province</span>
+                      <input
+                        className="sf-checkout-inp"
+                        placeholder="Search"
+                        value={address.state}
+                        onChange={(e) => {
+                          setAddress({ ...address, state: e.target.value });
+                          resetCheckoutProgress();
+                        }}
+                      />
+                    </label>
+                    <label className="sf-checkout-field">
+                      <span className="sf-checkout-label">Zip code / Pin</span>
+                      <input
+                        className="sf-checkout-inp"
+                        placeholder="00000"
+                        value={address.pincode}
+                        onChange={(e) => {
+                          setAddress({ ...address, pincode: e.target.value });
+                          resetCheckoutProgress();
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <button type="button" className="sf-checkout-save" onClick={saveShipping}>
+                  Save
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className="sf-checkout-continue"
+                disabled={!addressSaved}
+                onClick={confirmShipping}
+              >
+                Continue
+              </button>
             </div>
-            <button className="sf-add-btn" style={{ width: "100%", height: 46 }} disabled={placing || overBudget || cart.length === 0} onClick={placeOrder}>
-              {placing ? "Placing order…" : "Place order"}
-            </button>
+
+            <aside className="sf-checkout-sidebar">
+              <div className="sf-checkout-summary">
+                <h2 className="sf-checkout-summary-title">Order Summary</h2>
+                <div className="sf-checkout-summary-row">
+                  <span>Bag total</span>
+                  <b>{fmtCardPrice(cartTotalInr)}</b>
+                </div>
+                <div className="sf-checkout-summary-row sf-checkout-summary-row--muted">
+                  <span>Estimated taxes</span>
+                  <b>TBD</b>
+                </div>
+                <button type="button" className="sf-checkout-promo" onClick={() => {}}>
+                  Apply promo code
+                </button>
+                {mode === "redeem" && useRewardPoints && pointsApplied > 0 ? (
+                  <div className="sf-checkout-summary-row sf-checkout-summary-row--muted">
+                    <span>Points applied</span>
+                    <b>{fmtCardPrice(pointsApplied)}</b>
+                  </div>
+                ) : null}
+                {mode === "redeem" && paysWithUpi ? (
+                  <div className="sf-checkout-summary-row sf-checkout-summary-row--muted">
+                    <span>Pay via UPI</span>
+                    <b>{fmtUpiAmount(upiDueInr)}</b>
+                  </div>
+                ) : null}
+                <div className="sf-checkout-summary-total">
+                  <span>You pay</span>
+                  <b>{paysWithUpi ? fmtUpiAmount(upiDueInr) : fmtCheckoutInr(cartTotalInr)}</b>
+                </div>
+                <button
+                  type="button"
+                  className="sf-checkout-pay"
+                  disabled={placing || !shippingConfirmed || !canCheckout || cart.length === 0}
+                  onClick={() => void placeOrder()}
+                >
+                  {placing
+                    ? "Processing…"
+                    : paysWithUpi
+                      ? `Pay ${fmtUpiAmount(upiDueInr)} via UPI`
+                      : "Pay now"}
+                </button>
+              </div>
+
+              <div className="sf-checkout-items">
+                <button
+                  type="button"
+                  className="sf-checkout-items-toggle"
+                  aria-expanded={itemsExpanded}
+                  onClick={() => setItemsExpanded((v) => !v)}
+                >
+                  <span>Your item{cartCount === 1 ? "" : "s"}</span>
+                  <ChevronDown className={`sf-checkout-items-chevron${itemsExpanded ? " sf-checkout-items-chevron--open" : ""}`} />
+                </button>
+                {itemsExpanded ? (
+                  <div className="sf-checkout-items-body">
+                    {cart.map((l) => {
+                      const variantLabel = [l.variant?.size, l.variant?.color].filter(Boolean).join(" · ");
+                      return (
+                        <div key={l.key} className="sf-checkout-item">
+                          <div className="sf-checkout-item-img">
+                            {l.image ? <img src={l.image} alt={l.name} /> : null}
+                          </div>
+                          <div className="sf-checkout-item-info">
+                            <div className="sf-checkout-item-name">{l.name}</div>
+                            {variantLabel ? (
+                              <div className="sf-checkout-item-variant">{variantLabel}</div>
+                            ) : null}
+                            <div className="sf-checkout-item-meta">
+                              <span>Qty {l.qty}</span>
+                              <b>{fmtCardPrice(l.priceInr * l.qty)}</b>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            </aside>
           </div>
         </div>
       )}
 
       {/* ────── DONE ────── */}
       {page === "done" && (
-        <div className="sf-content" style={{ paddingTop: 60, paddingBottom: 60 }}>
-          <div className="card sf-fade-in" style={{ padding: 48, textAlign: "center", maxWidth: 520, margin: "0 auto", borderRadius: 24 }}>
-            <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#eaf5ef", display: "grid", placeItems: "center", margin: "0 auto 20px" }}>
+        <div className="sf-content sf-order-success">
+          <div className="card sf-fade-in sf-order-success-card">
+            <div className="sf-order-success-icon" aria-hidden="true">
               <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#15784C" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
             </div>
             <div className="eyebrow">Order placed</div>
-            <h1 style={{ fontSize: 28, margin: "8px 0" }}>Thank you{recipientName ? `, ${recipientName}` : ""}! 🎁</h1>
-            <p className="muted" style={{ fontSize: 15, lineHeight: 1.6 }}>
-              Order <b>{orderNumber}</b> is confirmed. We'll email you tracking once it ships.
+            <h1 className="sf-order-success-title">Thank you{recipientName ? `, ${recipientName}` : ""}!</h1>
+            <p className="muted sf-order-success-copy">
+              Order <b>#{orderNumber}</b> is confirmed. We&apos;ll email you tracking once it ships.
             </p>
+            {balanceInr != null && balanceInr > 0 ? (
+              <p className="sf-order-success-balance">
+                You still have <b>{navBalanceValue(balanceInr)}</b> to spend in the store.
+              </p>
+            ) : null}
+            <div className="sf-order-success-actions">
+              <button type="button" className="sf-add-btn" onClick={continueShopping}>
+                Continue shopping
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost sf-order-success-secondary"
+                onClick={() => {
+                  setPage("orders");
+                  void refreshOrders();
+                }}
+              >
+                View my orders
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* ────── ORDERS ────── */}
+      {page === "orders" && (
+        <StorePageShell
+          backLabel="← Back to store"
+          onBack={() => setPage("home")}
+          title="My orders"
+          subtitle={
+            recipientEmail
+              ? `${recipientEmail}${balanceInr != null ? ` · ${navBalanceValue(balanceInr)} available` : ""}`
+              : balanceInr != null
+                ? `${navBalanceValue(balanceInr)} available`
+                : undefined
+          }
+        >
+          {ordersLoading ? (
+            <div className="sf-orders-skeleton">
+              {[1, 2].map((n) => (
+                <div key={n} className="sf-order-card sf-order-card--skeleton" />
+              ))}
+            </div>
+          ) : ordersError ? (
+            <StoreEmptyState
+              variant="orders"
+              title="Couldn't load orders"
+              description={ordersError}
+              action={
+                <button type="button" className="sf-btn-secondary" onClick={() => void refreshOrders()}>
+                  Try again
+                </button>
+              }
+            />
+          ) : orders.length === 0 ? (
+            <StoreEmptyState
+              variant="orders"
+              title="No orders yet"
+              description="When you redeem products from the store, your order history will appear here."
+              action={
+                <button type="button" className="sf-btn-secondary" onClick={() => setPage("products")}>
+                  Browse products
+                </button>
+              }
+            />
+          ) : (
+            <div className="sf-orders-list">
+              {orders.map((o) => (
+                <div key={o.orderNumber} className="sf-summary-card sf-order-card">
+                  <div className="sf-order-card-head">
+                    <div>
+                      <div className="sf-order-card-num">Order #{o.orderNumber}</div>
+                      <div className="sf-order-card-date">
+                        {o.createdAt
+                          ? new Date(o.createdAt).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : ""}
+                      </div>
+                    </div>
+                    <span className={`sf-order-status sf-order-status--${o.status}`}>
+                      {o.status.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                  <div className="sf-order-card-meta">
+                    <span>
+                      {o.itemCount ?? 0} item{(o.itemCount ?? 0) === 1 ? "" : "s"}
+                    </span>
+                    {o.total != null ? <b>{fmt(o.total)}</b> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </StorePageShell>
       )}
 
       {/* ═══ FOOTER ═══ */}
@@ -776,13 +1626,15 @@ function ProductsPageWithFilters({
   products,
   searchQuery,
   onOpen,
-  fmt,
+  priceLabel,
+  shopBrand,
   selectedCategory,
 }: {
   products: StoreProduct[];
   searchQuery: string;
   onOpen: (id: string) => void;
-  fmt: (n: number) => string;
+  priceLabel: (inr: number) => string;
+  shopBrand: string;
   selectedCategory: string;
 }) {
   const q = searchQuery.toLowerCase();
@@ -793,64 +1645,72 @@ function ProductsPageWithFilters({
   });
 
   return (
-    <div style={{ marginTop: 20 }}>
-      <PremiumProductGrid products={filtered} onOpen={onOpen} fmt={fmt} />
+    <StadiumProductGrid
+      products={filtered}
+      shopBrand={shopBrand}
+      onOpen={onOpen}
+      priceLabel={priceLabel}
+    />
+  );
+}
+
+function StadiumProductGrid({
+  products,
+  shopBrand,
+  onOpen,
+  priceLabel,
+}: {
+  products: StoreProduct[];
+  shopBrand: string;
+  onOpen: (id: string) => void;
+  priceLabel: (inr: number) => string;
+}) {
+  if (products.length === 0) {
+    return (
+      <StoreEmptyState
+        variant="search"
+        title="No products found"
+        description="Try adjusting your search or browse all categories."
+      />
+    );
+  }
+  return (
+    <div className="sf-product-grid sf-product-grid--stadium">
+      {products.map((p) => (
+        <StadiumProductCard
+          key={p._id}
+          product={p}
+          brandLabel={(p.brand || shopBrand || "Rewards").toUpperCase()}
+          price={priceLabel(p.basePriceInr)}
+          onOpen={() => onOpen(p._id)}
+        />
+      ))}
     </div>
   );
 }
 
-function PremiumProductGrid({
-  products,
+function StadiumProductCard({
+  product,
+  brandLabel,
+  price,
   onOpen,
-  fmt,
 }: {
-  products: StoreProduct[];
-  onOpen: (id: string) => void;
-  fmt: (n: number) => string;
+  product: StoreProduct;
+  brandLabel: string;
+  price: string;
+  onOpen: () => void;
 }) {
-  if (products.length === 0) {
-    return (
-      <div className="sf-empty">
-        <div className="sf-empty-icon">🔍</div>
-        <h3>No products found</h3>
-        <p>Try adjusting your search or filters.</p>
-      </div>
-    );
-  }
   return (
-    <div className="sf-product-grid sf-stagger">
-      {products.map((p) => {
-        const colors = productColorOptions(p);
-        return (
-          <button key={p._id} type="button" className="sf-pcard" onClick={() => onOpen(p._id)}>
-            <div className="sf-pcard-img">
-              <ArtworkMockup product={p} />
-              <div className="sf-wishlist" onClick={(e) => { e.stopPropagation(); }}>
-                <HeartIcon />
-              </div>
-            </div>
-            <div className="sf-pcard-meta">
-              <div className="sf-pcard-name">{p.name}</div>
-              <div className="sf-pcard-category">{p.category || p.group || "Merchandise"}</div>
-              <div className="sf-pcard-price">
-                <PointsIcon /> {fmt(p.basePriceInr)}
-              </div>
-              {colors.length > 0 && (
-                <div className="sf-pcard-swatches">
-                  {colors.slice(0, 5).map((c) => (
-                    <span key={c.name} className="sf-pcard-sw" style={{ background: c.hex }} title={c.name} />
-                  ))}
-                  {colors.length > 5 && <span style={{ fontSize: 10, color: "#8C988F", alignSelf: "center" }}>+{colors.length - 5}</span>}
-                </div>
-              )}
-              <div className="sf-pcard-cta">
-                <ShoppingBagIcon /> Redeem Now
-              </div>
-            </div>
-          </button>
-        );
-      })}
-    </div>
+    <button type="button" className="sf-pcard sf-pcard--stadium" onClick={onOpen}>
+      <div className="sf-pcard-img sf-pcard-img--stadium">
+        <ArtworkMockup product={product} />
+      </div>
+      <div className="sf-pcard-meta sf-pcard-meta--stadium">
+        <div className="sf-pcard-brand">{brandLabel}</div>
+        <div className="sf-pcard-name">{product.name}</div>
+        <div className="sf-pcard-price">{price}</div>
+      </div>
+    </button>
   );
 }
 
@@ -910,14 +1770,14 @@ function ProductInfoTabs({ product }: { product: StoreProduct }) {
   const currentTab = useTabs ? activeTab : tabs[0].id;
 
   return (
-    <div className="sf-detail-info" style={{ marginBottom: 24 }}>
+    <div className="sf-pdp-info-card">
       {useTabs ? (
-        <div className="pd-detail-tabs" role="tablist" aria-label="Product information">
+        <div className="sf-pdp-tabs" role="tablist" aria-label="Product information">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
-              className={currentTab === tab.id ? "on" : ""}
+              className={`sf-pdp-tab${currentTab === tab.id ? " sf-pdp-tab--on" : ""}`}
               role="tab"
               aria-selected={currentTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -926,29 +1786,33 @@ function ProductInfoTabs({ product }: { product: StoreProduct }) {
             </button>
           ))}
         </div>
-      ) : null}
+      ) : (
+        <div className="sf-checkout-section-head">
+          <span>Product information</span>
+        </div>
+      )}
 
       <div
-        className={`pd-tab-panel pd-description-panel${currentTab === "description" ? " on" : ""}`}
+        className={`sf-pdp-tab-panel${currentTab === "description" ? " sf-pdp-tab-panel--on" : ""}`}
         role="tabpanel"
         hidden={currentTab !== "description"}
       >
-        <p className="sf-detail-desc" style={{ marginBottom: 8 }}>{detailText(shortDescription)}</p>
+        <p className="sf-pdp-desc">{detailText(shortDescription)}</p>
         {description.length > 180 ? (
-          <button type="button" className="lnk" style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }} onClick={() => setDescExpanded((v) => !v)}>
+          <button type="button" className="sf-pdp-see-more" onClick={() => setDescExpanded((v) => !v)}>
             {descExpanded ? "See less" : "See more"}
           </button>
         ) : null}
       </div>
 
       <div
-        className={`pd-tab-panel${currentTab === "features" ? " on" : ""}`}
+        className={`sf-pdp-tab-panel${currentTab === "features" ? " sf-pdp-tab-panel--on" : ""}`}
         role="tabpanel"
         hidden={currentTab !== "features"}
       >
-        <div className="pd-feature-card">
+        <div className="sf-pdp-feature-list">
           {featureRows.map(([label, value]) => (
-            <div key={`${label}-${value}`} className="pd-feature-row">
+            <div key={`${label}-${value}`} className="sf-pdp-feature-row">
               <div>{label}</div>
               <div>{value ? detailText(value) : null}</div>
             </div>
@@ -957,17 +1821,17 @@ function ProductInfoTabs({ product }: { product: StoreProduct }) {
       </div>
 
       <div
-        className={`pd-tab-panel${currentTab === "size" ? " on" : ""}`}
+        className={`sf-pdp-tab-panel${currentTab === "size" ? " sf-pdp-tab-panel--on" : ""}`}
         role="tabpanel"
         hidden={currentTab !== "size"}
       >
-        <div className="pd-size-table">
-          <div className="pd-size-head">
+        <div className="sf-pdp-size-table">
+          <div className="sf-pdp-size-head">
             <div>Feature</div>
             <div>Details</div>
           </div>
           {sizeRows.map(([label, value]) => (
-            <div key={`${label}-${value}`} className="pd-size-row">
+            <div key={`${label}-${value}`} className="sf-pdp-size-row">
               <div>{label}</div>
               <div>{value ? detailText(value) : null}</div>
             </div>
@@ -978,10 +1842,10 @@ function ProductInfoTabs({ product }: { product: StoreProduct }) {
   );
 }
 
-function ProductDetail({ product, mode, fmt, onBack, onAdd }: {
+function ProductDetail({ product, mode, priceLabel, onBack, onAdd }: {
   product: StoreProduct;
   mode: Mode;
-  fmt: (n: number) => string;
+  priceLabel: (n: number) => string;
   onBack: () => void;
   onAdd: (variant: { size?: string; color?: string }, qty: number) => void;
 }) {
@@ -993,6 +1857,7 @@ function ProductDetail({ product, mode, fmt, onBack, onAdd }: {
   const [qty, setQty] = useState(1);
   const selectedColor = colorOptions[selColor];
   const previewBg = selectedColor?.hex || "#ffffff";
+  const lineTotal = product.basePriceInr * qty;
 
   useEffect(() => {
     setSelColor(primaryColorIndex(colorOptions));
@@ -1002,85 +1867,119 @@ function ProductDetail({ product, mode, fmt, onBack, onAdd }: {
 
   return (
     <>
-      <button type="button" className="sf-back-btn" onClick={onBack} style={{ marginBottom: 20 }}>← Back to products</button>
-      <div className="sf-detail-grid">
-        <div className="sf-detail-gallery">
-          <div className="sf-detail-img-box" style={{ background: previewBg }}>
-            <div className="sf-detail-img-inner">
-              <ArtworkMockup product={product} />
-            </div>
-          </div>
-          {/* {colorOptions.length > 0 && (
-            <div className="pd-colors" style={{ marginTop: 20 }}>
-              <div className="lbl" style={{ marginBottom: 10 }}>Color preview</div>
-              <ColorSwatches colors={colorOptions} selected={selColor} onSelect={setSelColor} />
-            </div>
-          )} */}
-        </div>
-        <div>
-          {product.brand && <div className="sf-detail-brand">{product.brand}</div>}
-          <h1 className="sf-detail-name">{product.name}</h1>
-          <div className="sf-detail-price">
-            <PointsIcon /> {fmt(product.basePriceInr)}
-          </div>
-          <ProductInfoTabs product={product} />
+      <button type="button" className="sf-bag-back" onClick={onBack}>
+        ← BACK TO ALL PRODUCTS
+      </button>
 
-          {colorOptions.length > 0 && (
-            <div className="field">
-              <label className="lbl">Colour</label>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      <div className="sf-pdp-hero">
+        <div className="sf-pdp-gallery">
+          <div className="sf-pdp-media-card">
+            <div className="sf-pdp-media" style={{ background: previewBg }}>
+              <ArtworkMockup product={product} className="sf-pdp-thumb" />
+            </div>
+          </div>
+        </div>
+
+        <div className="sf-pdp-buy">
+          {product.brand ? (
+            <div className="sf-pdp-brand">{product.brand.toUpperCase()}</div>
+          ) : null}
+          <h1 className="sf-pdp-title">{product.name}</h1>
+          <p className="sf-pdp-price-line">
+            <b>{priceLabel(product.basePriceInr)}</b> per unit
+            <span className="sf-pdp-price-sep" aria-hidden="true">
+              |
+            </span>
+            <b>{priceLabel(lineTotal)}</b> total
+          </p>
+
+          {colorOptions.length > 0 ? (
+            <div className="sf-pdp-field">
+              <span className="sf-pdp-field-label">Colour</span>
+              <div className="sf-pdp-option-grid">
                 {colorOptions.map((c, i) => (
                   <button
                     key={c.name}
                     type="button"
                     onClick={() => setSelColor(i)}
-                    className={`sf-option-btn${selColor === i ? " active" : ""}`}
+                    className={`sf-pdp-option${selColor === i ? " sf-pdp-option--on" : ""}`}
                   >
-                    <span className="sf-option-btn-swatch" style={{ background: c.hex }} />
+                    <span className="sf-pdp-option-swatch" style={{ background: c.hex }} />
                     {c.name}
                   </button>
                 ))}
               </div>
             </div>
-          )}
-          {sizes.length > 0 && (
-            <div className="field">
-              <label className="lbl">Size</label>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {sizes.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setSize(s)}
-                    className={`sf-option-btn${size === s ? " active" : ""}`}
-                  >
-                    {s}
+          ) : null}
+
+          {sizes.length > 0 ? (
+            <div className="sf-pdp-field">
+              <div className="sf-pdp-field-head">
+                <span className="sf-pdp-field-label">Size</span>
+                {product.sizeGuide ? (
+                  <button type="button" className="sf-pdp-size-guide">
+                    Size guide
                   </button>
-                ))}
+                ) : null}
               </div>
+              <select
+                className="sf-pdp-select"
+                value={size ?? ""}
+                onChange={(e) => setSize(e.target.value || undefined)}
+              >
+                {sizes.length > 1 ? <option value="">Select</option> : null}
+                {sizes.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
+          ) : null}
 
           {mode === "redeem" ? (
-            <div className="row" style={{ gap: 12, marginTop: 24, alignItems: "center" }}>
-              <input
-                className="sf-qty-input"
-                type="number"
-                min={1}
-                value={qty}
-                onChange={(e) => setQty(Math.max(1, Number(e.target.value)))}
-              />
-              <button className="sf-add-btn" onClick={() => onAdd({ size, color: selectedColor?.name }, qty)}>
-                <ShoppingBagIcon /> Add to cart
+            <div className="sf-pdp-purchase">
+              <div className="sf-pdp-purchase-qty">
+                <span className="sf-pdp-field-label">Quantity</span>
+                <div className="sf-bag-qty">
+                  <button
+                    type="button"
+                    className="sf-bag-qty-btn"
+                    aria-label="Decrease quantity"
+                    onClick={() => setQty((n) => Math.max(1, n - 1))}
+                  >
+                    <MinusIcon />
+                  </button>
+                  <span className="sf-bag-qty-val">{qty}</span>
+                  <button
+                    type="button"
+                    className="sf-bag-qty-btn"
+                    aria-label="Increase quantity"
+                    onClick={() => setQty((n) => n + 1)}
+                  >
+                    <PlusIcon />
+                  </button>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="sf-pdp-add-btn"
+                onClick={() => onAdd({ size, color: selectedColor?.name }, qty)}
+              >
+                Add to bag
               </button>
             </div>
           ) : (
-            <p className="mut3" style={{ fontSize: 13, marginTop: 22, padding: "14px 18px", background: "#FBF3DC", borderRadius: 12, border: "1px solid #F0E2B0", color: "#7A5A00" }}>
-              Open your private invite link to redeem this item.
-            </p>
+            <p className="sf-bag-preview-note">Open your invite link to redeem this item.</p>
           )}
         </div>
       </div>
+
+      {product.description || product.keyFeatures || product.sizeGuide ? (
+        <div className="sf-pdp-details">
+          <ProductInfoTabs product={product} />
+        </div>
+      ) : null}
     </>
   );
 }
