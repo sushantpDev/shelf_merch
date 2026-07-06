@@ -142,15 +142,15 @@ const platformChildren: RouteObject[] = [
       { index: true, lazy: page(platformPages, "CatalogPage") },
       {
         path: "new",
-        lazy: page(() => import("@/components/platform/ProductWizard"), "ProductWizard"),
+        lazy: page(() => import("@/components/platform/pages/product-wizard"), "ProductWizard"),
       },
       {
         path: "import",
-        lazy: page(() => import("@/components/platform/ShopifyImport"), "ShopifyImport"),
+        lazy: page(() => import("@/components/platform/pages/shopify-import"), "ShopifyImport"),
       },
       {
         path: ":id",
-        lazy: page(() => import("@/components/platform/ProductWizard"), "ProductWizard"),
+        lazy: page(() => import("@/components/platform/pages/product-wizard"), "ProductWizard"),
       },
     ],
   },
@@ -158,12 +158,12 @@ const platformChildren: RouteObject[] = [
     path: "kits",
     children: [
       { index: true, lazy: page(platformPages, "KitsPage") },
-      { path: "new", lazy: page(() => import("@/components/platform/KitWizard"), "KitWizard") },
+      { path: "new", lazy: page(() => import("@/components/platform/pages/kit-wizard"), "KitWizard") },
       {
         path: "import",
-        lazy: page(() => import("@/components/platform/ShopifyImport"), "ShopifyImport"),
+        lazy: page(() => import("@/components/platform/pages/shopify-import"), "ShopifyImport"),
       },
-      { path: ":id", lazy: page(() => import("@/components/platform/KitWizard"), "KitWizard") },
+      { path: ":id", lazy: page(() => import("@/components/platform/pages/kit-wizard"), "KitWizard") },
     ],
   },
   {

@@ -1,0 +1,503 @@
+import { isPlaceholderColorHex, resolveColorHex } from "@/lib/colorMap";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { TintedGarment } from "@/components/store/TintedGarment";
+import { PrintAreaEditor } from "../../../PrintAreaEditor";
+import { PlatformError, PlatformPageHeader } from "../../../platform-ui";
+import type { ProductWizardVm } from "../controllers/useProductWizardController";
+import { MarketingImageCard, MasterImageUpload } from "./product-wizard-upload";
+
+/** Platform product create/edit wizard. */
+export function ProductWizardView({
+  mode,
+  steps,
+  step,
+  busy,
+  error,
+  problems,
+  id,
+  details,
+  variant,
+  product,
+  printAreas,
+  previewColor,
+  categoryOptions,
+  colorSwatches,
+  activeSwatch,
+  firstHex,
+  marketingImageUrl,
+  baseStageImageUrl,
+  productionMaskImageUrl,
+  onBack,
+  onStep,
+  onSet,
+  onVariant,
+  onPrintAreas,
+  onPreviewColor,
+  onSaveDetails,
+  onAddVariant,
+  onUploadMask,
+  onUploadBase,
+  onSaveAreas,
+  onContinueFromVariants,
+  onGoToStep,
+  onPublish,
+  onSaveDraft,
+}: ProductWizardVm) {
+  return (
+    <>
+      <PlatformPageHeader
+        title={mode === "edit" ? "Edit product" : "New product"}
+        subtitle="Define a base catalog product, its variants, images, and design placeholders."
+        actions={
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onBack}>
+            Back to catalog
+          </button>
+        }
+      />
+
+      <div className="row" style={{ gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+        {steps.map((label, i) => (
+          <button
+            type="button"
+            key={label}
+            className="chip"
+            style={
+              i === step ? { borderColor: "var(--brand)", color: "var(--brand-d)", fontWeight: 700 } : undefined
+            }
+            disabled={!id && i > 0}
+            onClick={() => onStep(i)}
+          >
+            {i + 1}. {label}
+          </button>
+        ))}
+      </div>
+
+      {error && <PlatformError message={error} />}
+
+      <div className="card" style={{ padding: 22, maxWidth: 880 }}>
+        {step === 0 && (
+          <>
+            <div className="row" style={{ gap: 14 }}>
+              <div className="field" style={{ flex: 2 }}>
+                <label className="lbl">Product name</label>
+                <input className="inp" value={details.name} onChange={(e) => onSet("name", e.target.value)} />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label className="lbl">Category</label>
+                <select className="inp" value={details.category} onChange={(e) => onSet("category", e.target.value)}>
+                  <option value="" disabled>
+                    Select a category
+                  </option>
+                  {categoryOptions.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="field">
+              <label className="lbl">Description</label>
+              <textarea
+                className="inp"
+                rows={4}
+                value={details.description}
+                onChange={(e) => onSet("description", e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label className="lbl">Key features</label>
+              <textarea
+                className="inp"
+                rows={4}
+                value={details.keyFeatures}
+                onChange={(e) => onSet("keyFeatures", e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label className="lbl">Size guide</label>
+              <textarea
+                className="inp"
+                rows={4}
+                value={details.sizeGuide}
+                onChange={(e) => onSet("sizeGuide", e.target.value)}
+              />
+            </div>
+            <div className="row" style={{ gap: 14 }}>
+              <div className="field" style={{ flex: 1 }}>
+                <label className="lbl">Selling price (₹)</label>
+                <input
+                  className="inp"
+                  type="number"
+                  value={details.sellingPriceInr}
+                  onChange={(e) => onSet("sellingPriceInr", Number(e.target.value))}
+                />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label className="lbl">Cost price (₹, internal)</label>
+                <input
+                  className="inp"
+                  type="number"
+                  value={details.costPriceInr}
+                  onChange={(e) => onSet("costPriceInr", Number(e.target.value))}
+                />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label className="lbl">GST %</label>
+                <input
+                  className="inp"
+                  type="number"
+                  value={details.gstRate}
+                  onChange={(e) => onSet("gstRate", Number(e.target.value))}
+                />
+              </div>
+            </div>
+            <div className="row" style={{ gap: 14 }}>
+              <div className="field" style={{ flex: 1 }}>
+                <label className="lbl">HSN code</label>
+                <input className="inp" value={details.hsnCode} onChange={(e) => onSet("hsnCode", e.target.value)} />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label className="lbl">MOQ</label>
+                <input
+                  className="inp"
+                  type="number"
+                  value={details.moq}
+                  onChange={(e) => onSet("moq", Number(e.target.value))}
+                />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label className="lbl">Production days</label>
+                <input
+                  className="inp"
+                  type="number"
+                  value={details.productionDays}
+                  onChange={(e) => onSet("productionDays", Number(e.target.value))}
+                />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label className="lbl">Material</label>
+                <input className="inp" value={details.material} onChange={(e) => onSet("material", e.target.value)} />
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn btn-brand"
+              disabled={busy || !details.name || !details.category || !details.sellingPriceInr}
+              onClick={onSaveDetails}
+            >
+              {id ? "Save & continue" : "Create draft & continue"}
+            </button>
+          </>
+        )}
+
+        {step === 1 && (
+          <>
+            <h3 style={{ marginBottom: 12 }}>Variants</h3>
+            {product?.variants?.length ? (
+              <table className="tbl" style={{ marginBottom: 14 }}>
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Size</th>
+                    <th>Color</th>
+                    <th>Stock</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {product.variants.map((v) => {
+                    const hex = resolveColorHex(v.color, v.colorHex);
+                    return (
+                      <tr key={v.sku}>
+                        <td>{v.sku}</td>
+                        <td>{v.size || "—"}</td>
+                        <td>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            {!isPlaceholderColorHex(hex) && (
+                              <span
+                                title={hex}
+                                style={{
+                                  width: 14,
+                                  height: 14,
+                                  borderRadius: 4,
+                                  border: "1px solid var(--line)",
+                                  background: hex,
+                                }}
+                              />
+                            )}
+                            {v.color || "—"}
+                          </span>
+                        </td>
+                        <td>{v.stock ?? 0}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <p className="muted" style={{ marginBottom: 14 }}>
+                No variants yet.
+              </p>
+            )}
+            <div className="row" style={{ gap: 10, alignItems: "flex-end" }}>
+              <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+                <label className="lbl">SKU</label>
+                <input
+                  className="inp"
+                  value={variant.sku}
+                  onChange={(e) => onVariant({ ...variant, sku: e.target.value })}
+                />
+              </div>
+              <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+                <label className="lbl">Size</label>
+                <input
+                  className="inp"
+                  value={variant.size}
+                  onChange={(e) => onVariant({ ...variant, size: e.target.value })}
+                />
+              </div>
+              <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+                <label className="lbl">Color</label>
+                <input
+                  className="inp"
+                  value={variant.color}
+                  onChange={(e) => onVariant({ ...variant, color: e.target.value })}
+                />
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label className="lbl">Hex</label>
+                <input
+                  type="color"
+                  value={variant.colorHex || "#ffffff"}
+                  onChange={(e) => onVariant({ ...variant, colorHex: e.target.value })}
+                  style={{
+                    width: 44,
+                    height: 38,
+                    padding: 2,
+                    border: "1px solid var(--line)",
+                    borderRadius: 8,
+                    background: "#fff",
+                  }}
+                />
+              </div>
+              <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+                <label className="lbl">Stock</label>
+                <input
+                  className="inp"
+                  type="number"
+                  value={variant.stock}
+                  onChange={(e) => onVariant({ ...variant, stock: Number(e.target.value) })}
+                />
+              </div>
+              <button type="button" className="btn btn-soft" disabled={busy || !variant.sku} onClick={onAddVariant}>
+                Add
+              </button>
+            </div>
+            <div className="row" style={{ gap: 8, marginTop: 18 }}>
+              <button type="button" className="btn btn-ghost" onClick={() => onGoToStep(0)}>
+                Back
+              </button>
+              <button type="button" className="btn btn-brand" disabled={busy} onClick={onContinueFromVariants}>
+                Continue
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <h3 style={{ marginBottom: 4 }}>Product images</h3>
+            <p className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
+              Marketing and production imagery are kept separate. Upload both a visible product stage image and the
+              transparent production mask.
+            </p>
+            <div className="row" style={{ gap: 18, flexWrap: "wrap", marginBottom: 22, alignItems: "flex-start" }}>
+              <MarketingImageCard imageUrl={marketingImageUrl} />
+              <MasterImageUpload
+                label="Product stage image"
+                hint="Visible garment/product image used in swag previews"
+                accept="image/*"
+                imageUrl={baseStageImageUrl}
+                disabled={busy || !id}
+                onFile={onUploadBase}
+              />
+              <MasterImageUpload
+                label="Design & production mask"
+                hint="Transparent PNG · used for artwork, print areas and production"
+                accept="image/png"
+                imageUrl={productionMaskImageUrl ? resolveMediaUrl(productionMaskImageUrl) : undefined}
+                tintHex={firstHex}
+                disabled={busy || !id}
+                onFile={onUploadMask}
+              />
+            </div>
+
+            {!id && (
+              <p className="muted" style={{ fontSize: 12, marginTop: -8, marginBottom: 12 }}>
+                Save product details on step 1 before uploading images.
+              </p>
+            )}
+
+            {productionMaskImageUrl && (
+              <div style={{ marginBottom: 22 }}>
+                <h3 style={{ marginBottom: 2 }}>Colour preview</h3>
+                <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
+                  The single mask recolours to each variant colour automatically. Pick a colour to inspect the runtime
+                  tint.
+                </p>
+                {colorSwatches.length === 0 ? (
+                  <p className="muted">Add variants with colours to preview the recoloured mask.</p>
+                ) : (
+                  <div className="row" style={{ gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+                    <div>
+                      <div
+                        style={{
+                          width: 200,
+                          height: 200,
+                          borderRadius: 10,
+                          border: "1px solid var(--line)",
+                          background: "var(--surface-2)",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <TintedGarment src={resolveMediaUrl(productionMaskImageUrl)} hex={activeSwatch?.hex} />
+                      </div>
+                      {activeSwatch && (
+                        <div className="row" style={{ gap: 8, alignItems: "center", marginTop: 8 }}>
+                          <span
+                            style={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: "50%",
+                              border: "1px solid var(--line)",
+                              background: activeSwatch.hex,
+                            }}
+                          />
+                          <span style={{ fontWeight: 600, fontSize: 13 }}>{activeSwatch.name}</span>
+                          <span className="muted" style={{ fontSize: 12, fontFamily: "monospace" }}>
+                            {activeSwatch.hex}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="row" style={{ gap: 10, flexWrap: "wrap", flex: 1 }}>
+                      {colorSwatches.map((c) => {
+                        const selected = c.name === activeSwatch?.name;
+                        return (
+                          <button
+                            type="button"
+                            key={c.name}
+                            onClick={() => onPreviewColor(c.name)}
+                            title={`${c.name} · ${c.hex}`}
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              gap: 6,
+                              padding: 6,
+                              borderRadius: 8,
+                              cursor: "pointer",
+                              background: selected ? "var(--surface-2)" : "transparent",
+                              border: selected ? "2px solid var(--brand)" : "1px solid var(--line)",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 64,
+                                height: 64,
+                                borderRadius: 6,
+                                overflow: "hidden",
+                                background: "var(--surface-2)",
+                              }}
+                            >
+                              <TintedGarment src={resolveMediaUrl(productionMaskImageUrl)} hex={c.hex} />
+                            </div>
+                            <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, maxWidth: 72 }}>
+                              <span
+                                style={{
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: "50%",
+                                  border: "1px solid var(--line)",
+                                  background: c.hex,
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {c.name}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="row" style={{ gap: 8, marginTop: 18 }}>
+              <button type="button" className="btn btn-ghost" onClick={() => onGoToStep(1)}>
+                Back
+              </button>
+              <button type="button" className="btn btn-brand" onClick={() => onGoToStep(3)}>
+                Continue
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === 3 && (
+          <>
+            <h3 style={{ marginBottom: 12 }}>Design placeholders</h3>
+            <PrintAreaEditor
+              images={[productionMaskImageUrl].filter(Boolean) as string[]}
+              maskImageUrl={productionMaskImageUrl}
+              colors={colorSwatches}
+              value={printAreas}
+              onChange={onPrintAreas}
+            />
+            <div className="row" style={{ gap: 8, marginTop: 18 }}>
+              <button type="button" className="btn btn-ghost" onClick={() => onGoToStep(2)}>
+                Back
+              </button>
+              <button type="button" className="btn btn-brand" disabled={busy} onClick={onSaveAreas}>
+                Save & continue
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === 4 && (
+          <>
+            <h3 style={{ marginBottom: 12 }}>Review &amp; publish</h3>
+            <p className="muted" style={{ marginBottom: 6 }}>
+              {product?.name} · {product?.sku} · {product?.variants?.length ?? 0} variants ·{" "}
+              {marketingImageUrl ? "Shopify marketing image" : "no marketing image"} ·{" "}
+              {baseStageImageUrl ? "stage image" : "no stage image"} ·{" "}
+              {productionMaskImageUrl ? "production mask" : "no production mask"} · {printAreas.length} print areas
+            </p>
+            {problems.length > 0 && (
+              <ul style={{ color: "var(--danger)", margin: "10px 0", paddingLeft: 18 }}>
+                {problems.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            )}
+            <div className="row" style={{ gap: 8, marginTop: 12 }}>
+              <button type="button" className="btn btn-ghost" onClick={() => onGoToStep(3)}>
+                Back
+              </button>
+              <button type="button" className="btn btn-brand" disabled={busy} onClick={onPublish}>
+                Publish product
+              </button>
+              <button type="button" className="btn btn-soft" onClick={onSaveDraft}>
+                Save as draft
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
