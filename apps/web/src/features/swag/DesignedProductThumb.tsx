@@ -2,6 +2,7 @@ import { useMemo, useState, type CSSProperties } from "react";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { TintedGarment } from "@/components/store/TintedGarment";
 import type { UiProduct } from "@/services/mappers";
+import { DEFAULT_MOCKUP_TINT_HEX } from "./colors";
 import {
   defaultPlacement,
   designImgUrl,
@@ -116,32 +117,25 @@ export function DesignedProductThumb({
   const overlay = artworkUrl ? resolveMediaUrl(artworkUrl) : "";
   const printAreaBase = resolveMediaUrl(pickPrintArea(product)?.mockupImageUrl);
   const stageBase = resolveMediaUrl(product.baseImageUrl);
-  const photoBase = resolveMediaUrl(product.photoUrl);
-  const resolvedImg = resolveMediaUrl(product.imgUrl);
   const resolvedMask = resolveMediaUrl(product.maskImageUrl);
-  const nonMaskImg = resolvedImg && resolvedImg !== resolvedMask ? resolvedImg : "";
-  const tintHex = Object.values(product.colorHexByName ?? {}).find(Boolean) || "#d1d5db";
-  // For saved-design cards, prefer the real product stage image. Using the
-  // transparent mask here makes the card look blank with only artwork visible.
+  const tintHex = DEFAULT_MOCKUP_TINT_HEX;
+  const maskStage = resolvedMask || stageBase || printAreaBase || resolveMediaUrl(designImgUrl(product));
   const base =
-    stageBase ||
-    photoBase ||
-    nonMaskImg ||
-    printAreaBase ||
+    maskStage ||
+    resolveMediaUrl(product.photoUrl) ||
     productThumbUrl(product, false) ||
-    resolveMediaUrl(designImgUrl(product)) ||
     productThumbUrl(product, true);
 
   const inner =
-    overlay && base ? (
-      <LiveArtworkComposite product={product} base={base} overlay={overlay} />
-    ) : overlay && resolvedMask ? (
+    overlay && resolvedMask ? (
       <MaskArtworkComposite
         product={product}
         mask={resolvedMask}
         overlay={overlay}
         tintHex={tintHex}
       />
+    ) : overlay && maskStage ? (
+      <LiveArtworkComposite product={product} base={maskStage} overlay={overlay} />
     ) : baked ? (
       <div className="img img-mockup">
         <img
@@ -209,7 +203,8 @@ export function storeProductAsUi(p: {
     price: "",
     sw: 4,
     maskImageUrl: mask,
-    imgUrl: mask || base || photo,
+    baseImageUrl: base,
+    imgUrl: mask || base,
     photoUrl: photo,
     mockupUrl: p.mockupUrl,
     printAreas: p.printAreas,

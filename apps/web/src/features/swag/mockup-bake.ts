@@ -22,9 +22,9 @@ function normMediaPath(url: string | undefined): string {
   return path.startsWith("/") ? path : `/${path}`;
 }
 
-/** Visible stage image used behind artwork in design previews and baked mockups. */
+/** Production mask used behind artwork in design previews and baked mockups (never the marketing photo). */
 export function designImgUrl(p: UiProduct): string {
-  return p?.baseImageUrl || p?.photoUrl || p?.imgUrl || p?.maskImageUrl || "";
+  return p?.maskImageUrl || p?.baseImageUrl || "";
 }
 
 /** Pick the print area whose mockup image matches the mask/photo, else the first usable one. */
@@ -37,9 +37,9 @@ export function pickPrintArea(p: UiProduct) {
     const maskArea = areas.find((a) => normMediaPath(a.mockupImageUrl) === maskNorm);
     if (maskArea) return maskArea;
   }
-  if (p.imgUrl) {
-    const imgNorm = normMediaPath(p.imgUrl);
-    const match = areas.find((a) => normMediaPath(a.mockupImageUrl) === imgNorm);
+  if (p.baseImageUrl) {
+    const baseNorm = normMediaPath(p.baseImageUrl);
+    const match = areas.find((a) => normMediaPath(a.mockupImageUrl) === baseNorm);
     if (match) return match;
   }
   return areas.find((a) => a?.box?.widthPct > 0) || areas[0];

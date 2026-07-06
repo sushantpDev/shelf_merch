@@ -88,12 +88,12 @@ function SidebarNavLink({
   const hoverHandlers = expanded
     ? {}
     : {
-        onMouseEnter: (event: MouseEvent<HTMLElement>) =>
-          onItemHover(item.label, event.currentTarget),
-        onMouseLeave: onItemLeave,
-        onFocus: (event: FocusEvent<HTMLElement>) => onItemHover(item.label, event.currentTarget),
-        onBlur: onItemLeave,
-      };
+      onMouseEnter: (event: MouseEvent<HTMLElement>) =>
+        onItemHover(item.label, event.currentTarget),
+      onMouseLeave: onItemLeave,
+      onFocus: (event: FocusEvent<HTMLElement>) => onItemHover(item.label, event.currentTarget),
+      onBlur: onItemLeave,
+    };
 
   return (
     <Link to={item.href} className={className} aria-label={a11y} {...hoverHandlers}>
@@ -111,6 +111,8 @@ export function CollapsibleSidebar() {
   const [expanded, setExpanded] = useState(readExpandedPreference);
   const [flyout, setFlyout] = useState<HoverFlyout | null>(null);
   const [togglePos, setTogglePos] = useState<{ top: number; left: number } | null>(null);
+  const [showFooterImage, setShowFooterImage] = useState(true);
+
 
   const syncTogglePosition = useCallback(() => {
     const rail = railRef.current;
@@ -164,6 +166,14 @@ export function CollapsibleSidebar() {
 
   const hideFlyout = () => setFlyout(null);
 
+  const handleToggle = () => {
+    setExpanded((prev) => {
+      const next = !prev;
+      setShowFooterImage(next);
+      return next;
+    });
+  };
+
   const toggleButton =
     togglePos &&
     createPortal(
@@ -173,7 +183,8 @@ export function CollapsibleSidebar() {
         style={{ top: togglePos.top, left: togglePos.left }}
         aria-label="Toggle sidebar"
         aria-expanded={expanded}
-        onClick={() => setExpanded((prev) => !prev)}
+        // onClick={() => setExpanded((prev) => !prev)}
+        onClick={handleToggle}
       >
         {expanded ? (
           <ChevronLeft size={13} strokeWidth={2.2} aria-hidden="true" />
@@ -211,7 +222,7 @@ export function CollapsibleSidebar() {
         </div>
 
         <div className="sidebar-rail__footer" style={{ marginTop: 0, paddingTop: 0 }}>
-          <img src={NavFooterImage} alt="Nav Footer" />
+          {showFooterImage && <img src={NavFooterImage} alt="Nav Footer" />}
         </div>
       </nav>
 
@@ -228,4 +239,4 @@ export function CollapsibleSidebar() {
     </>
   );
 }
-
+

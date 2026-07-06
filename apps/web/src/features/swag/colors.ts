@@ -55,6 +55,9 @@ export function swagColorHex(name: string): string {
   return SWAG_COLOR_HEX[name] || "#9a9a9a";
 }
 
+/** Default garment tint for swag mockups — always white, never a catalog variant hex. */
+export const DEFAULT_MOCKUP_TINT_HEX = SWAG_COLOR_HEX.White;
+
 export function productColorHex(p: UiProduct, name: string): string {
   if (p?.colorHexByName?.[name]) return p.colorHexByName[name];
   if (isHexColor(name)) return name;
@@ -75,7 +78,7 @@ function ensureWhitePrimaryNames(names: string[]): string[] {
 }
 
 export function productColorNames(p: UiProduct): string[] {
-  if (p?.colors?.length) return p.colors;
+  if (p?.colors?.length) return ensureWhitePrimaryNames(p.colors);
   const names = DEFAULT_PRODUCT_COLOR_NAMES[p?.g] || DEFAULT_PRODUCT_COLOR_NAMES.default;
   return ensureWhitePrimaryNames(names);
 }
@@ -86,7 +89,7 @@ export function collectionProductColorNames(col: UiCollection, p: UiProduct): st
   const names = prefs.length
     ? prefs.filter((c) => !available.length || available.includes(c))
     : available;
-  return names.length ? names : available;
+  return ensureWhitePrimaryNames(names.length ? names : available);
 }
 
 export function productDescription(p: UiProduct): string {

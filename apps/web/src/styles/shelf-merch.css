@@ -1,6 +1,6 @@
 :root{
   --bg:#F4F6F4; --surface:#FFFFFF; --surface-2:#FBFCFB;
-  --app-sidebar-bg:#88e788; --app-content-bg:#F7F9F7;
+  --app-sidebar-bg:#fdfdfd; --app-content-bg:#F7F9F7;
   --ink:#0E1E16; --ink-2:#56655C; --ink-3:#8C988F;
   --line:#E6EAE6; --line-2:#EFF2EF; --line-strong:#D5DBD6;
   --brand:#15784C; --brand-d:#0E5536; --brand-l:#1E8E5C;
@@ -200,8 +200,8 @@ select.inp{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http
   border-right:1px solid var(--line);
   padding:16px 12px 28px;
   flex:none;
-  overflow-y:auto;
-  overscroll-behavior:contain;
+  /* overflow-y:auto; */
+  /* overscroll-behavior:contain; */
   display:flex;
   flex-direction:column;
 }
