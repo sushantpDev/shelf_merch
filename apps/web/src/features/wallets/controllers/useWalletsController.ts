@@ -86,7 +86,7 @@ export function useWalletsController(): WalletsScreen {
     };
   }
 
-  if (role === "entity_manager" && workspace.wallets.length > 0) {
+  if (role === "entity_manager") {
     return { kind: "entityManager", account, workspace };
   }
 

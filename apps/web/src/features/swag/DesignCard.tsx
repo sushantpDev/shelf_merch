@@ -35,37 +35,44 @@ function CardToolbar({
   onEditDesign,
   onViewProduct,
   onAddToShop,
-  showMenu = true,
+  canEdit = true,
+  canAddToShop = true,
 }: {
   onEditDesign?: () => void;
   onViewProduct?: () => void;
   onAddToShop?: () => void;
-  showMenu?: boolean;
+  canEdit?: boolean;
+  canAddToShop?: boolean;
 }) {
+  const showMenu = canEdit || canAddToShop;
+  if (!showMenu) return null;
+
   return (
     <div className="swag-card-actions" onClick={stop} onKeyDown={stop}>
-      {showMenu && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="swag-card-menu"
-              aria-label="Product actions"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MoreHorizontal size={14} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="bottom" className="shop-card-menu">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="swag-card-menu"
+            aria-label="Product actions"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MoreHorizontal size={14} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" side="bottom" className="shop-card-menu">
+          {canEdit ? (
             <DropdownMenuItem onSelect={() => onEditDesign?.()}>
               <span>Edit design</span>
               <span className="tag tag-beta">Beta</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onViewProduct?.()}>View product</DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem onSelect={() => onViewProduct?.()}>View product</DropdownMenuItem>
+          {canAddToShop ? (
             <DropdownMenuItem onSelect={() => onAddToShop?.()}>Add to shop</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
@@ -77,6 +84,8 @@ export function DesignCard({
   onOpen,
   productView = false,
   showToolbar = false,
+  canEdit = true,
+  canAddToShop = true,
   onEditDesign,
   onViewProduct,
   onAddToShop,
@@ -86,6 +95,8 @@ export function DesignCard({
   onOpen: () => void;
   productView?: boolean;
   showToolbar?: boolean;
+  canEdit?: boolean;
+  canAddToShop?: boolean;
   onEditDesign?: () => void;
   onViewProduct?: () => void;
   onAddToShop?: () => void;
@@ -141,6 +152,8 @@ export function DesignCard({
               onEditDesign={onEditDesign}
               onViewProduct={onViewProduct}
               onAddToShop={onAddToShop}
+              canEdit={canEdit}
+              canAddToShop={canAddToShop}
             />
           </div>
           <div
@@ -195,6 +208,8 @@ export function DesignCard({
           onEditDesign={onEditDesign}
           onViewProduct={onViewProduct}
           onAddToShop={onAddToShop}
+          canEdit={canEdit}
+          canAddToShop={canAddToShop}
         />
       </div>
       <div

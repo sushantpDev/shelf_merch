@@ -19,10 +19,12 @@ export function ProductDetailDialog({
   target,
   onOpenChange,
   onAddToShop,
+  canAddToShop = true,
 }: {
   target: DesignTarget | null;
   onOpenChange: (open: boolean) => void;
   onAddToShop: (target: DesignTarget) => void;
+  canAddToShop?: boolean;
 }) {
   const [sel, setSel] = useState(0);
   useEffect(() => {
@@ -32,7 +34,15 @@ export function ProductDetailDialog({
   return (
     <Dialog open={target !== null} onOpenChange={onOpenChange}>
       <DialogContent className="sm-modal" style={{ maxWidth: "min(820px,96vw)", width: "100%" }}>
-        {target && <Body target={target} sel={sel} setSel={setSel} onAddToShop={onAddToShop} />}
+        {target && (
+          <Body
+            target={target}
+            sel={sel}
+            setSel={setSel}
+            onAddToShop={onAddToShop}
+            canAddToShop={canAddToShop}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -43,11 +53,13 @@ function Body({
   sel,
   setSel,
   onAddToShop,
+  canAddToShop,
 }: {
   target: DesignTarget;
   sel: number;
   setSel: (i: number) => void;
   onAddToShop: (target: DesignTarget) => void;
+  canAddToShop: boolean;
 }) {
   const { collection, product } = target;
   const title = product.brand ? `${product.brand} ${product.nm}` : product.nm;
@@ -108,13 +120,15 @@ function Body({
             <ProductInfoTabs product={product} />
           </div>
 
-          <button
-            type="button"
-            className="btn btn-dark btn-block"
-            onClick={() => onAddToShop(target)}
-          >
-            <Store size={16} /> Add to shop
-          </button>
+          {canAddToShop ? (
+            <button
+              type="button"
+              className="btn btn-dark btn-block"
+              onClick={() => onAddToShop(target)}
+            >
+              <Store size={16} /> Add to shop
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

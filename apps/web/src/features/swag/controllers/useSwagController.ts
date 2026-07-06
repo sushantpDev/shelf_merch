@@ -15,6 +15,8 @@ export type SwagVm = {
   isLoading: boolean;
   errorMessage: string | null;
   canDesignSwag: boolean;
+  canManageSwag: boolean;
+  canAddToShop: boolean;
   tab: SwagTab;
   view: SwagView;
   shown: UiCollection[];
@@ -79,6 +81,8 @@ export function useSwagController(): SwagVm {
           : "Could not load swag"
         : null,
     canDesignSwag: canWrite("swag"),
+    canManageSwag: canWrite("swag"),
+    canAddToShop: canWrite("shops"),
     tab,
     view,
     shown,

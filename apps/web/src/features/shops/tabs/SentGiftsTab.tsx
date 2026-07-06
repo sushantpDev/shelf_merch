@@ -163,12 +163,14 @@ function CampaignRecipientsPanel({
   campaignId,
   shop,
   isDraft,
+  canSendPoints,
   deleting,
   onDelete,
 }: {
   campaignId: string;
   shop: UiShop;
   isDraft: boolean;
+  canSendPoints: boolean;
   deleting: boolean;
   onDelete: () => void;
 }) {
@@ -225,7 +227,7 @@ function CampaignRecipientsPanel({
           </tbody>
         </table>
       )}
-      {isDraft ? (
+      {isDraft && canSendPoints ? (
         <button
           type="button"
           className="lnk"
@@ -258,9 +260,11 @@ const centerCellStyle = {
 
 export function SentGiftsTab({
   shop,
+  canSendPoints = false,
   onSendPoints,
 }: {
   shop: UiShop;
+  canSendPoints?: boolean;
   onSendPoints: (campaignId?: string) => void;
 }) {
   const { data: workspace } = useWorkspace();
@@ -363,7 +367,7 @@ export function SentGiftsTab({
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {isDraft ? (
+                        {isDraft && canSendPoints ? (
                           <button
                             type="button"
                             className="lnk"
@@ -420,6 +424,7 @@ export function SentGiftsTab({
                           campaignId={campaign.id}
                           shop={shop}
                           isDraft={isDraft}
+                          canSendPoints={canSendPoints}
                           deleting={deletingId === campaign.id}
                           onDelete={() => void deleteIncompleteOrder(campaign.id)}
                         />

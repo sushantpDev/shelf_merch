@@ -34,7 +34,7 @@ export function ContactFormDialogView(vm: ContactFormVm) {
           )}
         </DialogHeader>
 
-        {vm.mode === "add" && (
+        {vm.mode === "add" && vm.canImportContacts && (
           <div className="tabs" style={{ maxWidth: 280, margin: "4px 0 16px" }}>
             {(
               [

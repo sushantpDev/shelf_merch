@@ -174,6 +174,8 @@ export function SwagView(vm: SwagVm) {
               collection={collection}
               product={product}
               productView
+              canEdit={vm.canManageSwag}
+              canAddToShop={vm.canAddToShop}
               onOpen={() => vm.onOpenDesign({ collection, product, pIdx })}
               onEditDesign={vm.onEditDesign}
               onViewProduct={() => {
@@ -189,6 +191,8 @@ export function SwagView(vm: SwagVm) {
           <CollectionBlock
             key={col.id}
             collection={col}
+            canManageSwag={vm.canManageSwag}
+            canAddToShop={vm.canAddToShop}
             onOpenDesign={(product, pIdx) => vm.onOpenDesign({ collection: col, product, pIdx })}
             onAddToShop={(collection) => vm.onSetAddTarget({ collection })}
             onEditDesign={vm.onEditDesign}
@@ -204,6 +208,7 @@ export function SwagView(vm: SwagVm) {
         target={vm.design}
         onOpenChange={(open) => !open && vm.onCloseDesign()}
         onAddToShop={vm.onDesignAddToShop}
+        canAddToShop={vm.canAddToShop}
       />
       <AddToShopDialog
         target={vm.addTarget}

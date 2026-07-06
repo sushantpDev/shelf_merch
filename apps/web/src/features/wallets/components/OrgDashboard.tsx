@@ -3,6 +3,7 @@ import { Plus, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { inr } from "@/components/platform/platform-ui";
 import { PageHeader } from "@/components/tenant/PageHeader";
+import { useTenantAccess } from "@/hooks/useTenantAccess";
 import {
   fmtDate,
   deptPaletteColor,
@@ -30,6 +31,8 @@ export function OrgDashboard({
   onAllocate: (step?: number) => void;
   openAddFundsOnMount?: boolean;
 }) {
+  const { canWrite } = useTenantAccess();
+  const canManageWallets = canWrite("wallets");
   const [addFundsOpen, setAddFundsOpen] = useState(false);
   const walletId = org.wallet.id;
 
@@ -60,6 +63,7 @@ export function OrgDashboard({
             className="btn btn-brand"
             style={{ marginTop: 16 }}
             onClick={onStart}
+            disabled={!canManageWallets}
           >
             <Plus size={16} /> Create wallet
           </button>
@@ -102,16 +106,18 @@ export function OrgDashboard({
         title="Wallets"
         subtitle={`${o.name} · Organization merchandise budget · ${account}`}
         actions={
-          <div className="row" style={{ gap: 8 }}>
-            {walletId && !fundingPending && (
-              <button type="button" className="btn btn-brand" onClick={() => setAddFundsOpen(true)}>
-                <Plus size={16} /> Add funds
+          canManageWallets ? (
+            <div className="row" style={{ gap: 8 }}>
+              {walletId && !fundingPending && (
+                <button type="button" className="btn btn-brand" onClick={() => setAddFundsOpen(true)}>
+                  <Plus size={16} /> Add funds
+                </button>
+              )}
+              <button type="button" className="btn btn-brand" onClick={onStart}>
+                <Plus size={16} /> Create wallet
               </button>
-            )}
-            <button type="button" className="btn btn-brand" onClick={onStart}>
-              <Plus size={16} /> Create wallet
-            </button>
-          </div>
+            </div>
+          ) : undefined
         }
       />
 
@@ -133,7 +139,7 @@ export function OrgDashboard({
         </div>
       )}
 
-      {needsAllocation && (
+      {needsAllocation && canManageWallets && (
         <div className="banner" style={{ marginBottom: 18 }}>
           <Wallet size={16} aria-hidden="true" />
           <div>
@@ -181,7 +187,7 @@ export function OrgDashboard({
             ) : (
               <span className="tag tag-draft">Setup in progress</span>
             )}
-            {canAllocate && (
+            {canAllocate && canManageWallets && (
               <button type="button" className="wallet-allocate-link" onClick={handleAllocateClick}>
                 Allocate funds
               </button>
@@ -258,7 +264,7 @@ export function OrgDashboard({
               {depts.length === 0 ? (
                 <p className="muted" style={{ fontSize: 13 }}>
                   No departments yet.{" "}
-                  {canAllocate ? (
+                  {canAllocate && canManageWallets ? (
                     <span className="lnk" role="button" tabIndex={0} onClick={handleAllocateClick}>
                       Allocate funds
                     </span>
@@ -310,7 +316,7 @@ export function OrgDashboard({
               ) : null}
             </div>
           </div>
-          {canAllocate && (
+          {canAllocate && canManageWallets && (
             <button
               type="button"
               className="btn btn-ghost btn-sm"

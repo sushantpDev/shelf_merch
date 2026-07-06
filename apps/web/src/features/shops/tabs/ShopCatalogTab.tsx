@@ -3,7 +3,15 @@ import type { UiProduct, UiShop } from "@/services/mappers";
 import { CatalogEditorDialog } from "../CatalogEditorDialog";
 import shopCatalogImg from "../../../../assets/shop-catalog.png";
 
-export function ShopCatalogTab({ shop, products }: { shop: UiShop; products: UiProduct[] }) {
+export function ShopCatalogTab({
+  shop,
+  products,
+  canEditShop = true,
+}: {
+  shop: UiShop;
+  products: UiProduct[];
+  canEditShop?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const total = products.length;
   const count = (shop.selectedCatalogProductIds || []).length;
@@ -29,9 +37,11 @@ export function ShopCatalogTab({ shop, products }: { shop: UiShop; products: UiP
               className="row"
               style={{ gap: 10, marginTop: 18, alignItems: "center", flexWrap: "wrap" }}
             >
-              <button type="button" className="btn btn-dark" onClick={() => setOpen(true)}>
-                Edit catalog
-              </button>
+              {canEditShop ? (
+                <button type="button" className="btn btn-dark" onClick={() => setOpen(true)}>
+                  Edit catalog
+                </button>
+              ) : null}
               <span className="mut3" style={{ fontSize: 13 }}>
                 {count} of {total} products enabled
               </span>

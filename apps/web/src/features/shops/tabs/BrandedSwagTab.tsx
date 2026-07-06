@@ -16,10 +16,12 @@ type Sub = "Saved Designs" | "Locker Inventory" | "Archived";
 export function BrandedSwagTab({
   shop,
   collections,
+  canDesignSwag,
   onStartDesigning,
 }: {
   shop: UiShop;
   collections: UiCollection[];
+  canDesignSwag: boolean;
   onStartDesigning: () => void;
 }) {
   const [sub, setSub] = useState<Sub>("Saved Designs");
@@ -52,7 +54,7 @@ export function BrandedSwagTab({
       <div className="shop-swag-content" style={{ flex: 1, minWidth: 0 }}>
         {sub === "Saved Designs" &&
           (active.length === 0 ? (
-            <EmptyDesigner onStartDesigning={onStartDesigning} />
+            <EmptyDesigner canDesignSwag={canDesignSwag} onStartDesigning={onStartDesigning} />
           ) : (
             <div className="card" style={{ padding: 22 }}>
               <div
@@ -60,9 +62,11 @@ export function BrandedSwagTab({
                 style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}
               >
                 <h3 style={{ fontSize: 17 }}>Your branded swag designs</h3>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={onStartDesigning}>
-                  <Plus size={15} /> Start designing
-                </button>
+                {canDesignSwag ? (
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={onStartDesigning}>
+                    <Plus size={15} /> Start designing
+                  </button>
+                ) : null}
               </div>
               <p className="muted" style={{ fontSize: 13, marginBottom: 18 }}>
                 Add more logos to auto-generate additional collections for free.
@@ -133,22 +137,34 @@ export function BrandedSwagTab({
     </div>
   );
 
-  function EmptyDesigner({ onStartDesigning: onStart }: { onStartDesigning: () => void }) {
+  function EmptyDesigner({
+    canDesignSwag: canDesign,
+    onStartDesigning: onStart,
+  }: {
+    canDesignSwag: boolean;
+    onStartDesigning: () => void;
+  }) {
     return (
       <div className="card empty" style={{ padding: 48 }}>
         <div className="ic" aria-hidden="true">
           <Shirt size={34} color="#cdd6cf" />
         </div>
         <h3>Design branded swag for {shop.name}</h3>
-        <p>Create branded collections your recipients can redeem.</p>
-        <button
-          type="button"
-          className="btn btn-dark btn-lg"
-          style={{ marginTop: 14 }}
-          onClick={onStart}
-        >
-          <Plus size={16} /> Start designing
-        </button>
+        <p>
+          {canDesign
+            ? "Create branded collections your recipients can redeem."
+            : "Your company admin designs branded collections for this shop."}
+        </p>
+        {canDesign ? (
+          <button
+            type="button"
+            className="btn btn-dark btn-lg"
+            style={{ marginTop: 14 }}
+            onClick={onStart}
+          >
+            <Plus size={16} /> Start designing
+          </button>
+        ) : null}
       </div>
     );
   }

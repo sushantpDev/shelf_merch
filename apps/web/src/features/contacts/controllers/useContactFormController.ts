@@ -18,12 +18,14 @@ export type ContactFormProps = {
   onOpenChange: (open: boolean) => void;
   mode: "add" | "edit";
   contact?: UiContact;
+  canImportContacts?: boolean;
 };
 
 export type ContactFormVm = {
   open: boolean;
   mode: "add" | "edit";
   tab: "manual" | "csv";
+  canImportContacts: boolean;
   roleOptions: readonly string[];
   busy: boolean;
   register: UseFormRegister<ContactFormValues>;
@@ -41,6 +43,7 @@ export function useContactFormController({
   onOpenChange,
   mode,
   contact,
+  canImportContacts = true,
 }: ContactFormProps): ContactFormVm {
   const [tab, setTab] = useState<"manual" | "csv">("manual");
   const addContact = useAddContact();
@@ -84,6 +87,7 @@ export function useContactFormController({
     open,
     mode,
     tab,
+    canImportContacts,
     roleOptions: mode === "edit" ? ROLES : ADD_ROLES,
     busy: addContact.isPending || updateContact.isPending,
     register,

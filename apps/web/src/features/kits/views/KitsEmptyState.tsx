@@ -119,9 +119,10 @@ function FlowStep({
 type KitsEmptyStateProps = {
   /** Workspace contacts available to send kits to. */
   contactCount?: number;
+  canCreateKits?: boolean;
 };
 
-export function KitsEmptyState({ contactCount = 0 }: KitsEmptyStateProps) {
+export function KitsEmptyState({ contactCount = 0, canCreateKits = true }: KitsEmptyStateProps) {
   return (
     <>
       <div
@@ -172,9 +173,11 @@ export function KitsEmptyState({ contactCount = 0 }: KitsEmptyStateProps) {
               occasion.
             </p>
             <div className="row" style={{ gap: 12 }}>
-              <Link to="/app/kits/new" className="btn btn-brand">
-                Create your first kit
-              </Link>
+              {canCreateKits ? (
+                <Link to="/app/kits/new" className="btn btn-brand">
+                  Create your first kit
+                </Link>
+              ) : null}
               <button
                 type="button"
                 className="btn btn-ghost"

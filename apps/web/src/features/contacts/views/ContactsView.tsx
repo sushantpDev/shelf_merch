@@ -104,9 +104,11 @@ export function ContactsView(vm: ContactsVm) {
                 <HelpCircle size={15} />
               </button>
             </div>
-            <button type="button" className="btn btn-dark contacts-add-btn" onClick={vm.onAddOpen}>
-              <Plus size={16} /> Add contacts
-            </button>
+            {vm.canManageContacts ? (
+              <button type="button" className="btn btn-dark contacts-add-btn" onClick={vm.onAddOpen}>
+                <Plus size={16} /> Add contacts
+              </button>
+            ) : null}
             <button
               type="button"
               className="contacts-more-btn"
@@ -256,8 +258,8 @@ export function ContactsView(vm: ContactsVm) {
                           <td className="contacts-td-email">{c.email}</td>
                           <td className="contacts-td-name">{emptyCell(c.name)}</td>
                           <td className="contacts-td-role">
-                            {c.role === "Owner" ? (
-                              <span className="contacts-role-text">Owner</span>
+                            {c.role === "Owner" || !vm.canManageContactRoles ? (
+                              <span className="contacts-role-text">{permissionLabel(c.role)}</span>
                             ) : (
                               <select
                                 className="contacts-role-select"
@@ -281,23 +283,27 @@ export function ContactsView(vm: ContactsVm) {
                           )}
                           <td className="contacts-td-muted">{emptyCell(c.loc)}</td>
                           <td className="contacts-td-actions">
-                            <button
-                              type="button"
-                              className="contacts-row-action"
-                              aria-label={`Restrict ${c.name || c.email}`}
-                              disabled={c.role === "Owner"}
-                              onClick={vm.onRestrict}
-                            >
-                              <Ban size={15} />
-                            </button>
-                            <button
-                              type="button"
-                              className="contacts-row-action"
-                              aria-label={`Edit ${c.name || c.email}`}
-                              onClick={() => vm.onEdit(c)}
-                            >
-                              <SquareArrowOutUpRight size={15} />
-                            </button>
+                            {vm.canManageContacts ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="contacts-row-action"
+                                  aria-label={`Restrict ${c.name || c.email}`}
+                                  disabled={c.role === "Owner"}
+                                  onClick={vm.onRestrict}
+                                >
+                                  <Ban size={15} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="contacts-row-action"
+                                  aria-label={`Edit ${c.name || c.email}`}
+                                  onClick={() => vm.onEdit(c)}
+                                >
+                                  <SquareArrowOutUpRight size={15} />
+                                </button>
+                              </>
+                            ) : null}
                           </td>
                         </tr>
                       ))}
@@ -321,7 +327,12 @@ export function ContactsView(vm: ContactsVm) {
         </footer>
       </div>
 
-      <ContactFormDialog open={vm.adding} onOpenChange={vm.onAddOpenChange} mode="add" />
+      <ContactFormDialog
+        open={vm.adding}
+        onOpenChange={vm.onAddOpenChange}
+        mode="add"
+        canImportContacts={vm.canManageContacts}
+      />
       <ContactFormDialog
         open={vm.editing !== null}
         onOpenChange={vm.onEditOpenChange}

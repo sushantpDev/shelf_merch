@@ -23,12 +23,16 @@ import { useArchiveCollection, useDeleteCollection, useRestoreCollection } from 
 
 export function CollectionBlock({
   collection,
+  canManageSwag = true,
+  canAddToShop = true,
   onOpenDesign,
   onAddToShop,
   onEditDesign,
   onViewProduct,
 }: {
   collection: UiCollection;
+  canManageSwag?: boolean;
+  canAddToShop?: boolean;
   onOpenDesign: (product: UiProduct, pIdx: number) => void;
   onAddToShop: (collection: UiCollection) => void;
   onEditDesign: () => void;
@@ -95,56 +99,60 @@ export function CollectionBlock({
           >
             <Share2 size={16} />
           </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="iconbtn"
-                style={{ width: 34, height: 34 }}
-                aria-label="Collection actions"
-              >
-                <MoreHorizontal size={18} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="bottom" className="shop-card-menu">
-              {archived ? (
-                <>
-                  <DropdownMenuItem
-                    onSelect={() =>
-                      run(restore, "Collection restored", "Failed to restore collection")
-                    }
-                  >
-                    Restore to saved designs
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="shop-card-menu-item--danger"
-                    onSelect={() => setConfirmDelete(true)}
-                  >
-                    Delete permanently
-                  </DropdownMenuItem>
-                </>
-              ) : (
-                <>
-                  <DropdownMenuItem onSelect={() => onAddToShop(collection)}>
-                    Add collection to shop
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() =>
-                      run(archive, "Collection archived", "Failed to archive collection")
-                    }
-                  >
-                    Archive collection
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="shop-card-menu-item--danger"
-                    onSelect={() => setConfirmDelete(true)}
-                  >
-                    Delete collection
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {canManageSwag ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="iconbtn"
+                  style={{ width: 34, height: 34 }}
+                  aria-label="Collection actions"
+                >
+                  <MoreHorizontal size={18} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" side="bottom" className="shop-card-menu">
+                {archived ? (
+                  <>
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        run(restore, "Collection restored", "Failed to restore collection")
+                      }
+                    >
+                      Restore to saved designs
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="shop-card-menu-item--danger"
+                      onSelect={() => setConfirmDelete(true)}
+                    >
+                      Delete permanently
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    {canAddToShop ? (
+                      <DropdownMenuItem onSelect={() => onAddToShop(collection)}>
+                        Add collection to shop
+                      </DropdownMenuItem>
+                    ) : null}
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        run(archive, "Collection archived", "Failed to archive collection")
+                      }
+                    >
+                      Archive collection
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="shop-card-menu-item--danger"
+                      onSelect={() => setConfirmDelete(true)}
+                    >
+                      Delete collection
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
         </div>
       </header>
 
@@ -155,7 +163,9 @@ export function CollectionBlock({
               key={`${p.id ?? p.nm}-${i}`}
               collection={collection}
               product={p}
-              showToolbar
+              showToolbar={canManageSwag || canAddToShop}
+              canEdit={canManageSwag}
+              canAddToShop={canAddToShop}
               onOpen={() => onOpenDesign(p, i)}
               onEditDesign={onEditDesign}
               onViewProduct={() => onViewProduct(p, i)}

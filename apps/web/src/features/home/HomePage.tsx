@@ -40,8 +40,9 @@ const HELP_LINKS = [
 
 export function HomePage() {
   const { data: workspace, isLoading, isError, error } = useWorkspace();
-  const { canWrite } = useTenantAccess();
+  const { canWrite, canManageContacts } = useTenantAccess();
   const canCreateShop = canWrite("shops");
+  const canManageDirectory = canManageContacts();
   const sessionUser = getStoredUser();
 
   if (isLoading && !workspace) {
@@ -116,15 +117,19 @@ export function HomePage() {
               <span className="home-stat__label">Members</span>
               <span className="home-stat__value">{memberCount}</span>
             </div>
-            <Link to="/app/contacts" className="home-stat__add" aria-label="Add contacts">
-              <Plus size={14} strokeWidth={2.4} aria-hidden="true" />
-            </Link>
+            {canManageDirectory ? (
+              <Link to="/app/contacts" className="home-stat__add" aria-label="Add contacts">
+                <Plus size={14} strokeWidth={2.4} aria-hidden="true" />
+              </Link>
+            ) : null}
           </div>
 
           <div className="home-card card">
             <h2 className="home-card__title">Help center</h2>
             <ul className="home-help-list">
-              {HELP_LINKS.map((item) => (
+              {HELP_LINKS.filter(
+                (item) => item.href !== "/app/contacts" || canManageDirectory,
+              ).map((item) => (
                 <li key={item.label}>
                   <Link to={item.href} className="home-help-item">
                     <span className="home-help-item__icon">
@@ -165,13 +170,15 @@ export function HomePage() {
             <span className="home-mini-card__label">Workspace settings</span>
             <span className="home-mini-card__cta">Customize workspace</span>
           </Link>
-          <Link to="/app/contacts" className="home-mini-card card">
-            <span className="home-mini-card__icon">
-              <Users size={20} strokeWidth={1.75} aria-hidden="true" />
-            </span>
-            <span className="home-mini-card__label">Contacts</span>
-            <span className="home-mini-card__cta">Add members</span>
-          </Link>
+          {canManageDirectory ? (
+            <Link to="/app/contacts" className="home-mini-card card">
+              <span className="home-mini-card__icon">
+                <Users size={20} strokeWidth={1.75} aria-hidden="true" />
+              </span>
+              <span className="home-mini-card__label">Contacts</span>
+              <span className="home-mini-card__cta">Add members</span>
+            </Link>
+          ) : null}
         </div>
 
         <div className="home-layout__span-7">

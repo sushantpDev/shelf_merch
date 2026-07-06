@@ -22,10 +22,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ShopBanner } from "./banner";
 import { useArchiveShop, useDuplicateShop } from "./model";
+import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { shopCardMeta } from "./types";
 
 export function ShopCard({ shop, fallbackUser }: { shop: UiShop; fallbackUser: string }) {
   const navigate = useNavigate();
+  const { canWrite } = useTenantAccess();
+  const canEditShop = canWrite("shops");
   const duplicate = useDuplicateShop();
   const archive = useArchiveShop();
   const [confirmArchive, setConfirmArchive] = useState(false);
@@ -83,23 +86,25 @@ export function ShopCard({ shop, fallbackUser }: { shop: UiShop; fallbackUser: s
                 <MoreHorizontal size={18} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="bottom" className="shop-card-menu">
-              <DropdownMenuItem onSelect={() => navigate(`/app/shops/${shop.id}?tab=layout`)}>
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => navigate("/app/contacts")}>
-                Add Users
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={onDuplicate} disabled={duplicate.isPending}>
-                Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="shop-card-menu-item--danger"
-                onSelect={() => setConfirmArchive(true)}
-              >
-                Archive
-              </DropdownMenuItem>
-            </DropdownMenuContent>
+            {canEditShop ? (
+              <DropdownMenuContent align="end" side="bottom" className="shop-card-menu">
+                <DropdownMenuItem onSelect={() => navigate(`/app/shops/${shop.id}?tab=layout`)}>
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => navigate("/app/contacts")}>
+                  Add Users
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={onDuplicate} disabled={duplicate.isPending}>
+                  Duplicate
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="shop-card-menu-item--danger"
+                  onSelect={() => setConfirmArchive(true)}
+                >
+                  Archive
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            ) : null}
           </DropdownMenu>
         </div>
         <div className="shop-card-body">

@@ -48,12 +48,16 @@ export function KitDetailView(vm: KitDetailVm) {
         subtitle={`A reusable ${kit.items}-item kit. Send it to new recipients any time without rebuilding.`}
         actions={
           <div className="row" style={{ gap: 10 }}>
-            <Link to={`/app/kits/${kit.id}/edit`} className="btn btn-ghost">
-              <Pencil size={15} /> Edit kit
-            </Link>
-            <Link to={`/app/kits/${kit.id}/send`} className="btn btn-brand">
-              <Send size={15} /> Send this kit
-            </Link>
+            {vm.canEditKit ? (
+              <Link to={`/app/kits/${kit.id}/edit`} className="btn btn-ghost">
+                <Pencil size={15} /> Edit kit
+              </Link>
+            ) : null}
+            {vm.canSendKit ? (
+              <Link to={`/app/kits/${kit.id}/send`} className="btn btn-brand">
+                <Send size={15} /> Send this kit
+              </Link>
+            ) : null}
           </div>
         }
       />

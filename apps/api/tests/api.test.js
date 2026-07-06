@@ -135,7 +135,7 @@ describe('RBAC + ABAC (must-have §11.1)', () => {
     expect(res.status).toBe(403);
   });
 
-  it('company admin and entity manager can import campaign recipients (campaignOps RBAC)', async () => {
+  it('company admin cannot import campaign recipients; entity manager can (campaignOps RBAC)', async () => {
     const entity = await Entity.create({ tenantId: tenantA._id, walletId: walletA._id, name: 'HR' });
     const { token: mgrToken } = await makeUser(tenantA, 'entity_manager', 'entity', {
       assignedEntityIds: [entity._id],
@@ -147,17 +147,17 @@ describe('RBAC + ABAC (must-have §11.1)', () => {
     expect(created.status).toBe(201);
     const id = created.body._id;
 
-    const adminImport = await request(app)
+    const denied = await request(app)
       .post(`/api/v1/campaigns/${id}/recipients/import`)
       .set('Authorization', `Bearer ${tokenA}`)
       .send({ recipients: [{ name: 'A', email: 'a@test.io' }] });
-    expect(adminImport.status).toBe(200);
+    expect(denied.status).toBe(403);
 
-    const mgrImport = await request(app)
+    const allowed = await request(app)
       .post(`/api/v1/campaigns/${id}/recipients/import`)
       .set('Authorization', `Bearer ${mgrToken}`)
       .send({ recipients: [{ name: 'B', email: 'b@test.io' }] });
-    expect(mgrImport.status).toBe(200);
+    expect(allowed.status).toBe(200);
   });
 
   it('entity manager cannot create campaign for unassigned entity (ABAC)', async () => {

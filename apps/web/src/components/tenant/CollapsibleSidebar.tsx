@@ -169,7 +169,7 @@ export function CollapsibleSidebar() {
   const handleToggle = () => {
     setExpanded((prev) => {
       const next = !prev;
-      setShowFooterImage(next);
+      setShowFooterImage(!prev);
       return next;
     });
   };

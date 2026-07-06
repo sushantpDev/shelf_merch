@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useContacts, useUpdateContact } from "../model";
 import type { UiContact } from "../model";
@@ -25,6 +26,8 @@ export type ContactsVm = {
   allSelected: boolean;
   someSelected: boolean;
   isRolePending: boolean;
+  canManageContacts: boolean;
+  canManageContactRoles: boolean;
   adding: boolean;
   editing: UiContact | null;
   onTab: (tab: ContactsTab) => void;
@@ -73,6 +76,7 @@ function sortContacts(list: UiContact[], key: SortKey, dir: SortDir) {
 /** Controller for the contacts screen: list query, table state, role mutation, dialogs. */
 export function useContactsController(): ContactsVm {
   const workspace = useWorkspace();
+  const { canManageContacts, canManageUsers } = useTenantAccess();
   const { data: contacts, isLoading, isError, error } = useContacts(workspace.data?.contacts);
   const updateContact = useUpdateContact();
 
@@ -162,6 +166,8 @@ export function useContactsController(): ContactsVm {
     allSelected,
     someSelected,
     isRolePending: updateContact.isPending,
+    canManageContacts: canManageContacts(),
+    canManageContactRoles: canManageUsers(),
     adding,
     editing,
     onTab: setTab,

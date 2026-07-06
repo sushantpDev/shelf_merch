@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useParams } from "react-router";
+import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import type { UiKit, UiProduct } from "../model";
 
@@ -10,12 +11,15 @@ export type KitDetailVm = {
   errorMessage: string | null;
   kit: UiKit | undefined;
   products: KitDetailProduct[];
+  canEditKit: boolean;
+  canSendKit: boolean;
 };
 
 /** Controller for the kit detail page: route param, kit lookup, product refs. */
 export function useKitDetailController(): KitDetailVm {
   const { id } = useParams() as { id: string };
   const { data: workspace, isLoading, isError, error } = useWorkspace();
+  const { canWrite, canOperateCampaigns } = useTenantAccess();
   const kit = workspace?.kits.find((k) => k.id === id);
 
   const products = useMemo<KitDetailProduct[]>(() => {
@@ -38,5 +42,7 @@ export function useKitDetailController(): KitDetailVm {
         : null,
     kit,
     products,
+    canEditKit: canWrite("kits"),
+    canSendKit: canOperateCampaigns(),
   };
 }

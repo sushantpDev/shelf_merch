@@ -2,7 +2,6 @@ import { Link } from "react-router";
 import { ArrowLeft, Coins } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { ShopBanner } from "../banner";
-import { SHOP_TABS } from "../types";
 import { BrandedSwagTab } from "../tabs/BrandedSwagTab";
 import { ShopCatalogTab } from "../tabs/ShopCatalogTab";
 import { SentGiftsTab } from "../tabs/SentGiftsTab";
@@ -81,13 +80,15 @@ export function ShopDetailView(vm: ShopDetailVm) {
             )}
           </div>
         </div>
-        <button type="button" className="btn btn-brand" onClick={() => vm.onSendPoints()}>
-          <Coins size={16} /> Send points
-        </button>
+        {vm.canSendPoints ? (
+          <button type="button" className="btn btn-brand" onClick={() => vm.onSendPoints()}>
+            <Coins size={16} /> Send points
+          </button>
+        ) : null}
       </div>
 
       <div className="tabs" style={{ marginBottom: 22 }} role="tablist" aria-label="Shop sections">
-        {SHOP_TABS.map((t) => (
+        {vm.visibleTabs.map((t) => (
           <button
             key={t}
             type="button"
@@ -105,14 +106,23 @@ export function ShopDetailView(vm: ShopDetailVm) {
         <BrandedSwagTab
           shop={shop}
           collections={vm.collections}
+          canDesignSwag={vm.canDesignSwag}
           onStartDesigning={vm.onStartDesigning}
         />
       )}
-      {vm.tab === "Shop Catalog" && <ShopCatalogTab shop={shop} products={vm.catalogProducts} />}
-      {vm.tab === "Sent Gifts" && <SentGiftsTab shop={shop} onSendPoints={vm.onSendPoints} />}
-      {vm.tab === "Layout" && <ShopLayoutTab shop={shop} />}
+      {vm.tab === "Shop Catalog" && (
+        <ShopCatalogTab shop={shop} products={vm.catalogProducts} canEditShop={vm.canEditShop} />
+      )}
+      {vm.tab === "Sent Gifts" && (
+        <SentGiftsTab
+          shop={shop}
+          canSendPoints={vm.canSendPoints}
+          onSendPoints={vm.onSendPoints}
+        />
+      )}
+      {vm.tab === "Layout" && vm.canEditShop && <ShopLayoutTab shop={shop} />}
       {vm.tab === "Reports" && <ReportsTab />}
-      {vm.tab === "Settings" && <GeneralSettingsTab shop={shop} />}
+      {vm.tab === "Settings" && vm.canEditShop && <GeneralSettingsTab shop={shop} />}
     </>
   );
 }

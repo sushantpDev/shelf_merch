@@ -23,7 +23,7 @@ export type KitsVm = {
 /** Controller for the kits dashboard: workspace slice, access, stats, show-all toggle. */
 export function useKitsController(): KitsVm {
   const { data: workspace, isLoading, isError, error } = useWorkspace();
-  const { canWrite } = useTenantAccess();
+  const { canWrite, canOperateCampaigns } = useTenantAccess();
   const [showAll, setShowAll] = useState(false);
 
   const kits = workspace?.kits ?? [];
@@ -44,7 +44,7 @@ export function useKitsController(): KitsVm {
     kits,
     stats,
     canCreateKits: canWrite("kits"),
-    canSendKits: canWrite("campaignOps"),
+    canSendKits: canOperateCampaigns(),
     showAll,
     previewLimit: PREVIEW_LIMIT,
     hasMoreKits: kits.length > PREVIEW_LIMIT,

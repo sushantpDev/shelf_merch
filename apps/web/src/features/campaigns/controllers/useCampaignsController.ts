@@ -32,6 +32,8 @@ export type SendGiftVm = {
   onSelectKit: (kitId: string) => void;
   onCreateKit: () => void;
   onCreateShop: () => void;
+  canCreateKit: boolean;
+  canCreateShop: boolean;
 };
 
 export type CampaignsVm = {
@@ -59,7 +61,7 @@ export type CampaignsVm = {
 export function useCampaignsController(): CampaignsVm {
   const { data: workspace, isLoading, isError, error } = useWorkspace();
   const navigate = useNavigate();
-  const { canOperateCampaigns } = useTenantAccess();
+  const { canOperateCampaigns, canWrite } = useTenantAccess();
 
   const [giftOpen, setGiftOpen] = useState(false);
   const [giftView, setGiftView] = useState<SendGiftView>("choose");
@@ -162,6 +164,8 @@ export function useCampaignsController(): CampaignsVm {
         closeGift();
         navigate("/app/shops/new");
       },
+      canCreateKit: canWrite("kits"),
+      canCreateShop: canWrite("shops"),
     },
   };
 }

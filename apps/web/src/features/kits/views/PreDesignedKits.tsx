@@ -13,7 +13,7 @@ function templateItemLabel(kit: PlatformKitTemplate): string {
   return count ? `${count} item${count === 1 ? "" : "s"}` : "Curated bundle";
 }
 
-export function PreDesignedKitsView({ isLoading, kits }: PreDesignedKitsVm) {
+export function PreDesignedKitsView({ isLoading, kits, canCreateKits }: PreDesignedKitsVm) {
   if (isLoading) {
     return (
       <div className="muted" style={{ textAlign: "center", padding: "32px 12px", fontSize: 13 }}>
@@ -79,13 +79,15 @@ export function PreDesignedKitsView({ isLoading, kits }: PreDesignedKitsVm) {
           <div className="muted" style={{ fontSize: 11.5, marginBottom: 10, textAlign: "center" }}>
             {templateItemLabel(kit)}
           </div>
-          <Link
-            to={`/app/kits/new?template=${encodeURIComponent(kit._id)}`}
-            className="btn btn-ghost btn-sm btn-block"
-            style={{ border: "1px solid var(--line)", fontWeight: 600, fontSize: 12, height: 32 }}
-          >
-            Use this kit
-          </Link>
+          {canCreateKits ? (
+            <Link
+              to={`/app/kits/new?template=${encodeURIComponent(kit._id)}`}
+              className="btn btn-ghost btn-sm btn-block"
+              style={{ border: "1px solid var(--line)", fontWeight: 600, fontSize: 12, height: 32 }}
+            >
+              Use this kit
+            </Link>
+          ) : null}
         </div>
       ))}
     </div>

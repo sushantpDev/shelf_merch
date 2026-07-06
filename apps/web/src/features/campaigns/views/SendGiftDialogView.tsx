@@ -17,6 +17,8 @@ export function SendGiftDialogView({
   onSelectKit,
   onCreateKit,
   onCreateShop,
+  canCreateKit,
+  canCreateShop,
 }: SendGiftVm) {
   const modalWidth = view === "choose" ? 600 : 640;
 
@@ -112,7 +114,7 @@ export function SendGiftDialogView({
               )}
             </div>
 
-            {availableShops.length === 0 ? (
+            {availableShops.length === 0 && canCreateShop ? (
               <button
                 type="button"
                 className="btn btn-brand btn-block send-gift-create-kit"
@@ -167,13 +169,15 @@ export function SendGiftDialogView({
               )}
             </div>
 
-            <button
-              type="button"
-              className="btn btn-soft btn-block send-gift-create-kit"
-              onClick={onCreateKit}
-            >
-              <Plus size={16} /> Create a new kit
-            </button>
+            {canCreateKit ? (
+              <button
+                type="button"
+                className="btn btn-soft btn-block send-gift-create-kit"
+                onClick={onCreateKit}
+              >
+                <Plus size={16} /> Create a new kit
+              </button>
+            ) : null}
           </>
         )}
       </DialogContent>
