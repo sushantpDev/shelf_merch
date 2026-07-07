@@ -4,7 +4,6 @@ import { StoreBanner } from "@/components/StoreBanner";
 import { LoadingState } from "@/components/LoadingState";
 import { publicFetch } from "@/services/api";
 import { shopRedeemDisplayHost } from "@/lib/shopRedeemUrl";
-import "@/styles/shelf-merch.css";
 
 type ShopInfo = {
   id: string;

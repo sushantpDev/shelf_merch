@@ -59,7 +59,16 @@ import chatRoutes from './modules/chat/chat.routes.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIST = path.resolve(__dirname, '../../web/dist');
 
-function resolveCorsOptions() {
+function isSameHostOrigin(origin, hostHeader) {
+  if (!origin || !hostHeader) return false;
+  try {
+    return new URL(origin).host === hostHeader.split(',')[0].trim();
+  } catch {
+    return false;
+  }
+}
+
+function resolveCorsOptions(req) {
   if (env.NODE_ENV !== 'production') {
     return { origin: true, credentials: true };
   }
@@ -68,7 +77,10 @@ function resolveCorsOptions() {
   return {
     origin(origin, callback) {
       if (!origin || origins.includes(origin)) return callback(null, true);
-      return callback(new Error('Not allowed by CORS'));
+      // Vite emits crossorigin on /assets/*; browsers send Origin even for same-host
+      // document loads. Allow when Origin matches the request Host (e.g. shelfmerch.io).
+      if (req && isSameHostOrigin(origin, req.headers.host)) return callback(null, true);
+      return callback(null, false);
     },
     credentials: true,
   };
@@ -85,7 +97,7 @@ export function createApp() {
         : undefined,
     ),
   );
-  app.use(cors(resolveCorsOptions()));
+  app.use((req, res, next) => cors(resolveCorsOptions(req))(req, res, next));
 
   // §9.3 — Razorpay webhook must verify signature against the raw body.
   app.post(
