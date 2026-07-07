@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { login, isPlatformUser, ApiError } from "../model";
 
@@ -18,6 +18,9 @@ export type LoginVm = {
 
 function loginErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
+    if (err.status === 429) {
+      return "Too many login attempts — wait a moment and try again.";
+    }
     if (err.status === 502 || err.status === 503) {
       return "Cannot reach the server. Start the API with npm run dev:api.";
     }
@@ -31,6 +34,7 @@ function loginErrorMessage(err: unknown): string {
 
 /** Controller for the login screen: form state, submit flow, redirect by role. */
 export function useLoginController(): LoginVm {
+  const submitInFlight = useRef(false);
   const [email, setEmail] = useState("hr@rubix.net");
   const [password, setPassword] = useState("demo1234");
   const [showPassword, setShowPassword] = useState(false);
@@ -39,11 +43,15 @@ export function useLoginController(): LoginVm {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitInFlight.current) return;
+
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
       toast.error("Enter email and password");
       return;
     }
+
+    submitInFlight.current = true;
     setError("");
     setBusy(true);
     try {
@@ -52,6 +60,7 @@ export function useLoginController(): LoginVm {
       const destination = isPlatformUser(user) ? "/platform/dashboard" : "/app/orders";
       window.location.assign(destination);
     } catch (err) {
+      submitInFlight.current = false;
       setBusy(false);
       const message = loginErrorMessage(err);
       setError(message);

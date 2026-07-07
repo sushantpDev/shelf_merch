@@ -8,7 +8,8 @@ export function LoginView(vm: LoginVm) {
       title="Log in with your Shelf Merch account"
       footerLink={{ hint: "Don't have an account?", label: "Sign up", to: "/signup" }}
     >
-      <form className="auth-simple-form" onSubmit={vm.onSubmit}>
+      <form className="auth-simple-form" onSubmit={vm.onSubmit} aria-busy={vm.busy}>
+        <fieldset className="auth-simple-fieldset" disabled={vm.busy}>
         <div className="auth-simple-field">
           <AuthLabel htmlFor="login-email">Email</AuthLabel>
           <input
@@ -64,9 +65,10 @@ export function LoginView(vm: LoginVm) {
           </p>
         ) : null}
 
-        <button type="submit" disabled={vm.busy} className="auth-simple-submit">
+        <button type="submit" className="auth-simple-submit">
           {vm.busy ? "Signing in…" : "Log in"}
         </button>
+        </fieldset>
       </form>
     </AuthLayout>
   );

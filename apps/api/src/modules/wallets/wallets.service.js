@@ -68,14 +68,27 @@ async function removeOrphanDraft({ tenantId, name }) {
  * request. Rolls back the draft wallet if any step fails.
  */
 export async function setupWallet({ tenantId, userId, data, file }) {
-  await removeOrphanDraft({ tenantId, name: data.name });
+  const trimmedName = data.name.trim();
+
+  // Idempotent retry — double-clicks or a failed client response must not spawn duplicates.
+  const pending = await Wallet.findOne({
+    tenantId,
+    name: trimmedName,
+    'fundingDocument.approvalStatus': 'pending',
+    status: { $in: ['draft', 'wallet_created'] },
+  });
+  if (pending) {
+    return withMeta(await getWallet({ tenantId, walletId: pending._id }));
+  }
+
+  await removeOrphanDraft({ tenantId, name: trimmedName });
 
   let wallet = null;
   try {
     wallet = await Wallet.create({
       tenantId,
       ownerUserId: userId,
-      name: data.name,
+      name: trimmedName,
       currency: data.currency ?? 'INR',
       validFrom: data.validFrom,
       validTo: data.validTo,

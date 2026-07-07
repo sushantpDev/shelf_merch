@@ -1,5 +1,5 @@
-import { useState, type Dispatch } from "react";
-import { ArrowLeft, CheckCircle2, Send, Wallet } from "lucide-react";
+import { useRef, useState, type Dispatch } from "react";
+import { ArrowLeft, Send } from "lucide-react";
 import { toast } from "sonner";
 import { inr } from "@/components/platform/platform-ui";
 import {
@@ -43,10 +43,12 @@ export function OrgWizard({
   onFinished: () => void;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const submitInFlight = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
   const createWallet = useCreateWallet();
   const sync = useSyncOrgWizard();
   const isWalletFlow = state.flow === "wallet";
-  const busy = createWallet.isPending || sync.isPending;
+  const busy = submitting || createWallet.isPending || sync.isPending;
   const n = state.step;
   const isEditAllocate = isAllocateEditFlow(state.flow, state.mode);
   const fromPool = allocationFromPool(state.departments);
@@ -106,6 +108,9 @@ export function OrgWizard({
   }
 
   async function handleFinish() {
+    if (submitInFlight.current) return;
+    submitInFlight.current = true;
+    setSubmitting(true);
     setConfirmOpen(false);
     try {
       if (isWalletFlow) {
@@ -126,6 +131,8 @@ export function OrgWizard({
       );
       onExit();
     } catch (err) {
+      submitInFlight.current = false;
+      setSubmitting(false);
       toast.error(err instanceof Error ? err.message : "Failed to save");
     }
   }
@@ -246,50 +253,44 @@ export function OrgWizard({
       </div>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="sm-modal wallet-confirm-modal">
-          <div className="wallet-confirm">
-            <DialogHeader className="wallet-confirm-head">
-              <div className="wallet-confirm-icon" aria-hidden="true">
-                {isWalletFlow ? <Wallet size={22} /> : <CheckCircle2 size={23} />}
-              </div>
-              <DialogTitle className="wallet-confirm-title">
+        <DialogContent className="sm-modal" style={{ maxWidth: 440 }}>
+          <div className="modal-pad">
+            <DialogHeader>
+              <DialogTitle style={{ fontSize: 20, fontFamily: "var(--disp)" }}>
                 {isWalletFlow ? "Submit wallet for review?" : "Finish allocation?"}
               </DialogTitle>
-              <DialogDescription className="wallet-confirm-desc">
+              <DialogDescription className="muted" style={{ fontSize: 14, margin: "8px 0 0" }}>
                 {isWalletFlow ? (
                   <>
-                    This creates the <b>{state.wallet.name}</b> wallet and sends your PO to platform
-                    finance. Your balance will appear after approval — then you can allocate funds
-                    to departments.
+                    Create <b>{state.wallet.name}</b> ({inr(state.wallet.amount)}) and send your PO
+                    to finance for approval.
                   </>
                 ) : (
                   <>
-                    This saves department allocations and sends manager invitations for{" "}
-                    <b>{state.wallet.name}</b>. You can edit everything afterward.
+                    Save allocations for <b>{state.wallet.name}</b> ({inr(fromPool)}) and send
+                    manager invites.
                   </>
                 )}
               </DialogDescription>
             </DialogHeader>
-            <div className="wallet-confirm-summary">
-              <div>
-                <span>Wallet</span>
-                <b>{state.wallet.name}</b>
-              </div>
-              <div>
-                <span>{isWalletFlow ? "Submitted amount" : "Adding from wallet"}</span>
-                <b>{isWalletFlow ? inr(state.wallet.amount) : inr(fromPool)}</b>
-              </div>
-              <div>
-                <span>Next step</span>
-                <b>{isWalletFlow ? "Finance review" : "Manager access"}</b>
-              </div>
-            </div>
-            <div className="wallet-confirm-actions">
-              <button type="button" className="btn btn-ghost" onClick={() => setConfirmOpen(false)}>
-                Not yet
+            <div className="row" style={{ gap: 10, marginTop: 24 }}>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ flex: 1, justifyContent: "center" }}
+                onClick={() => setConfirmOpen(false)}
+                disabled={submitting}
+              >
+                Cancel
               </button>
-              <button type="button" className="btn btn-brand" onClick={handleFinish}>
-                {isWalletFlow ? "Submit for review" : "Finish allocation"}
+              <button
+                type="button"
+                className="btn btn-brand"
+                style={{ flex: 1, justifyContent: "center" }}
+                onClick={handleFinish}
+                disabled={submitting}
+              >
+                {isWalletFlow ? "Submit" : "Finish"}
               </button>
             </div>
           </div>

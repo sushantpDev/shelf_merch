@@ -131,6 +131,27 @@ async function cleanupOrphanDraftByName(name: string): Promise<void> {
   }
 }
 
+async function findRecoverableWalletId(name: string): Promise<string | null> {
+  const nameKey = name.trim().toLowerCase();
+  if (!nameKey) return null;
+  try {
+    const wallets = await apiFetch<Array<Record<string, unknown>>>("/wallets");
+    const match = wallets.find((row) => {
+      const rowName = String(row.name ?? "").trim().toLowerCase();
+      if (rowName !== nameKey) return false;
+      const status = String(row.status ?? "draft");
+      const approval = (row.fundingDocument as { approvalStatus?: string } | undefined)
+        ?.approvalStatus;
+      if (approval === "pending") return true;
+      return status === "draft" && Number(row.balance ?? 0) === 0;
+    });
+    if (!match) return null;
+    return walletIdFromResponse(match);
+  } catch {
+    return null;
+  }
+}
+
 async function createWalletAndFund(org: OrgWizardState): Promise<string> {
   const fundingMethod = org.wallet.funding === "pay" ? "online" : "po_upload";
   const form = new FormData();
@@ -146,14 +167,18 @@ async function createWalletAndFund(org: OrgWizardState): Promise<string> {
     form.append("document", org.wallet.uploadFile.file);
   }
 
+  const existing = await findRecoverableWalletId(org.wallet.name);
+  if (existing) return existing;
+
   try {
     const wallet = await apiFetch<Record<string, unknown>>("/wallets/setup", {
       method: "POST",
       body: form,
     });
-    const walletId = walletIdFromResponse(wallet);
-    return walletId;
+    return walletIdFromResponse(wallet);
   } catch (err) {
+    const recovered = await findRecoverableWalletId(org.wallet.name);
+    if (recovered) return recovered;
     await cleanupOrphanDraftByName(org.wallet.name);
     throw err;
   }

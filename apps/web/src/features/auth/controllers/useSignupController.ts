@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { register, isPlatformUser } from "../model";
@@ -22,6 +22,7 @@ export type SignupVm = {
 
 /** Controller for the signup screen: form state, register flow, redirect by role. */
 export function useSignupController(): SignupVm {
+  const submitInFlight = useRef(false);
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,6 +34,8 @@ export function useSignupController(): SignupVm {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitInFlight.current) return;
+
     const name = `${firstName.trim()} ${lastName.trim()}`.trim();
     if (!email || !password || !name || !company) {
       toast.error("Fill in all fields");
@@ -42,6 +45,7 @@ export function useSignupController(): SignupVm {
       toast.error("Password must be at least 8 characters");
       return;
     }
+    submitInFlight.current = true;
     setBusy(true);
     try {
       const user = await register({ name, email, password, companyName: company });
@@ -52,6 +56,7 @@ export function useSignupController(): SignupVm {
         navigate("/app/orders");
       }
     } catch (err) {
+      submitInFlight.current = false;
       setBusy(false);
       toast.error(err instanceof Error ? err.message : "Sign up failed");
     }
