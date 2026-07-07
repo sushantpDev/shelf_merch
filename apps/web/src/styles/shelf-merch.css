@@ -8235,3 +8235,38 @@ tr:hover .camp-avatar {
   .auth-simple-title{font-size:20px}
 }
 
+/* App status pages (404 / route errors) */
+.status-page-icon{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:72px;
+  height:72px;
+  margin:0 auto 20px;
+  border-radius:999px;
+  background:var(--brand-50);
+  color:var(--brand);
+}
+.status-page-code{
+  font-family:var(--disp);
+  font-size:56px;
+  font-weight:700;
+  line-height:1;
+  letter-spacing:-.04em;
+  color:var(--ink);
+}
+.status-page-title{margin-bottom:12px !important}
+.status-page-description{
+  margin:0 auto !important;
+  max-width:340px;
+  line-height:1.55;
+}
+.status-page-actions{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  margin-top:28px;
+}
+.status-page-actions .btn{min-width:148px;justify-content:center}

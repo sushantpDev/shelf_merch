@@ -2,7 +2,6 @@ import { useState, type ReactNode } from "react";
 import "./landing-page.css";
 import { Link } from "react-router";
 import type { LucideIcon } from "lucide-react";
-import templateAsset from "../../assets/template.png";
 import {
   Award,
   Backpack,
@@ -39,7 +38,6 @@ import {
   PartyPopper,
   Pencil,
   Plane,
-  Play,
   Popcorn,
   Puzzle,
   Rocket,
@@ -58,6 +56,7 @@ import {
   UserCircle,
   Users,
   Wallet,
+  Youtube,
 } from "lucide-react";
 
 const LP_ICONS = {
@@ -125,13 +124,53 @@ const HERO_TRUST_ITEMS: { icon: LucideIcon; label: string }[] = [
 
 const HERO_BANNER_IMAGE = "/images/landing/corporate-gifting-hero.png?v=2";
 
-const INTRO_FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
-  { icon: Monitor, title: "One dashboard", desc: "Shops, gifts, and swag unified" },
-  { icon: Sparkles, title: "Smart automation", desc: "Milestones and peer recognition" },
-  { icon: Globe, title: "Global reach", desc: "Fulfillment in 170+ countries" },
+const CONSOLIDATE_ICONS: { icon: LucideIcon; color: string }[] = [
+  { icon: Gift, color: "#7C3AED" },
+  { icon: Award, color: "#2563EB" },
+  { icon: Package, color: "#0D9488" },
+  { icon: Heart, color: "#F59E0B" },
+  { icon: Calendar, color: "#F97316" },
+  { icon: Megaphone, color: "#EC4899" },
+  { icon: Star, color: "#6366F1" },
 ];
 
-const INTRO_CHAPTERS = ["Overview", "Kits & Swag", "Gifting", "Analytics"] as const;
+const GIFTING_HERO_IMAGE = "/images/offerings/gifting/gifting-journey-hq.png?v=3";
+
+const GIFTING_FEATURES = [
+  "Clients & Prospects",
+  "Holidays & Celebrations",
+  "Employee Appreciation",
+  "Birthdays",
+] as const;
+
+const FOOTER_COLUMNS = [
+  {
+    title: "Products",
+    links: ["Shops", "Gifting", "Swag", "Snacks", "Gift Cards", "Send Points"],
+  },
+  {
+    title: "Platform",
+    links: ["Integrations", "API", "Kudos Program", "Custom Shops", "Analytics", "Wallet"],
+  },
+  {
+    title: "Resources",
+    links: ["Help Center", "Blog", "Case Studies", "Partnerships", "Videos", "Contact Us"],
+  },
+  {
+    title: "Company",
+    links: ["About", "Careers", "Press", "Reviews", "Partner With Us"],
+  },
+  {
+    title: "Legal",
+    links: ["Privacy Policy", "Terms of Service", "Security", "Cookie Preferences"],
+  },
+] as const;
+
+const FOOTER_OFFERINGS: { label: string; icon: LucideIcon }[] = [
+  { label: "Shops", icon: Store },
+  { label: "Gifting", icon: Gift },
+  { label: "Kudos", icon: Heart },
+];
 
 /* ─── offerings tabs (ShelfMerch) ─── */
 const OFFERING_TABS = [
@@ -139,10 +178,11 @@ const OFFERING_TABS = [
     id: "shops",
     label: "Shops",
     icon: "/images/offering-icons/shops.svg",
-    color: "#0D5C3F",
-    bg: "#eef5f0",
-    bgDark: "#14532d",
+    color: "#7c3aed",
+    bg: "#f3e8ff",
+    bgDark: "#5b21b6",
     title: "Do it all with your shop",
+    sub: "Launch a branded storefront with customizable swag, flexible rewards, and thousands of catalog options.",
     layout: "shop" as const,
     perfectFor: [
       "Company Storefront",
@@ -156,36 +196,14 @@ const OFFERING_TABS = [
     features: ["Add your branding", "Curated catalog", "Points or currency", "5K+ product options"],
   },
   {
-    id: "gifting",
-    label: "Gifting",
-    icon: "/images/offering-icons/gifting.svg",
-    color: "#00C036",
-    bg: "#ecfdf5",
-    bgDark: "#047857",
-    title: "All your gifting operations in one place",
-    layout: "gifting" as const,
-    cards: [
-      { image: "/images/offerings/gifting/gift-boxes.png", title: "Gift Boxes", desc: "Customize everything from gifts to branding." },
-      { image: "/images/offerings/gifting/give-a-budget.svg", title: "Give a Budget", desc: "Points, currency, or a number of gifts." },
-      { image: "/images/offerings/gifting/spot-gifting.png", title: "Spot Gifting", desc: "Gift on a whim — there's always a reason to gift." },
-      { image: "/images/offerings/gifting/automated-gifting.png", title: "Automated Gifting", desc: "Set and forget for any occasion." },
-    ],
-    features: ["Clients & Prospects", "Holidays & Celebrations", "Employee Appreciation", "Birthdays"],
-  },
-  {
     id: "anniversaries",
     label: "Service Anniversaries",
     icon: "/images/offering-icons/anniversaries.svg",
-    color: "#1A6B52",
-    bg: "#e8f2ed",
-    bgDark: "#14532d",
+    color: "#2563eb",
+    bg: "#eef4fc",
+    bgDark: "#1e40af",
     title: "Celebrate milestones across your team",
     layout: "anniversaries" as const,
-    cards: [
-      { image: "/images/offerings/anniversaries/spot-recurring.png", title: "Spot & Recurring", desc: "Give once or set ongoing recognition." },
-      { image: "/images/offerings/anniversaries/feedback-reporting.svg", title: "Feedback & Reporting", desc: "Guardrails, analytics, and insights." },
-      { image: "/images/offerings/anniversaries/integrations.png", title: "Integrations", desc: "HRIS, CRM, Slack, Teams, and more." },
-    ],
     features: ["Service Anniversaries", "Employee Appreciation", "Rewards Redemption", "Sales Incentives"],
   },
   {
@@ -265,7 +283,57 @@ const OFFERING_TABS = [
 
 type OfferingId = (typeof OFFERING_TABS)[number]["id"];
 
-const SHOP_HERO_IMAGE = "/images/shops/shop-preview-clean.png";
+const ANNIVERSARY_CARDS = [
+  {
+    title: "Spot & Recurring",
+    desc: "Give once or set ongoing recognition.",
+    image: "/images/offerings/anniversaries/spot-recurring.png",
+  },
+  {
+    title: "Feedback & Reporting",
+    desc: "Guardrails, analytics, and insights.",
+    image: "/images/offerings/anniversaries/feedback-reporting.png",
+  },
+  {
+    title: "Integrations",
+    desc: "HRIS, CRM, Slack, Teams, and more.",
+    image: "/images/offerings/anniversaries/integrations.png",
+  },
+] as const;
+
+const SHOP_HERO_IMAGE = "/images/shops/shop-preview-happy-summer.png";
+
+const SHOP_CALLOUTS = [
+  { id: "branding", label: "ADD YOUR BRANDING", side: "left" as const, pos: "top" as const },
+  { id: "swag", label: "CUSTOMIZABLE SWAG FROM TOP BRANDS", side: "left" as const, pos: "bottom" as const },
+  { id: "points", label: "POINTS, CURRENCY, OR PRICELESS", side: "right" as const, pos: "top" as const },
+  { id: "catalog", label: "5K+ CATALOG OPTIONS", side: "right" as const, pos: "bottom" as const },
+];
+
+function ShopCalloutArrow({ flip }: { flip?: boolean }) {
+  return (
+    <svg
+      className={`lp-shop-callout__arrow${flip ? " lp-shop-callout__arrow--flip" : ""}`}
+      viewBox="0 0 48 32"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M2 16 C12 4, 28 6, 44 14"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M36 10 L44 14 L38 20"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 /* ─── data ─── */
 const TEAMS = [
@@ -273,157 +341,148 @@ const TEAMS = [
     id: "hr",
     label: "Human Resources",
     icon: Users,
-    src: "/assets/teams/human_resources.png",
     title: "Empower Your Employees",
     desc: "Optimize HR processes, recognize employees, and nurture the employee experience with ShelfMerch.",
     benefits: [
       "Onboard employees with an onboarding shop or swag kits.",
-      "Automate service awards and milestone celebrations.",
-      "Build culture with peer-to-peer recognition programs.",
+      "Create automations to send gifts for work anniversaries and milestones.",
+      "Boost company culture with a kudos program.",
     ],
+    theme: { bg: "#5B4589", card: "#F3EEF8", tabBg: "#F3EEF8", tabBorder: "#7C5CBF", cardText: "#3D2E5C" },
   },
   {
     id: "marketing",
     label: "Marketing & Branding",
     icon: Megaphone,
-    src: "/assets/teams/marketing_branding.png",
-    title: "Amplify Your Brand",
-    desc: "Deliver branded experiences that leave lasting impressions on customers and partners.",
+    title: "Enrich your marketing efforts",
+    desc: "Increase brand awareness, boost marketing campaigns, and attract new customers with ShelfMerch.",
     benefits: [
-      "Launch branded company stores in minutes.",
-      "Send curated gift campaigns at scale.",
-      "Track engagement and ROI across programs.",
+      "Avoid employees or customers going rogue with non-approved logos.",
+      "Easily rebrand your swag and gifts in just a few clicks with a swag shop.",
+      "Run coordinated gift campaigns for clients.",
+      "Attract partners and vendors worldwide with swag and gifts.",
     ],
+    theme: { bg: "#7A2D3E", card: "#FDE8EC", tabBg: "#FDE8EC", tabBorder: "#E85D7A", cardText: "#5C2030" },
   },
   {
     id: "leaders",
     label: "Team Leaders",
     icon: Target,
-    src: "/assets/teams/team_leaders.png",
-    title: "Motivate Your Teams",
-    desc: "Give managers the tools to recognize wins and keep teams engaged every day.",
+    title: "Shape company culture with rewards",
+    desc: "Foster a positive team culture with rewards, recognition, and gifting.",
     benefits: [
-      "Distribute kudos budgets to team leads.",
-      "Celebrate wins with instant rewards.",
-      "Run team-specific gifting programs.",
+      "Allocate and track funds across your team for easy spending.",
+      "Reward your team for a job well done with snacks, swag, and more.",
+      "Enhance team morale with a kudos program.",
     ],
+    theme: { bg: "#3D6B52", card: "#E8F5EC", tabBg: "#E8F5EC", tabBorder: "#4A9B6E", cardText: "#1F4A35" },
   },
   {
     id: "sales",
     label: "Sales",
     icon: Briefcase,
-    src: "/assets/teams/sales.png",
-    title: "Close Deals Faster",
-    desc: "Prospect, incentivize, and reward with premium gifts that open doors.",
+    title: "Lead your sales team to success",
+    desc: "Equip your sales team with the tools they need to secure wins.",
     benefits: [
-      "Send prospecting gifts globally.",
-      "Run sales incentive programs effortlessly.",
-      "Track redemption and engagement metrics.",
+      "Attract and nurture prospects by sending a gift.",
+      "Show your client appreciation by gifting them top-tier swag.",
+      "Celebrate sales wins with our catalog of snacks, swag, and more.",
     ],
+    theme: { bg: "#5C5620", card: "#FAF6E5", tabBg: "#FAF6E5", tabBorder: "#C9A227", cardText: "#3D3814" },
   },
   {
     id: "ops",
     label: "Operations",
     icon: Settings,
-    src: "/assets/teams/operations.png",
-    title: "Streamline Operations",
-    desc: "Consolidate vendors, automate fulfillment, and reduce operational overhead.",
+    title: "Streamline your company's processes",
+    desc: "Use ShelfMerch to take your processes to the next level, from onboarding to performance goals.",
     benefits: [
-      "One platform for all gifting and swag.",
-      "Automated global fulfillment and tracking.",
-      "Centralized billing and reporting.",
+      "Create a swag shop for uniforms, supplies, and more.",
+      "Onboard at scale with swag kits.",
+      "Store, distribute, and organize your swag inventory with ShelfMerch.",
+      "Centralize all your approved designs.",
     ],
+    theme: { bg: "#2B4F6E", card: "#E8F0FA", tabBg: "#E8F0FA", tabBorder: "#4A7EB5", cardText: "#1A3348" },
   },
   {
     id: "events",
     label: "Event Managers",
     icon: Tent,
-    src: "/assets/teams/event_managers.png",
-    title: "Elevate Every Event",
-    desc: "From welcome kits to booth swag, deliver memorable event experiences.",
+    title: "Make every event remarkable",
+    desc: "Every aspect of the event matters! Ensure a memorable experience with gifts they'll love.",
     benefits: [
-      "Ship event kits to any location worldwide.",
-      "Custom branding on every item.",
-      "Real-time order tracking and support.",
+      "Pair any event (virtual or in-person) with epic snacks and swag to match.",
+      "Gift attendees before, during, or after the event.",
+      "Collect leads at scale using our Scan for Swag feature.",
+      "Award attendees with redeemable points to your shop.",
     ],
+    theme: { bg: "#2D6B4F", card: "#E5F5EB", tabBg: "#E5F5EB", tabBorder: "#3D9B6A", cardText: "#1A4A35" },
   },
 ] as const;
 
 const CATEGORIES = [
-  { title: "Food & Beverages", img: "/images/landing/categories/food-beverages.png", fullCard: true },
-  { title: "Luxury", img: "/images/landing/categories/luxury.png", fullCard: true },
-  { title: "Wellness", img: "/images/landing/categories/wellness.png", fullCard: true },
-  { title: "Gift Cards", img: "/images/landing/categories/gift-cards.png", fullCard: true },
-  {
-    title: "Work & Essentials",
-    img: "/images/landing/categories/work-essentials.png",
-    fullCard: true,
-  },
-  { title: "Apparel & Wearables", img: "/images/landing/categories/apparel-wearables.png", fullCard: true, bleed: true },
-  {
-    title: "Life & Hobbies",
-    img: "/images/landing/categories/life-hobbies.png",
-    fullCard: true,
-  },
-  {
-    title: "Experiences",
-    img: "/images/landing/categories/experiences.png",
-    fullCard: true,
-  },
+  { title: "Food & Beverages", img: "/images/landing/categories/food-beverages.png" },
+  { title: "Luxury", img: "/images/landing/categories/luxury.png" },
+  { title: "Wellness", img: "/images/landing/categories/wellness.png" },
+  { title: "Gift Cards", img: "/images/landing/categories/gift-cards.png" },
+  { title: "Work & Essentials", img: "/images/landing/categories/work-essentials.png" },
+  { title: "Apparel & Wearables", img: "/images/landing/categories/apparel-wearables.png", bleed: true },
+  { title: "Life & Hobbies", img: "/images/landing/categories/life-hobbies.png" },
+  { title: "Experiences", img: "/images/landing/categories/experiences.png" },
 ] as const;
 
-const USE_CASES: { label: string; icon: LucideIcon; bg: string; color: string }[] = [
-  { label: "Employee Appreciation", icon: Star, bg: "#D1FAE5", color: "#059669" },
-  { label: "Rewards & Recognition", icon: Award, bg: "#FEF3C7", color: "#D97706" },
-  { label: "Swag Distribution", icon: Package, bg: "#EDE9FE", color: "#7C3AED" },
-  { label: "Client Gifting", icon: Gift, bg: "#D1FAE5", color: "#059669" },
-  { label: "Sales Incentives", icon: Target, bg: "#CCFBF1", color: "#0D9488" },
-  { label: "Employee Birthday Gifts", icon: Cake, bg: "#CCFBF1", color: "#0D9488" },
-  { label: "Snack Boxes", icon: Popcorn, bg: "#FFEDD5", color: "#EA580C" },
-  { label: "Prospecting & Outreach", icon: Search, bg: "#DBEAFE", color: "#2563EB" },
-  { label: "Onboarding Kits", icon: IdCard, bg: "#DBEAFE", color: "#2563EB" },
-  { label: "Work Anniversaries", icon: Calendar, bg: "#FCE7F3", color: "#DB2777" },
-  { label: "Gift Cards", icon: CreditCard, bg: "#CCFBF1", color: "#0D9488" },
-  { label: "Celebration Kits", icon: PartyPopper, bg: "#FCE7F3", color: "#DB2777" },
-  { label: "Remote Employee Kits", icon: Laptop, bg: "#EDE9FE", color: "#7C3AED" },
-  { label: "Swag Store Redemption", icon: ShoppingBag, bg: "#D1FAE5", color: "#059669" },
-  { label: "Channel Partner Rewards", icon: Handshake, bg: "#DBEAFE", color: "#2563EB" },
-  { label: "Corporate Events", icon: Tent, bg: "#FFEDD5", color: "#EA580C" },
-  { label: "Marketing Campaigns", icon: Megaphone, bg: "#FCE7F3", color: "#DB2777" },
-  { label: "Company Store", icon: Store, bg: "#DBEAFE", color: "#2563EB" },
-  { label: "Wellness Programs", icon: Heart, bg: "#FCE7F3", color: "#DB2777" },
-  { label: "New Hire Welcome", icon: Hand, bg: "#CCFBF1", color: "#0D9488" },
-  { label: "Customer Loyalty", icon: Heart, bg: "#FFEDD5", color: "#EA580C" },
-  { label: "Boosting Attendance", icon: TrendingUp, bg: "#EDE9FE", color: "#7C3AED" },
-  { label: "Boosting Response Rates", icon: MessageCircle, bg: "#FEF3C7", color: "#D97706" },
-  { label: "Recognizing DEI Events", icon: HeartHandshake, bg: "#EDE9FE", color: "#7C3AED" },
+const USE_CASES: { label: string; icon: LucideIcon }[] = [
+  { label: "Employee Appreciation", icon: Star },
+  { label: "Incentives", icon: Target },
+  { label: "Work Anniversaries", icon: Calendar },
+  { label: "Awards", icon: Award },
+  { label: "Work From Home Stipend", icon: Laptop },
+  { label: "Rewards Redemption", icon: Award },
+  { label: "Employee Birthday Treats", icon: Cake },
+  { label: "Swag Store Redemption", icon: ShoppingBag },
+  { label: "Boosting Morale", icon: Rocket },
+  { label: "Kudos Program", icon: Users },
+  { label: "Swag Distribution", icon: Package },
+  { label: "Snack Perks", icon: Popcorn },
+  { label: "Recurring Perks", icon: Calendar },
+  { label: "Boosting Attendance", icon: TrendingUp },
+  { label: "New Hire Welcome", icon: Hand },
+  { label: "Client Gifting", icon: Gift },
+  { label: "Prospecting", icon: Search },
+  { label: "Celebration Shops", icon: Store },
+  { label: "Boosting Response Rates", icon: MessageCircle },
+  { label: "Recognizing DEI Events", icon: HeartHandshake },
 ];
 
 const TESTIMONIALS = [
-  {content: "ShelfMerch has completely streamlined our branded merchandise process. The quality is top-notch, the platform is easy to use, and our team loves the variety of options!", src: "/assets/testemonies/messi.webp", name: "messi"},
-  {content: "From onboarding kits to employee appreciation gifts, ShelfMerch helps us deliver meaningful swag that represents our brand perfectly. Our go-to platform!", src: "/assets/testemonies/stephanhawking.webp", name: "stephanhawking"},
-  {content: "The ShelfMerch team is amazing! ShelfMerch helps us deliver meaningfu Fast  and Fast to turnaround, great support, and products our employees actually use and love.", src: "/assets/testemonies/kim_jong_un.webp", name: "kimjongun"},
+  {
+    content:
+      "ShelfMerch solved our remote gifting problem by being flexible, personal, and stress-free for our admins.",
+    name: "Patty L",
+    role: "MARQETA | SR. EXECUTIVE ASSISTANT",
+  },
+  {
+    content:
+      "We consolidated swag, kits, and recognition into one workspace. Our team actually uses what we send now.",
+    name: "Jordan M",
+    role: "NOTION | PEOPLE OPERATIONS",
+  },
+  {
+    content:
+      "From onboarding kits to milestone gifts, ShelfMerch makes it easy to show appreciation at scale without the logistics headache.",
+    name: "Rina K",
+    role: "FIGMA | EMPLOYEE EXPERIENCE",
+  },
 ] as const;
 
 const TRUSTED_LOGOS = [
-  { name: "Google", src: "/images/logos/google-wordmark.svg", width: 92, height: 28 },
-  { name: "Pinterest", src: "/images/logos/pinterest-wordmark.png", width: 110, height: 28 },
-  { name: "Spotify", src: "/images/logos/spotify-wordmark.svg", width: 100, height: 28 },
-  { name: "Airbnb", src: "/images/logos/airbnb-wordmark.svg", width: 92, height: 28 },
-  { name: "Slack", src: "/images/logos/slack-wordmark.svg", width: 88, height: 28 },
-  { name: "HubSpot", src: "/images/logos/hubspot-wordmark.svg", width: 96, height: 28 },
+  { name: "Google", src: "/images/logos/google-wordmark.svg", width: 92, height: 32 },
+  { name: "YouTube", src: "/images/logos/youtube-wordmark.svg", width: 108, height: 32 },
+  { name: "Spotify", src: "/images/logos/spotify-wordmark.svg", width: 104, height: 32 },
+  { name: "Airbnb", src: "/images/logos/airbnb-wordmark.svg", width: 104, height: 32 },
+  { name: "Slack", src: "/images/logos/slack-wordmark.svg", width: 112, height: 32 },
+  { name: "HubSpot", src: "/images/logos/hubspot-wordmark.svg", width: 124, height: 32 },
 ] as const;
-
-const INTEGRATIONS: { icon: LucideIcon; label: string }[] = [
-  { icon: Wallet, label: "Payroll" },
-  { icon: Plane, label: "Travel" },
-  { icon: Gift, label: "Gifting" },
-  { icon: Rocket, label: "Automation" },
-  { icon: Package, label: "Fulfillment" },
-  { icon: MessageCircle, label: "Slack" },
-  { icon: Users, label: "HRIS" },
-  { icon: Eye, label: "Analytics" },
-];
 
 const KUDOS_FEED = [
   { initials: "PS", name: "Priya S.", action: "sent kudos", message: "Great work on the launch!", points: 15, tone: "#C45C6A" },
@@ -515,7 +574,7 @@ export default function LandingPage() {
                 <Link to="/signup" className="lp-btn-primary lp-btn-pill">
                   Get started for free
                 </Link>
-                <a href="#demo" className="lp-btn-outline-green">
+                <a href="#gifting" className="lp-btn-outline-green">
                   Book a demo
                 </a>
               </div>
@@ -536,7 +595,15 @@ export default function LandingPage() {
 
       {/* ── OFFERINGS TABS ── */}
       <section className="lp-section lp-offerings" id="products">
-        <div className="lp-container" style={{position: "relative", top: "60px"}}>
+        <div className="lp-container">
+          <header className="lp-offerings__header">
+            <p className="lp-offerings__eyebrow">Our Offerings</p>
+            <h2 className="lp-offerings__title">Supercharge Your Engagement</h2>
+            <p className="lp-offerings__sub">
+              Our offerings and curated swag catalog will take your engagement to new heights.
+            </p>
+          </header>
+
           <div className="lp-offerings__shell">
           <div className="lp-offerings-tabs" role="tablist" aria-label="ShelfMerch offerings">
             {OFFERING_TABS.map((tab) => (
@@ -569,19 +636,34 @@ export default function LandingPage() {
             style={{ "--panel-bg": activeOffering.bg, "--panel-accent": activeOffering.bgDark } as React.CSSProperties}
           >
             <h3 className="lp-offerings-panel__title">{activeOffering.title}</h3>
+            {"sub" in activeOffering && activeOffering.sub ? (
+              <p className="lp-offerings-panel__sub">{activeOffering.sub}</p>
+            ) : null}
 
             {activeOffering.layout === "shop" && (
               <div className="lp-offerings-shop">
-                <div className="lp-shop-hero">
-                  <img
-                    src={SHOP_HERO_IMAGE}
-                    alt="Branded company shop with customizable swag, points redemption, and thousands of catalog options"
-                    width={2149}
-                    height={1031}
-                    className="lp-shop-hero__img"
-                    loading="eager"
-                    decoding="async"
-                  />
+                <div className="lp-shop-showcase">
+                  {SHOP_CALLOUTS.map((callout) => (
+                    <div
+                      key={callout.id}
+                      className={`lp-shop-callout lp-shop-callout--${callout.side} lp-shop-callout--${callout.pos}`}
+                    >
+                      {callout.side === "left" && <ShopCalloutArrow />}
+                      <span className="lp-shop-callout__label">{callout.label}</span>
+                      {callout.side === "right" && <ShopCalloutArrow flip />}
+                    </div>
+                  ))}
+                  <div className="lp-shop-hero">
+                    <img
+                      src={SHOP_HERO_IMAGE}
+                      alt="Shelf Merch company shop with Happy Summer rewards banner, points, and featured products"
+                      width={2149}
+                      height={1031}
+                      className="lp-shop-hero__img"
+                      loading="eager"
+                      decoding="async"
+                    />
+                  </div>
                 </div>
 
                 <aside className="lp-offerings-perfect lp-offerings-perfect--shop">
@@ -589,38 +671,35 @@ export default function LandingPage() {
                   <ul>
                     {activeOffering.perfectFor?.map((item) => (
                       <li key={item}>
-                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                          <circle cx="8" cy="8" r="8" fill="#ede9fe" />
-                          <path d="M5 8.2 7 10.2 11 6.2" stroke="#0D5C3F" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <span className="lp-offerings-perfect__check" aria-hidden="true">
+                          <Check size={10} strokeWidth={3} />
+                        </span>
                         {item}
                       </li>
                     ))}
                   </ul>
-                  <Link to="/app/shops" className="lp-offerings-learn">Learn More →</Link>
+                  <Link to="/app/shops" className="lp-offerings-learn">Learn More</Link>
                 </aside>
               </div>
             )}
 
-            {(activeOffering.layout === "gifting" || activeOffering.layout === "anniversaries") && activeOffering.cards && (
-              <div className={`lp-offerings-feature-cards lp-offerings-feature-cards--${activeOffering.layout}`}>
-                <div className="lp-offerings-feature-cards__grid">
-                  {activeOffering.cards.map((card) => (
-                    <article key={card.title} className="lp-offerings-feature-cards__card">
-                      <div className="lp-offerings-feature-cards__visual">
-                        {"image" in card && (
-                          <img
-                            src={card.image}
-                            alt=""
-                            width={284}
-                            height={206}
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        )}
+            {activeOffering.layout === "anniversaries" && (
+              <div className="lp-anniv" aria-label="Service anniversaries features">
+                <div className="lp-anniv__grid">
+                  {ANNIVERSARY_CARDS.map((card) => (
+                    <article key={card.title} className="lp-anniv__card">
+                      <h4 className="lp-anniv__card-title">{card.title}</h4>
+                      <div className="lp-anniv__visual">
+                        <img
+                          src={card.image}
+                          alt=""
+                          width={400}
+                          height={320}
+                          loading="lazy"
+                          decoding="async"
+                        />
                       </div>
-                      <h4>{card.title}</h4>
-                      {"desc" in card && card.desc && <p>{card.desc}</p>}
+                      <p className="lp-anniv__card-desc">{card.desc}</p>
                     </article>
                   ))}
                 </div>
@@ -730,7 +809,7 @@ export default function LandingPage() {
           </div>
 
           {activeOffering.features && activeOffering.layout !== "shop" && (
-            <ul className={`lp-offerings-footer${activeOffering.layout === "gifting" ? " lp-offerings-footer--gifting" : ""}${activeOffering.layout === "anniversaries" ? " lp-offerings-footer--anniversaries" : ""}${activeOffering.layout === "kudos" ? " lp-offerings-footer--kudos" : ""}`}>
+            <ul className={`lp-offerings-footer${activeOffering.layout === "anniversaries" ? " lp-offerings-footer--anniversaries" : ""}${activeOffering.layout === "kudos" ? " lp-offerings-footer--kudos" : ""}`}>
               {activeOffering.features.map((f) => (
                 <li key={f}>
                   <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -746,256 +825,212 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── VIDEO INTRO ── */}
-      <section className="lp-section lp-intro" id="demo">
+      {/* ── GIFTING ── */}
+      <section className="lp-section lp-gifting" id="gifting">
         <div className="lp-container">
-          <LpSectionHeader
-            badge="Platform Tour"
-            title={<>See ShelfMerch <span className="c-gold">in action</span></>}
-            sub="Watch how teams worldwide engage employees, delight customers, and consolidate gifting, swag, and recognition in one platform."
-          />
-          <div className="lp-shell lp-intro__shell">
-            <div className="lp-intro__grid">
-              <div className="lp-intro__copy">
-                <p className="lp-intro__eyebrow">
-                  <Play size={12} fill="currentColor" strokeWidth={0} aria-hidden />
-                  2-minute product walkthrough
-                </p>
-                <h3>Take your ShelfMerch experience further</h3>
-                <p className="lp-intro__lede">
-                  From onboarding kits to global gifting campaigns—manage every recognition moment
-                  without juggling vendors.
-                </p>
-                <ul className="lp-intro__features">
-                  {INTRO_FEATURES.map((feature) => (
-                    <li key={feature.title} className="lp-intro__feature">
-                      <span className="lp-intro__feature-icon" aria-hidden>
-                        <LpIcon icon={feature.icon} size={18} strokeWidth={2.25} />
-                      </span>
-                      <span className="lp-intro__feature-text">
-                        <strong>{feature.title}</strong>
-                        <span>{feature.desc}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="lp-intro__ctas">
-                  <Link to="/signup" className="lp-btn-primary lp-btn-primary-sm lp-btn-pill">
-                    Get started free
-                  </Link>
-                  <a href="#intro-video" className="lp-intro__play-link">
-                    <span className="lp-intro__play-link-icon" aria-hidden>
-                      <Play size={14} fill="currentColor" strokeWidth={0} />
-                    </span>
-                    Watch overview
-                  </a>
-                </div>
-              </div>
-              <div className="lp-intro__media" id="intro-video">
-                <div className="lp-video-mock">
-                  <div className="lp-video-mock__bar" aria-hidden>
-                    <span className="lp-video-mock__dot lp-video-mock__dot--close" />
-                    <span className="lp-video-mock__dot lp-video-mock__dot--min" />
-                    <span className="lp-video-mock__dot lp-video-mock__dot--max" />
-                    <span className="lp-video-mock__title">ShelfMerch — Platform Overview</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="lp-video-mock__screen"
-                    aria-label="Play platform overview video (2 minutes 45 seconds)"
-                  >
-                    <img
-                      className="lp-video-mock__poster"
-                      src={templateAsset}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                    />
-                    <span className="lp-video-mock__overlay" aria-hidden>
-                      <span className="lp-video-mock__play">
-                        <Play size={26} fill="currentColor" strokeWidth={0} />
-                      </span>
-                      <span className="lp-video-mock__label">Platform Overview</span>
-                    </span>
-                    <span className="lp-video-mock__duration">2:45</span>
-                    <span className="lp-video-mock__progress" aria-hidden>
-                      <span className="lp-video-mock__progress-fill" />
-                    </span>
-                  </button>
-                  <div className="lp-video-mock__chapters" role="list" aria-label="Video chapters">
-                    {INTRO_CHAPTERS.map((chapter, index) => (
-                      <span
-                        key={chapter}
-                        role="listitem"
-                        className={`lp-video-mock__chapter${index === 0 ? " is-active" : ""}`}
-                      >
-                        {chapter}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <p className="lp-intro__caption">
-                  <Users size={14} strokeWidth={2.25} aria-hidden />
-                  Trusted by HR, Marketing &amp; Ops teams worldwide
-                </p>
-              </div>
+          <header className="lp-gifting__header">
+            <p className="lp-gifting__eyebrow">Gifting</p>
+            <h2 className="lp-gifting__title">All your gifting operations in one place</h2>
+          </header>
+
+          <div className="lp-gifting__panel">
+            <div className="lp-gifting__hero">
+              <img
+                src={GIFTING_HERO_IMAGE}
+                alt="Corporate gifting journey — choose gift, add branding, pack, ship, and happy delivery"
+                width={6688}
+                height={3764}
+                className="lp-gifting__hero-img"
+                loading="lazy"
+                decoding="async"
+                fetchPriority="low"
+              />
+            </div>
+
+            <ul className="lp-gifting__features">
+              {GIFTING_FEATURES.map((feature) => (
+                <li key={feature}>
+                  <Check size={14} strokeWidth={2.5} aria-hidden />
+                  {feature}
+                </li>
+              ))}
+            </ul>
+
+            <div className="lp-gifting__cta">
+              <Link to="/app" className="lp-btn-primary">
+                Explore gifting
+                <ChevronRight size={18} aria-hidden />
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── SOCIAL PROOF (logos + quote) ── */}
-      <section className="lp-section lp-social" style={{height: "50vh"}}>
-        <div className="lp-container lp-social__layout">
-          <div className="lp-social__copy">
-            <p className="lp-social__label">For every possible occasion</p>
-            <h2 className="lp-social__title">
-              Loved by teams <span>everywhere</span>
-            </h2>
+      {/* ── SOCIAL PROOF ── */}
+      <section className="lp-section lp-social">
+        <div className="lp-container">
+          <div className="lp-social__layout">
+            <div className="lp-social__copy">
+              <p className="lp-social__label">For every possible occasion</p>
+              <h2 className="lp-social__title">Loved by teams everywhere</h2>
+            </div>
+            <div className="lp-social__logos" aria-label="Companies using Shelf Merch">
+              {TRUSTED_LOGOS.map((logo) => (
+                <span key={logo.name} className="lp-social__logo" title={logo.name}>
+                  <img
+                    src={logo.src}
+                    alt={logo.name}
+                    width={logo.width}
+                    height={logo.height}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </span>
+              ))}
+            </div>
           </div>
-          <div className="lp-social__logos" aria-label="Companies using ShelfMerch">
-            {TRUSTED_LOGOS.map((logo) => (
-              <span key={logo.name} className="lp-social__logo" title={logo.name}>
-                <img
-                  src={logo.src}
-                  alt={logo.name}
-                  width={logo.width}
-                  height={logo.height}
-                  loading="lazy"
-                  decoding="async"
-                />
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="lp-container" style={{position: "relative", top: "20px"}}>
-          <figure className="lp-social__quote lp-shell">
-            <span className="lp-social__mark" aria-hidden="true">"</span>
-            <blockquote>
-              We saved vendors a ton of money and took our engagement to a whole new level.
-            </blockquote>
-            <figcaption className="lp-social__author">
-              <span className="lp-social__avatar">SM</span>
-              <span>
-                <strong>Sarah Mitchell</strong>
-                <span>Head of People, TechCorp</span>
-              </span>
-            </figcaption>
-          </figure>
         </div>
       </section>
 
       {/* ── CATEGORIES ── */}
       <section className="lp-section lp-categories-section" id="solutions">
         <div className="lp-container">
-          <LpSectionHeader
-            badge="For Everyone"
-            title={<>Something for <span className="c-gold">Everyone</span></>}
-            sub="Discover unlimited possibilities with our catalog. From snacks to swag, we've got it all."
-          />
+          <header className="lp-categories-header">
+            <p className="lp-categories-eyebrow">For everyone</p>
+            <h2 className="lp-categories-title">
+              Something for <span className="lp-categories-title__accent">Everyone</span>
+            </h2>
+            <p className="lp-categories-sub">
+              Discover unlimited possibilities with our catalog. From snacks to swag, we&apos;ve got it all.
+            </p>
+          </header>
+
           <div className="lp-categories">
-            {CATEGORIES.map((c) =>
-              "fullCard" in c && c.fullCard ? (
-                <Link
-                  key={c.title}
-                  to="/app/catalog"
-                  className={`lp-cat-card lp-cat-card--full${"bleed" in c && c.bleed ? " lp-cat-card--bleed" : ""}`}
-                >
-                  <img src={c.img} alt={c.title} width={600} height={600} loading="lazy" decoding="async" />
-                </Link>
-              ) : (
-                <Link
-                  key={c.title}
-                  to="/app/catalog"
-                  className="lp-cat-card lp-cat-card--tile"
-                  style={{ background: "bg" in c ? (c.bg as string) : undefined }}
-                >
-                  <h3>{c.title}</h3>
-                  <div className="lp-cat-card__media">
-                    <img src={c.img} alt={c.title} width={600} height={600} loading="lazy" decoding="async" />
-                  </div>
-                </Link>
-              ),
-            )}
+            {CATEGORIES.map((c) => (
+              <Link
+                key={c.title}
+                to="/app/catalog"
+                className={`lp-cat-card${"bleed" in c && c.bleed ? " lp-cat-card--bleed" : ""}`}
+                aria-label={`Browse ${c.title}`}
+              >
+                <img src={c.img} alt="" width={600} height={600} loading="lazy" decoding="async" />
+              </Link>
+            ))}
           </div>
+
           <div className="lp-categories__cta">
-            <Link to="/app/catalog" className="lp-btn-gold lp-btn-gold--sm">View Catalog →</Link>
+            <Link to="/app/catalog" className="lp-btn-primary lp-categories__btn">
+              View Catalog
+              <ChevronRight size={18} aria-hidden />
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* ── INTEGRATIONS ── */}
-      {/* <section className="lp-section lp-integrations">
+      {/* ── VENDOR CONSOLIDATION ── */}
+      <section className="lp-section lp-consolidate" id="integrations">
         <div className="lp-container">
-          <LpSectionHeader
-            badge="Integrations"
-            title={
-              <>
-                Consolidate your <span className="c-gold">gifting, swag,</span> and{" "}
-                <span className="c-gold">recognition</span> vendors
-              </>
-            }
-            sub="Save big on budget and headaches with one connected platform."
-          />
-          <div className="lp-shell lp-integrations__shell">
-            <div className="lp-integration-graphic">
-              <svg className="lp-path" viewBox="0 0 900 200" preserveAspectRatio="xMidYMid meet">
-                <path d="M 20 160 Q 250 40, 500 100 T 820 80" fill="none" stroke="var(--lp-green-mid)" strokeWidth="2" strokeDasharray="8 6" />
-                <circle cx="20" cy="160" r="6" fill="var(--lp-green)" />
-                <circle cx="820" cy="80" r="6" fill="var(--lp-gold)" />
+          <div className="lp-consolidate__card">
+            <header className="lp-consolidate__header">
+              <h2 className="lp-consolidate__title">One platform for employee gifting and swag</h2>
+              <p className="lp-consolidate__sub">Replace the vendor sprawl.</p>
+            </header>
+
+            <div className="lp-consolidate__visual" aria-hidden="true">
+              <svg className="lp-consolidate__path" viewBox="0 0 900 80" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="lp-consolidate-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#7C3AED" />
+                    <stop offset="16%" stopColor="#2563EB" />
+                    <stop offset="33%" stopColor="#0D9488" />
+                    <stop offset="50%" stopColor="#F59E0B" />
+                    <stop offset="66%" stopColor="#F97316" />
+                    <stop offset="83%" stopColor="#EC4899" />
+                    <stop offset="100%" stopColor="#6366F1" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M 0 52 Q 112 18, 225 48 T 450 44 T 675 50 T 900 38"
+                  fill="none"
+                  stroke="url(#lp-consolidate-grad)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
               </svg>
-              <div className="lp-integration-icons">
-                {INTEGRATIONS.map((item, i) => (
-                  <div key={item.label} className="lp-int-icon" title={item.label} style={{ left: `${8 + i * 11.5}%` }}>
-                    <LpIcon icon={item.icon} size={18} strokeWidth={2} />
-                  </div>
+
+              <ul className="lp-consolidate__icons">
+                {CONSOLIDATE_ICONS.map((item) => (
+                  <li key={item.color}>
+                    <span className="lp-consolidate__icon" style={{ background: item.color }}>
+                      <LpIcon icon={item.icon} size={22} strokeWidth={2} />
+                    </span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           </div>
         </div>
-      </section> */}
+      </section>
 
       {/* ── TEAMS TABS ── */}
-      <section className="lp-section lp-teams-section">
+      <section className="lp-section lp-teams-section" id="teams">
         <div className="lp-container">
-          <LpSectionHeader
-            badge="Built for Teams"
-            title={<>One solution for <span className="c-gold">all your teams</span></>}
-            sub="HR, sales, marketing, and ops—every department gets the tools they need."
-          />
-          <div className="lp-shell lp-teams-card">
-            <nav className="lp-teams-nav">
+          <header className="lp-teams-header">
+            <h2 className="lp-teams-title">One solution for all your teams</h2>
+          </header>
+
+          <div className="lp-teams-shell">
+            <nav className="lp-teams-nav" aria-label="Teams">
               {TEAMS.map((t) => (
                 <button
                   key={t.id}
                   type="button"
-                  className={`lp-teams-nav__item${team === t.id ? " active" : ""}`}
+                  className={`lp-teams-nav__item${team === t.id ? " is-active" : ""}`}
                   onClick={() => setTeam(t.id)}
+                  aria-pressed={team === t.id}
+                  style={
+                    team === t.id
+                      ? ({
+                          background: t.theme.tabBg,
+                          borderLeftColor: t.theme.tabBorder,
+                          borderBottomColor: t.theme.tabBorder,
+                          color: t.theme.cardText,
+                        } as React.CSSProperties)
+                      : undefined
+                  }
                 >
-                  <span className="lp-teams-nav__icon"><LpIcon icon={t.icon} size={15} strokeWidth={2} /></span>
                   {t.label}
                 </button>
               ))}
             </nav>
-            <div className="lp-teams-feature">
-              <img
-                src={activeTeam.src}
-                alt={activeTeam.title}
-                width={600}
-                height={600}
-                loading="lazy"
-                decoding="async"
-              />
+
+            <div
+              className="lp-teams-stage"
+              key={activeTeam.id}
+              style={{ background: activeTeam.theme.bg }}
+            >
+              <div className="lp-teams-stage__copy">
+                <div className="lp-teams-stage__icon" aria-hidden>
+                  <LpIcon icon={activeTeam.icon} size={44} strokeWidth={1.5} />
+                </div>
+                <h3 className="lp-teams-stage__title">{activeTeam.title}</h3>
+                <p className="lp-teams-stage__desc">{activeTeam.desc}</p>
+                <Link to="/app/catalog" className="lp-teams-stage__link">
+                  Learn more
+                </Link>
+              </div>
+
+              <div
+                className="lp-teams-stage__card"
+                style={{ background: activeTeam.theme.card, color: activeTeam.theme.cardText }}
+              >
+                <ul className="lp-teams-stage__list">
+                  {activeTeam.benefits.map((b) => (
+                    <li key={b}>{b}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
-            <ul className="lp-teams-benefits">
-              {activeTeam.benefits.map((b) => (
-                <li key={b}>
-                  <span className="check"><Check size={12} strokeWidth={3} /></span>
-                  {b}
-                </li>
-              ))}
-            </ul>
           </div>
         </div>
       </section>
@@ -1003,18 +1038,18 @@ export default function LandingPage() {
       {/* ── USE CASES ── */}
       <section className="lp-section lp-usecases">
         <div className="lp-container">
-          <LpSectionHeader
-            badge="Unlimited Use Cases"
-            title={<>ShelfMerch for <span className="c-gold">Every Occasion</span></>}
-            sub="From everyday appreciation to big milestones—engage, reward, and celebrate anytime, anywhere."
-          />
+          <header className="lp-usecases-header">
+            <p className="lp-usecases-eyebrow">Unlimited use cases</p>
+            <h2 className="lp-usecases-title">Shelf Merch for every occasion</h2>
+          </header>
+
           <div className="lp-usecases-grid">
             {USE_CASES.map((uc) => (
               <div key={uc.label} className="lp-usecase-card">
-                <span className="lp-usecase-card__icon" style={{ background: uc.bg, color: uc.color }}>
-                  <LpIcon icon={uc.icon} size={18} strokeWidth={2} />
+                <span className="lp-usecase-card__icon">
+                  <LpIcon icon={uc.icon} size={20} strokeWidth={1.75} />
                 </span>
-                <span>{uc.label}</span>
+                <span className="lp-usecase-card__label">{uc.label}</span>
               </div>
             ))}
           </div>
@@ -1076,68 +1111,107 @@ export default function LandingPage() {
       {/* ── TESTIMONIALS ── */}
       <section className="lp-section lp-testimonials" id="resources">
         <div className="lp-container">
-          <LpSectionHeader
-            badge="Customer Stories"
-            title={<>What keeps <span className="c-gold">'em coming</span></>}
-            sub="Hear from teams who consolidated gifting, swag, and recognition on ShelfMerch."
-          />
+          <header className="lp-testimonials-header">
+            <p className="lp-testimonials-eyebrow">Hear it from our customers</p>
+            <h2 className="lp-testimonials-title">What keeps &apos;em coming</h2>
+          </header>
 
           <div className="lp-testimonials-grid">
-            {TESTIMONIALS.map((t, i) => (
-              <div key={i} className="lp-testimonial-card lp-shell">
-                <div className="lp-testimonial-card__quote">"</div>
-                <p>{t.content}</p>
-                <hr />
-                <div className="lp-testimonial-card__author">
-                  <div className="lp-testimonial-card__avatar"><img src={t.src} alt={t.name} width={46} height={46} loading="lazy" decoding="async" className="lp-testimonial-card__avatar img" /></div>
+            {TESTIMONIALS.map((t) => (
+              <article key={t.name} className="lp-testimonial-card">
+                <div className="lp-testimonial-card__quote" aria-hidden="true">
+                  <svg viewBox="0 0 32 24" width="32" height="24" fill="none">
+                    <path
+                      d="M0 24V14.4C0 8.8 1.6 4.5 4.8 1.5 6.4.5 8.1 0 10 0v4.8c-2.1.3-3.6 1.2-4.5 2.7-.6 1-.9 2.2-.9 3.5h5.4V24H0zm18 0V14.4c0-5.6 1.6-9.9 4.8-12.9C24.4.5 26.1 0 28 0v4.8c-2.1.3-3.6 1.2-4.5 2.7-.6 1-.9 2.2-.9 3.5h5.4V24H18z"
+                      fill="currentColor"
+                    />
+                  </svg>
                 </div>
-              </div>
+                <p className="lp-testimonial-card__body">{t.content}</p>
+                <hr className="lp-testimonial-card__rule" />
+                <div className="lp-testimonial-card__author">
+                  <strong>{t.name}</strong>
+                  <span>{t.role}</span>
+                </div>
+              </article>
             ))}
           </div>
-          <div className="lp-center">
-            <button type="button" className="lp-btn-gold lp-btn-gold--sm lp-btn-pill">Read More →</button>
+
+          <div className="lp-testimonials-footer">
+            <a href="#resources" className="lp-testimonials-more">
+              Read More
+            </a>
           </div>
         </div>
       </section>
 
       {/* ── FOOTER ── */}
       <footer className="lp-footer">
-        <div className="lp-container lp-footer__grid">
-          <div>
-            <a href="/" className="lp-logo lp-logo--footer">
-              <img
-                src="/images/logo/shelfmerch-logo-light.svg"
-                alt="ShelfMerch"
-                width={168}
-                height={28}
-                className="lp-logo__img"
-              />
-            </a>
-            <div className="lp-footer__social">
-              <a href="#" aria-label="LinkedIn"><Linkedin size={18} strokeWidth={2} /></a>
-              <a href="#" aria-label="Instagram"><Instagram size={18} strokeWidth={2} /></a>
+        <div className="lp-container">
+          <div className="lp-footer__grid">
+            <div className="lp-footer__brand">
+              <a href="/" className="lp-logo lp-logo--footer">
+                <img
+                  src="/images/logo/shelfmerch-logo-light.svg"
+                  alt="ShelfMerch"
+                  width={168}
+                  height={32}
+                  className="lp-logo__img"
+                />
+              </a>
+              <p className="lp-footer__tagline">
+                Gifting, swag &amp; recognition. One platform.
+              </p>
+              <div className="lp-footer__social">
+                <a href="#" aria-label="LinkedIn">
+                  <Linkedin size={17} strokeWidth={2} />
+                </a>
+                <a href="#" aria-label="YouTube">
+                  <Youtube size={17} strokeWidth={2} />
+                </a>
+                <a href="#" aria-label="Instagram">
+                  <Instagram size={17} strokeWidth={2} />
+                </a>
+              </div>
+              <div className="lp-footer__offerings">
+                <p className="lp-footer__offerings-label">
+                  <span>Our offerings</span>
+                </p>
+                <div className="lp-footer__offerings-list">
+                  {FOOTER_OFFERINGS.map((item) => (
+                    <a key={item.label} href="#products" className="lp-footer__offering">
+                      <LpIcon icon={item.icon} size={14} strokeWidth={2} />
+                      {item.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
             </div>
+
+            {FOOTER_COLUMNS.map((col) => (
+              <div key={col.title} className="lp-footer__col">
+                <h4 className="lp-footer__col-title">{col.title}</h4>
+                <ul className="lp-footer__links">
+                  {col.links.map((link) => (
+                    <li key={link}>
+                      <a href="#">{link}</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
-          {[
-            { title: "Company", links: ["About", "Careers", "Press", "Contact"] },
-            { title: "Products", links: ["Shops", "Gifting", "Swag", "Snacks", "Gift Cards"] },
-            { title: "Solutions", links: ["HR", "Sales", "Marketing", "Events", "Operations"] },
-            { title: "Resources", links: ["Blog", "Help Center", "API Docs", "Case Studies"] },
-          ].map((col) => (
-            <div key={col.title}>
-              <h4>{col.title}</h4>
-              <ul>
-                {col.links.map((l) => (
-                  <li key={l}><a href="#">{l}</a></li>
-                ))}
-              </ul>
-            </div>
-          ))}
         </div>
+
         <div className="lp-footer__bottom">
-          <div className="lp-container">
-            <span>© 2026 ShelfMerch. All rights reserved.</span>
-            <span><a href="#">Privacy Policy</a> · <a href="#">Terms of Service</a></span>
+          <div className="lp-container lp-footer__bottom-inner">
+            <span className="lp-footer__copy">© 2026 ShelfMerch. All rights reserved.</span>
+            <div className="lp-footer__bottom-links">
+              <a href="#">Privacy Policy</a>
+              <a href="#">Terms of Service</a>
+              <a href="#">Security</a>
+              <a href="#">Need Help?</a>
+            </div>
           </div>
         </div>
       </footer>

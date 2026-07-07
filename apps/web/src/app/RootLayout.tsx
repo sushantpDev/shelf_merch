@@ -1,10 +1,44 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link, Outlet, useRouteError, useRevalidator } from "react-router";
 import { ChatWidget } from "@/components/ChatWidget";
 import { Toaster } from "@/components/ui/sonner";
 import { ShopSubdomainGate } from "./ShopSubdomainGate";
 
+const LOGO_SRC = "/images/logo/shelfmerch-logo-dark.svg";
 const queryClient = new QueryClient();
+
+function StatusPageShell({
+  icon,
+  title,
+  description,
+  actions,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  actions: ReactNode;
+}) {
+  return (
+    <div className="auth-simple">
+      <div className="auth-simple-body">
+        <div className="auth-simple-card">
+          <Link to="/" className="auth-simple-logo" aria-label="Shelf Merch home">
+            <img src={LOGO_SRC} alt="Shelf Merch" className="auth-simple-logo-img" />
+          </Link>
+
+          <div className="status-page-icon">{icon}</div>
+
+          <h1 className="auth-simple-title status-page-title">{title}</h1>
+          <p className="auth-simple-subtitle status-page-description">{description}</p>
+
+          <div className="status-page-actions">{actions}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** App shell: provides react-query + renders the matched route tree. */
 export function RootLayout() {
@@ -19,23 +53,16 @@ export function RootLayout() {
 
 export function NotFound() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
-        </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Go home
-          </Link>
-        </div>
-      </div>
-    </div>
+    <StatusPageShell
+      icon={<span className="status-page-code">404</span>}
+      title="Page not found"
+      description="The page you're looking for doesn't exist or has been moved."
+      actions={
+        <Link to="/" className="btn btn-brand">
+          Go home
+        </Link>
+      }
+    />
   );
 }
 
@@ -45,29 +72,24 @@ export function RouteError() {
   console.error(error);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+    <StatusPageShell
+      icon={<AlertTriangle size={32} strokeWidth={1.75} aria-hidden />}
+      title="This page didn't load"
+      description="Something went wrong on our end. Try again, or head back to the homepage."
+      actions={
+        <>
           <button
+            type="button"
+            className="btn btn-brand"
             onClick={() => revalidator.revalidate()}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Try again
           </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
+          <Link to="/" className="btn btn-ghost">
             Go home
-          </a>
-        </div>
-      </div>
-    </div>
+          </Link>
+        </>
+      }
+    />
   );
 }
