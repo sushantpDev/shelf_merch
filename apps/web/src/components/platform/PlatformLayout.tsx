@@ -7,7 +7,6 @@ import {
   logout,
 } from "@/services/api-bridge";
 import { navItemsForRole } from "@/services/platform-access";
-import "@/styles/shelf-merch.css";
 
 const LOGO = `<svg viewBox="0 0 32 32" fill="none"><path d="M16 3 4 9l12 6 12-6-12-6Z" fill="#15784C"/><path d="M4 15l12 6 12-6" stroke="#0E5536" stroke-width="2.4" stroke-linejoin="round"/><path d="M4 21l12 6 12-6" stroke="#1E8E5C" stroke-width="2.4" stroke-linejoin="round"/></svg>`;
 

@@ -12,7 +12,6 @@ import {
   spendableForWallet,
   type WorkspaceSnapshot,
 } from "@/services/workspace-api";
-import "@/styles/shelf-merch.css";
 
 // The workspace navigation now lives in <CollapsibleSidebar/>; this layout only
 // renders the topbar + sidebar shell.
