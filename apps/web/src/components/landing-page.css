@@ -32,8 +32,8 @@
 .squiggle{color:#006838;font-size:1.2rem;margin-left:8px}
 
 /* buttons */
-.lp-btn-primary{display:inline-flex;align-items:center;gap:6px;background:#006838;color:#fff;font-weight:600;font-size:.9rem;padding:12px 24px;border-radius:8px;border:none;cursor:pointer;text-decoration:none;transition:background .2s}
-.lp-btn-primary:hover{background:#004d2a}
+.lp-btn-primary{display:inline-flex;align-items:center;gap:6px;background:#0E1E16;color:#fff;font-weight:600;font-size:.9rem;padding:12px 24px;border-radius:8px;border:none;cursor:pointer;text-decoration:none;transition:background .2s}
+.lp-btn-primary:hover{background:#1b3326}
 .lp-btn-primary-sm{padding:8px 18px;font-size:.85rem}
 .lp-btn-primary-sm,.lp-btn-ghost,.lp-btn-gold,.lp-btn-outline,.lp-btn-outline-green{text-decoration:none;display:inline-flex;align-items:center}
 .lp-btn-gold{background:var(--lp-gold);color:#1a2e28;font-weight:700;padding:14px 28px;border-radius:10px;border:none;cursor:pointer;font-size:.95rem;transition:transform .2s,box-shadow .2s}
@@ -46,7 +46,7 @@
 .lp-btn-outline-green:hover{background:#006838;color:#fff}
 .lp-btn-ghost{color:#1a1a1a;font-weight:500;font-size:.9rem;padding:8px 16px;border:none;background:transparent;cursor:pointer;font:inherit}
 .lp-btn-ghost:disabled{opacity:.6;cursor:wait}
-.lp-btn-ghost:hover{color:#006838}
+.lp-btn-ghost:hover{color:#1b3326}
 .lp-btn-full{width:100%;justify-content:center;margin-top:16px}
 .lp-btn-pill{border-radius:999px;padding:14px 36px}
 
@@ -55,6 +55,7 @@
 .lp-nav__inner{display:flex;align-items:center;justify-content:space-between;height:64px}
 .lp-logo{display:flex;align-items:center;text-decoration:none}
 .lp-logo__img{display:block;height:28px;width:auto;object-fit:contain}
+.lp-logo__img--merch{height:36px}
 .lp-logo--footer .lp-logo__img{height:32px}
 .lp-nav__links{display:flex;gap:28px}
 .lp-nav__links a{color:#4b5563;text-decoration:none;font-size:.9rem;font-weight:500;transition:color .2s}
@@ -166,7 +167,7 @@
 .lp-nav__links--merch{display:none;gap:28px}
 @media(min-width:1024px){.lp-nav__links--merch{display:flex}}
 .lp-nav__links--merch a{
-  color:#004D3D;
+  color:#0E1E16;
   text-decoration:none;
   font-size:.9375rem;
   font-weight:500;
@@ -175,12 +176,12 @@
   gap:4px;
   transition:opacity .2s;
 }
-.lp-nav__links--merch a:hover{opacity:.7}
+.lp-nav__links--merch a:hover{opacity:.7;color:#0E1E16}
 .lp-nav__chevron{width:14px;height:14px;opacity:.7;flex-shrink:0}
 .lp-nav__actions--merch{display:none;align-items:center;gap:16px}
 @media(min-width:1024px){.lp-nav__actions--merch{display:flex}}
-.lp-btn-ghost--merch{color:#004D3D}
-.lp-btn-ghost--merch:hover{color:#004D3D;opacity:.7}
+.lp-btn-ghost--merch{color:#0E1E16}
+.lp-btn-ghost--merch:hover{color:#1b3326;opacity:1}
 .lp-nav__menu{
   display:inline-flex;
   align-items:center;
@@ -188,9 +189,9 @@
   width:40px;
   height:40px;
   border-radius:8px;
-  border:1px solid #d4e5dc;
+  border:1px solid #d5dbd6;
   background:#fff;
-  color:#004D3D;
+  color:#0E1E16;
   cursor:pointer;
   justify-self:end;
   padding:0;
@@ -220,6 +221,8 @@
   align-items:center;
   justify-content:center;
   aspect-ratio:3 / 1;
+  container-type:size;
+  container-name:hero-banner;
 }
 .lp-hero-banner__img{
   position:absolute;
@@ -245,40 +248,58 @@
   width:100%;
   height:100%;
   margin:0;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  padding:clamp(24px,5vw,56px) clamp(20px,4vw,40px);
+  display:grid;
+  place-items:center;
+  padding:clamp(12px,3cqw,32px);
 }
 .lp-hero__content--banner{
-  max-width:min(720px,88vw);
+  max-width:min(700px,88cqw);
   width:100%;
   margin:0 auto;
   text-align:center;
   display:flex;
   flex-direction:column;
   align-items:center;
-  /* Align with the artwork's empty center (slightly left of image midpoint) */
-  transform:translateX(-2.5%);
+  justify-content:center;
+  gap:clamp(8px,2.2cqh,18px);
+  transform:translate(clamp(-36px,-5.5cqw,-72px),clamp(-20px,-7cqh,-52px));
 }
 .lp-hero__eyebrow{
   margin:0;
-  font-size:clamp(.68rem,.8vw,.75rem);
+  font-size:clamp(.62rem,1.35cqw,.75rem);
   font-weight:700;
   letter-spacing:.12em;
   text-transform:uppercase;
   color:rgba(255,255,255,.72);
 }
+.lp-hero__tone-orange{color:#F38131}
+.lp-hero__tone-blue{color:#3B59B6}
 .lp-hero__content--banner .lp-hero__headline{
-  color:#fff;
-  font-size:clamp(1.85rem,4.2vw,3.5rem);
+  margin:0;
+  max-width:18ch;
+  font-size:clamp(1.35rem,5.8cqw,3.25rem);
   font-weight:700;
+  line-height:1.1;
   letter-spacing:-.02em;
 }
 .lp-hero__content--banner .lp-hero__lede{
-  color:rgba(255,255,255,.84);
-  font-size:clamp(.92rem,1.35vw,1.2rem);
+  margin:0;
+  max-width:46ch;
+  font-size:clamp(.78rem,2.15cqw,1.12rem);
+  line-height:1.45;
+}
+.lp-hero__content--banner .lp-hero__ctas--merch{
+  margin-top:clamp(4px,1cqh,10px);
+}
+.lp-hero__content--banner .lp-hero__ctas--merch .lp-btn-primary,
+.lp-hero__content--banner .lp-hero__ctas--merch .lp-btn-outline-green{
+  font-size:clamp(.72rem,1.75cqw,.9rem);
+  padding:clamp(7px,1.4cqh,11px) clamp(14px,2.8cqw,26px);
+}
+.lp-hero__content--banner .lp-hero__trust{
+  margin-top:clamp(4px,1cqh,10px);
+  font-size:clamp(.64rem,1.45cqw,.8rem);
+  gap:clamp(6px,1.2cqw,12px);
 }
 .lp-hero__content--banner .lp-hero__trust{
   color:rgba(255,255,255,.72);
@@ -312,10 +333,16 @@
     min-height:min(92vw,520px);
   }
   .lp-hero__content--banner{
-    transform:translateX(-1%);
+    transform:translate(clamp(-20px,-4cqw,-40px),clamp(-12px,-4cqh,-28px));
+    max-width:min(92cqw,520px);
   }
   .lp-hero__content--banner .lp-hero__headline{
-    font-size:clamp(1.55rem,7vw,2.25rem);
+    max-width:16ch;
+    font-size:clamp(1.25rem,7.5cqw,2.1rem);
+  }
+  .lp-hero__content--banner .lp-hero__lede{
+    max-width:42ch;
+    font-size:clamp(.74rem,2.8cqw,.95rem);
   }
 }
 .lp-hero--merch__inner{
@@ -343,6 +370,10 @@
   flex-direction:column;
   align-items:center;
   gap:clamp(12px,2.2vh,20px);
+}
+.lp-hero__content--merch.lp-hero__content--banner{
+  max-width:min(700px,88cqw);
+  gap:clamp(8px,2.2cqh,18px);
 }
 .lp-hero__headline{
   margin:0 auto;

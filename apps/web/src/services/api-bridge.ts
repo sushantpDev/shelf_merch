@@ -124,16 +124,18 @@ export async function register(payload: {
 export async function logout() {
   const refreshToken = getRefreshToken();
   clearSession();
-  if (!refreshToken) return;
-  try {
-    await apiFetch("/auth/logout", {
-      method: "POST",
-      auth: false,
-      body: JSON.stringify({ refreshToken }),
-    });
-  } catch {
-    /* session already cleared locally */
+  if (refreshToken) {
+    try {
+      await apiFetch("/auth/logout", {
+        method: "POST",
+        auth: false,
+        body: JSON.stringify({ refreshToken }),
+      });
+    } catch {
+      /* session already cleared locally */
+    }
   }
+  window.location.assign("/");
 }
 
 export async function tryRestoreSession(): Promise<WorkspaceSnapshot | "platform" | null> {

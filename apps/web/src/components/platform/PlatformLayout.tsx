@@ -24,7 +24,6 @@ export default function PlatformLayout() {
 
   async function onLogout() {
     await logout().catch(() => {});
-    window.location.href = "/login";
   }
 
   if (!user || !isPlatformUser(user)) return null;

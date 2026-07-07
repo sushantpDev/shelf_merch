@@ -121,7 +121,6 @@ export function useSettingsController(): SettingsVm {
 
   async function onLogout() {
     await logout().catch(() => {});
-    window.location.href = "/login";
   }
 
   return {

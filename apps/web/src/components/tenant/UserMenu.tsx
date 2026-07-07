@@ -58,7 +58,6 @@ export function UserMenu({
   function onLogout() {
     close();
     void logout();
-    window.location.assign("/login");
   }
 
   const workspaceLabel = workspaceName.toLowerCase();

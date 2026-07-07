@@ -445,11 +445,11 @@ export default function LandingPage() {
         <div className="lp-container lp-nav__inner lp-nav__inner--merch">
           <a href="/" className="lp-logo">
             <img
-              src="/assets/rockefeller.png"
+              src="/images/logo/shelfmerch-logo-dark.svg"
               alt="Shelf Merch"
-              width={178}
-              height={30}
-              className="lp-logo__img"
+              width={188}
+              height={40}
+              className="lp-logo__img lp-logo__img--merch"
             />
           </a>
 
@@ -463,7 +463,7 @@ export default function LandingPage() {
           </nav>
 
           <div className="lp-nav__actions lp-nav__actions--merch">
-            <Link to="/login" className="lp-btn-ghost lp-btn-ghost--merch">
+            <Link to="/login" className="lp-btn-primary lp-btn-primary-sm lp-btn-pill">
               Log in
             </Link>
             <Link to="/signup" className="lp-btn-primary lp-btn-primary-sm lp-btn-pill">
@@ -496,15 +496,19 @@ export default function LandingPage() {
               <p className="lp-hero__eyebrow">Recognition · Swag · Gifting</p>
 
               <h1 className="lp-hero__headline">
-                Celebrate your people.
+                <span className="lp-hero__tone-orange">Celebrate your people.</span>
                 <br />
-                One platform.
+                <span className="lp-hero__tone-blue">One platform.</span>
               </h1>
 
               <p className="lp-hero__lede">
-                Launch branded shops, send corporate gifts, and reward teams
+                <span className="lp-hero__tone-orange">
+                  Launch branded shops, send corporate gifts, and reward teams
+                </span>
                 <br className="lp-hero__lede-br" />
-                with premium swag—all from one gifting workspace.
+                <span className="lp-hero__tone-blue">
+                  with premium swag—all from one gifting workspace.
+                </span>
               </p>
 
               <div className="lp-hero__ctas lp-hero__ctas--merch lp-hero__ctas--banner">

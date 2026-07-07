@@ -1,108 +1,106 @@
-import { Link } from "react-router";
-import { Building2, ChevronRight, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import type { SignupVm } from "../controllers/useSignupController";
-import {
-  AuthDivider,
-  AuthField,
-  AuthLayout,
-  GoogleSignInButton,
-  inputClassName,
-  inputWithToggleClassName,
-} from "./AuthLayout";
+import { AuthLabel, AuthLayout, authInputClassName } from "./AuthLayout";
 
 export function SignupView(vm: SignupVm) {
   return (
     <AuthLayout
-      headerHint="Already have an account?"
-      headerActionLabel="Log in"
-      headerActionTo="/login"
-      cardIcon={User}
-      eyebrow="Get started ✨"
       title="Create your account"
-      subtitle="Set up your SwagStore workspace in minutes."
+      footerLink={{ hint: "Already have an account?", label: "Log in", to: "/login" }}
     >
-      <form className="mt-8 space-y-5" onSubmit={vm.onSubmit}>
-        <AuthField label="Work email" icon={Mail}>
+      <form className="auth-simple-form" onSubmit={vm.onSubmit}>
+        <div className="auth-simple-name-row">
+          <div className="auth-simple-field">
+            <AuthLabel htmlFor="signup-first">First name</AuthLabel>
+            <input
+              id="signup-first"
+              type="text"
+              autoComplete="given-name"
+              placeholder="First name"
+              value={vm.firstName}
+              onChange={(e) => vm.onFirstName(e.target.value)}
+              className={authInputClassName}
+              autoFocus
+            />
+          </div>
+          <div className="auth-simple-field">
+            <AuthLabel htmlFor="signup-last">Last name</AuthLabel>
+            <input
+              id="signup-last"
+              type="text"
+              autoComplete="family-name"
+              placeholder="Last name"
+              value={vm.lastName}
+              onChange={(e) => vm.onLastName(e.target.value)}
+              className={authInputClassName}
+            />
+          </div>
+        </div>
+
+        <div className="auth-simple-field">
+          <AuthLabel htmlFor="signup-email">Email</AuthLabel>
           <input
+            id="signup-email"
             type="email"
+            autoComplete="email"
             placeholder="you@company.com"
             value={vm.email}
             onChange={(e) => vm.onEmail(e.target.value)}
-            className={inputClassName}
-            autoFocus
+            className={authInputClassName}
           />
-        </AuthField>
+        </div>
 
-        <div>
-          <AuthField label="Password" icon={Lock}>
+        <div className="auth-simple-field">
+          <AuthLabel htmlFor="signup-company">Company</AuthLabel>
+          <input
+            id="signup-company"
+            type="text"
+            autoComplete="organization"
+            placeholder="Company name"
+            value={vm.company}
+            onChange={(e) => vm.onCompany(e.target.value)}
+            className={authInputClassName}
+          />
+        </div>
+
+        <div className="auth-simple-field">
+          <AuthLabel htmlFor="signup-password">Password</AuthLabel>
+          <div className="auth-simple-input-wrap">
             <input
+              id="signup-password"
               type={vm.showPassword ? "text" : "password"}
+              autoComplete="new-password"
               placeholder="At least 8 characters"
               value={vm.password}
               onChange={(e) => vm.onPassword(e.target.value)}
-              className={inputWithToggleClassName}
+              className={`${authInputClassName} auth-simple-input--toggle`}
             />
             <button
               type="button"
+              className="auth-simple-toggle"
               onClick={vm.onToggleShowPassword}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6b7a70] hover:text-[#0f4d2e]"
+              aria-label={vm.showPassword ? "Hide password" : "Show password"}
             >
-              {vm.showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {vm.showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
-          </AuthField>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <AuthField label="Name" icon={User}>
-            <input
-              type="text"
-              placeholder="Your name"
-              value={vm.name}
-              onChange={(e) => vm.onName(e.target.value)}
-              className={inputClassName}
-            />
-          </AuthField>
-          <AuthField label="Company" icon={Building2}>
-            <input
-              type="text"
-              placeholder="Company name"
-              value={vm.company}
-              onChange={(e) => vm.onCompany(e.target.value)}
-              className={inputClassName}
-            />
-          </AuthField>
-        </div>
-
-        <p className="text-[11.5px] leading-relaxed text-[#6b7a70]">
-          By creating an account, I agree to SwagStore's{" "}
-          <button type="button" className="text-[#0f4d2e] underline">
+        <p className="auth-simple-legal">
+          By proceeding, you agree to Shelf Merch&apos;s{" "}
+          <button type="button" className="auth-simple-legal-link">
+            Privacy Policy
+          </button>{" "}
+          and{" "}
+          <button type="button" className="auth-simple-legal-link">
             Terms of Use
           </button>
-          , the use of my personal data per the{" "}
-          <button type="button" className="text-[#0f4d2e] underline">
-            Privacy Notice
-          </button>
-          , and to receive product emails from SwagStore.
+          .
         </p>
 
-        <button
-          type="submit"
-          disabled={vm.busy}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#0f4d2e] py-3.5 text-sm font-semibold text-white transition hover:bg-[#0a3a22] disabled:opacity-60"
-        >
-          {vm.busy ? "Creating your account…" : "Create account"}{" "}
-          {!vm.busy && <ChevronRight className="h-4 w-4" />}
+        <button type="submit" disabled={vm.busy} className="auth-simple-submit">
+          {vm.busy ? "Creating account…" : "Create account"}
         </button>
-
-        <AuthDivider />
-        <GoogleSignInButton onClick={vm.onGoogleSignIn} />
-
-        <p className="text-center text-sm text-[#6b7a70]">
-          Already have an account?{" "}
-          <Link to="/login" className="font-medium text-[#0f4d2e] underline">
-            Log in
-          </Link>
-        </p>
       </form>
     </AuthLayout>
   );

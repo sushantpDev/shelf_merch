@@ -6,17 +6,18 @@ import { register, isPlatformUser } from "../model";
 export type SignupVm = {
   email: string;
   password: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   company: string;
   showPassword: boolean;
   busy: boolean;
   onEmail: (email: string) => void;
   onPassword: (password: string) => void;
-  onName: (name: string) => void;
+  onFirstName: (firstName: string) => void;
+  onLastName: (lastName: string) => void;
   onCompany: (company: string) => void;
   onToggleShowPassword: () => void;
   onSubmit: (e: React.FormEvent) => void;
-  onGoogleSignIn: () => void;
 };
 
 /** Controller for the signup screen: form state, register flow, redirect by role. */
@@ -24,13 +25,15 @@ export function useSignupController(): SignupVm {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [company, setCompany] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    const name = `${firstName.trim()} ${lastName.trim()}`.trim();
     if (!email || !password || !name || !company) {
       toast.error("Fill in all fields");
       return;
@@ -42,7 +45,7 @@ export function useSignupController(): SignupVm {
     setBusy(true);
     try {
       const user = await register({ name, email, password, companyName: company });
-      toast.success(`Welcome to SwagStore, ${user.name.split(" ")[0]}!`);
+      toast.success(`Welcome to Shelf Merch, ${user.name.split(" ")[0]}!`);
       if (isPlatformUser(user)) {
         navigate("/platform/dashboard");
       } else {
@@ -57,16 +60,17 @@ export function useSignupController(): SignupVm {
   return {
     email,
     password,
-    name,
+    firstName,
+    lastName,
     company,
     showPassword,
     busy,
     onEmail: setEmail,
     onPassword: setPassword,
-    onName: setName,
+    onFirstName: setFirstName,
+    onLastName: setLastName,
     onCompany: setCompany,
     onToggleShowPassword: () => setShowPassword((s) => !s),
     onSubmit: submit,
-    onGoogleSignIn: () => toast("Google sign-in coming soon"),
   };
 }

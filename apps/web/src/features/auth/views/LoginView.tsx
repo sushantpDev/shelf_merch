@@ -1,92 +1,72 @@
-import { Link } from "react-router";
-import { ChevronRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import type { LoginVm } from "../controllers/useLoginController";
-import {
-  AuthDivider,
-  AuthField,
-  AuthLayout,
-  GoogleSignInButton,
-  inputClassName,
-  inputWithToggleClassName,
-} from "./AuthLayout";
+import { AuthLabel, AuthLayout, authInputClassName } from "./AuthLayout";
 
 export function LoginView(vm: LoginVm) {
   return (
     <AuthLayout
-      headerHint="New here?"
-      headerActionLabel="Create an account"
-      headerActionTo="/signup"
-      cardIcon={Lock}
-      eyebrow="Welcome back 👋"
-      title="Log in to SwagStore"
-      subtitle="Pick up where your team left off."
+      title="Log in with your Shelf Merch account"
+      footerLink={{ hint: "Don't have an account?", label: "Sign up", to: "/signup" }}
     >
-      <form className="mt-8 space-y-5" onSubmit={vm.onSubmit}>
-        <AuthField label="Work email" icon={Mail}>
+      <form className="auth-simple-form" onSubmit={vm.onSubmit}>
+        <div className="auth-simple-field">
+          <AuthLabel htmlFor="login-email">Email</AuthLabel>
           <input
+            id="login-email"
             type="email"
-            placeholder="hr@rubix.net"
+            autoComplete="email"
+            placeholder="you@company.com"
             value={vm.email}
             onChange={(e) => vm.onEmail(e.target.value)}
-            className={inputClassName}
+            className={authInputClassName}
             autoFocus
           />
-        </AuthField>
+        </div>
 
-        <div>
-          <AuthField label="Password" icon={Lock}>
+        <div className="auth-simple-field">
+          <AuthLabel
+            htmlFor="login-password"
+            action={
+              <button
+                type="button"
+                className="auth-simple-label-action"
+                onClick={vm.onForgotPassword}
+              >
+                Reset password
+              </button>
+            }
+          >
+            Password
+          </AuthLabel>
+          <div className="auth-simple-input-wrap">
             <input
+              id="login-password"
               type={vm.showPassword ? "text" : "password"}
+              autoComplete="current-password"
               value={vm.password}
               onChange={(e) => vm.onPassword(e.target.value)}
-              className={inputWithToggleClassName}
+              className={`${authInputClassName} auth-simple-input--toggle`}
             />
             <button
               type="button"
+              className="auth-simple-toggle"
               onClick={vm.onToggleShowPassword}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6b7a70] hover:text-[#0f4d2e]"
+              aria-label={vm.showPassword ? "Hide password" : "Show password"}
             >
-              {vm.showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </AuthField>
-          <div className="mt-2 text-right">
-            <button
-              type="button"
-              className="text-sm font-medium text-[#0f4d2e] underline"
-              onClick={vm.onForgotPassword}
-            >
-              Forgot password?
+              {vm.showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
         </div>
 
         {vm.error ? (
-          <p
-            className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-            role="alert"
-          >
+          <p className="auth-simple-error" role="alert">
             {vm.error}
           </p>
         ) : null}
 
-        <button
-          type="submit"
-          disabled={vm.busy}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#0f4d2e] py-3.5 text-sm font-semibold text-white transition hover:bg-[#0a3a22] disabled:opacity-60"
-        >
-          {vm.busy ? "Signing you in…" : "Log in"}{" "}
-          {!vm.busy && <ChevronRight className="h-4 w-4" />}
+        <button type="submit" disabled={vm.busy} className="auth-simple-submit">
+          {vm.busy ? "Signing in…" : "Log in"}
         </button>
-
-        <AuthDivider />
-        <GoogleSignInButton onClick={vm.onGoogleSignIn} />
-
-        <p className="text-center text-sm text-[#6b7a70]">
-          New here?{" "}
-          <Link to="/signup" className="font-medium text-[#0f4d2e] underline">
-            Create an account
-          </Link>
-        </p>
       </form>
     </AuthLayout>
   );
