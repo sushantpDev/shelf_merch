@@ -2,15 +2,7 @@ import { useState, type ReactNode } from "react";
 import "./landing-page.css";
 import { Link } from "react-router";
 import type { LucideIcon } from "lucide-react";
-import arrowAsset from "../../assets/arrow.avif";
-import bottleAsset from "../../assets/bottle.png";
-import capAsset from "../../assets/cap.png";
-import diaryAsset from "../../assets/diary.png";
-import hoodieAsset from "../../assets/hoodie.png";
-import mugAsset from "../../assets/mug.png";
 import templateAsset from "../../assets/template.png";
-import toteAsset from "../../assets/tote.png";
-import zigAsset from "../../assets/zig.avif";
 import {
   Award,
   Backpack,
@@ -66,8 +58,6 @@ import {
   UserCircle,
   Users,
   Wallet,
-  Upload,
-  X,
 } from "lucide-react";
 
 const LP_ICONS = {
@@ -133,21 +123,7 @@ const HERO_TRUST_ITEMS: { icon: LucideIcon; label: string }[] = [
   { icon: Headphones, label: "Expert support" },
 ];
 
-const HERO_FLOATS = [
-  { src: hoodieAsset, alt: "Green hoodie mockup", className: "lp-hero__float--hoodie" },
-  { src: toteAsset, alt: "Canvas tote mockup", className: "lp-hero__float--tote" },
-  { src: mugAsset, alt: "Branded mug mockup", className: "lp-hero__float--mug" },
-  { src: bottleAsset, alt: "Water bottle mockup", className: "lp-hero__float--bottle" },
-  { src: diaryAsset, alt: "Notebook mockup", className: "lp-hero__float--diary" },
-  { src: capAsset, alt: "Cap mockup", className: "lp-hero__float--cap" },
-] as const;
-
-const HERO_ACCENTS = [
-  { src: zigAsset, className: "lp-hero__accent--zig-left" },
-  // { src: zigAsset, className: "lp-hero__accent--zig-right" },
-  // { src: arrowAsset, className: "lp-hero__accent--arrow-left" },
-  { src: arrowAsset, className: "lp-hero__accent--arrow-right" },
-] as const;
+const HERO_BANNER_IMAGE = "/images/landing/corporate-gifting-hero.png?v=2";
 
 const INTRO_FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
   { icon: Monitor, title: "One dashboard", desc: "Shops, gifts, and swag unified" },
@@ -459,8 +435,6 @@ const KUDOS_FEED = [
 export default function LandingPage() {
   const [offering, setOffering] = useState<OfferingId>("shops");
   const [team, setTeam] = useState<(typeof TEAMS)[number]["id"]>("hr");
-  const [isDragActive, setIsDragActive] = useState(false);
-  const [customLogo, setCustomLogo] = useState<string | null>(null);
   const activeTeam = TEAMS.find((t) => t.id === team)!;
   const activeOffering = OFFERING_TABS.find((t) => t.id === offering)!;
 
@@ -504,55 +478,36 @@ export default function LandingPage() {
       </header>
 
       {/* ── HERO ── */}
-      <div className="lp-hero-zone lp-hero-zone--merch">
-        <div className="lp-hero__floats" aria-hidden="true">
-          {HERO_ACCENTS.map((accent) => (
-            <img
-              key={accent.className}
-              src={accent.src}
-              alt=""
-              className={`lp-hero__accent ${accent.className}`}
-              loading="eager"
-            />
-          ))}
-          {HERO_FLOATS.map((product) => (
-            <img
-              key={product.alt}
-              src={product.src}
-              alt={product.alt}
-              className={`lp-hero__float ${product.className}`}
-              loading="eager"
-            />
-          ))}
-          <LpHeroDecorSprig className="lp-hero__decor lp-hero__decor--sprig" />
-          <LpHeroDecorSquiggle className="lp-hero__decor lp-hero__decor--squiggle" />
-          <LpHeroDecorWave className="lp-hero__decor lp-hero__decor--wave" />
-          <LpHeroDecorDots className="lp-hero__decor lp-hero__decor--dots-r" />
-          <LpHeroDecorDots className="lp-hero__decor lp-hero__decor--dots-l" />
-        </div>
-
-        <section className="lp-hero lp-hero--merch">
+      <div className="lp-hero-zone lp-hero-zone--merch lp-hero-zone--banner">
+        <section className="lp-hero lp-hero--merch lp-hero--banner">
+          <img
+            src={HERO_BANNER_IMAGE}
+            alt=""
+            className="lp-hero-banner__img"
+            width={8688}
+            height={2896}
+            aria-hidden="true"
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+          />
           <div className="lp-hero--merch__inner">
-            <div className="lp-hero__content lp-hero__content--merch">
-              {/* <a href="#products" className="lp-hero__announce">
-                <strong>NEW</strong>
-                <span>Spring collection now available</span>
-                <ChevronRight className="lp-hero__announce-icon" aria-hidden />
-              </a> */}
+            <div className="lp-hero__content lp-hero__content--merch lp-hero__content--banner">
+              <p className="lp-hero__eyebrow">Recognition · Swag · Gifting</p>
 
               <h1 className="lp-hero__headline">
-                Limitless engagement.
+                Celebrate your people.
                 <br />
                 One platform.
               </h1>
 
               <p className="lp-hero__lede">
-                Power your global recognition programs with premium swag,
+                Launch branded shops, send corporate gifts, and reward teams
                 <br className="lp-hero__lede-br" />
-                snack boxes, and gifts—all fulfilled locally in 170+ countries.
+                with premium swag—all from one gifting workspace.
               </p>
 
-              <div className="lp-hero__ctas lp-hero__ctas--merch">
+              <div className="lp-hero__ctas lp-hero__ctas--merch lp-hero__ctas--banner">
                 <Link to="/signup" className="lp-btn-primary lp-btn-pill">
                   Get started for free
                 </Link>
@@ -570,85 +525,6 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-            </div>
-
-            <div
-              className={`lp-hero__mockup ${isDragActive ? "is-drag-active" : ""}`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragActive(true);
-              }}
-              onDragLeave={() => {
-                setIsDragActive(false);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                setIsDragActive(false);
-                const files = e.dataTransfer.files;
-                if (files && files[0] && files[0].type.startsWith("image/")) {
-                  const reader = new FileReader();
-                  reader.onload = (ev) => {
-                    if (ev.target?.result) {
-                      setCustomLogo(ev.target.result as string);
-                    }
-                  };
-                  reader.readAsDataURL(files[0]);
-                }
-              }}
-            >
-              
-              <img
-                src={arrowAsset}
-                alt=""
-                className="lp-hero__mockup-accent lp-hero__mockup-accent--arrow"
-                aria-hidden="true"
-                loading="eager"
-              />
-              <div className="lp-hero__mockup-frame">
-                <img
-                  src={templateAsset}
-                  alt="Shelf Merch editor interface for creating a branded hoodie design"
-                  loading="eager"
-                />
-
-                {/* Dropped custom logo overlay */}
-                {customLogo && (
-                  <div className="lp-hero__mockup-logo-container">
-                    <img
-                      src={customLogo}
-                      alt="Custom branding logo"
-                      className="lp-hero__mockup-logo"
-                    />
-                  </div>
-                )}
-
-                {/* Reset button floating inside mockup frame */}
-                {customLogo && (
-                  <button
-                    type="button"
-                    className="lp-hero__mockup-logo-reset"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCustomLogo(null);
-                    }}
-                    title="Reset Custom Design"
-                  >
-                    <X size={12} />
-                    <span>Reset Design</span>
-                  </button>
-                )}
-
-                {/* Drag-over overlay */}
-                {isDragActive && (
-                  <div className="lp-hero__mockup-dropzone">
-                    <div className="lp-hero__mockup-dropzone-box">
-                      <Upload className="lp-hero__mockup-dropzone-icon" />
-                      <p className="lp-hero__mockup-dropzone-title">Drop your logo</p>
-                      <p className="lp-hero__mockup-dropzone-desc">to customize the hoodie</p>
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         </section>
@@ -1265,50 +1141,3 @@ export default function LandingPage() {
   );
 }
 
-function LpHeroDecorSprig({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="58" height="42" viewBox="0 0 58 42" fill="none" aria-hidden>
-      <path d="M13 29L2 19" stroke="#004D3D" strokeWidth="3.5" strokeLinecap="round" opacity="0.8" />
-      <path d="M26 14L21 1" stroke="#004D3D" strokeWidth="3.5" strokeLinecap="round" opacity="0.8" />
-      <path d="M41 22L55 16" stroke="#004D3D" strokeWidth="3.5" strokeLinecap="round" opacity="0.8" />
-    </svg>
-  );
-}
-
-function LpHeroDecorSquiggle({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="70" height="90" viewBox="0 0 70 90" fill="none" aria-hidden>
-      <path
-        d="M48 7C25 16 15 35 21 47C27 59 46 58 50 70C53 79 46 86 34 87"
-        stroke="#004D3D"
-        strokeWidth="4"
-        strokeLinecap="round"
-        opacity="0.45"
-      />
-    </svg>
-  );
-}
-
-function LpHeroDecorWave({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="62" height="92" viewBox="0 0 62 92" fill="none" aria-hidden>
-      <path
-        d="M17 6C32 12 44 25 37 39C31 52 12 55 11 68C10 77 15 83 22 87"
-        stroke="#004D3D"
-        strokeWidth="4"
-        strokeLinecap="round"
-        opacity="0.45"
-      />
-    </svg>
-  );
-}
-
-function LpHeroDecorDots({ className }: { className?: string }) {
-  return (
-    <div className={className}>
-      {Array.from({ length: 12 }).map((_, index) => (
-        <span key={index} className="lp-hero__decor-dot" />
-      ))}
-    </div>
-  );
-}
