@@ -267,6 +267,7 @@ export async function updateKitApi(payload: {
   catalog: UiProduct[];
   packaging?: "none" | "box";
   designNotes?: string;
+  status?: string;
 }) {
   const productRefs = payload.pickedIndices.map((i) => {
     const p = payload.catalog[i];
@@ -277,6 +278,7 @@ export async function updateKitApi(payload: {
   if (payload.name != null) body.name = payload.name;
   if (payload.packaging != null) body.packaging = payload.packaging;
   if (payload.designNotes != null) body.designNotes = payload.designNotes;
+  if (payload.status != null) body.status = payload.status;
 
   const kit = await apiFetch<Record<string, unknown>>(`/kits/${payload.id}`, {
     method: "PATCH",

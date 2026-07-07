@@ -1,12 +1,12 @@
 import { LoadingState } from "@/components/LoadingState";
 import { inr } from "@/components/platform/platform-ui";
 import { WizardChrome } from "@/features/swag/wizard/WizardChrome";
-import { RecipientPicker } from "@/features/send/RecipientPicker";
+import { RecipientPicker, LocField } from "@/features/send/RecipientPicker";
 import { RecipientExperience } from "@/features/send/RecipientExperience";
 import { PaymentPanel } from "@/features/send/PaymentPanel";
 import type { SendKitVm } from "../controllers/useSendKitController";
 
-const STEPS = ["Recipients", "Experience", "Checkout"];
+const STEPS = ["Choose Mode", "Recipients", "Experience", "Checkout"];
 
 /** Send-kit wizard shell; all state and actions come from the controller. */
 export function SendKitView(vm: SendKitVm) {
@@ -45,7 +45,7 @@ export function SendKitView(vm: SendKitVm) {
       ) : (
         <span />
       )}
-      {vm.step < 2 ? (
+      {vm.step < 3 ? (
         <button type="button" className="btn btn-dark" onClick={vm.onNext}>
           Next
         </button>
@@ -65,19 +65,129 @@ export function SendKitView(vm: SendKitVm) {
       footer={footer}
     >
       {vm.step === 0 && (
+        <div style={{ maxWidth: 880, margin: "0 auto", padding: "10px 0" }}>
+          <h1 style={{ fontSize: 24, marginBottom: 8 }}>Choose Send Mode</h1>
+          <p className="muted" style={{ marginBottom: 24 }}>
+            Select how you would like to deliver this kit to your recipients.
+          </p>
+          <div className="grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+            <button
+              type="button"
+              className={`optcard ${draft.mode === "surprise" ? "on" : ""}`}
+              onClick={() => dispatch({ type: "setMode", mode: "surprise" })}
+              style={{ minHeight: 180, display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", cursor: "pointer", padding: 18 }}
+            >
+              <div className="rd" />
+              <div style={{ marginTop: 12 }}>
+                <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Surprise recipient</h4>
+                <p className="muted" style={{ fontSize: 13, lineHeight: 1.4 }}>
+                  Enter recipient details up front so gifts ship directly without requiring their input.
+                </p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              className={`optcard ${draft.mode === "single" ? "on" : ""}`}
+              onClick={() => dispatch({ type: "setMode", mode: "single" })}
+              style={{ minHeight: 180, display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", cursor: "pointer", padding: 18 }}
+            >
+              <div className="rd" />
+              <div style={{ marginTop: 12 }}>
+                <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Send all kits to given address</h4>
+                <p className="muted" style={{ fontSize: 13, lineHeight: 1.4 }}>
+                  Ship all units to one office, event venue or specific address.
+                </p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              className={`optcard ${draft.mode === "redeem" ? "on" : ""}`}
+              onClick={() => dispatch({ type: "setMode", mode: "redeem" })}
+              style={{ minHeight: 180, display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", cursor: "pointer", padding: 18 }}
+            >
+              <div className="rd" />
+              <div style={{ marginTop: 12 }}>
+                <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Let recipient choose the variants</h4>
+                <p className="muted" style={{ fontSize: 13, lineHeight: 1.4 }}>
+                  Recipients choose their own size, color & shipping address from a private link.
+                </p>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {vm.step === 1 && (
         <>
+          {draft.mode === "single" && (
+            <div className="card" style={{ padding: 20, marginBottom: 18 }}>
+              <h3 style={{ fontSize: 16, marginBottom: 5 }}>Single delivery location</h3>
+              <p className="muted" style={{ fontSize: 12.5, marginBottom: 16 }}>
+                All selected recipients' gifts will ship together to this address. A notification will
+                be sent to the email below.
+              </p>
+              <div className="row" style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+                <LocField label="Contact name" k="name" loc={draft.singleLocation} onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })} />
+                <LocField
+                  label="Notification email"
+                  k="email"
+                  type="email"
+                  loc={draft.singleLocation}
+                  onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })}
+                />
+                <LocField
+                  label="Phone (optional)"
+                  k="phone"
+                  loc={draft.singleLocation}
+                  onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })}
+                />
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <LocField label="Address" k="line1" loc={draft.singleLocation} onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })} block />
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <LocField
+                  label="Address line 2 (optional)"
+                  k="line2"
+                  loc={draft.singleLocation}
+                  onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })}
+                  block
+                />
+              </div>
+              <div className="row" style={{ display: "flex", gap: 12 }}>
+                <LocField label="City" k="city" loc={draft.singleLocation} onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })} />
+                <LocField label="State" k="state" loc={draft.singleLocation} onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })} />
+                <LocField
+                  label="PIN / Postal code"
+                  k="pincode"
+                  loc={draft.singleLocation}
+                  onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })}
+                />
+                <div className="field" style={{ flex: 1 }}>
+                  <label className="lbl">Country</label>
+                  <select
+                    className="inp"
+                    value={draft.singleLocation.country || "IN"}
+                    onChange={(e) => dispatch({ type: "setSingleLoc", key: "country", value: e.target.value })}
+                  >
+                    <option value="IN">India</option>
+                    <option value="AE">UAE</option>
+                    <option value="US">USA</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
           <RecipientPicker
             title="Who's receiving this?"
-            subtitle="Choose how recipients get their items, then pick people."
+            subtitle="Choose who you would like to send these items to."
             contacts={vm.contacts}
             selected={draft.selRecips}
             onToggle={(rid) => dispatch({ type: "toggleRecip", id: rid })}
             onDeselectAll={() => dispatch({ type: "deselectRecips" })}
-            showModes
-            mode={draft.mode}
-            onMode={(mode) => dispatch({ type: "setMode", mode })}
-            singleLocation={draft.singleLocation}
-            onSingleLocationChange={(key, value) => dispatch({ type: "setSingleLoc", key, value })}
+            showModes={false}
           />
           {draft.mode === "surprise" && vm.surpriseMissing.length > 0 && (
             <div className="banner" style={{ marginTop: 14 }}>
@@ -88,7 +198,7 @@ export function SendKitView(vm: SendKitVm) {
         </>
       )}
 
-      {vm.step === 1 && (
+      {vm.step === 2 && (
         <RecipientExperience
           shopName={vm.shopName}
           mode={draft.mode}
@@ -143,7 +253,7 @@ export function SendKitView(vm: SendKitVm) {
         />
       )}
 
-      {vm.step === 2 && (
+      {vm.step === 3 && (
         <>
           <h1 style={{ fontSize: 24, marginBottom: 16 }}>Checkout</h1>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>

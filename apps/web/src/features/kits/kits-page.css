@@ -426,6 +426,15 @@
   background: #eead1d;
 }
 
+.kits-status--archived {
+  background: #f0f4f2;
+  color: #5c6660;
+}
+
+.kits-status--archived i {
+  background: #8b9991;
+}
+
 .kits-row-actions {
   display: flex;
   align-items: center;

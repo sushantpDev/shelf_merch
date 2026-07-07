@@ -51,6 +51,7 @@ export type UpdateKitInput = {
   packaging?: string;
   designNotes?: string;
   artwork?: KitArtworkInput;
+  status?: string;
 };
 
 export function useUpdateKit() {

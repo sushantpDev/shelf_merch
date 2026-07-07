@@ -9,7 +9,7 @@ import { entityIdForWallet, spendableForWallet } from "@/services/workspace-api"
 import { kitSendTotals, type KitSendTotals } from "@/features/send/money";
 import { toSchedulePayload } from "@/features/send/types";
 import { kitPickedIndices } from "../wizard/kitDraft";
-import { useLaunchKitCampaign } from "../model";
+import { useLaunchKitCampaign, useUpdateKit } from "../model";
 import type { UiKit } from "../model";
 import {
   initialSendKitDraft,
@@ -18,7 +18,7 @@ import {
   type SendKitDraft,
 } from "../send/sendDraft";
 
-export type SendKitStep = 0 | 1 | 2;
+export type SendKitStep = 0 | 1 | 2 | 3;
 
 export type SendKitVm = {
   isLoading: boolean;
@@ -57,6 +57,7 @@ export function useSendKitController(): SendKitVm {
   const { data: workspace, isLoading } = useWorkspace();
   const refreshWorkspace = useInvalidateWorkspace();
   const launch = useLaunchKitCampaign();
+  const updateKit = useUpdateKit();
   const [step, setStep] = useState<SendKitStep>(0);
   const [sending, setSending] = useState(false);
   const [selectedWalletId, setSelectedWalletId] = useState("");
@@ -81,6 +82,10 @@ export function useSendKitController(): SendKitVm {
 
   function onNext() {
     if (step === 0) {
+      setStep(1);
+      return;
+    }
+    if (step === 1) {
       if (!draft.selRecips.length) {
         toast.error("Select at least one recipient");
         return;
@@ -97,7 +102,7 @@ export function useSendKitController(): SendKitVm {
         }
       }
     }
-    setStep((s) => Math.min(s + 1, 2) as SendKitStep);
+    setStep((s) => Math.min(s + 1, 3) as SendKitStep);
   }
 
   async function onPayAndSend() {
@@ -124,6 +129,14 @@ export function useSendKitController(): SendKitVm {
     }
     setSending(true);
     try {
+      if (kit && kit.status !== "live") {
+        await updateKit.mutateAsync({
+          id: kit.id,
+          pickedIndices: kitPickedIndices(kit, catalog),
+          catalog,
+          status: "live",
+        });
+      }
       await launch.mutateAsync({
         entityId: String(entityId),
         kitId: String(kit!.id),
@@ -171,7 +184,7 @@ export function useSendKitController(): SendKitVm {
     walletAvailable: (w) => (workspace ? spendableForWallet(workspace, w.id) : 0),
     onExit: () => navigate("/app/kits"),
     onNext,
-    onBack: () => setStep((s) => (s - 1) as SendKitStep),
+    onBack: () => setStep((s) => Math.max(s - 1, 0) as SendKitStep),
     onPayAndSend,
   };
 }

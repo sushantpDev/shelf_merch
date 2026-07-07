@@ -364,6 +364,7 @@ export async function updateKitFlow(payload: {
   packaging?: string;
   designNotes?: string;
   artwork?: { file?: File; preview?: string; name?: string };
+  status?: string;
 }) {
   let kit = await updateKitApi({
     ...payload,

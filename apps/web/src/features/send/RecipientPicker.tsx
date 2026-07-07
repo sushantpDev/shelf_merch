@@ -218,7 +218,7 @@ export function RecipientPicker({
   );
 }
 
-function LocField({
+export function LocField({
   label,
   k,
   loc,
