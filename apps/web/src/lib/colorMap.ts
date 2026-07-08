@@ -29,6 +29,7 @@ export const COLOR_MAP: Record<string, string> = {
 
   navy: "#000080",
   "navy blue": "#000080",
+  "midnight navy": "#1a2744",
   "dark navy": "#000033",
   "royal blue": "#4169E1",
   royal: "#4169E1",

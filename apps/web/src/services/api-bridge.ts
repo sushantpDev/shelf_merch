@@ -675,7 +675,32 @@ export type RedemptionOrderSummary = {
   total: number;
   itemCount: number;
   createdAt?: string;
-  items?: Array<{ name: string; qty: number; unitPriceInr?: number }>;
+  items?: Array<{
+    name: string;
+    qty: number;
+    unitPriceInr?: number;
+    imageUrl?: string;
+    catalogProductId?: string;
+    collectionId?: string;
+    variant?: { size?: string; color?: string };
+  }>;
+  shippingAddress?: {
+    name?: string;
+    phone?: string;
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    country?: string;
+  } | null;
+  amountBreakdown?: {
+    subtotal?: number;
+    serviceFee?: number;
+    gst?: number;
+    total?: number;
+  } | null;
+  statusHistory?: Array<{ status: string; at?: string; note?: string }>;
 };
 
 export async function listRedemptionOrders(token: string, sessionToken: string) {

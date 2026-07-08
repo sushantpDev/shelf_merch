@@ -5,6 +5,13 @@ import { Campaign } from '../campaigns/campaign.model.js';
 import { Shop } from '../shops/shop.model.js';
 import { Collection } from '../collections/collection.model.js';
 import { collectionsForShopFilter } from '../collections/collectionQueries.js';
+import {
+  buildBrandedProductListings,
+  loadShopCollections,
+  mockupUrlFromCollections,
+  parseBrandedListingProductId,
+  resolveBrandedListingSnapshot,
+} from '../storefront/brandedShopProducts.js';
 import { Kit } from '../kits/kit.model.js';
 import {
   effectiveProductGroup,
@@ -15,7 +22,7 @@ import {
 import { CatalogProduct } from '../catalog/catalogProduct.model.js';
 import { Order, sanitizeOrderItems } from '../orders/order.model.js';
 import { Contact } from '../contacts/contact.model.js';
-import { transitionRedemption } from '../campaigns/campaigns.service.js';
+import { transitionRedemption, finalizeRecipientRedemption } from '../campaigns/campaigns.service.js';
 import { computeAmountBreakdown } from '../../services/pricing.service.js';
 import { env } from '../../config/env.js';
 import { sendOtpSms } from '../../services/msg91.service.js';
@@ -188,13 +195,7 @@ async function debitPointsCreditPool({
     remaining -= debit;
 
     if (row.creditAmount <= 0) {
-      if (row.redemptionStatus === 'verified') {
-        transitionRedemption(row, 'redeemed');
-        transitionRedemption(row, 'order_created');
-      } else if (!['redeemed', 'order_created'].includes(row.redemptionStatus)) {
-        transitionRedemption(row, 'redeemed');
-        transitionRedemption(row, 'order_created');
-      }
+      finalizeRecipientRedemption(row);
     }
     await row.save();
   }
@@ -366,61 +367,60 @@ export async function getCatalog(token) {
   const recipient = await findRecipientByToken(token);
   const { campaign } = await loadCampaignContext(recipient);
 
-  const artworkByProductId = new Map();
-  const mockupByProductId = new Map();
-  const preferredColorsByProductId = new Map();
-  let shopCollections = [];
-  let effectiveIdsFromShop = [];
-  if (campaign.shopId) {
-    shopCollections = await Collection.find({
-      ...collectionsForShopFilter(campaign.shopId),
-      tenantId: recipient.tenantId,
-      status: { $ne: 'archived' },
-    })
-      .select('productRefs artworkUrl preferredColors')
-      .lean();
-
-    const shop = await Shop.findOne({ _id: campaign.shopId, tenantId: recipient.tenantId })
-      .select('selectedCatalogProductIds')
-      .lean();
-    effectiveIdsFromShop = (shop?.selectedCatalogProductIds || []).map(String).filter(Boolean);
-
-    for (const col of shopCollections) {
-      for (const ref of col.productRefs || []) {
-        const pid = ref.catalogProductId ? String(ref.catalogProductId) : '';
-        if (!pid) continue;
-        if (col.artworkUrl && !artworkByProductId.has(pid)) artworkByProductId.set(pid, col.artworkUrl);
-        if (ref.mockupUrl && !mockupByProductId.has(pid)) mockupByProductId.set(pid, ref.mockupUrl);
-        if (col.preferredColors?.length && !preferredColorsByProductId.has(pid)) {
-          preferredColorsByProductId.set(pid, col.preferredColors);
+  if (campaign.catalogMode === 'selected_products' && campaign.selectedProductIds.length) {
+    const artworkByProductId = new Map();
+    const mockupByProductId = new Map();
+    const preferredColorsByProductId = new Map();
+    if (campaign.shopId) {
+      const shopCollections = await Collection.find({
+        ...collectionsForShopFilter(campaign.shopId),
+        tenantId: recipient.tenantId,
+        status: { $ne: 'archived' },
+      })
+        .select('productRefs artworkUrl preferredColors')
+        .lean();
+      for (const col of shopCollections) {
+        for (const ref of col.productRefs || []) {
+          const pid = ref.catalogProductId ? String(ref.catalogProductId) : '';
+          if (!pid) continue;
+          if (col.artworkUrl && !artworkByProductId.has(pid)) artworkByProductId.set(pid, col.artworkUrl);
+          if (ref.mockupUrl && !mockupByProductId.has(pid)) mockupByProductId.set(pid, ref.mockupUrl);
+          if (col.preferredColors?.length && !preferredColorsByProductId.has(pid)) {
+            preferredColorsByProductId.set(pid, col.preferredColors);
+          }
         }
       }
     }
+
+    const products = await CatalogProduct.find({
+      status: 'active',
+      _id: { $in: campaign.selectedProductIds },
+    })
+      .select('name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas')
+      .sort({ name: 1 })
+      .lean()
+      .then((rows) =>
+        rows.map((p) => ({
+          ...p,
+          artworkUrl: artworkByProductId.get(String(p._id)) || '',
+          mockupUrl: mockupByProductId.get(String(p._id)) || '',
+          preferredColors: preferredColorsByProductId.get(String(p._id)) || [],
+        })),
+      );
+    return { products };
   }
 
-  const filter = { status: 'active' };
-  if (campaign.catalogMode === 'selected_products' && campaign.selectedProductIds.length) {
-    // Campaign explicitly hand-picked products — those win over the shop.
-    filter._id = { $in: campaign.selectedProductIds };
-  } else if (campaign.shopId) {
-    // Redemption catalog mirrors the storefront: only products with an active
-    // Branded Swag design for this shop are shown.
-    const effectiveIds = [...new Set(effectiveIdsFromShop)];
-    if (!effectiveIds.length) return { products: [] };
-    filter._id = { $in: effectiveIds };
+  if (campaign.shopId) {
+    const shop = await Shop.findOne({ _id: campaign.shopId, tenantId: recipient.tenantId });
+    if (!shop) return { products: [] };
+    const products = await buildBrandedProductListings(shop, { skipTenantGuard: false });
+    return { products };
   }
-  const products = await CatalogProduct.find(filter)
+
+  const products = await CatalogProduct.find({ status: 'active' })
     .select('name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas')
     .sort({ name: 1 })
-    .lean()
-    .then((rows) =>
-      rows.map((p) => ({
-        ...p,
-        artworkUrl: artworkByProductId.get(String(p._id)) || '',
-        mockupUrl: mockupByProductId.get(String(p._id)) || '',
-        preferredColors: preferredColorsByProductId.get(String(p._id)) || [],
-      })),
-    );
+    .lean();
   return { products };
 }
 
@@ -710,19 +710,17 @@ export async function submitRedemption(
   // Baked design mockups for this shop's products, so the frozen order item
   // image is the composited mockup that production should print against, not
   // the bare mask. Store (non-kit) redemptions only.
+  let shopCollections = [];
   const mockupByProductId = new Map();
   if (!kitFulfillment && campaign.shopId) {
-    const cols = await Collection.find({
-      ...collectionsForShopFilter(campaign.shopId),
-      tenantId: recipient.tenantId,
-      status: { $ne: 'archived' },
-    })
-      .select('productRefs')
-      .lean();
-    for (const col of cols) {
-      for (const ref of col.productRefs || []) {
-        const pid = ref.catalogProductId ? String(ref.catalogProductId) : '';
-        if (pid && ref.mockupUrl && !mockupByProductId.has(pid)) mockupByProductId.set(pid, ref.mockupUrl);
+    const shop = await Shop.findOne({ _id: campaign.shopId, tenantId: recipient.tenantId });
+    if (shop) {
+      shopCollections = await loadShopCollections(shop, { skipTenantGuard: false });
+      for (const col of shopCollections) {
+        for (const ref of col.productRefs || []) {
+          const pid = ref.catalogProductId ? String(ref.catalogProductId) : '';
+          if (pid && ref.mockupUrl && !mockupByProductId.has(pid)) mockupByProductId.set(pid, ref.mockupUrl);
+        }
       }
     }
   }
@@ -731,11 +729,14 @@ export async function submitRedemption(
   // (price, cost, GST, HSN, image) frozen at order time.
   const lineItems = [];
   for (const item of items) {
-    const product = await CatalogProduct.findById(item.productId).select('+costPriceInr');
-    if (!product) throw new NotFoundError(`Product ${item.productId} not found`);
+    const listing = parseBrandedListingProductId(item.productId);
+    if (!listing) throw new ApiError(422, `Invalid product ${item.productId}`, 'INVALID_PRODUCT');
+    const product = await CatalogProduct.findById(listing.catalogProductId).select('+costPriceInr');
+    if (!product) throw new NotFoundError(`Product ${listing.catalogProductId} not found`);
     const kitRef = kitFulfillment
-      ? kitEntries.find((e) => String(e.product._id) === String(item.productId))?.ref ?? null
+      ? kitEntries.find((e) => String(e.product._id) === String(listing.catalogProductId))?.ref ?? null
       : null;
+    const listingSnap = resolveBrandedListingSnapshot(shopCollections, listing);
 
     if (kitFulfillment) {
       const options = resolveKitItemOptions(product, kitRef || {});
@@ -758,7 +759,8 @@ export async function submitRedemption(
 
     lineItems.push({
       catalogProductId: product._id,
-      name: product.name,
+      collectionId: listingSnap.collectionId || null,
+      name: listingSnap.name || product.name,
       sku: product.sku,
       variant: item.variant ?? {},
       qty: item.qty,
@@ -766,7 +768,15 @@ export async function submitRedemption(
       costPriceInr: product.costPriceInr ?? 0,
       gstRate: product.gstRate ?? 18,
       hsnCode: product.hsnCode ?? '',
-      imageUrl: mockupByProductId.get(String(product._id)) || kitProductImageUrl(product, kitRef || {}) || product.maskImageUrl || product.primaryImageUrl || product.imageUrls?.[0] || '',
+      imageUrl:
+        listingSnap.mockupUrl ||
+        mockupUrlFromCollections(shopCollections, listing.collectionId, listing.catalogProductId) ||
+        mockupByProductId.get(String(product._id)) ||
+        kitProductImageUrl(product, kitRef || {}) ||
+        product.maskImageUrl ||
+        product.primaryImageUrl ||
+        product.imageUrls?.[0] ||
+        '',
     });
   }
 
@@ -897,6 +907,13 @@ export async function listRedemptionOrders(token) {
       itemCount: o.items?.length ?? 0,
       createdAt: o.createdAt,
       items: sanitizeOrderItems(o.items),
+      shippingAddress: o.shippingAddress ?? null,
+      amountBreakdown: o.amountBreakdown ?? null,
+      statusHistory: (o.statusHistory ?? []).map((h) => ({
+        status: h.status,
+        at: h.at,
+        note: h.note ?? '',
+      })),
     })),
     creditAmount: await resolveRecipientCreditAmount(recipient, campaign),
   };

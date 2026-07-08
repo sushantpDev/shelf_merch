@@ -76,6 +76,25 @@ function transitionRedemption(recipient, toStatus) {
   if (toStatus === 'redeemed' || toStatus === 'order_created') recipient.redeemedAt = now;
 }
 
+/** Close out a points send when its credit is fully spent — only legal hops. */
+function finalizeRecipientRedemption(recipient) {
+  if (recipient.redemptionStatus === 'order_created') return;
+
+  const stepsByStatus = {
+    invited: ['opened', 'verified', 'redeemed', 'order_created'],
+    opened: ['verified', 'redeemed', 'order_created'],
+    verified: ['redeemed', 'order_created'],
+    redeemed: ['order_created'],
+  };
+  const steps = stepsByStatus[recipient.redemptionStatus];
+  if (!steps) return;
+
+  for (const step of steps) {
+    if (recipient.redemptionStatus === 'order_created') break;
+    transitionRedemption(recipient, step);
+  }
+}
+
 export async function listCampaigns({ tenantId, user }) {
   const filter = { tenantId };
   if (user.scopeType === 'entity') {
@@ -525,4 +544,4 @@ export async function campaignReport({ tenantId, campaignId, user }) {
   return { recipients };
 }
 
-export { transitionRedemption };
+export { transitionRedemption, finalizeRecipientRedemption };

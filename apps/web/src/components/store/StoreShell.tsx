@@ -11,7 +11,7 @@ import { POINT_VALUE } from "@/features/send/money";
 import { createRedemptionRazorpayOrder } from "@/services/api-bridge";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 import walletIconImg from "../../../assets/wallet-icon.svg";
-import { StoreAccountMenu, type StoreOrderSummary } from "./StoreAccountMenu";
+import { StoreAccountMenu, type StoreOrderItem, type StoreOrderSummary } from "./StoreAccountMenu";
 import { StoreEmptyState } from "./StoreEmptyState";
 import { StorePageShell } from "./StorePageShell";
 
@@ -124,16 +124,19 @@ function ColorSwatches({
   selected,
   onSelect,
   size = "md",
+  className,
 }: {
   colors: Array<{ name: string; hex: string }>;
   selected: number;
   onSelect: (index: number) => void;
   size?: "sm" | "md";
+  className?: string;
 }) {
   if (!colors.length) return null;
   const btnClass = size === "sm" ? "sw" : "pd-sw";
+  const wrapClass = size === "sm" ? "swatches" : "pd-swatches";
   return (
-    <div className={size === "sm" ? "swatches" : "pd-swatches"}>
+    <div className={className ? `${wrapClass} ${className}` : wrapClass}>
       {colors.map((c, i) => (
         <button
           key={c.name}
@@ -142,6 +145,8 @@ function ColorSwatches({
           style={{ background: c.hex }}
           onClick={() => onSelect(i)}
           title={c.name}
+          aria-label={c.name}
+          aria-pressed={i === selected}
         />
       ))}
     </div>
@@ -177,7 +182,7 @@ type AddedToBagInfo = {
 };
 
 type Mode = "preview" | "redeem";
-type Page = "home" | "products" | "product" | "cart" | "checkout" | "done" | "orders";
+type Page = "home" | "products" | "product" | "cart" | "checkout" | "done" | "orders" | "order-detail";
 
 type CartLine = {
   key: string;
@@ -288,6 +293,35 @@ function PencilIcon() {
   );
 }
 
+function ZoomIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.35-4.35M11 8v6M8 11h6" />
+    </svg>
+  );
+}
+
+function TruckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 18V6a2 2 0 00-2-2H4a2 2 0 00-2 2v11a1 1 0 001 1h2" />
+      <path d="M15 18h2a1 1 0 001-1v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.316.948V17a1 1 0 001 1h1" />
+      <circle cx="7" cy="18" r="2" />
+      <circle cx="17" cy="18" r="2" />
+    </svg>
+  );
+}
+
+function LeafIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 20A7 7 0 019.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
+      <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+    </svg>
+  );
+}
+
 function MinusIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -372,17 +406,166 @@ function ChevronDown({ className }: { className?: string }) {
   );
 }
 
-function TruckIcon() {
+function PackageIcon() {
   return (
-    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M14 18V6a2 2 0 00-2-2H4a2 2 0 00-2 2v11a1 1 0 001 1h2" />
-      <path d="M15 18h2" />
-      <path d="M19 18h2v-3.34a1 1 0 00-.76-.97L16.5 12.5" />
-      <path d="M16 18H6" />
-      <circle cx="17" cy="18" r="2" />
-      <circle cx="7" cy="18" r="2" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16.5 9.4 7.55 4.24" />
+      <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
+      <path d="M3.27 6.96 12 12.01l8.73-5.05M12 22.08V12" />
     </svg>
   );
+}
+
+function formatOrderStatus(status: string) {
+  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatOrderDate(iso?: string) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function orderStatusDisplay(order: StoreOrderSummary) {
+  const status = order.status.toLowerCase();
+  const historyDate =
+    order.statusHistory?.find((h) => h.status === order.status)?.at ||
+    order.statusHistory?.[order.statusHistory.length - 1]?.at ||
+    order.createdAt;
+  const date = formatOrderDate(historyDate);
+
+  if (status === "delivered") {
+    return { tone: "success" as const, title: `Delivered on ${date}`, message: "Your item has been delivered" };
+  }
+  if (status === "cancelled") {
+    return { tone: "danger" as const, title: `Cancelled on ${date}`, message: "Your order was cancelled" };
+  }
+  if (["shipped", "packed", "in_production", "qc_pending"].includes(status)) {
+    return { tone: "info" as const, title: "Shipped", message: "Your order is on the way" };
+  }
+  return { tone: "success" as const, title: `Order placed on ${date}`, message: "Your order has been confirmed" };
+}
+
+function orderItemImage(url?: string) {
+  return url ? resolveMediaUrl(url) : "";
+}
+
+function findStoreProductForOrderItem(products: StoreProduct[], item?: StoreOrderItem) {
+  const catalogId = item?.catalogProductId?.trim();
+  const collectionId = item?.collectionId?.trim();
+  if (collectionId && catalogId) {
+    const branded = products.find(
+      (p) =>
+        p.collectionId === collectionId &&
+        (p.catalogProductId === catalogId || p._id === `${collectionId}:${catalogId}`),
+    );
+    if (branded) return branded;
+  }
+  if (!catalogId) return undefined;
+  return products.find(
+    (p) =>
+      p.catalogProductId === catalogId ||
+      p._id === catalogId ||
+      (p._id.includes(":") && p._id.split(":").pop() === catalogId),
+  );
+}
+
+function orderItemKey(item: StoreOrderItem, idx: number) {
+  return `${item.collectionId || ""}:${item.catalogProductId || item.name}:${idx}`;
+}
+
+function orderItemTintHex(product: StoreProduct | undefined, color?: string) {
+  if (!color || !product) return undefined;
+  return resolveColorHex(color, product.variants?.find((v) => v.color === color)?.colorHex);
+}
+
+function orderVariantLines(item?: StoreOrderItem) {
+  const lines: string[] = [];
+  if (item?.variant?.color) lines.push(`Color: ${item.variant.color}`);
+  if (item?.variant?.size) lines.push(`Size: ${item.variant.size}`);
+  return lines;
+}
+
+function orderItemLinePrice(item?: StoreOrderItem) {
+  if (item?.unitPriceInr == null) return null;
+  return item.unitPriceInr * (item.qty || 1);
+}
+
+function OrderItemLine({
+  item,
+  products,
+  priceLabel,
+  layout,
+}: {
+  item: StoreOrderItem;
+  products: StoreProduct[];
+  priceLabel: (inr: number) => string;
+  layout: "row" | "detail";
+}) {
+  const variantLines = orderVariantLines(item);
+  const linePrice = orderItemLinePrice(item);
+
+  if (layout === "row") {
+    return (
+      <div className="sf-order-row-item">
+        <div className="sf-order-row-img">
+          <OrderItemThumb item={item} products={products} />
+        </div>
+        <div className="sf-order-row-main">
+          <div className="sf-order-row-title">{item.name}</div>
+          {variantLines.map((line) => (
+            <div key={line} className="sf-order-row-variant">{line}</div>
+          ))}
+        </div>
+        <div className="sf-order-row-price">
+          {linePrice != null ? priceLabel(linePrice) : "—"}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="sf-order-detail-product">
+      <div className="sf-order-detail-product-copy">
+        <h2 className="sf-order-detail-title">{item.name}</h2>
+        {variantLines.map((line) => (
+          <p key={line}>{line}</p>
+        ))}
+        <p className="sf-order-detail-price">
+          {linePrice != null ? priceLabel(linePrice) : "—"}
+          {item.qty && item.qty > 1 ? ` · Qty ${item.qty}` : ""}
+        </p>
+      </div>
+      <div className="sf-order-detail-product-img">
+        <OrderItemThumb item={item} products={products} />
+      </div>
+    </div>
+  );
+}
+
+function OrderItemThumb({
+  item,
+  products,
+  className,
+}: {
+  item?: StoreOrderItem;
+  products: StoreProduct[];
+  className?: string;
+}) {
+  const product = findStoreProductForOrderItem(products, item);
+  const tintHex = orderItemTintHex(product, item?.variant?.color);
+  const canTint = !!(product && item?.variant?.color && (product.maskImageUrl || product.artworkUrl));
+
+  if (canTint && product) {
+    return <ArtworkMockup product={product} tintHex={tintHex} className={className} />;
+  }
+
+  const img = orderItemImage(item?.imageUrl);
+  if (img) return <img src={img} alt="" className={className} />;
+  return <PackageIcon />;
 }
 
 function truncTopbarName(name: string, max = 8) {
@@ -444,6 +627,7 @@ export default function StoreShell({
   const [orders, setOrders] = useState<StoreOrderSummary[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState("");
+  const [selectedOrderNumber, setSelectedOrderNumber] = useState<string | null>(null);
   const [address, setAddress] = useState<ShippingAddress>({
     name: recipientName || "",
     phone: "",
@@ -454,7 +638,7 @@ export default function StoreShell({
     country: "IN",
   });
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [selectedCategory, setSelectedCategory] = useState<string>("All Products");
   const [scrolled, setScrolled] = useState(false);
   const [checkoutFirst, setCheckoutFirst] = useState("");
   const [checkoutLast, setCheckoutLast] = useState("");
@@ -489,12 +673,6 @@ export default function StoreShell({
   useEffect(() => {
     if (page === "orders") void refreshOrders();
   }, [page]);
-
-  useEffect(() => {
-    if (page === "cart" && cart.length === 0) {
-      setPage("products");
-    }
-  }, [page, cart.length]);
 
   useEffect(() => {
     window.scrollTo({ top: 0 });
@@ -545,6 +723,11 @@ export default function StoreShell({
     unique.sort((a, b) => a.localeCompare(b));
     return ["All Products", ...unique];
   }, [products]);
+
+  const selectedOrder = useMemo(
+    () => (selectedOrderNumber ? orders.find((o) => o.orderNumber === selectedOrderNumber) : undefined),
+    [orders, selectedOrderNumber],
+  );
 
   function inrToPoints(inr: number) {
     return Math.round(inr / POINT_VALUE);
@@ -750,10 +933,6 @@ export default function StoreShell({
   }
 
   function openCart() {
-    if (cart.length === 0) {
-      setPage("products");
-      return;
-    }
     setPage("cart");
   }
 
@@ -777,6 +956,15 @@ export default function StoreShell({
       return;
     }
     if (!onCheckout) return;
+    const missingSize = cart.find((line) => {
+      const product = products.find((p) => p._id === line.productId);
+      const sizes = distinct(product?.variants?.map((v) => v.size) ?? []);
+      return sizes.length > 1 && !line.variant?.size;
+    });
+    if (missingSize) {
+      setError(`Please select a size for ${missingSize.name}.`);
+      return;
+    }
     setPlacing(true);
     try {
       const items: CheckoutItem[] = cart.map((l) => ({ productId: l.productId, qty: l.qty, variant: l.variant }));
@@ -831,108 +1019,120 @@ export default function StoreShell({
         </div>
       )}
 
-      {/* ═══ TOP NAV ═══ */}
-      <div className={`sf-topbar${scrolled ? " scrolled" : ""}`}>
-        <div className="sf-topbar-inner sf-topbar-inner--stadium">
-          <button type="button" className="sf-shopbrand sf-shopbrand--compact" onClick={() => setPage("home")}>
-            <div className="sf-shopbrand-logo">
-              {shop.logoUrl ? (
-                <img src={shop.logoUrl} alt={shop.name} />
+      {/* ═══ TOP NAV (two-row Stadium style) ═══ */}
+      <div className={`sf-topbar sf-topbar--two-row${scrolled ? " scrolled" : ""}`}>
+        <div className="sf-topbar-row sf-topbar-row--main">
+          <div className="sf-topbar-inner sf-topbar-inner--stadium">
+            <div className="sf-topbar-left">
+              <button type="button" className="sf-shopbrand sf-shopbrand--stadium" onClick={() => setPage("home")}>
+                {shop.logoUrl ? (
+                  <img src={shop.logoUrl} alt="" className="sf-shopbrand-mark" />
+                ) : null}
+                <span className="sf-shopbrand-name">{shop.name}</span>
+              </button>
+
+              <span className="sf-topbar-vrule" aria-hidden="true" />
+
+              <div className="sf-powered-by" aria-label="Powered by ShelfMerch">
+                <span className="sf-powered-by-label">Powered by</span>
+                <img
+                  src="/images/logo/shelfmerch-logo-dark.svg"
+                  alt="ShelfMerch"
+                  className="sf-powered-by-logo"
+                />
+              </div>
+            </div>
+
+            <div className="sf-topbar-search">
+              <input
+                type="search"
+                className="sf-topbar-search-input"
+                placeholder="Search all products"
+                value={searchQuery}
+                onChange={(e) => onHeaderSearch(e.target.value)}
+                aria-label="Search all products"
+              />
+            </div>
+
+            <div className="sf-topbar-right sf-topbar-right--stadium">
+              {mode === "redeem" && balanceInr != null && (
+                <button
+                  type="button"
+                  className="topbar-wallet sf-topbar-wallet"
+                  aria-label={currency === "points" || (mode === "redeem" && currency === "inr") ? "Your points balance" : "Available balance"}
+                  onClick={() => setPage("home")}
+                >
+                  <span className="topbar-wallet-icon">
+                    <img src={walletIconImg} alt="" className="topbar-wallet-img" aria-hidden="true" />
+                  </span>
+                  <span className="topbar-wallet-copy">
+                    <span className="k">{navBalanceLabel()}</span>
+                    <span className="v">{navBalanceValue(balanceInr)}</span>
+                  </span>
+                </button>
+              )}
+
+              {mode === "redeem" && onLogout ? (
+                <StoreAccountMenu
+                  recipientName={recipientName || "Guest"}
+                  recipientEmail={recipientEmail}
+                  shopName={shop.name}
+                  initials={userInitials}
+                  truncName={displayName}
+                  balanceLabel={navBalanceLabel()}
+                  balanceValue={balanceInr != null ? navBalanceValue(balanceInr) : "—"}
+                  onOpenOrders={() => {
+                    setPage("orders");
+                    void refreshOrders();
+                  }}
+                  onLogout={onLogout}
+                />
               ) : (
-                <span>{shop.name.charAt(0).toUpperCase()}</span>
+              <button type="button" className="topbar-user sf-topbar-user" aria-label="Account">
+                <span className="topbar-user-avatar">{userInitials}</span>
+                <span className="topbar-user-copy">
+                  <span className="topbar-user-name">{displayName}</span>
+                  <span className="topbar-user-sub">{workspaceLabel}</span>
+                </span>
+                <ChevronDown className="topbar-chevron sf-topbar-user-chevron" />
+              </button>
+              )}
+
+              {mode === "redeem" && (
+                <button
+                  type="button"
+                  className="sf-topbar-cart"
+                  onClick={openCart}
+                  aria-label={cartCount > 0 ? `Cart, ${cartCount} items` : "Cart"}
+                >
+                  <ShoppingBagIcon />
+                  {cartCount > 0 ? <span className="sf-topbar-cart-badge">{cartCount}</span> : null}
+                </button>
               )}
             </div>
-            <span className="sf-shopbrand-text">
-              <span className="sf-shopbrand-name">{shop.name}</span>
-              <span className="sf-shopbrand-sub">Rewards store</span>
-            </span>
-          </button>
-
-          <div className="sf-topbar-search">
-            <input
-              type="search"
-              className="sf-topbar-search-input"
-              placeholder="Search all products"
-              value={searchQuery}
-              onChange={(e) => onHeaderSearch(e.target.value)}
-              aria-label="Search all products"
-            />
           </div>
+        </div>
 
-          <nav className="sf-nav" aria-label="Categories">
-            {storeCategories.map((c) => (
-              <button
-                key={c}
-                type="button"
-                className={`sf-nav-link${selectedCategory === c ? " active" : ""}`}
-                onClick={() => {
-                  setSelectedCategory(c);
-                  setPage("products");
-                }}
-              >
-                {c}
-              </button>
-            ))}
-          </nav>
-
-          <div className="sf-topbar-right sf-topbar-right--stadium">
-            {mode === "redeem" && balanceInr != null && (
-              <button
-                type="button"
-                className="topbar-wallet sf-topbar-wallet"
-                aria-label={currency === "points" || (mode === "redeem" && currency === "inr") ? "Your points balance" : "Available balance"}
-                onClick={() => setPage("home")}
-              >
-                <span className="topbar-wallet-icon">
-                  <img src={walletIconImg} alt="" className="topbar-wallet-img" aria-hidden="true" />
-                </span>
-                <span className="topbar-wallet-copy">
-                  <span className="k">{navBalanceLabel()}</span>
-                  <span className="v">{navBalanceValue(balanceInr)}</span>
-                </span>
-              </button>
-            )}
-
-            {mode === "redeem" && onLogout ? (
-              <StoreAccountMenu
-                recipientName={recipientName || "Guest"}
-                recipientEmail={recipientEmail}
-                shopName={shop.name}
-                initials={userInitials}
-                truncName={displayName}
-                balanceLabel={navBalanceLabel()}
-                balanceValue={balanceInr != null ? navBalanceValue(balanceInr) : "—"}
-                orders={orders}
-                ordersLoading={ordersLoading}
-                onOpenOrders={() => {
-                  setPage("orders");
-                  void refreshOrders();
-                }}
-                onLogout={onLogout}
-                onRefreshOrders={() => void refreshOrders()}
-              />
-            ) : (
-            <button type="button" className="topbar-user sf-topbar-user" aria-label="Account">
-              <span className="topbar-user-avatar">{userInitials}</span>
-              <span className="topbar-user-copy">
-                <span className="topbar-user-name">{displayName}</span>
-                <span className="topbar-user-sub">{workspaceLabel}</span>
-              </span>
-              <ChevronDown className="topbar-chevron sf-topbar-user-chevron" />
-            </button>
-            )}
-
-            {mode === "redeem" && (
-              <button
-                type="button"
-                className="sf-topbar-cart"
-                onClick={openCart}
-                aria-label={cartCount > 0 ? `Cart, ${cartCount} items` : "Cart"}
-              >
-                <ShoppingBagIcon />
-                {cartCount > 0 ? <span className="sf-topbar-cart-badge">{cartCount}</span> : null}
-              </button>
-            )}
+        <div className="sf-topbar-row sf-topbar-row--categories">
+          <div className="sf-topbar-inner sf-topbar-inner--categories">
+            <nav
+              className={`sf-nav sf-nav--stadium${storeCategories.length <= 6 ? " sf-nav--stadium-compact" : ""}`}
+              aria-label="Categories"
+            >
+              {storeCategories.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`sf-nav-link${selectedCategory === c ? " active" : ""}`}
+                  onClick={() => {
+                    setSelectedCategory(c);
+                    setPage("products");
+                  }}
+                >
+                  {c}
+                </button>
+              ))}
+            </nav>
           </div>
         </div>
       </div>
@@ -1098,6 +1298,23 @@ export default function StoreShell({
       )}
 
       {/* ────── CART ────── */}
+      {page === "cart" && cart.length === 0 && (
+        <div className="sf-content sf-bag-page sf-bag-page--empty">
+          <StoreEmptyState
+            variant="cart"
+            title="Your bag is empty"
+            description={
+              <>
+                Fill up your bag with our endless options.{" "}
+                <button type="button" className="sf-empty-state-link" onClick={() => setPage("products")}>
+                  Shop Menu
+                </button>
+              </>
+            }
+          />
+        </div>
+      )}
+
       {page === "cart" && cart.length > 0 && (
         <div className="sf-content sf-bag-page">
           <button type="button" className="sf-bag-back" onClick={() => setPage("home")}>
@@ -1578,20 +1795,14 @@ export default function StoreShell({
       {/* ────── ORDERS ────── */}
       {page === "orders" && (
         <StorePageShell
+          className="sf-orders-page"
           backLabel="← Back to store"
           onBack={() => setPage("home")}
           title="My orders"
-          subtitle={
-            recipientEmail
-              ? `${recipientEmail}${balanceInr != null ? ` · ${navBalanceValue(balanceInr)} available` : ""}`
-              : balanceInr != null
-                ? `${navBalanceValue(balanceInr)} available`
-                : undefined
-          }
         >
           {ordersLoading ? (
             <div className="sf-orders-skeleton">
-              {[1, 2].map((n) => (
+              {[1, 2, 3].map((n) => (
                 <div key={n} className="sf-order-card sf-order-card--skeleton" />
               ))}
             </div>
@@ -1620,38 +1831,54 @@ export default function StoreShell({
           ) : (
             <div className="sf-orders-list">
               {orders.map((o) => (
-                <div key={o.orderNumber} className="sf-summary-card sf-order-card">
-                  <div className="sf-order-card-head">
-                    <div>
-                      <div className="sf-order-card-num">Order #{o.orderNumber}</div>
-                      <div className="sf-order-card-date">
-                        {o.createdAt
-                          ? new Date(o.createdAt).toLocaleDateString("en-IN", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : ""}
-                      </div>
-                    </div>
-                    <span className={`sf-order-status sf-order-status--${o.status}`}>
-                      {o.status.replace(/_/g, " ")}
-                    </span>
-                  </div>
-                  <div className="sf-order-card-meta">
-                    <span>
-                      {o.itemCount ?? 0} item{(o.itemCount ?? 0) === 1 ? "" : "s"}
-                    </span>
-                    {o.total != null ? <b>{fmt(o.total)}</b> : null}
-                  </div>
-                </div>
+                <OrderRowCard
+                  key={o.orderNumber}
+                  order={o}
+                  products={products}
+                  priceLabel={fmt}
+                  onOpen={() => {
+                    setSelectedOrderNumber(o.orderNumber);
+                    setPage("order-detail");
+                  }}
+                />
               ))}
             </div>
           )}
         </StorePageShell>
       )}
 
+      {page === "order-detail" && selectedOrderNumber ? (
+        selectedOrder ? (
+          <OrderDetailView
+            order={selectedOrder}
+            products={products}
+            shopName={shop.name}
+            priceLabel={fmt}
+            onBack={() => setPage("orders")}
+          />
+        ) : (
+          <StorePageShell
+            className="sf-orders-page"
+            backLabel="← Back to orders"
+            onBack={() => setPage("orders")}
+            title="Order not found"
+          >
+            <StoreEmptyState
+              variant="orders"
+              title="Order not found"
+              description="This order could not be loaded."
+              action={
+                <button type="button" className="sf-btn-secondary" onClick={() => setPage("orders")}>
+                  Back to orders
+                </button>
+              }
+            />
+          </StorePageShell>
+        )
+      ) : null}
+
       {/* ═══ FOOTER ═══ */}
+      {page !== "orders" && page !== "order-detail" ? (
       <div className="sf-footer">
         <div className="sf-footer-inner">
           <ShelfMerchLogo />
@@ -1659,6 +1886,7 @@ export default function StoreShell({
           {mode === "preview" ? " · Recipients redeem from a private invite link." : ""}
         </div>
       </div>
+      ) : null}
     </div>
   );
 }
@@ -1684,7 +1912,7 @@ function ProductsPageWithFilters({
 }) {
   const q = searchQuery.toLowerCase();
   const filtered = products.filter((p) => {
-    const matchCat = selectedCategory === "All" || p.category === selectedCategory;
+    const matchCat = selectedCategory === "All Products" || p.category === selectedCategory;
     const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.category || "").toLowerCase().includes(q) || (p.brand || "").toLowerCase().includes(q);
     return matchCat && matchSearch;
   });
@@ -1780,108 +2008,396 @@ function detailText(value: string) {
   ));
 }
 
-type ProductDetailTab = "description" | "features" | "size";
+function SizeGuideModal({
+  open,
+  sizeGuide,
+  onClose,
+}: {
+  open: boolean;
+  sizeGuide: string;
+  onClose: () => void;
+}) {
+  const sizeRows = parseDetailRows(sizeGuide).filter(([label]) => !/^feature$/i.test(label));
 
-function ProductInfoTabs({ product }: { product: StoreProduct }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <>
+      <button type="button" className="sf-size-guide-scrim" aria-label="Close size guide" onClick={onClose} />
+      <div
+        className="sf-size-guide-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sf-size-guide-title"
+      >
+        <div className="sf-size-guide-panel">
+          <div className="sf-size-guide-head">
+            <h2 id="sf-size-guide-title" className="sf-size-guide-title">
+              Size Guide
+            </h2>
+            <button type="button" className="sf-size-guide-close" aria-label="Close" onClick={onClose}>
+              <CloseIcon />
+            </button>
+          </div>
+
+          {sizeRows.length > 0 ? (
+            <div className="sf-size-guide-table">
+              {sizeRows.map(([label, value]) => (
+                <div key={`${label}-${value}`} className="sf-size-guide-row">
+                  <div>{label}</div>
+                  <div>{value ? detailText(value) : null}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="sf-size-guide-body">{detailText(sizeGuide)}</div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ProductInfoAccordion({
+  product,
+  expanded,
+  onToggle,
+  onOpenSizeGuide,
+}: {
+  product: StoreProduct;
+  expanded: boolean;
+  onToggle: () => void;
+  onOpenSizeGuide?: () => void;
+}) {
   const description = product.description?.trim() || "";
   const keyFeatures = product.keyFeatures?.trim() || "";
   const sizeGuide = product.sizeGuide?.trim() || "";
-  const tabs = useMemo(
-    () =>
-      (
-        [
-          { id: "description" as const, label: "Description", show: !!description },
-          { id: "features" as const, label: "Key features", show: !!keyFeatures },
-          { id: "size" as const, label: "Size Guide", show: !!sizeGuide },
-        ] as const
-      ).filter((tab) => tab.show),
-    [description, keyFeatures, sizeGuide],
-  );
-  const [activeTab, setActiveTab] = useState<ProductDetailTab>("description");
-  const [descExpanded, setDescExpanded] = useState(false);
-
-  useEffect(() => {
-    setActiveTab(tabs[0]?.id ?? "description");
-    setDescExpanded(false);
-  }, [product._id, tabs]);
-
-  if (!tabs.length) return null;
-
-  const shortDescription =
-    description.length > 180 && !descExpanded ? `${description.slice(0, 180).trim()}…` : description;
   const featureRows = parseDetailRows(keyFeatures);
   const sizeRows = parseDetailRows(sizeGuide).filter(([label]) => !/^feature$/i.test(label));
-  const useTabs = tabs.length > 1;
-  const currentTab = useTabs ? activeTab : tabs[0].id;
+  const hasContent = description || featureRows.length || sizeRows.length;
+
+  if (!hasContent) return null;
 
   return (
-    <div className="sf-pdp-info-card">
-      {useTabs ? (
-        <div className="sf-pdp-tabs" role="tablist" aria-label="Product information">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={`sf-pdp-tab${currentTab === tab.id ? " sf-pdp-tab--on" : ""}`}
-              role="tab"
-              aria-selected={currentTab === tab.id}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="sf-checkout-section-head">
-          <span>Product information</span>
-        </div>
-      )}
-
-      <div
-        className={`sf-pdp-tab-panel${currentTab === "description" ? " sf-pdp-tab-panel--on" : ""}`}
-        role="tabpanel"
-        hidden={currentTab !== "description"}
+    <div className="sf-pdp-accordion">
+      <button
+        type="button"
+        className="sf-pdp-accordion-head"
+        aria-expanded={expanded}
+        onClick={onToggle}
       >
-        <p className="sf-pdp-desc">{detailText(shortDescription)}</p>
-        {description.length > 180 ? (
-          <button type="button" className="sf-pdp-see-more" onClick={() => setDescExpanded((v) => !v)}>
-            {descExpanded ? "See less" : "See more"}
-          </button>
-        ) : null}
-      </div>
+        <span>Product Information</span>
+        <span className="sf-pdp-accordion-icon" aria-hidden="true">
+          {expanded ? <MinusIcon /> : <PlusIcon />}
+        </span>
+      </button>
 
-      <div
-        className={`sf-pdp-tab-panel${currentTab === "features" ? " sf-pdp-tab-panel--on" : ""}`}
-        role="tabpanel"
-        hidden={currentTab !== "features"}
-      >
-        <div className="sf-pdp-feature-list">
-          {featureRows.map(([label, value]) => (
-            <div key={`${label}-${value}`} className="sf-pdp-feature-row">
-              <div>{label}</div>
-              <div>{value ? detailText(value) : null}</div>
+      {expanded ? (
+        <div className="sf-pdp-accordion-body">
+          {description ? (
+            <div className="sf-pdp-accordion-section">
+              <p className="sf-pdp-desc">{detailText(description)}</p>
             </div>
-          ))}
-        </div>
-      </div>
+          ) : null}
 
-      <div
-        className={`sf-pdp-tab-panel${currentTab === "size" ? " sf-pdp-tab-panel--on" : ""}`}
-        role="tabpanel"
-        hidden={currentTab !== "size"}
+          {featureRows.length > 0 ? (
+            <div className="sf-pdp-accordion-section">
+              <div className="sf-pdp-accordion-subhead">Key features</div>
+              <div className="sf-pdp-feature-list">
+                {featureRows.map(([label, value]) => (
+                  <div key={`${label}-${value}`} className="sf-pdp-feature-row">
+                    <div>{label}</div>
+                    <div>{value ? detailText(value) : null}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {sizeRows.length > 0 ? (
+            <div className="sf-pdp-accordion-section">
+              <div className="sf-pdp-accordion-subhead-row">
+                <div className="sf-pdp-accordion-subhead">Size guide</div>
+                {onOpenSizeGuide ? (
+                  <button type="button" className="sf-pdp-size-guide" onClick={onOpenSizeGuide}>
+                    View chart
+                  </button>
+                ) : null}
+              </div>
+              <div className="sf-pdp-size-table">
+                {sizeRows.map(([label, value]) => (
+                  <div key={`${label}-${value}`} className="sf-pdp-size-row">
+                    <div>{label}</div>
+                    <div>{value ? detailText(value) : null}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PdpSizeSelect({
+  value,
+  sizes,
+  onChange,
+}: {
+  value?: string;
+  sizes: string[];
+  onChange: (size: string | undefined) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [value]);
+
+  const showPlaceholder = !value;
+
+  return (
+    <div className="sf-pdp-size-select" ref={wrapRef}>
+      <button
+        type="button"
+        className={`sf-pdp-size-trigger${open ? " sf-pdp-size-trigger--open" : ""}${showPlaceholder ? " sf-pdp-size-trigger--placeholder" : ""}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
       >
-        <div className="sf-pdp-size-table">
-          <div className="sf-pdp-size-head">
-            <div>Feature</div>
-            <div>Details</div>
+        <span>{value || "Select"}</span>
+        <ChevronDown className="sf-pdp-size-chevron" />
+      </button>
+
+      {open ? (
+        <ul className="sf-pdp-size-menu" role="listbox" aria-label="Size">
+          {sizes.length > 1 ? (
+            <li>
+              <button
+                type="button"
+                role="option"
+                aria-selected={!value}
+                className={`sf-pdp-size-option${!value ? " sf-pdp-size-option--on" : ""}`}
+                onClick={() => onChange(undefined)}
+              >
+                Select
+              </button>
+            </li>
+          ) : null}
+          {sizes.map((s) => (
+            <li key={s}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={value === s}
+                className={`sf-pdp-size-option${value === s ? " sf-pdp-size-option--on" : ""}`}
+                onClick={() => onChange(s)}
+              >
+                {s}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function OrderRowCard({
+  order,
+  products,
+  priceLabel,
+  onOpen,
+}: {
+  order: StoreOrderSummary;
+  products: StoreProduct[];
+  priceLabel: (inr: number) => string;
+  onOpen: () => void;
+}) {
+  const items = order.items ?? [];
+  const status = orderStatusDisplay(order);
+
+  return (
+    <button type="button" className="sf-order-row" onClick={onOpen}>
+      <div className="sf-order-row-items">
+        {items.length > 0 ? (
+          items.map((item, idx) => (
+            <OrderItemLine
+              key={orderItemKey(item, idx)}
+              item={item}
+              products={products}
+              priceLabel={priceLabel}
+              layout="row"
+            />
+          ))
+        ) : (
+          <div className="sf-order-row-item sf-order-row-item--fallback">
+            <div className="sf-order-row-main">
+              <div className="sf-order-row-title">Order #{order.orderNumber}</div>
+            </div>
+            <div className="sf-order-row-price">
+              {order.total != null ? priceLabel(order.total) : "—"}
+            </div>
           </div>
-          {sizeRows.map(([label, value]) => (
-            <div key={`${label}-${value}`} className="sf-pdp-size-row">
-              <div>{label}</div>
-              <div>{value ? detailText(value) : null}</div>
-            </div>
-          ))}
+        )}
+      </div>
+      <div className={`sf-order-row-status sf-order-row-status--${status.tone}`}>
+        <div className="sf-order-row-status-head">
+          <span className="sf-order-row-dot" aria-hidden="true" />
+          <span className="sf-order-row-status-title">{status.title}</span>
         </div>
+        <div className="sf-order-row-status-msg">{status.message}</div>
+      </div>
+    </button>
+  );
+}
+
+function OrderDetailView({
+  order,
+  products,
+  shopName,
+  priceLabel,
+  onBack,
+}: {
+  order: StoreOrderSummary;
+  products: StoreProduct[];
+  shopName: string;
+  priceLabel: (inr: number) => string;
+  onBack: () => void;
+}) {
+  const items = order.items ?? [];
+  const addr = order.shippingAddress;
+  const breakdown = order.amountBreakdown;
+  const timeline = (order.statusHistory ?? []).filter((h) => h.status && h.at);
+
+  return (
+    <div className="sf-order-detail-page">
+      <button type="button" className="sf-page-back" onClick={onBack}>
+        ← Back to orders
+      </button>
+
+      <div className="sf-order-detail-layout">
+        <div className="sf-order-detail-main">
+          <div className="sf-order-detail-card">
+            <p className="sf-order-detail-order-meta">
+              {items.length > 1 ? `${items.length} items` : "1 item"}
+              <span aria-hidden="true"> · </span>
+              Seller: {shopName}
+            </p>
+
+            <div className="sf-order-detail-products">
+              {items.length > 0 ? (
+                items.map((item, idx) => (
+                  <OrderItemLine
+                    key={orderItemKey(item, idx)}
+                    item={item}
+                    products={products}
+                    priceLabel={priceLabel}
+                    layout="detail"
+                  />
+                ))
+              ) : (
+                <p className="sf-order-detail-empty-items">No item details available.</p>
+              )}
+            </div>
+
+            {timeline.length > 0 ? (
+              <div className="sf-order-detail-timeline">
+                {timeline.map((step, i) => (
+                  <div key={`${step.status}-${step.at}`} className="sf-order-detail-step">
+                    <div className={`sf-order-detail-step-dot${i < timeline.length - 1 ? "" : " sf-order-detail-step-dot--on"}`} />
+                    <div className="sf-order-detail-step-copy">
+                      <div className="sf-order-detail-step-title">{formatOrderStatus(step.status)}</div>
+                      <div className="sf-order-detail-step-date">{formatOrderDate(step.at)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="sf-order-detail-timeline">
+                <div className="sf-order-detail-step">
+                  <div className="sf-order-detail-step-dot sf-order-detail-step-dot--on" />
+                  <div className="sf-order-detail-step-copy">
+                    <div className="sf-order-detail-step-title">{formatOrderStatus(order.status)}</div>
+                    <div className="sf-order-detail-step-date">{formatOrderDate(order.createdAt)}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="sf-order-detail-id">
+            Order #{order.orderNumber}
+          </div>
+        </div>
+
+        <aside className="sf-order-detail-side">
+          {addr ? (
+            <div className="sf-order-detail-card">
+              <h2 className="sf-order-detail-card-title">Delivery details</h2>
+              <div className="sf-order-detail-delivery">
+                <p>
+                  {[addr.line1, addr.line2, addr.city, addr.state, addr.pincode].filter(Boolean).join(", ")}
+                </p>
+                {(addr.name || addr.phone) && (
+                  <p className="sf-order-detail-contact">
+                    {[addr.name, addr.phone].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="sf-order-detail-card">
+            <h2 className="sf-order-detail-card-title">Price details</h2>
+            <div className="sf-order-detail-prices">
+              {breakdown?.subtotal != null ? (
+                <div className="sf-order-detail-price-row">
+                  <span>Subtotal</span>
+                  <span>{priceLabel(breakdown.subtotal)}</span>
+                </div>
+              ) : null}
+              {breakdown?.serviceFee != null && breakdown.serviceFee > 0 ? (
+                <div className="sf-order-detail-price-row">
+                  <span>Service fee</span>
+                  <span>{priceLabel(breakdown.serviceFee)}</span>
+                </div>
+              ) : null}
+              {breakdown?.gst != null && breakdown.gst > 0 ? (
+                <div className="sf-order-detail-price-row">
+                  <span>GST</span>
+                  <span>{priceLabel(breakdown.gst)}</span>
+                </div>
+              ) : null}
+              <div className="sf-order-detail-price-row sf-order-detail-price-row--total">
+                <span>Total amount</span>
+                <b>{order.total != null ? priceLabel(order.total) : "—"}</b>
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );
@@ -1898,33 +2414,42 @@ function ProductDetail({ product, mode, priceLabel, onBack, onAdd }: {
   const sizes = useMemo(() => distinct(variants.map((v) => v.size)), [variants]);
   const colorOptions = useMemo(() => productColorOptions(product), [product]);
   const [selColor, setSelColor] = useState(() => primaryColorIndex(colorOptions));
-  const [size, setSize] = useState<string | undefined>(() => sizes[0]);
+  const [size, setSize] = useState<string | undefined>(() => (sizes.length === 1 ? sizes[0] : undefined));
   const [qty, setQty] = useState(1);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
   const selectedColor = colorOptions[selColor];
-  const lineTotal = product.basePriceInr * qty;
+  const hasProductInfo = !!(product.description?.trim() || product.keyFeatures?.trim() || product.sizeGuide?.trim());
+  const sizeRequired = sizes.length > 1;
+  const canAdd = !sizeRequired || !!size;
 
   useEffect(() => {
     setSelColor(primaryColorIndex(colorOptions));
-    setSize(sizes[0]);
+    setSize(sizes.length === 1 ? sizes[0] : undefined);
     setQty(1);
+    setInfoOpen(false);
+    setSizeGuideOpen(false);
   }, [product._id]);
+
+  const openSizeGuide = () => setSizeGuideOpen(true);
 
   return (
     <>
-      <button type="button" className="sf-bag-back" onClick={onBack}>
+      <button type="button" className="sf-pdp-back" onClick={onBack}>
         ← BACK TO ALL PRODUCTS
       </button>
 
-      <div className="sf-pdp-hero">
+      <div className="sf-pdp-layout">
         <div className="sf-pdp-gallery">
-          <div className="sf-pdp-media-card">
-            <div className="sf-pdp-media">
-              <ArtworkMockup
-                product={product}
-                tintHex={selectedColor?.hex}
-                className="sf-pdp-thumb"
-              />
-            </div>
+          <div className="sf-pdp-media">
+            <ArtworkMockup
+              product={product}
+              tintHex={selectedColor?.hex}
+              className="sf-pdp-main-image"
+            />
+            <button type="button" className="sf-pdp-zoom" aria-label="Zoom image">
+              <ZoomIcon />
+            </button>
           </div>
         </div>
 
@@ -1933,75 +2458,53 @@ function ProductDetail({ product, mode, priceLabel, onBack, onAdd }: {
             <div className="sf-pdp-brand">{product.brand.toUpperCase()}</div>
           ) : null}
           <h1 className="sf-pdp-title">{product.name}</h1>
-          <p className="sf-pdp-price-line">
-            <b>{priceLabel(product.basePriceInr)}</b> per unit
-            <span className="sf-pdp-price-sep" aria-hidden="true">
-              |
-            </span>
-            <b>{priceLabel(lineTotal)}</b> total
-          </p>
+          <p className="sf-pdp-price">{priceLabel(product.basePriceInr)}</p>
 
           {colorOptions.length > 0 ? (
             <div className="sf-pdp-field">
-              <span className="sf-pdp-field-label">Colour</span>
-              <div className="sf-pdp-option-grid">
-                {colorOptions.map((c, i) => (
-                  <button
-                    key={c.name}
-                    type="button"
-                    onClick={() => setSelColor(i)}
-                    className={`sf-pdp-option${selColor === i ? " sf-pdp-option--on" : ""}`}
-                  >
-                    <span className="sf-pdp-option-swatch" style={{ background: c.hex }} />
-                    {c.name}
-                  </button>
-                ))}
+              <div className="sf-pdp-color-label">
+                Color: <strong>{selectedColor?.name || "—"}</strong>
               </div>
+              <ColorSwatches
+                colors={colorOptions}
+                selected={selColor}
+                onSelect={setSelColor}
+                className="sf-pdp-color-swatches"
+              />
             </div>
           ) : null}
 
           {sizes.length > 0 ? (
             <div className="sf-pdp-field">
               <div className="sf-pdp-field-head">
-                <span className="sf-pdp-field-label">Size</span>
+                <span className="sf-pdp-size-label">Size</span>
                 {product.sizeGuide ? (
-                  <button type="button" className="sf-pdp-size-guide">
-                    Size guide
+                  <button type="button" className="sf-pdp-size-guide" onClick={openSizeGuide}>
+                    Size Guide
                   </button>
                 ) : null}
               </div>
-              <select
-                className="sf-pdp-select"
-                value={size ?? ""}
-                onChange={(e) => setSize(e.target.value || undefined)}
-              >
-                {sizes.length > 1 ? <option value="">Select</option> : null}
-                {sizes.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+              <PdpSizeSelect value={size} sizes={sizes} onChange={setSize} />
             </div>
           ) : null}
 
           {mode === "redeem" ? (
             <div className="sf-pdp-purchase">
               <div className="sf-pdp-purchase-qty">
-                <span className="sf-pdp-field-label">Quantity</span>
-                <div className="sf-bag-qty">
+                <span className="sf-pdp-qty-label">Quantity</span>
+                <div className="sf-pdp-qty">
                   <button
                     type="button"
-                    className="sf-bag-qty-btn"
+                    className="sf-pdp-qty-btn"
                     aria-label="Decrease quantity"
                     onClick={() => setQty((n) => Math.max(1, n - 1))}
                   >
                     <MinusIcon />
                   </button>
-                  <span className="sf-bag-qty-val">{qty}</span>
+                  <span className="sf-pdp-qty-val">{qty}</span>
                   <button
                     type="button"
-                    className="sf-bag-qty-btn"
+                    className="sf-pdp-qty-btn"
                     aria-label="Increase quantity"
                     onClick={() => setQty((n) => n + 1)}
                   >
@@ -2012,22 +2515,46 @@ function ProductDetail({ product, mode, priceLabel, onBack, onAdd }: {
               <button
                 type="button"
                 className="sf-pdp-add-btn"
+                disabled={!canAdd}
+                title={!canAdd ? "Select a size" : undefined}
                 onClick={() => onAdd({ size, color: selectedColor?.name }, qty)}
               >
                 Add to bag
               </button>
             </div>
           ) : (
-            <p className="sf-bag-preview-note">Open your invite link to redeem this item.</p>
+            <p className="sf-pdp-preview-note">Open your invite link to redeem this item.</p>
           )}
+
+          {hasProductInfo ? (
+            <ProductInfoAccordion
+              product={product}
+              expanded={infoOpen}
+              onToggle={() => setInfoOpen((v) => !v)}
+              onOpenSizeGuide={product.sizeGuide ? openSizeGuide : undefined}
+            />
+          ) : null}
+
+          {product.sizeGuide ? (
+            <SizeGuideModal
+              open={sizeGuideOpen}
+              sizeGuide={product.sizeGuide}
+              onClose={() => setSizeGuideOpen(false)}
+            />
+          ) : null}
+
+          <div className="sf-pdp-footnotes">
+            <div className="sf-pdp-footnote">
+              <TruckIcon />
+              <span>One print location, basic decoration, and shipping included.</span>
+            </div>
+            <div className="sf-pdp-footnote sf-pdp-footnote--green">
+              <LeafIcon />
+              <span>Sustainable printing</span>
+            </div>
+          </div>
         </div>
       </div>
-
-      {product.description || product.keyFeatures || product.sizeGuide ? (
-        <div className="sf-pdp-details">
-          <ProductInfoTabs product={product} />
-        </div>
-      ) : null}
     </>
   );
 }

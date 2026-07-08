@@ -24,7 +24,16 @@ export const ORDER_STATUSES = [
 export function sanitizeOrderItems(items = []) {
   return items.map((item) => {
     const { costPriceInr, ...safe } = item.toObject ? item.toObject() : item;
-    return safe;
+    const variant = safe.variant ?? {};
+    return {
+      ...safe,
+      catalogProductId: safe.catalogProductId ? String(safe.catalogProductId) : undefined,
+      collectionId: safe.collectionId ? String(safe.collectionId) : undefined,
+      variant: {
+        size: variant.size ? String(variant.size) : undefined,
+        color: variant.color ? String(variant.color) : undefined,
+      },
+    };
   });
 }
 
@@ -38,6 +47,7 @@ const orderSchema = new mongoose.Schema(
     items: [
       {
         catalogProductId: { type: mongoose.Schema.Types.ObjectId, ref: 'CatalogProduct' },
+        collectionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collection', default: null },
         name: String,
         sku: { type: String, default: '' },
         variant: { size: String, color: String },

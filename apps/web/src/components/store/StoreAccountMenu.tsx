@@ -19,12 +19,40 @@ function TopbarChevron({ open }: { open: boolean }) {
   );
 }
 
+export type StoreOrderItem = {
+  name: string;
+  qty: number;
+  unitPriceInr?: number;
+  imageUrl?: string;
+  catalogProductId?: string;
+  collectionId?: string;
+  variant?: { size?: string; color?: string };
+};
+
 export type StoreOrderSummary = {
   orderNumber: string;
   status: string;
   total?: number;
   itemCount?: number;
   createdAt?: string;
+  items?: StoreOrderItem[];
+  shippingAddress?: {
+    name?: string;
+    phone?: string;
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    country?: string;
+  } | null;
+  amountBreakdown?: {
+    subtotal?: number;
+    serviceFee?: number;
+    gst?: number;
+    total?: number;
+  } | null;
+  statusHistory?: Array<{ status: string; at?: string; note?: string }>;
 };
 
 type StoreAccountMenuProps = {
@@ -35,11 +63,8 @@ type StoreAccountMenuProps = {
   truncName: string;
   balanceLabel: string;
   balanceValue: string;
-  orders: StoreOrderSummary[];
-  ordersLoading?: boolean;
   onOpenOrders: () => void;
   onLogout: () => void;
-  onRefreshOrders?: () => void;
 };
 
 export function StoreAccountMenu({
@@ -50,23 +75,19 @@ export function StoreAccountMenu({
   truncName,
   balanceLabel,
   balanceValue,
-  orders,
-  ordersLoading,
   onOpenOrders,
   onLogout,
-  onRefreshOrders,
 }: StoreAccountMenuProps) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    onRefreshOrders?.();
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onRefreshOrders]);
+  }, [open]);
 
   function close() {
     setOpen(false);
@@ -125,24 +146,8 @@ export function StoreAccountMenu({
               >
                 <Package size={16} strokeWidth={2} aria-hidden="true" />
                 <span>My orders</span>
-                {orders.length > 0 ? (
-                  <span className="sf-account-menu-badge">{orders.length}</span>
-                ) : null}
               </button>
             </div>
-
-            {ordersLoading ? (
-              <div className="sf-account-orders-preview mut3">Loading orders…</div>
-            ) : orders.length > 0 ? (
-              <div className="sf-account-orders-preview">
-                {orders.slice(0, 2).map((o) => (
-                  <div key={o.orderNumber} className="sf-account-order-row">
-                    <span className="sf-account-order-num">#{o.orderNumber}</span>
-                    <span className="sf-account-order-status">{formatOrderStatus(o.status)}</span>
-                  </div>
-                ))}
-              </div>
-            ) : null}
 
             <div className="user-menu-foot">
               <button
@@ -162,8 +167,4 @@ export function StoreAccountMenu({
       ) : null}
     </div>
   );
-}
-
-function formatOrderStatus(status: string) {
-  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }

@@ -1,6 +1,20 @@
 import type { ReactNode } from "react";
+import emptyBagImg from "../../../assets/empty-bag.svg";
 
 function EmptyBagIllustration() {
+  return (
+    <img
+      src={emptyBagImg}
+      alt=""
+      className="sf-empty-illus sf-empty-illus--bag"
+      width={119}
+      height={104}
+      aria-hidden="true"
+    />
+  );
+}
+
+function EmptySearchIllustration() {
   return (
     <svg
       className="sf-empty-illus"
@@ -23,7 +37,6 @@ function EmptyBagIllustration() {
     </svg>
   );
 }
-
 function EmptyOrdersIllustration() {
   return (
     <svg
@@ -59,14 +72,20 @@ export function StoreEmptyState({
 }: {
   variant: Variant;
   title: string;
-  description: string;
+  description: ReactNode;
   action?: ReactNode;
 }) {
   const illus =
-    variant === "orders" ? <EmptyOrdersIllustration /> : <EmptyBagIllustration />;
+    variant === "orders" ? (
+      <EmptyOrdersIllustration />
+    ) : variant === "cart" ? (
+      <EmptyBagIllustration />
+    ) : (
+      <EmptySearchIllustration />
+    );
 
   return (
-    <div className="sf-empty-state">
+    <div className={`sf-empty-state${variant === "cart" ? " sf-empty-state--cart" : ""}`}>
       {illus}
       <h2 className="sf-empty-state-title">{title}</h2>
       <p className="sf-empty-state-desc">{description}</p>

@@ -7,15 +7,17 @@ export function StorePageShell({
   title,
   subtitle,
   children,
+  className,
 }: {
   backLabel: string;
   onBack: () => void;
   title: string;
   subtitle?: string;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="sf-page-shell">
+    <div className={className ? `sf-page-shell ${className}` : "sf-page-shell"}>
       <button type="button" className="sf-page-back" onClick={onBack}>
         {backLabel}
       </button>

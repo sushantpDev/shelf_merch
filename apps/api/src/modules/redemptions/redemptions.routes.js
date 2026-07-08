@@ -24,6 +24,9 @@ async function attachRedemptionScope(req, _res, next) {
 const router = Router();
 
 const tokenParams = z.object({ token: z.string().min(16) });
+const brandedListingProductId = z
+  .string()
+  .regex(/^(?:[a-f\d]{24}|[a-f\d]{24}:[a-f\d]{24})$/i, 'Invalid id');
 
 router.get(
   '/:token',
@@ -112,7 +115,7 @@ router.post(
       items: z
         .array(
           z.object({
-            productId: objectId,
+            productId: brandedListingProductId,
             variant: z.object({ size: z.string().optional(), color: z.string().optional() }).optional(),
             qty: z.number().int().positive(),
           }),
