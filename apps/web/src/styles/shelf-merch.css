@@ -1906,6 +1906,45 @@ button.thumb{font:inherit;color:inherit}
   gap:16px;
   width:100%;
 }
+.shop-collection-rows{
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+.shop-collection-row{
+  padding:18px 20px 20px;
+}
+.shop-collection-row-head{
+  margin-bottom:14px;
+}
+.shop-collection-product{
+  display:block;
+  position:relative;
+  aspect-ratio:1;
+  border:1px solid var(--line-2);
+  border-radius:var(--r);
+  overflow:hidden;
+  background:var(--surface-2);
+  text-decoration:none;
+  color:inherit;
+  transition:border-color .16s,box-shadow .16s,transform .16s;
+}
+.shop-collection-product:hover{
+  border-color:#d7ddd8;
+  box-shadow:var(--sh-2);
+  transform:translateY(-2px);
+}
+.shop-collection-product > .img{
+  width:100%;
+  height:100%;
+  aspect-ratio:unset;
+}
+.shop-collection-product > .img img:not(.art-overlay-img){
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  display:block;
+}
 .shop-collection-card{
   display:flex;flex-direction:column;width:100%;
   border:1px solid var(--line);border-radius:var(--r);background:#fff;overflow:hidden;

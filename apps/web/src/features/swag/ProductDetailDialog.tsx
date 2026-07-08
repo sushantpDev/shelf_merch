@@ -64,6 +64,7 @@ function Body({
   const { collection, product } = target;
   const title = product.brand ? `${product.brand} ${product.nm}` : product.nm;
   const names = collectionProductColorNames(collection, product);
+  const tintHex = names[sel] ? productColorHex(product, names[sel]) : undefined;
 
   return (
     <div className="modal-pad">
@@ -82,7 +83,11 @@ function Body({
             overflow: "hidden",
           }}
         >
-          <DesignedProductThumb product={product} artworkUrl={collection.artworkUrl} />
+          <DesignedProductThumb
+            product={product}
+            artworkUrl={collection.artworkUrl}
+            tintHex={tintHex}
+          />
         </div>
 
         <div>

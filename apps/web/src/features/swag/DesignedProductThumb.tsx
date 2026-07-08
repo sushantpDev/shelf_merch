@@ -105,11 +105,14 @@ function MaskArtworkComposite({
 export function DesignedProductThumb({
   product,
   artworkUrl,
+  tintHex = DEFAULT_MOCKUP_TINT_HEX,
   className,
   style,
 }: {
   product: UiProduct;
   artworkUrl?: string;
+  /** Garment colour for mask-based previews (store colour picker). */
+  tintHex?: string;
   className?: string;
   style?: CSSProperties;
 }) {
@@ -118,7 +121,6 @@ export function DesignedProductThumb({
   const printAreaBase = resolveMediaUrl(pickPrintArea(product)?.mockupImageUrl);
   const stageBase = resolveMediaUrl(product.baseImageUrl);
   const resolvedMask = resolveMediaUrl(product.maskImageUrl);
-  const tintHex = DEFAULT_MOCKUP_TINT_HEX;
   const maskStage = resolvedMask || stageBase || printAreaBase || resolveMediaUrl(designImgUrl(product));
   const base =
     maskStage ||

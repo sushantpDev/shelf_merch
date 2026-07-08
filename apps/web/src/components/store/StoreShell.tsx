@@ -89,7 +89,17 @@ function productColorOptions(p: StoreProduct): Array<{ name: string; hex: string
   );
 }
 
-function ArtworkMockup({ product, className, style }: { product: StoreProduct; className?: string; style?: CSSProperties }) {
+function ArtworkMockup({
+  product,
+  tintHex,
+  className,
+  style,
+}: {
+  product: StoreProduct;
+  tintHex?: string;
+  className?: string;
+  style?: CSSProperties;
+}) {
   const ui = storeProductAsUi(product);
   if (!ui.imgUrl && !ui.mockupUrl && !product.artworkUrl) {
     return (
@@ -102,6 +112,7 @@ function ArtworkMockup({ product, className, style }: { product: StoreProduct; c
     <DesignedProductThumb
       product={ui}
       artworkUrl={product.artworkUrl}
+      tintHex={tintHex}
       className={className}
       style={style}
     />
@@ -1856,7 +1867,6 @@ function ProductDetail({ product, mode, priceLabel, onBack, onAdd }: {
   const [size, setSize] = useState<string | undefined>(() => sizes[0]);
   const [qty, setQty] = useState(1);
   const selectedColor = colorOptions[selColor];
-  const previewBg = selectedColor?.hex || "#ffffff";
   const lineTotal = product.basePriceInr * qty;
 
   useEffect(() => {
@@ -1874,8 +1884,12 @@ function ProductDetail({ product, mode, priceLabel, onBack, onAdd }: {
       <div className="sf-pdp-hero">
         <div className="sf-pdp-gallery">
           <div className="sf-pdp-media-card">
-            <div className="sf-pdp-media" style={{ background: previewBg }}>
-              <ArtworkMockup product={product} className="sf-pdp-thumb" />
+            <div className="sf-pdp-media">
+              <ArtworkMockup
+                product={product}
+                tintHex={selectedColor?.hex}
+                className="sf-pdp-thumb"
+              />
             </div>
           </div>
         </div>

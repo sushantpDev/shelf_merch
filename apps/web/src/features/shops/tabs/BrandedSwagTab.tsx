@@ -56,26 +56,26 @@ export function BrandedSwagTab({
           (active.length === 0 ? (
             <EmptyDesigner canDesignSwag={canDesignSwag} onStartDesigning={onStartDesigning} />
           ) : (
-            <div className="card" style={{ padding: 22 }}>
-              <div
-                className="row"
-                style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}
-              >
-                <h3 style={{ fontSize: 17 }}>Your branded swag designs</h3>
-                {canDesignSwag ? (
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={onStartDesigning}>
-                    <Plus size={15} /> Start designing
-                  </button>
-                ) : null}
+            <div className="shop-collection-rows">
+              <div style={{ marginBottom: 4 }}>
+                <div
+                  className="row"
+                  style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}
+                >
+                  <h3 style={{ fontSize: 17 }}>Your branded swag designs</h3>
+                  {canDesignSwag ? (
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={onStartDesigning}>
+                      <Plus size={15} /> Start designing
+                    </button>
+                  ) : null}
+                </div>
+                <p className="muted" style={{ fontSize: 13 }}>
+                  Add more logos to auto-generate additional collections for free.
+                </p>
               </div>
-              <p className="muted" style={{ fontSize: 13, marginBottom: 18 }}>
-                Add more logos to auto-generate additional collections for free.
-              </p>
-              <div className="grid shop-collection-grid">
-                {active.map((col) => (
-                  <CollectionCard key={col.id} shopId={shop.id} collection={col} />
-                ))}
-              </div>
+              {active.map((col) => (
+                <CollectionRow key={col.id} shopId={shop.id} collection={col} />
+              ))}
             </div>
           ))}
 
@@ -125,12 +125,10 @@ export function BrandedSwagTab({
               <p>Designs you archive will be stored here and can be restored any time.</p>
             </div>
           ) : (
-            <div className="card" style={{ padding: 22 }}>
-              <div className="grid shop-collection-grid">
-                {archived.map((col) => (
-                  <CollectionCard key={col.id} shopId={shop.id} collection={col} />
-                ))}
-              </div>
+            <div className="shop-collection-rows">
+              {archived.map((col) => (
+                <CollectionRow key={col.id} shopId={shop.id} collection={col} />
+              ))}
             </div>
           ))}
       </div>
@@ -170,75 +168,36 @@ export function BrandedSwagTab({
   }
 }
 
-function CollectionCard({ shopId, collection }: { shopId: string; collection: UiCollection }) {
-  const products = collection.products.slice(0, 4);
-  const cols = products.length <= 1 ? 1 : 2;
-
-  if (products.length === 0) {
-    return (
-      <article className="shop-collection-card">
-        <div className="shop-collection-visual shop-collection-visual--empty" />
-        <div className="shop-collection-meta">
-          <div className="shop-collection-name">{collection.name}</div>
-          <div className="shop-collection-sub muted">No products yet</div>
-        </div>
-      </article>
-    );
-  }
-
-  if (products.length === 1) {
-    const product = products[0];
-    const label = product.brand ? `${product.brand} ${product.nm}` : product.nm;
-    return (
-      <Link
-        to={`/app/shops/${shopId}/designs/${collection.id}?p=0`}
-        className="shop-collection-card"
-        aria-label={`View ${label}`}
-      >
-        <div
-          className="shop-collection-visual"
-          style={{ gridTemplateColumns: "repeat(1, minmax(0, 1fr))" }}
-        >
-          <div className="shop-collection-cell">
-            <DesignedProductThumb product={product} artworkUrl={collection.artworkUrl} />
-          </div>
-        </div>
-        <div className="shop-collection-meta">
-          <div className="shop-collection-name">{collection.name}</div>
-          <div className="shop-collection-sub muted">
-            {collection.code} · {collection.products.length} item
-          </div>
-        </div>
-      </Link>
-    );
-  }
+function CollectionRow({ shopId, collection }: { shopId: string; collection: UiCollection }) {
+  const products = collection.products;
+  const countLabel =
+    products.length === 0
+      ? "No products yet"
+      : `${collection.code} · ${products.length} ${products.length === 1 ? "item" : "items"}`;
 
   return (
-    <article className="shop-collection-card shop-collection-card--multi">
-      <div
-        className="shop-collection-visual"
-        style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
-      >
-        {products.map((p, i) => {
-          const label = p.brand ? `${p.brand} ${p.nm}` : p.nm;
-          return (
-            <Link
-              key={`${p.id ?? p.nm}-${i}`}
-              to={`/app/shops/${shopId}/designs/${collection.id}?p=${i}`}
-              className="shop-collection-cell"
-              aria-label={`View ${label}`}
-            >
-              <DesignedProductThumb product={p} artworkUrl={collection.artworkUrl} />
-            </Link>
-          );
-        })}
-      </div>
-      <div className="shop-collection-meta">
+    <article className="card shop-collection-row">
+      <header className="shop-collection-row-head">
         <div className="shop-collection-name">{collection.name}</div>
-        <div className="shop-collection-sub muted">
-          {collection.code} · {collection.products.length} items
+        <div className="shop-collection-sub muted">{countLabel}</div>
+      </header>
+      {products.length > 0 ? (
+        <div className="swag-designs-grid swag-designs-grid--in-collection">
+          {products.map((p, i) => {
+            const label = p.brand ? `${p.brand} ${p.nm}` : p.nm;
+            return (
+              <Link
+                key={`${p.id ?? p.nm}-${i}`}
+                to={`/app/shops/${shopId}/designs/${collection.id}?p=${i}`}
+                className="shop-collection-product"
+                aria-label={`View ${label}`}
+              >
+                <DesignedProductThumb product={p} artworkUrl={collection.artworkUrl} />
+              </Link>
+            );
+          })}
         </div>
-      </div>
+      ) : null}
     </article>
   );
 }

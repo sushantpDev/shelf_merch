@@ -161,7 +161,7 @@ export function SwagDesignDetail({
         <div className="pd-gallery">
           <div className="pd-img" style={{ background: "#f4f6f4" }}>
             <div className="pd-img-inner pd-img-mockup">
-              <DesignedProductThumb product={product} artworkUrl={collection.artworkUrl} />
+              <DesignedProductThumb product={product} artworkUrl={collection.artworkUrl} tintHex={productColorHex(product, colorNames[selColor])} />
             </div>
             <button type="button" className="pd-zoom" aria-label="Zoom preview" tabIndex={-1}>
               <ZoomIn size={17} />
