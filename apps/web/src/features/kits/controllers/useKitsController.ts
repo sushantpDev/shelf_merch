@@ -12,8 +12,12 @@ export type KitsVm = {
   errorMessage: string | null;
   kits: UiKit[];
   stats: KitStats;
+  /** Total workspace contacts that can receive kits. */
+  contactCount: number;
   canCreateKits: boolean;
   canSendKits: boolean;
+  /** True when the workspace has not created any kits yet. */
+  isEmpty: boolean;
   showAll: boolean;
   previewLimit: number;
   hasMoreKits: boolean;
@@ -27,6 +31,7 @@ export function useKitsController(): KitsVm {
   const [showAll, setShowAll] = useState(false);
 
   const kits = workspace?.kits ?? [];
+  const contactCount = workspace?.contacts?.length ?? 0;
   const stats: KitStats = {
     total: Math.max(kits.length, 24),
     live: Math.max(kits.filter((k) => k.status === "live").length, 16),
@@ -42,9 +47,11 @@ export function useKitsController(): KitsVm {
           : "Could not load kits"
         : null,
     kits,
+    contactCount,
     stats,
     canCreateKits: canWrite("kits"),
     canSendKits: canOperateCampaigns(),
+    isEmpty: kits.length === 0,
     showAll,
     previewLimit: PREVIEW_LIMIT,
     hasMoreKits: kits.length > PREVIEW_LIMIT,

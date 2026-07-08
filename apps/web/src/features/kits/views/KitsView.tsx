@@ -19,6 +19,7 @@ import {
 import { LoadingState } from "@/components/LoadingState";
 import type { UiKit } from "../model";
 import type { KitsVm } from "../controllers/useKitsController";
+import { KitsEmptyState } from "./KitsEmptyState";
 import scaleYourGiftingImg from "../../../../assets/scale_your_gifting.png";
 import wellnessKitImg from "../../../../assets/wellness-kit.png";
 import workFromHomeKitImg from "../../../../assets/work-from-home-kit.png";
@@ -216,6 +217,15 @@ export function KitsView(vm: KitsVm) {
       <div className="card" style={{ padding: 16, color: "var(--danger)" }}>
         {vm.errorMessage}
       </div>
+    );
+  }
+
+  if (vm.isEmpty) {
+    return (
+      <KitsEmptyState
+        contactCount={vm.contactCount}
+        canCreateKits={vm.canCreateKits}
+      />
     );
   }
 
