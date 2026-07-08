@@ -39,7 +39,7 @@ export const createCampaignSchema = z.object({
     .optional(),
 });
 
-export const updateCampaignSchema = createCampaignSchema.partial().omit({ entityId: true });
+export const updateCampaignSchema = createCampaignSchema.partial();
 
 export const importRecipientsSchema = z.object({
   recipients: z

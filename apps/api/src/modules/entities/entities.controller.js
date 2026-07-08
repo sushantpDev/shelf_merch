@@ -16,6 +16,17 @@ export async function getOne(req, res) {
   res.json(await entitiesService.getEntity({ tenantId: req.tenantId, entityId: req.params.id }));
 }
 
+export async function transactions(req, res) {
+  res.json(
+    await entitiesService.listEntityTransactions({
+      tenantId: req.tenantId,
+      entityId: req.params.id,
+      user: req.user,
+      query: req.query,
+    }),
+  );
+}
+
 export async function create(req, res) {
   const entity = await entitiesService.createEntity({
     tenantId: req.tenantId,

@@ -1,5 +1,6 @@
 import { Entity } from './entity.model.js';
 import { Wallet } from '../wallets/wallet.model.js';
+import { WalletTransaction } from '../wallets/walletTransaction.model.js';
 import { Tenant } from '../tenants/tenant.model.js';
 import { User } from '../users/user.model.js';
 import { inviteUser } from '../users/users.service.js';
@@ -7,6 +8,8 @@ import { RoleAssignment } from '../roles/roleAssignment.model.js';
 import { transitionState } from '../../services/stateMachine.service.js';
 import * as ledger from '../../services/ledger.service.js';
 import { ApiError, NotFoundError } from '../../utils/errors.js';
+import { assertEntityAccess } from '../../middleware/abac.middleware.js';
+import { getPagination, paginatedResponse } from '../../utils/pagination.js';
 
 /** Keep role assignments in sync when a user is set as entity.managerUserId. */
 export async function syncManagerEntityAccess({ tenantId, userId }) {
@@ -129,6 +132,43 @@ export async function createEntity({ tenantId, data, userId }) {
   return entity;
 }
 
+/** Return an entity on the wallet that campaigns can bill against (creates one for tenant admins when missing). */
+export async function ensureSpendEntity({ tenantId, walletId, userId, user }) {
+  const wallet = await Wallet.findOne({ _id: walletId, tenantId });
+  if (!wallet) throw new NotFoundError('Wallet not found');
+
+  const isEntityManager = user?.role === 'entity_manager' || user?.scopeType === 'entity';
+  if (isEntityManager) {
+    const managedIds = await entityIdsVisibleToManager({ tenantId, user });
+    const entity = await Entity.findOne({
+      tenantId,
+      walletId,
+      _id: { $in: managedIds ?? [] },
+    }).sort({ createdAt: 1 });
+    if (!entity) {
+      throw new ApiError(
+        422,
+        'No budget department found for this wallet — allocate funds first',
+        'NO_SPEND_ENTITY',
+      );
+    }
+    return entity;
+  }
+
+  const existing = await Entity.findOne({ tenantId, walletId }).sort({ createdAt: 1 });
+  if (existing) return existing;
+
+  return createEntity({
+    tenantId,
+    data: {
+      walletId,
+      name: wallet.name?.trim() || 'General',
+      description: 'Default department for campaign spending',
+    },
+    userId,
+  });
+}
+
 export async function updateEntity({ tenantId, entityId, patch }) {
   const entity = await getEntity({ tenantId, entityId });
   const before = entity.toObject();
@@ -205,4 +245,22 @@ export async function assignManager({ tenantId, entityId, data, userId }) {
 
 export async function entityRoleAssignment({ tenantId, entityId }) {
   return RoleAssignment.findOne({ tenantId, scopeType: 'entity', scopeId: entityId });
+}
+
+/** Ledger rows for a department — works even when the source wallet was removed. */
+export async function listEntityTransactions({ tenantId, entityId, user, query }) {
+  const entity = await getEntity({ tenantId, entityId });
+  assertEntityAccess(user, entity._id);
+
+  const { page, limit, skip } = getPagination(query);
+  const filter = {
+    tenantId,
+    relatedEntityId: entity._id,
+    type: { $in: ['allocation_to_entity', 'campaign_spend', 'order_payment', 'refund'] },
+  };
+  const [items, total] = await Promise.all([
+    WalletTransaction.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    WalletTransaction.countDocuments(filter),
+  ]);
+  return paginatedResponse(items, total, { page, limit });
 }

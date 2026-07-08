@@ -1,3 +1,4 @@
+import { normalizeMongoId } from "@/lib/mongoId";
 import { apiFetch } from "./api";
 import type { WalletUploadFile } from "@/features/wallets/types";
 import {
@@ -21,7 +22,7 @@ import {
   type UiWallet,
 } from "./mappers";
 import { getStoredUser, type AuthUser } from "./auth-store";
-import { walletSpendable, walletUnallocated } from "@/lib/walletFormat";
+import { walletUnallocated } from "@/lib/walletFormat";
 
 export type WalletOrgView = {
   active: boolean;
@@ -170,9 +171,13 @@ export function entityManagerDepartments(
 ): WorkspaceSnapshot["org"]["departments"] {
   const id = workspace.primaryEntityId;
   const email = workspace.userPatch.email?.toLowerCase();
+  const assignedIds = new Set(
+    (getStoredUser()?.assignedEntityIds ?? []).map(String),
+  );
   const departments = allWorkspaceDepartments(workspace);
   const matches = departments.filter((d) => {
     if (id && String(d.id) === String(id)) return true;
+    if (assignedIds.has(String(d.id))) return true;
     return Boolean(email && d.mgr?.email?.toLowerCase() === email);
   });
   if (matches.length) return matches;
@@ -229,17 +234,75 @@ export function walletDepartmentsMap(
 }
 
 export function spendableForWallet(workspace: WorkspaceSnapshot, walletId: string): number {
-  const wallet = workspace.wallets.find((w) => w.id === walletId);
-  if (!wallet) return 0;
-  let departments = workspace.walletViews[walletId]?.departments ?? [];
+  const wid = String(walletId);
+
   if (workspace.userPatch.role === "entity_manager") {
-    departments = entityManagerDepartments(workspace).filter(
-      (d) => String(d.walletId ?? "") === String(walletId),
+    const departments = entityManagerDepartments(workspace).filter(
+      (d) => normalizeMongoId(d.walletId) === wid,
     );
     if (!departments.length) return 0;
-    return walletSpendable(wallet, departments);
+    return departments.reduce(
+      (sum, d) => sum + Math.max(0, (d.allocated ?? 0) - (d.spent ?? 0)),
+      0,
+    );
   }
+
+  const wallet = workspace.wallets.find((w) => w.id === walletId);
+  if (!wallet) return 0;
   return walletUnallocated(wallet);
+}
+
+function synthesizeDepartmentWallet(
+  workspace: WorkspaceSnapshot,
+  walletId: string,
+  departments: WorkspaceSnapshot["org"]["departments"],
+): UiWallet {
+  const remaining = departments.reduce(
+    (sum, d) => sum + Math.max(0, (d.allocated ?? 0) - (d.spent ?? 0)),
+    0,
+  );
+  const allocated = departments.reduce((sum, d) => sum + (d.allocated ?? 0), 0);
+  const label =
+    departments.length === 1
+      ? departments[0].name
+      : `${departments[0]?.name ?? "Department"} +${departments.length - 1}`;
+  return {
+    id: walletId,
+    name: label,
+    cur: "INR",
+    balance: remaining,
+    unalloc: remaining,
+    alloc: Math.max(0, allocated - remaining),
+    owner: workspace.account,
+    email: "",
+    activity: [],
+  };
+}
+
+/** Wallets the signed-in user can pay from at campaign checkout. */
+export function walletsForCheckout(workspace: WorkspaceSnapshot): UiWallet[] {
+  if (workspace.userPatch.role !== "entity_manager") {
+    return workspace.wallets;
+  }
+
+  const departments = entityManagerDepartments(workspace);
+  if (!departments.length) return [];
+
+  const byWallet = new Map<string, WorkspaceSnapshot["org"]["departments"]>();
+  for (const dept of departments) {
+    const walletId = normalizeMongoId(dept.walletId);
+    if (!walletId) continue;
+    const rows = byWallet.get(walletId) ?? [];
+    rows.push(dept);
+    byWallet.set(walletId, rows);
+  }
+
+  const checkout: UiWallet[] = [];
+  for (const [walletId, depts] of byWallet) {
+    const live = workspace.wallets.find((w) => w.id === walletId);
+    checkout.push(live ?? synthesizeDepartmentWallet(workspace, walletId, depts));
+  }
+  return checkout;
 }
 
 /** First department entity for a wallet — used when paying from a selected wallet. */
@@ -247,15 +310,24 @@ export function entityIdForWallet(
   workspace: WorkspaceSnapshot,
   walletId: string,
 ): string | undefined {
-  const view = workspace.walletViews[walletId];
-  const dept =
-    workspace.userPatch.role === "entity_manager"
-      ? entityManagerDepartments(workspace).find(
-          (d) => String(d.walletId ?? "") === String(walletId),
-        )
-      : view?.departments?.[0];
-  if (dept?.id == null || dept.id === "") return undefined;
-  return String(dept.id);
+  const wid = String(walletId);
+  const view = workspace.walletViews[wid];
+  if (workspace.userPatch.role === "entity_manager") {
+    const dept = entityManagerDepartments(workspace).find(
+      (d) => normalizeMongoId(d.walletId) === wid,
+    );
+    if (dept?.id != null && dept.id !== "") return String(dept.id);
+    return undefined;
+  }
+  const dept = view?.departments?.[0];
+  if (dept?.id != null && dept.id !== "") return String(dept.id);
+
+  const fromOrg = workspace.org.departments.find(
+    (d) => normalizeMongoId(d.walletId) === wid,
+  );
+  if (fromOrg?.id != null && fromOrg.id !== "") return String(fromOrg.id);
+
+  return undefined;
 }
 
 function managerUserIdFromEntity(entity: {
@@ -417,7 +489,7 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
     ? assignedEntities
     : primaryWalletId
       ? (entities as never[]).filter(
-          (e) => String((e as { walletId: string }).walletId) === primaryWalletId,
+          (e) => normalizeMongoId((e as { walletId?: unknown }).walletId) === primaryWalletId,
         )
       : (entities as never[]);
 
@@ -431,7 +503,7 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
     const id = String(w._id ?? w.id ?? "");
     if (!id) continue;
     const ents = entityRows.filter(
-      (e) => String((e as { walletId: string }).walletId) === id,
+      (e) => normalizeMongoId((e as { walletId?: unknown }).walletId) === id,
     );
     walletViews[id] = {
       active: Boolean(w),
@@ -466,7 +538,7 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
         : undefined,
     primaryEntityWalletId:
       isEntityManager && myEntity
-        ? String((myEntity as { walletId: string }).walletId ?? "")
+        ? normalizeMongoId((myEntity as { walletId?: unknown }).walletId) || undefined
         : undefined,
     org: {
       active: orgActive,

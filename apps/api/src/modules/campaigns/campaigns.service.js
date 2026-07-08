@@ -24,20 +24,8 @@ const INCOMPLETE_CAMPAIGN_STATUSES = ['draft', 'recipients_uploaded', 'credits_a
 async function assertWalletCanSpend({ tenantId, entityId, amount, user }) {
   const budget = Math.round(amount ?? 0);
   if (budget <= 0) return;
-  const entity = await Entity.findOne({ _id: entityId, tenantId });
-  if (!entity) throw new NotFoundError('Entity not found');
-  const wallet = await Wallet.findOne({ _id: entity.walletId, tenantId });
-  if (!wallet) throw new NotFoundError('Wallet not found');
+  const { entity, wallet } = await ledger.resolveSpendWalletForEntity({ tenantId, entityId });
 
-  if (budget > wallet.balance) {
-    throw new ApiError(
-      422,
-      `Insufficient wallet balance: cash ₹${wallet.balance}, required ₹${budget}`,
-      'INSUFFICIENT_FUNDS',
-    );
-  }
-
-  const unalloc = Math.max(0, wallet.balance - wallet.allocatedAmount);
   const entityAvailable = Math.max(0, entity.allocatedAmount - entity.spentAmount);
 
   if (user?.scopeType === 'entity') {
@@ -48,9 +36,25 @@ async function assertWalletCanSpend({ tenantId, entityId, amount, user }) {
         'INSUFFICIENT_FUNDS',
       );
     }
+    if (budget > wallet.balance) {
+      throw new ApiError(
+        422,
+        `Insufficient wallet cash to complete this send (₹${wallet.balance} available)`,
+        'INSUFFICIENT_FUNDS',
+      );
+    }
     return;
   }
 
+  if (budget > wallet.balance) {
+    throw new ApiError(
+      422,
+      `Insufficient wallet balance: cash ₹${wallet.balance}, required ₹${budget}`,
+      'INSUFFICIENT_FUNDS',
+    );
+  }
+
+  const unalloc = Math.max(0, wallet.balance - wallet.allocatedAmount);
   if (budget > unalloc) {
     throw new ApiError(
       422,
@@ -127,11 +131,23 @@ export async function createCampaign({ tenantId, userId, user, data }) {
 export async function updateCampaign({ tenantId, campaignId, user, patch }) {
   const campaign = await Campaign.findOne({ _id: campaignId, tenantId });
   if (!campaign) throw new NotFoundError('Campaign not found');
+  const { status: _s, recipientCount: _rc, totalBudget: _tb, entityId, ...rest } = patch;
   if (user?.scopeType === 'entity') {
     const allowed = (user.assignedEntityIds ?? []).map(String);
-    if (!allowed.includes(String(campaign.entityId))) throw new ForbiddenError();
+    const nextEntityId = entityId != null ? String(entityId) : String(campaign.entityId);
+    const canAccess =
+      allowed.includes(String(campaign.entityId)) || allowed.includes(nextEntityId);
+    if (!canAccess) throw new ForbiddenError();
   }
-  const { status: _s, recipientCount: _rc, totalBudget: _tb, ...rest } = patch;
+  if (entityId !== undefined && String(entityId) !== String(campaign.entityId)) {
+    if (!INCOMPLETE_CAMPAIGN_STATUSES.includes(campaign.status)) {
+      throw new ApiError(422, 'Cannot change budget source after launch', 'CAMPAIGN_LOCKED');
+    }
+    const entity = await Entity.findOne({ _id: entityId, tenantId });
+    if (!entity) throw new NotFoundError('Entity not found');
+    assertEntityAccess(user, entity._id);
+    campaign.entityId = entityId;
+  }
   Object.assign(campaign, rest);
   await campaign.save();
   return withCampaignMeta(campaign);
@@ -363,12 +379,16 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
   }
 
   const entity = await Entity.findOne({ _id: campaign.entityId, tenantId });
+  const { wallet } = await ledger.resolveSpendWalletForEntity({
+    tenantId,
+    entityId: campaign.entityId,
+  });
   const isFulfillment = campaign.type === 'kit' || campaign.type === 'items';
   const spendFromEntity = user?.scopeType === 'entity';
   if (campaign.totalBudget > 0) {
     await ledger.createTransaction({
       tenantId,
-      walletId: entity.walletId,
+      walletId: wallet._id,
       type: 'campaign_spend',
       amount: -campaign.totalBudget,
       relatedEntityId: spendFromEntity ? entity._id : null,

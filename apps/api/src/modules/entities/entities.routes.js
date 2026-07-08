@@ -12,6 +12,7 @@ import {
   assignManagerSchema,
   entityIdParams,
   listEntitiesQuery,
+  entityTransactionsQuery,
 } from './entities.validation.js';
 
 const router = Router();
@@ -25,6 +26,13 @@ const entityScope = requireScope((req) => req.params.id); // ABAC on /:id routes
 router.get('/', canRead, validate({ query: listEntitiesQuery }), asyncHandler(controller.list));
 router.post('/', canWrite, validate({ body: createEntitySchema }), asyncHandler(controller.create));
 router.get('/:id', canRead, entityScope, validate({ params: entityIdParams }), asyncHandler(controller.getOne));
+router.get(
+  '/:id/transactions',
+  canRead,
+  entityScope,
+  validate({ params: entityIdParams, query: entityTransactionsQuery }),
+  asyncHandler(controller.transactions),
+);
 router.patch(
   '/:id',
   canWrite,

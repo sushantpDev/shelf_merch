@@ -159,3 +159,13 @@ export async function remove(req, res) {
   writeAudit({ req, action: 'wallet.delete_incomplete', entityType: 'Wallet', entityId: wallet._id });
   res.json({ success: true });
 }
+
+export async function ensureSpendEntity(req, res) {
+  const entity = await walletsService.ensureSpendEntity({
+    tenantId: req.tenantId,
+    walletId: req.params.id,
+    userId: req.user.userId,
+    user: req.user,
+  });
+  res.json(entity);
+}

@@ -1,3 +1,4 @@
+import { normalizeMongoId } from "@/lib/mongoId";
 import { ApiError, apiFetch } from "./api";
 import { getStoredUser } from "./auth-store";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
@@ -37,15 +38,6 @@ function walletIdFromResponse(wallet: Record<string, unknown>): string {
     throw new Error("Wallet create response missing a valid id");
   }
   return normalized;
-}
-
-function normalizeMongoId(value: unknown): string {
-  if (value == null) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "object" && "_id" in value) {
-    return normalizeMongoId((value as { _id: unknown })._id);
-  }
-  return String(value);
 }
 
 async function ensureWalletFunded(
@@ -497,6 +489,30 @@ export async function getCampaignApi(campaignId: string) {
   return mapCampaign(campaign);
 }
 
+/** Ensure the wallet has a department entity campaigns can bill against. */
+export async function ensureSpendEntityForWalletApi(walletId: string): Promise<string> {
+  const entities = await apiFetch<Array<{ _id?: string; id?: string }>>(
+    `/entities?walletId=${encodeURIComponent(walletId)}`,
+  );
+  if (entities.length) {
+    const id = entities[0]._id ?? entities[0].id;
+    if (id) return String(id);
+  }
+
+  const wallet = await apiFetch<{ name?: string }>(`/wallets/${walletId}`);
+  const entity = await apiFetch<{ _id?: string; id?: string }>("/entities", {
+    method: "POST",
+    body: JSON.stringify({
+      walletId,
+      name: wallet.name?.trim() || "General",
+      description: "Default department for campaign spending",
+    }),
+  });
+  const id = entity._id ?? entity.id;
+  if (!id) throw new Error("Could not resolve spend entity for wallet");
+  return String(id);
+}
+
 export async function savePointsCampaignDraftApi(payload: {
   campaignId?: string;
   entityId: string;
@@ -560,6 +576,7 @@ export async function launchPointsCampaignApi(payload: {
     await apiFetch(`/campaigns/${campaignId}`, {
       method: "PATCH",
       body: JSON.stringify({
+        entityId: payload.entityId,
         name: payload.name,
         pointsScope: payload.pointsScope ?? "shop",
         message: payload.message,
@@ -750,6 +767,16 @@ export async function fetchWalletTransactionsApi(
 ): Promise<WalletTransactionRow[]> {
   const res = await apiFetch<{ items?: WalletTransactionRow[] }>(
     `/wallets/${walletId}/transactions?limit=${limit}`,
+  );
+  return res.items ?? [];
+}
+
+export async function fetchEntityTransactionsApi(
+  entityId: string,
+  limit = 50,
+): Promise<WalletTransactionRow[]> {
+  const res = await apiFetch<{ items?: WalletTransactionRow[] }>(
+    `/entities/${entityId}/transactions?limit=${limit}`,
   );
   return res.items ?? [];
 }

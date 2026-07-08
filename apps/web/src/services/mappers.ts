@@ -1,5 +1,6 @@
 import type { AuthUser } from "./auth-store";
 import { isPlaceholderColorHex, resolveColorHex } from "../lib/colorMap";
+import { normalizeMongoId } from "@/lib/mongoId";
 
 export type UiPrintArea = {
   key?: string;
@@ -507,7 +508,7 @@ export function mapWallet(w: ApiProduct, owner?: ApiUser): UiWallet {
   const balance = w.totalAmount ?? w.balance ?? 0;
   const alloc = w.allocatedAmount ?? 0;
   return {
-    id: String(w._id),
+    id: normalizeMongoId(w._id ?? w.id),
     name: w.name,
     cur: (w.currency || "INR").toUpperCase(),
     balance,
@@ -540,7 +541,7 @@ export function mapEntityToDept(e: ApiEntity, usersById: Map<string, ApiUser>): 
   }
   return {
     id: String(e._id),
-    walletId: e.walletId ? String(e.walletId) : undefined,
+    walletId: normalizeMongoId(e.walletId) || undefined,
     name: e.name,
     desc: e.description || "",
     users: e.expectedUsers ?? 0,

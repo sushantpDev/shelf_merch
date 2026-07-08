@@ -5,7 +5,8 @@ import { useWorkspace, useInvalidateWorkspace } from "@/hooks/useWorkspace";
 import { formatWalletAmount } from "@/lib/walletFormat";
 import type { UiContact, UiProduct } from "@/services/mappers";
 import type { UiWallet } from "@/services/mappers";
-import { entityIdForWallet, spendableForWallet } from "@/services/workspace-api";
+import { ensureSpendEntityForWalletApi } from "@/services/mutations-api";
+import { entityIdForWallet, spendableForWallet, walletsForCheckout } from "@/services/workspace-api";
 import { kitSendTotals, type KitSendTotals } from "@/features/send/money";
 import { toSchedulePayload } from "@/features/send/types";
 import { kitPickedIndices } from "../wizard/kitDraft";
@@ -75,7 +76,12 @@ export function useSendKitController(): SendKitVm {
 
   const [draft, dispatch] = useReducer(sendKitReducer, initial);
 
-  const wallet = workspace?.wallets.find((w) => w.id === selectedWalletId) ?? workspace?.wallets[0];
+  const checkoutWallets = useMemo(
+    () => (workspace ? walletsForCheckout(workspace) : []),
+    [workspace],
+  );
+  const wallet =
+    checkoutWallets.find((w) => w.id === selectedWalletId) ?? checkoutWallets[0];
   const totals = kitSendTotals(draft.selRecips.length, draft.pkg);
   const surpriseMissing =
     draft.mode === "surprise" ? missingAddress(contacts, draft.selRecips) : [];
@@ -105,9 +111,26 @@ export function useSendKitController(): SendKitVm {
     setStep((s) => Math.min(s + 1, 3) as SendKitStep);
   }
 
+  async function resolveEntityId(walletId: string | undefined): Promise<string | undefined> {
+    if (!walletId || !workspace) return undefined;
+
+    const local = entityIdForWallet(workspace, walletId);
+    if (local) return local;
+
+    if (workspace.userPatch.role === "entity_manager") return undefined;
+
+    return ensureSpendEntityForWalletApi(walletId);
+  }
+
   async function onPayAndSend() {
-    const walletId = selectedWalletId || workspace?.wallets[0]?.id;
-    const entityId = walletId && workspace ? entityIdForWallet(workspace, walletId) : undefined;
+    const walletId = selectedWalletId || checkoutWallets[0]?.id || workspace?.wallets[0]?.id;
+    let entityId: string | undefined;
+    try {
+      entityId = await resolveEntityId(walletId);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not resolve wallet budget");
+      return;
+    }
     if (!entityId) {
       toast.error("No budget department found for this wallet — allocate funds first");
       return;
@@ -178,8 +201,8 @@ export function useSendKitController(): SendKitVm {
     totals,
     surpriseMissing,
     wallet,
-    wallets: workspace?.wallets ?? [],
-    selectedWalletId: selectedWalletId || workspace?.wallets[0]?.id,
+    wallets: checkoutWallets,
+    selectedWalletId: selectedWalletId || checkoutWallets[0]?.id,
     onWalletSelect: setSelectedWalletId,
     walletAvailable: (w) => (workspace ? spendableForWallet(workspace, w.id) : 0),
     onExit: () => navigate("/app/kits"),

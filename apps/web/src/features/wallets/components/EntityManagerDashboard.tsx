@@ -112,10 +112,7 @@ export function EntityManagerDashboard({
         </div>
       </div>
 
-      <WalletHistory
-        walletIds={[...new Set(departments.map((d) => d.walletId).filter(Boolean) as string[])]}
-        entityIds={departments.map((d) => String(d.id))}
-      />
+      <WalletHistory entityIds={departments.map((d) => String(d.id))} />
     </>
   );
 }

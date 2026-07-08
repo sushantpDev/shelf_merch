@@ -38,3 +38,8 @@ export const entityIdParams = z.object({ id: objectId });
 export const listEntitiesQuery = z.object({
   walletId: objectId.optional(),
 });
+
+export const entityTransactionsQuery = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().optional(),
+});

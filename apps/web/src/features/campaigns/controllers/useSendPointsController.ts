@@ -3,8 +3,8 @@ import { useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { useWorkspace, useInvalidateWorkspace } from "@/hooks/useWorkspace";
 import { formatWalletAmount } from "@/lib/walletFormat";
-import { getCampaignApi } from "@/services/mutations-api";
-import { entityIdForWallet, spendableForWallet } from "@/services/workspace-api";
+import { ensureSpendEntityForWalletApi, getCampaignApi } from "@/services/mutations-api";
+import { entityIdForWallet, spendableForWallet, walletsForCheckout } from "@/services/workspace-api";
 import { pointsSendTotals } from "@/features/send/money";
 import { toSchedulePayload } from "@/features/send/types";
 import type { PointsSendTotals } from "@/features/send/money";
@@ -136,7 +136,12 @@ export function useSendPointsController(): SendPointsVm {
   }, [campaignParam, shopId, initial, workspace]);
 
   const totals = pointsSendTotals(draft.ppr, draft.recips);
-  const wallet = workspace?.wallets.find((w) => w.id === selectedWalletId) ?? workspace?.wallets[0];
+  const checkoutWallets = useMemo(
+    () => (workspace ? walletsForCheckout(workspace) : []),
+    [workspace],
+  );
+  const wallet =
+    checkoutWallets.find((w) => w.id === selectedWalletId) ?? checkoutWallets[0];
   const shopCurrencyLabel = shop?.currency || "Points";
   const stadiumPointsAllowed = Boolean(shop?.pointsConversionEnabled);
 
@@ -148,14 +153,16 @@ export function useSendPointsController(): SendPointsVm {
     navigate("/app/campaigns");
   }
 
-  function resolveEntityId() {
-    const walletId = selectedWalletId || workspace?.wallets[0]?.id;
-    if (walletId && workspace) {
-      const entityId = entityIdForWallet(workspace, walletId);
-      if (entityId) return entityId;
-    }
-    const dept = workspace?.org.departments?.[0];
-    return dept?.id != null && dept.id !== "" ? String(dept.id) : undefined;
+  async function resolveEntityId(): Promise<string | undefined> {
+    const walletId = selectedWalletId || checkoutWallets[0]?.id || workspace?.wallets[0]?.id;
+    if (!walletId || !workspace) return undefined;
+
+    const local = entityIdForWallet(workspace, walletId);
+    if (local) return local;
+
+    if (workspace.userPatch.role === "entity_manager") return undefined;
+
+    return ensureSpendEntityForWalletApi(walletId);
   }
 
   function buildRecipients() {
@@ -171,7 +178,13 @@ export function useSendPointsController(): SendPointsVm {
   }
 
   async function saveAndExit() {
-    const entityId = resolveEntityId();
+    let entityId: string | undefined;
+    try {
+      entityId = await resolveEntityId();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not resolve wallet budget");
+      return;
+    }
     if (!entityId) {
       toast.error("No budget department found — allocate funds first");
       return;
@@ -229,8 +242,14 @@ export function useSendPointsController(): SendPointsVm {
   }
 
   async function payNow() {
-    const walletId = selectedWalletId || workspace?.wallets[0]?.id;
-    const entityId = resolveEntityId();
+    const walletId = selectedWalletId || checkoutWallets[0]?.id || workspace?.wallets[0]?.id;
+    let entityId: string | undefined;
+    try {
+      entityId = await resolveEntityId();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not resolve wallet budget");
+      return;
+    }
     if (!entityId) {
       toast.error("No budget department found for this wallet — allocate funds first");
       return;
@@ -298,8 +317,8 @@ export function useSendPointsController(): SendPointsVm {
     shopCurrencyLabel,
     stadiumPointsAllowed,
     wallet,
-    wallets: workspace?.wallets ?? [],
-    selectedWalletId: selectedWalletId || workspace?.wallets[0]?.id,
+    wallets: checkoutWallets,
+    selectedWalletId: selectedWalletId || checkoutWallets[0]?.id,
     onWalletSelect: setSelectedWalletId,
     walletAvailable: (w) => (workspace ? spendableForWallet(workspace, w.id) : 0),
     onExit: exit,

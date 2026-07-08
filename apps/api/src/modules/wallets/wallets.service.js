@@ -1,6 +1,7 @@
 import { Wallet } from './wallet.model.js';
 import { WalletTransaction } from './walletTransaction.model.js';
 import { Entity } from '../entities/entity.model.js';
+import * as entitiesService from '../entities/entities.service.js';
 import * as ledger from '../../services/ledger.service.js';
 import { uploadFile } from '../../services/storage.service.js';
 import { transitionState, transitionThrough, validNextStatuses } from '../../services/stateMachine.service.js';
@@ -332,4 +333,8 @@ export async function activate({ tenantId, walletId, userId }) {
   transitionThrough('wallet', wallet, 'active', { userId });
   await wallet.save();
   return withMeta(wallet);
+}
+
+export async function ensureSpendEntity(params) {
+  return entitiesService.ensureSpendEntity(params);
 }

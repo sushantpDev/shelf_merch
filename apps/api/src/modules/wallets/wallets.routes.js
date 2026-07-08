@@ -84,5 +84,11 @@ router.post(
   validate({ params: walletIdParams }),
   asyncHandler(controller.activate),
 );
+router.post(
+  '/:id/ensure-spend-entity',
+  canWrite,
+  validate({ params: walletIdParams }),
+  asyncHandler(controller.ensureSpendEntity),
+);
 
 export default router;

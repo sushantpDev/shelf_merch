@@ -12,6 +12,7 @@ import {
   spendableForWallet,
   type WorkspaceSnapshot,
 } from "@/services/workspace-api";
+import { normalizeMongoId } from "@/lib/mongoId";
 
 // The workspace navigation now lives in <CollapsibleSidebar/>; this layout only
 // renders the topbar + sidebar shell.
@@ -68,8 +69,8 @@ export default function TenantLayout() {
     isEntityManager && workspace
       ? new Set(
           entityManagerDepartments(workspace)
-            .map((d) => d.walletId)
-            .filter((id): id is string => Boolean(id)),
+            .map((d) => normalizeMongoId(d.walletId))
+            .filter(Boolean),
         )
       : undefined;
   const headerWallets =

@@ -53,7 +53,9 @@ export async function createTransaction(
   }
 
   return withSession(session, async (s) => {
-    const wallet = await Wallet.findOne({ _id: walletId, tenantId }).session(s);
+    const wallet = await Wallet.findOne({ _id: walletId, tenantId })
+      .setOptions({ includeDeleted: true })
+      .session(s);
     if (!wallet) throw new NotFoundError('Wallet not found');
 
     const isCash = CASH_TYPES.has(type);
@@ -121,6 +123,21 @@ export async function createTransaction(
 
     return txn;
   });
+}
+
+/** Resolve which wallet backs an entity-tied spend (handles removed source wallets). */
+export async function resolveSpendWalletForEntity({ tenantId, entityId }) {
+  const entity = await Entity.findOne({ _id: entityId, tenantId });
+  if (!entity) throw new NotFoundError('Entity not found');
+
+  const linked = await Wallet.findOne({ _id: entity.walletId, tenantId }).setOptions({
+    includeDeleted: true,
+  });
+  if (linked) return { entity, wallet: linked };
+
+  const fallback = await Wallet.findOne({ tenantId }).sort({ balance: -1 });
+  if (!fallback) throw new NotFoundError('Wallet not found');
+  return { entity, wallet: fallback };
 }
 
 /** Allocate budget to multiple entities atomically (§7.4 /allocate). */
@@ -277,7 +294,9 @@ export async function repairEntityCache({ tenantId, entityId }) {
 
 /** Repair cached wallet/entity figures from the append-only ledger. */
 export async function repairWalletCaches({ tenantId, walletId }) {
-  const wallet = await Wallet.findOne({ _id: walletId, tenantId });
+  const wallet = await Wallet.findOne({ _id: walletId, tenantId }).setOptions({
+    includeDeleted: true,
+  });
   if (!wallet) return null;
 
   const [balance, allocated] = await Promise.all([

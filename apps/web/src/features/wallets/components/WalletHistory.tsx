@@ -1,7 +1,7 @@
 import { Wallet } from "lucide-react";
 import { useQueries } from "@tanstack/react-query";
 import { inr } from "@/components/platform/platform-ui";
-import { fetchWalletTransactionsApi, type WalletTransactionRow } from "@/services/mutations-api";
+import { fetchEntityTransactionsApi, fetchWalletTransactionsApi, type WalletTransactionRow } from "@/services/mutations-api";
 
 function formatTxnDate(iso?: string): string {
   if (!iso) return "—";
@@ -128,13 +128,21 @@ export function WalletHistory({
   const entityIdList = entityIds?.length ? entityIds : entityId ? [entityId] : [];
   const entityMode = entityIdList.length > 0;
   const limit = entityMode ? 50 : 20;
-  const queries = useQueries({
+  const walletQueries = useQueries({
     queries: ids.map((id) => ({
       queryKey: ["wallet-transactions", id, limit],
       queryFn: () => fetchWalletTransactionsApi(id, limit),
-      enabled: Boolean(id),
+      enabled: Boolean(id) && !entityMode,
     })),
   });
+  const entityQueries = useQueries({
+    queries: entityIdList.map((id) => ({
+      queryKey: ["entity-transactions", id, limit],
+      queryFn: () => fetchEntityTransactionsApi(id, limit),
+      enabled: Boolean(id) && entityMode,
+    })),
+  });
+  const queries = entityMode ? entityQueries : walletQueries;
   const isLoading = queries.some((q) => q.isLoading);
   const txns = queries.flatMap((q) => q.data ?? []);
   const rows = (
