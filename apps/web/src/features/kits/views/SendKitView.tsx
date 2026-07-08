@@ -8,8 +8,9 @@ import { RecipientExperience } from "@/features/send/RecipientExperience";
 import { PaymentPanel } from "@/features/send/PaymentPanel";
 import type { SendKitVm } from "../controllers/useSendKitController";
 import { DesignedProductThumb } from "@/features/swag/DesignedProductThumb";
-import { resolveKitItemOptions } from "../controllers/useSendKitController";
+import { resolveKitItemOptions, getCuratedKitMeta } from "../controllers/useSendKitController";
 import type { UiProduct } from "@/services/mappers";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 const STEPS = ["Items", "Recipients", "Experience", "Checkout"];
 
@@ -23,11 +24,9 @@ const COLOR_MAP: Record<string, string> = {
 };
 
 function swatchColor(product: UiProduct, colorName: string): string {
-  // 1. Check variant colorHex
   const variantWithHex = product.variants?.find(v => v.color?.toLowerCase() === colorName.toLowerCase() && v.colorHex);
   if (variantWithHex?.colorHex) return variantWithHex.colorHex;
 
-  // 2. Check product.colorHexByName
   if (product.colorHexByName) {
     const nameMatch = Object.keys(product.colorHexByName).find(k => k.toLowerCase() === colorName.toLowerCase());
     if (nameMatch && product.colorHexByName[nameMatch]) {
@@ -35,7 +34,6 @@ function swatchColor(product: UiProduct, colorName: string): string {
     }
   }
 
-  // 3. Fallback
   return COLOR_MAP[colorName.toLowerCase()] ?? colorName.toLowerCase();
 }
 
@@ -184,6 +182,9 @@ export function SendKitView(vm: SendKitVm) {
 
   const { totals, kit } = vm;
 
+  const curatedMeta = getCuratedKitMeta(kit);
+  const isCurated = !!curatedMeta;
+
   const kitItems = draft.picked
     .map(idx => vm.catalog[idx])
     .filter(Boolean)
@@ -216,53 +217,101 @@ export function SendKitView(vm: SendKitVm) {
         <div style={{ maxWidth: 900, margin: "0 auto", padding: "10px 0" }}>
           <h1 style={{ fontSize: 24, marginBottom: 6 }}>Review Items</h1>
           <p className="muted" style={{ marginBottom: 24 }}>Review the items included in this kit before continuing.</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
-            {kitItems.map(({ product: p, opts }) => {
-              const distinctSizes = (p.variants?.map(v => v.size).filter((v): v is string => Boolean(v)).filter((v, i, a) => a.indexOf(v) === i)) ?? [];
-              const distinctColors = (p.variants?.map(v => v.color).filter((v): v is string => Boolean(v)).filter((v, i, a) => a.indexOf(v) === i)) ?? [];
-              return (
-                <div key={p.id} className="card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10, borderRadius: 12 }}>
-                  <div style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: "#f4f6f4", position: "relative" }}>
-                    <DesignedProductThumb product={p} artworkUrl={kit.artworkUrl} />
-                  </div>
-                  {p.brand && <div className="mut3" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".04em" }}>{p.brand}</div>}
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{p.nm}</div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Qty: 1 unit</div>
-                  <div className="divider" style={{ margin: "2px 0" }} />
-                  {distinctSizes.length > 0 && (
-                    <div>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4, fontWeight: 500 }}>Sizes</div>
-                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                        {distinctSizes.map(s => (
-                          <span key={s} style={{ fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 4, background: "var(--surface-2)", border: "1px solid var(--border)" }}>{s}</span>
-                        ))}
+
+          {isCurated && curatedMeta ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              {/* Editable Kit Name */}
+              <div style={{ maxWidth: 480 }}>
+                <label style={{ fontSize: 13, fontWeight: 700, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>
+                  Kit Name
+                </label>
+                <input
+                  className="inp"
+                  value={vm.kitName}
+                  onChange={(e) => vm.setKitName(e.target.value)}
+                  style={{ width: "100%", fontSize: 14, height: 38 }}
+                />
+              </div>
+
+              {/* Read-only Description */}
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 700, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>
+                  Description
+                </label>
+                <p style={{ color: "var(--text)", fontSize: 14, margin: 0, lineHeight: 1.5 }}>
+                  {curatedMeta.description || "No description provided."}
+                </p>
+              </div>
+
+              {/* Read-only Product Images as cards */}
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 700, color: "var(--text-muted)", display: "block", marginBottom: 12 }}>
+                  Included Items ({Math.max(0, (curatedMeta.imageUrls?.length ?? 0) - 1)})
+                </label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16 }}>
+                  {curatedMeta.imageUrls && curatedMeta.imageUrls.slice(1).map((imgUrl, idx) => (
+                    <div key={idx} className="card" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8, borderRadius: 12 }}>
+                      <div style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: "#f4f6f4", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <img
+                          src={resolveMediaUrl(imgUrl)}
+                          alt=""
+                          style={{ maxWidth: "90%", maxHeight: "90%", objectFit: "contain" }}
+                        />
                       </div>
                     </div>
-                  )}
-                  {distinctColors.length > 0 && (
-                    <div>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4, fontWeight: 500 }}>Colors</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {distinctColors.map(c => (
-                          <div key={c} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                            <ColorSwatch color={c} product={p} />
-                            <span style={{ color: "var(--text)" }}>{c}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {distinctSizes.length === 0 && distinctColors.length === 0 && (
-                    <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Standard size/color</div>
-                  )}
+                  ))}
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+              {kitItems.map(({ product: p, opts }) => {
+                const distinctSizes = (p.variants?.map(v => v.size).filter((v): v is string => Boolean(v)).filter((v, i, a) => a.indexOf(v) === i)) ?? [];
+                const distinctColors = (p.variants?.map(v => v.color).filter((v): v is string => Boolean(v)).filter((v, i, a) => a.indexOf(v) === i)) ?? [];
+                return (
+                  <div key={p.id} className="card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10, borderRadius: 12 }}>
+                    <div style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: "#f4f6f4", position: "relative" }}>
+                      <DesignedProductThumb product={p} artworkUrl={kit.artworkUrl} />
+                    </div>
+                    {p.brand && <div className="mut3" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".04em" }}>{p.brand}</div>}
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{p.nm}</div>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Qty: 1 unit</div>
+                    <div className="divider" style={{ margin: "2px 0" }} />
+                    {distinctSizes.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4, fontWeight: 500 }}>Sizes</div>
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {distinctSizes.map(s => (
+                            <span key={s} style={{ fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 4, background: "var(--surface-2)", border: "1px solid var(--border)" }}>{s}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {distinctColors.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4, fontWeight: 500 }}>Colors</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {distinctColors.map(c => (
+                            <div key={c} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                              <ColorSwatch color={c} product={p} />
+                              <span style={{ color: "var(--text)" }}>{c}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {distinctSizes.length === 0 && distinctColors.length === 0 && (
+                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Standard size/color</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
-      {/* ── Step 1: Recipients (with Choose Mode above the table) ── */}
+      {/* ── Step 1: Recipients ── */}
       {vm.step === 1 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           {/* Mode Selection Cards */}
@@ -294,7 +343,9 @@ export function SendKitView(vm: SendKitVm) {
 
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Who's receiving this?</h1>
-            <p className="muted" style={{ fontSize: 13, marginBottom: 18 }}>Choose recipients and configure variants for each item.</p>
+            <p className="muted" style={{ fontSize: 13, marginBottom: 18 }}>
+              {isCurated ? "Choose recipients to receive this curated kit." : "Choose recipients and configure variants for each item."}
+            </p>
 
             {draft.mode === "single" && (
               <div className="card" style={{ padding: 20, marginBottom: 20 }}>
@@ -329,8 +380,8 @@ export function SendKitView(vm: SendKitVm) {
                 {draft.selRecips.length} selected
               </span>
               <button type="button" className="btn btn-ghost btn-sm" style={{ border: "1px solid var(--border)", background: "var(--surface)", height: 32, padding: "0 12px", borderRadius: 6 }} onClick={() => dispatch({ type: "deselectRecips" })}>Deselect all</button>
-              <button type="button" className="btn btn-ghost btn-sm" style={{ border: "1px solid var(--border)", background: "var(--surface)", height: 32, padding: "0 12px", borderRadius: 6 }} onClick={() => toast.info("Manual email input functional modal placeholder triggered")}>Input emails</button>
-              <button type="button" className="btn btn-ghost btn-sm" style={{ border: "1px solid var(--border)", background: "var(--surface)", height: 32, padding: "0 12px", borderRadius: 6 }} onClick={() => toast.info("CSV import wizard functional overlay placeholder triggered")}>Add by CSV</button>
+              <button type="button" className="btn btn-ghost btn-sm" style={{ border: "1px solid var(--border)", background: "var(--surface)", height: 32, padding: "0 12px", borderRadius: 6 }} onClick={() => toast.info("Manual email input modal placeholder triggered")}>Input emails</button>
+              <button type="button" className="btn btn-ghost btn-sm" style={{ border: "1px solid var(--border)", background: "var(--surface)", height: 32, padding: "0 12px", borderRadius: 6 }} onClick={() => toast.info("CSV import wizard placeholder triggered")}>Add by CSV</button>
               <div style={{ marginLeft: "auto" }}>
                 <input
                   className="inp"
@@ -350,18 +401,20 @@ export function SendKitView(vm: SendKitVm) {
                     <th style={stickHeadCheckbox1}></th>
                     <th style={stickHeadName1}>RECIPIENT</th>
                     <th style={stickHeadEmail1}>EMAIL</th>
-                    <th style={stickHeadAddr1}>ADDRESS</th>
-                    <th
-                      colSpan={kitItems.length || 1}
-                      style={{ ...thStyle, borderLeft: "2px solid var(--border)", background: "var(--surface)" }}
-                    >
-                      <div style={{ fontWeight: 700, fontSize: 12, letterSpacing: ".05em" }}>KIT ITEMS &amp; VARIANTS</div>
-                      <div style={{ fontWeight: 400, fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                        Configure size, color &amp; other variants for each recipient
-                      </div>
-                    </th>
+                    <th style={{ ...stickHeadAddr1, ...(!isCurated ? {} : { borderRight: "none" }) }}>ADDRESS</th>
+                    {!isCurated && (
+                      <th
+                        colSpan={kitItems.length || 1}
+                        style={{ ...thStyle, borderLeft: "2px solid var(--border)", background: "var(--surface)" }}
+                      >
+                        <div style={{ fontWeight: 700, fontSize: 12, letterSpacing: ".05em" }}>KIT ITEMS &amp; VARIANTS</div>
+                        <div style={{ fontWeight: 400, fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                          Configure size, color &amp; other variants for each recipient
+                        </div>
+                      </th>
+                    )}
                   </tr>
-                  {kitItems.length > 0 && (
+                  {!isCurated && kitItems.length > 0 && (
                     <tr style={{ background: "var(--surface)" }}>
                       <th style={stickHeadCheckbox2}></th>
                       <th style={stickHeadName2}></th>
@@ -402,8 +455,8 @@ export function SendKitView(vm: SendKitVm) {
                         </td>
                         <td style={cellName(bg)}>{contact.name}</td>
                         <td style={cellEmail(bg)}>{contact.email}</td>
-                        <td style={cellAddr(bg)}>{addr || "—"}</td>
-                        {kitItems.map(({ product: prod, opts }) => {
+                        <td style={{ ...cellAddr(bg), ...(!isCurated ? {} : { borderRight: "none" }) }}>{addr || "—"}</td>
+                        {!isCurated && kitItems.map(({ product: prod, opts }) => {
                           const selection = draft.recipVariants[contact.id]?.[prod.id || ""] || {};
                           const showVariants = draft.mode === "surprise" || draft.mode === "single";
                           return (
@@ -534,12 +587,6 @@ const thStyle: React.CSSProperties = {
 const tdStyle: React.CSSProperties = {
   padding: "12px 14px", verticalAlign: "middle",
 };
-
-// Sticky column styling & offsets:
-// Checkbox: width 40px (left 0)
-// Recipient: width 120px (left 40)
-// Email: width 160px (left 160)
-// Address: width 180px (left 320)
 
 const stickHeadCheckbox1: React.CSSProperties = { ...thStyle, position: "sticky", left: 0, zIndex: 20, background: "var(--surface-2)", width: 40, minWidth: 40 };
 const stickHeadName1: React.CSSProperties = { ...thStyle, position: "sticky", left: 40, zIndex: 20, background: "var(--surface-2)", width: 120, minWidth: 120 };

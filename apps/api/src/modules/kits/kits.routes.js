@@ -32,7 +32,7 @@ const createSchema = z.object({
   productRefs: z.array(productRef).min(1),
   designNotes: z.string().optional().default(''),
   packaging: z.enum(['none', 'box']).optional().default('none'),
-  status: z.enum(['draft', 'live']).optional().default('draft'),
+  status: z.enum(['draft', 'live', 'archived']).optional().default('draft'),
 });
 
 const updateSchema = createSchema.partial();

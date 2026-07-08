@@ -1,4 +1,4 @@
-import { useMemo, useReducer, useState, type Dispatch } from "react";
+import { useMemo, useReducer, useState, useEffect, type Dispatch } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import { useWorkspace, useInvalidateWorkspace } from "@/hooks/useWorkspace";
@@ -133,6 +133,19 @@ export function resolveKitItemOptions(product: UiProduct, ref: any = {}) {
   };
 }
 
+export function getCuratedKitMeta(kit: UiKit | undefined) {
+  if (!kit?.designNotes) return null;
+  try {
+    const parsed = JSON.parse(kit.designNotes);
+    if (parsed && parsed.curated) {
+      return parsed as { curated: boolean; originalId: string; description: string; imageUrls: string[] };
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 export type SendKitStep = 0 | 1 | 2 | 3;
 
 export type SendKitVm = {
@@ -158,6 +171,8 @@ export type SendKitVm = {
   onNext: () => void;
   onBack: () => void;
   onPayAndSend: () => void;
+  kitName: string;
+  setKitName: (name: string) => void;
 };
 
 function missingAddress(contacts: UiContact[], selected: string[]): UiContact[] {
@@ -182,6 +197,14 @@ export function useSendKitController(): SendKitVm {
   const contacts: UiContact[] = useMemo(() => workspace?.contacts ?? [], [workspace]);
   const kit = workspace?.kits.find((k) => k.id === id);
 
+  const [kitName, setKitName] = useState("");
+
+  useEffect(() => {
+    if (kit) {
+      setKitName(kit.name);
+    }
+  }, [kit]);
+
   const initial = useMemo(() => {
     const picked = kit ? kitPickedIndices(kit, catalog) : [];
     const packaging = kit?.packaging === "none" ? "none" : "box";
@@ -202,7 +225,20 @@ export function useSendKitController(): SendKitVm {
     draft.mode === "surprise" ? missingAddress(contacts, draft.selRecips) : [];
 
   function onNext() {
-    if (step === 0) { setStep(1); return; }
+    if (step === 0) {
+      if (kit && kitName.trim() && kitName !== kit.name) {
+        updateKit.mutateAsync({
+          id: kit.id,
+          name: kitName.trim(),
+          pickedIndices: kitPickedIndices(kit, catalog),
+          catalog,
+        }).catch((err) => {
+          console.error("Failed to rename kit:", err);
+        });
+      }
+      setStep(1);
+      return;
+    }
     if (step === 1) {
       if (!draft.selRecips.length) {
         toast.error("Select at least one recipient");
@@ -219,7 +255,8 @@ export function useSendKitController(): SendKitVm {
           return;
         }
       }
-      if (draft.mode === "surprise" || draft.mode === "single") {
+      const isCurated = !!getCuratedKitMeta(kit);
+      if (!isCurated && (draft.mode === "surprise" || draft.mode === "single")) {
         const missingList: string[] = [];
         const pickedProds = draft.picked.map((idx) => catalog[idx]).filter(Boolean);
         for (const rid of draft.selRecips) {
@@ -343,5 +380,7 @@ export function useSendKitController(): SendKitVm {
     onNext,
     onBack: () => setStep((s) => Math.max(s - 1, 0) as SendKitStep),
     onPayAndSend,
+    kitName,
+    setKitName,
   };
 }

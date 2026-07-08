@@ -11,7 +11,7 @@ const kitSchema = new mongoose.Schema(
     artworkUrl: { type: String, default: '' },
     designNotes: { type: String, default: '' },
     packaging: { type: String, enum: ['none', 'box'], default: 'none' },
-    status: { type: String, enum: ['draft', 'live'], default: 'draft' },
+    status: { type: String, enum: ['draft', 'live', 'archived'], default: 'draft' },
     lastSentAt: { type: Date, default: null },
   },
   { timestamps: true },

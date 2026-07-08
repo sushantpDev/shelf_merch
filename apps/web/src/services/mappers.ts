@@ -380,7 +380,7 @@ export function mapKit(k: ApiProduct): UiKit {
     id: String(k._id),
     name: k.name,
     items: productRefs.length,
-    status: k.status === "live" ? "live" : "draft",
+    status: k.status === "live" ? "live" : k.status === "archived" ? "archived" : "draft",
     sent: Boolean(k.lastSentAt),
     productRefs,
     packaging: k.packaging || "none",
