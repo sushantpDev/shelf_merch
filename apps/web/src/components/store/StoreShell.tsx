@@ -467,6 +467,12 @@ export default function StoreShell({
   const catalogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const base = "ShelfMerch";
+    const name = (shop?.name || "").trim();
+    document.title = name ? `${name} | ${base}` : base;
+  }, [shop?.name]);
+
+  useEffect(() => {
     setBalanceInr(creditInr);
   }, [creditInr]);
 
@@ -533,6 +539,12 @@ export default function StoreShell({
   const hasEnoughPoints = balanceInr != null && cartTotalInr <= balanceInr;
   const paysWithUpi = mode === "redeem" && upiDueInr > 0;
   const canCheckout = mode !== "redeem" || cart.length > 0;
+
+  const storeCategories = useMemo(() => {
+    const unique = Array.from(new Set(products.map((p) => (p.category || "").trim()).filter(Boolean)));
+    unique.sort((a, b) => a.localeCompare(b));
+    return ["All Products", ...unique];
+  }, [products]);
 
   function inrToPoints(inr: number) {
     return Math.round(inr / POINT_VALUE);
@@ -847,6 +859,22 @@ export default function StoreShell({
             />
           </div>
 
+          <nav className="sf-nav" aria-label="Categories">
+            {storeCategories.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={`sf-nav-link${selectedCategory === c ? " active" : ""}`}
+                onClick={() => {
+                  setSelectedCategory(c);
+                  setPage("products");
+                }}
+              >
+                {c}
+              </button>
+            ))}
+          </nav>
+
           <div className="sf-topbar-right sf-topbar-right--stadium">
             {mode === "redeem" && balanceInr != null && (
               <button
@@ -989,18 +1017,7 @@ export default function StoreShell({
                 loading="eager"
                 decoding="async"
               />
-              <div className="sf-hero-banner-overlay" aria-hidden="false">
-                <div className="sf-hero-banner-actions">
-                  <button type="button" className="sf-hero-banner-btn sf-hero-banner-btn-primary" onClick={browseRewards}>
-                    <GiftIcon />
-                    Browse Rewards
-                  </button>
-                  <button type="button" className="sf-hero-banner-btn sf-hero-banner-btn-secondary" onClick={goHowItWorks}>
-                    <PlayCircleIcon />
-                    How it works
-                  </button>
-                </div>
-              </div>
+              <div className="sf-hero-banner-overlay" aria-hidden="true" />
             </div>
           </div>
 
@@ -1187,10 +1204,6 @@ export default function StoreShell({
                 <div className="sf-bag-summary-row">
                   <span>Bag total</span>
                   <b>{fmtCardPrice(cartTotalInr)}</b>
-                </div>
-                <div className="sf-bag-summary-row sf-bag-summary-row--muted">
-                  <span>Estimated taxes</span>
-                  <b>TBD</b>
                 </div>
                 {mode === "redeem" && balanceInr != null && useRewardPoints && pointsApplied > 0 ? (
                   <div className="sf-bag-summary-row sf-bag-summary-row--muted">
@@ -1424,17 +1437,38 @@ export default function StoreShell({
             <aside className="sf-checkout-sidebar">
               <div className="sf-checkout-summary">
                 <h2 className="sf-checkout-summary-title">Order Summary</h2>
+                {mode === "redeem" && balanceInr != null ? (
+                  <div className={`sf-bag-funds sf-bag-funds--checkout${useRewardPoints ? "" : " sf-bag-funds--off"}`}>
+                    <div className="sf-bag-funds-label">My Reward Points</div>
+                    <label className="sf-bag-funds-wallet">
+                      <input
+                        type="checkbox"
+                        checked={useRewardPoints}
+                        onChange={(e) => setUseRewardPoints(e.target.checked)}
+                      />
+                      <span>
+                        {recipientName ? `${recipientName}'s ` : ""}
+                        {shop.name} Wallet
+                      </span>
+                    </label>
+                    <div className="sf-bag-funds-balance">
+                      Available: <b>{navBalanceValue(balanceInr)}</b>
+                    </div>
+                    {!useRewardPoints ? (
+                      <p className="sf-bag-funds-hint">Pay at checkout via UPI, cards, or net banking.</p>
+                    ) : !hasEnoughPoints ? (
+                      <p className="sf-bag-funds-warning">
+                        Insufficient points — remaining balance can be paid via UPI at checkout.
+                      </p>
+                    ) : (
+                      <p className="sf-bag-funds-hint">Reward points will be applied at checkout.</p>
+                    )}
+                  </div>
+                ) : null}
                 <div className="sf-checkout-summary-row">
                   <span>Bag total</span>
                   <b>{fmtCardPrice(cartTotalInr)}</b>
                 </div>
-                <div className="sf-checkout-summary-row sf-checkout-summary-row--muted">
-                  <span>Estimated taxes</span>
-                  <b>TBD</b>
-                </div>
-                <button type="button" className="sf-checkout-promo" onClick={() => {}}>
-                  Apply promo code
-                </button>
                 {mode === "redeem" && useRewardPoints && pointsApplied > 0 ? (
                   <div className="sf-checkout-summary-row sf-checkout-summary-row--muted">
                     <span>Points applied</span>
@@ -1449,7 +1483,7 @@ export default function StoreShell({
                 ) : null}
                 <div className="sf-checkout-summary-total">
                   <span>You pay</span>
-                  <b>{paysWithUpi ? fmtUpiAmount(upiDueInr) : fmtCheckoutInr(cartTotalInr)}</b>
+                  <b>{paysWithUpi ? fmtUpiAmount(upiDueInr) : fmtCardPrice(cartTotalInr)}</b>
                 </div>
                 <button
                   type="button"

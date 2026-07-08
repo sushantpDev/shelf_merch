@@ -4408,6 +4408,9 @@ a.shop-collection-cell:hover{background:#eef1ee}
   padding: 18px 20px;
   margin-bottom: 24px;
 }
+.sf-bag-funds--checkout{
+  margin-bottom:16px;
+}
 .sf-bag-payment {
   background: #fff;
   border: 1px solid #e8ece8;

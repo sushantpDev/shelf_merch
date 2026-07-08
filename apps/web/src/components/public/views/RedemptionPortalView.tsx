@@ -130,8 +130,10 @@ export function RedemptionPortalView(vm: RedemptionVm) {
               className="btn btn-brand btn-block"
               style={{ marginTop: 16 }}
               onClick={vm.onSendOtp}
+              disabled={vm.isSendingOtp || !vm.contact.trim()}
+              aria-busy={vm.isSendingOtp}
             >
-              Send verification code
+              {vm.isSendingOtp ? "Sending…" : "Send verification code"}
             </button>
           </div>
         )}
@@ -152,8 +154,14 @@ export function RedemptionPortalView(vm: RedemptionVm) {
               className="btn btn-brand btn-block"
               style={{ marginTop: 16 }}
               onClick={vm.onVerifyOtp}
+              disabled={vm.isVerifyingOtp || vm.otp.trim().length !== 6}
+              aria-busy={vm.isVerifyingOtp}
             >
-              {isKitFlow ? "Verify & view kit" : "Verify & enter store"}
+              {vm.isVerifyingOtp
+                ? "Verifying…"
+                : isKitFlow
+                  ? "Verify & view kit"
+                  : "Verify & enter store"}
             </button>
           </div>
         )}

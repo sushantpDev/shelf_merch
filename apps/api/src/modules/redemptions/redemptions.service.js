@@ -370,6 +370,7 @@ export async function getCatalog(token) {
   const mockupByProductId = new Map();
   const preferredColorsByProductId = new Map();
   let shopCollections = [];
+  let effectiveIdsFromShop = [];
   if (campaign.shopId) {
     shopCollections = await Collection.find({
       ...collectionsForShopFilter(campaign.shopId),
@@ -378,6 +379,12 @@ export async function getCatalog(token) {
     })
       .select('productRefs artworkUrl preferredColors')
       .lean();
+
+    const shop = await Shop.findOne({ _id: campaign.shopId, tenantId: recipient.tenantId })
+      .select('selectedCatalogProductIds')
+      .lean();
+    effectiveIdsFromShop = (shop?.selectedCatalogProductIds || []).map(String).filter(Boolean);
+
     for (const col of shopCollections) {
       for (const ref of col.productRefs || []) {
         const pid = ref.catalogProductId ? String(ref.catalogProductId) : '';
@@ -398,16 +405,8 @@ export async function getCatalog(token) {
   } else if (campaign.shopId) {
     // Redemption catalog mirrors the storefront: only products with an active
     // Branded Swag design for this shop are shown.
-    const collectionCatalogIds = [];
-    for (const col of shopCollections) {
-      for (const ref of col.productRefs || []) {
-        if (ref.catalogProductId) collectionCatalogIds.push(String(ref.catalogProductId));
-      }
-    }
-    const effectiveIds = [...new Set(collectionCatalogIds)];
-    if (!effectiveIds.length) {
-      return { products: [] };
-    }
+    const effectiveIds = [...new Set(effectiveIdsFromShop)];
+    if (!effectiveIds.length) return { products: [] };
     filter._id = { $in: effectiveIds };
   }
   const products = await CatalogProduct.find(filter)

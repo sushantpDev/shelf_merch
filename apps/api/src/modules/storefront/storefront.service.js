@@ -31,9 +31,11 @@ function mapBrandedListing(col, ref, base) {
 }
 
 /**
- * Public, no-auth storefront for a live shop. Storefront listings are driven
- * entirely by Branded Swag: one entry per (active collection × productRef).
- * A product with no design is hidden even if it's enabled in Shop Catalog.
+ * Public, no-auth storefront for a live shop.
+ *
+ * Source of truth: the shop's enabled catalog (`selectedCatalogProductIds`).
+ * Branded Swag collections provide optional artwork/mockup metadata, but are
+ * not required for a product to appear.
  */
 export async function getStorefront(shopId) {
   const shop = await Shop.findById(shopId).setOptions({ skipTenantGuard: true });
@@ -48,13 +50,22 @@ export async function getStorefront(shopId) {
     .select('productRefs artworkUrl preferredColors')
     .lean();
 
-  const collectionCatalogIds = [];
+  const artworkByProductId = new Map();
+  const mockupByProductId = new Map();
+  const preferredColorsByProductId = new Map();
   for (const col of collections) {
     for (const ref of col.productRefs || []) {
-      if (ref.catalogProductId) collectionCatalogIds.push(String(ref.catalogProductId));
+      const pid = ref.catalogProductId ? String(ref.catalogProductId) : '';
+      if (!pid) continue;
+      if (col.artworkUrl && !artworkByProductId.has(pid)) artworkByProductId.set(pid, col.artworkUrl);
+      if (ref.mockupUrl && !mockupByProductId.has(pid)) mockupByProductId.set(pid, ref.mockupUrl);
+      if (col.preferredColors?.length && !preferredColorsByProductId.has(pid)) {
+        preferredColorsByProductId.set(pid, col.preferredColors);
+      }
     }
   }
-  const effectiveIds = [...new Set(collectionCatalogIds)];
+
+  const effectiveIds = [...new Set((shop.selectedCatalogProductIds || []).map(String).filter(Boolean))];
   if (!effectiveIds.length) {
     return {
       shop: shopPublicPayload(shop),
@@ -62,26 +73,21 @@ export async function getStorefront(shopId) {
     };
   }
 
-  const catalogRows = await CatalogProduct.find({
+  const products = await CatalogProduct.find({
     status: 'active',
     _id: { $in: effectiveIds },
   })
     .setOptions({ skipTenantGuard: true })
     .select(CATALOG_SELECT)
-    .lean();
-
-  const catalogById = new Map(catalogRows.map((row) => [String(row._id), row]));
-
-  const products = [];
-  for (const col of collections) {
-    for (const ref of col.productRefs || []) {
-      const catalogProductId = ref.catalogProductId ? String(ref.catalogProductId) : '';
-      if (!catalogProductId) continue;
-      const base = catalogById.get(catalogProductId);
-      if (!base) continue;
-      products.push(mapBrandedListing(col, ref, base));
-    }
-  }
+    .lean()
+    .then((rows) =>
+      rows.map((p) => ({
+        ...p,
+        artworkUrl: artworkByProductId.get(String(p._id)) || '',
+        mockupUrl: mockupByProductId.get(String(p._id)) || '',
+        preferredColors: preferredColorsByProductId.get(String(p._id)) || [],
+      })),
+    );
 
   products.sort((a, b) => String(a.name).localeCompare(String(b.name)));
 

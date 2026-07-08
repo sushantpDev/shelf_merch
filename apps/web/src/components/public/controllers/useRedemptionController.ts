@@ -43,10 +43,12 @@ export type RedemptionVm = {
   order: { orderNumber?: string; status?: string } | null;
   token: string;
   isKitFlow: boolean;
+  isSendingOtp: boolean;
+  isVerifyingOtp: boolean;
   onContact: (contact: string) => void;
   onOtp: (otp: string) => void;
-  onSendOtp: () => void;
-  onVerifyOtp: () => void;
+  onSendOtp: () => Promise<void>;
+  onVerifyOtp: () => Promise<void>;
   onCheckout: (
     items: CheckoutItem[],
     shippingAddress: ShippingAddress,
@@ -72,6 +74,8 @@ export function useRedemptionController(token: string): RedemptionVm {
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [kitData, setKitData] = useState<KitRedemptionData | null>(null);
   const [order, setOrder] = useState<{ orderNumber?: string; status?: string } | null>(null);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
   const enterRedemption = useCallback(
     async (session: string, portalData: PortalData) => {
@@ -117,23 +121,31 @@ export function useRedemptionController(token: string): RedemptionVm {
   }, [loadPortal]);
 
   async function onSendOtp() {
+    if (isSendingOtp) return;
     setError("");
+    setIsSendingOtp(true);
     try {
       await sendRedemptionOtp(token, contact);
       setStep("otp");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to send OTP");
+    } finally {
+      setIsSendingOtp(false);
     }
   }
 
   async function onVerifyOtp() {
+    if (isVerifyingOtp) return;
     setError("");
+    setIsVerifyingOtp(true);
     try {
       const res = await verifyRedemptionOtp(token, otp);
       setSessionToken(res.sessionToken);
       if (portal) await enterRedemption(res.sessionToken, portal);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Invalid OTP");
+    } finally {
+      setIsVerifyingOtp(false);
     }
   }
 
@@ -195,6 +207,8 @@ export function useRedemptionController(token: string): RedemptionVm {
     order,
     token,
     isKitFlow: isKitCampaign(portal),
+    isSendingOtp,
+    isVerifyingOtp,
     onContact: setContact,
     onOtp: setOtp,
     onSendOtp,
