@@ -50,6 +50,14 @@ export const importRecipientsSchema = z.object({
         phone: z.string().optional().default(''),
         contactId: objectId.optional(),
         creditAmount: z.number().positive().optional(),
+        variants: z
+          .record(
+            z.object({
+              size: z.string().optional(),
+              color: z.string().optional(),
+            }),
+          )
+          .optional(),
       }),
     )
     .min(1),

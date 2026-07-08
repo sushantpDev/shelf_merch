@@ -485,11 +485,18 @@ export async function launchKitCampaignFlow(payload: {
   schedule?: { mode: "now" | "scheduled" | "self"; sendAt?: string | null; timezone?: string };
   contactIds: string[];
   contacts: Array<{ id: string; name: string; email: string; phone?: string }>;
+  recipVariants?: Record<string, Record<string, { size?: string; color?: string }>>;
 }) {
   const recipients = payload.contactIds
     .map((id) => payload.contacts.find((c) => c.id === id))
     .filter(Boolean)
-    .map((c) => ({ contactId: c!.id, name: c!.name, email: c!.email, phone: c!.phone }));
+    .map((c) => ({
+      contactId: c!.id,
+      name: c!.name,
+      email: c!.email,
+      phone: c!.phone,
+      variants: payload.recipVariants?.[c!.id],
+    }));
   if (!recipients.length) throw new Error("Select at least one recipient");
   return launchKitCampaignApi({
     entityId: payload.entityId,

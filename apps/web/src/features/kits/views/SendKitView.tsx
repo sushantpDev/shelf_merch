@@ -1,203 +1,460 @@
+import { useState } from "react";
+import { toast } from "sonner";
 import { LoadingState } from "@/components/LoadingState";
 import { inr } from "@/components/platform/platform-ui";
 import { WizardChrome } from "@/features/swag/wizard/WizardChrome";
-import { RecipientPicker, LocField } from "@/features/send/RecipientPicker";
+import { LocField } from "@/features/send/RecipientPicker";
 import { RecipientExperience } from "@/features/send/RecipientExperience";
 import { PaymentPanel } from "@/features/send/PaymentPanel";
 import type { SendKitVm } from "../controllers/useSendKitController";
+import { DesignedProductThumb } from "@/features/swag/DesignedProductThumb";
+import { resolveKitItemOptions } from "../controllers/useSendKitController";
+import type { UiProduct } from "@/services/mappers";
 
-const STEPS = ["Choose Mode", "Recipients", "Experience", "Checkout"];
+const STEPS = ["Items", "Recipients", "Experience", "Checkout"];
 
-/** Send-kit wizard shell; all state and actions come from the controller. */
+const COLOR_MAP: Record<string, string> = {
+  black: "#1a1a1a", white: "#f8f8f8", navy: "#001f5b", red: "#c0392b",
+  blue: "#2980b9", green: "#27ae60", gray: "#95a5a6", grey: "#95a5a6",
+  brown: "#8B4513", beige: "#f5f5dc", yellow: "#f1c40f", orange: "#e67e22",
+  purple: "#8e44ad", pink: "#e91e8c", teal: "#1abc9c", maroon: "#800000",
+  olive: "#808000", cream: "#fffdd0", charcoal: "#36454f", gold: "#FFD700",
+  silver: "#C0C0C0", coral: "#FF6B6B", "royal blue": "#4169e1",
+};
+
+function swatchColor(product: UiProduct, colorName: string): string {
+  // 1. Check variant colorHex
+  const variantWithHex = product.variants?.find(v => v.color?.toLowerCase() === colorName.toLowerCase() && v.colorHex);
+  if (variantWithHex?.colorHex) return variantWithHex.colorHex;
+
+  // 2. Check product.colorHexByName
+  if (product.colorHexByName) {
+    const nameMatch = Object.keys(product.colorHexByName).find(k => k.toLowerCase() === colorName.toLowerCase());
+    if (nameMatch && product.colorHexByName[nameMatch]) {
+      return product.colorHexByName[nameMatch];
+    }
+  }
+
+  // 3. Fallback
+  return COLOR_MAP[colorName.toLowerCase()] ?? colorName.toLowerCase();
+}
+
+function ColorSwatch({ color, product }: { color: string; product: UiProduct }) {
+  return (
+    <span
+      title={color}
+      style={{
+        width: 14, height: 14, borderRadius: "50%",
+        background: swatchColor(product, color),
+        border: "1.5px solid rgba(0,0,0,.18)",
+        display: "inline-block", flexShrink: 0,
+      }}
+    />
+  );
+}
+
+function ColorSelect({
+  value, colors, onChange, product
+}: { value: string; colors: string[]; onChange: (v: string) => void; product: UiProduct }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div style={{ position: "relative", display: "inline-block" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          display: "flex", alignItems: "center", gap: 5,
+          border: "1px solid var(--border)", borderRadius: 8,
+          padding: "4px 8px", background: "var(--surface)", width: 105,
+          height: 32, cursor: "pointer", textAlign: "left",
+          justifyContent: "space-between", color: value ? "var(--text)" : "var(--text-muted)",
+          outline: "none"
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 5, overflow: "hidden" }}>
+          {value ? (
+            <span
+              style={{
+                width: 12, height: 12, borderRadius: "50%",
+                background: swatchColor(product, value),
+                border: "1px solid rgba(0,0,0,0.15)",
+                display: "inline-block", flexShrink: 0,
+              }}
+            />
+          ) : (
+            <span
+              style={{
+                width: 12, height: 12, borderRadius: "50%",
+                background: "transparent",
+                border: "1px dashed var(--border)",
+                display: "inline-block", flexShrink: 0,
+              }}
+            />
+          )}
+          <span style={{ fontSize: 12, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {value || "Color"}
+          </span>
+        </div>
+        <span style={{ fontSize: 9, opacity: 0.7 }}>▼</span>
+      </button>
+
+      {open && (
+        <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 999 }} onClick={() => setOpen(false)} />
+          <div style={{
+            position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4,
+            background: "var(--surface)", border: "1px solid var(--border)",
+            borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.08)", zIndex: 1000,
+            maxHeight: 180, overflowY: "auto", padding: 4
+          }}>
+            <div
+              onClick={() => { onChange(""); setOpen(false); }}
+              style={{
+                padding: "6px 8px", fontSize: 12, cursor: "pointer",
+                borderRadius: 6, display: "flex", alignItems: "center", gap: 6,
+                background: !value ? "var(--surface-2)" : "transparent"
+              }}
+            >
+              <span style={{ width: 12, height: 12, borderRadius: "50%", border: "1px dashed var(--border)", display: "inline-block" }} />
+              <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>Color</span>
+            </div>
+            {colors.map(c => (
+              <div
+                key={c}
+                onClick={() => { onChange(c); setOpen(false); }}
+                style={{
+                  padding: "6px 8px", fontSize: 12, cursor: "pointer",
+                  borderRadius: 6, display: "flex", alignItems: "center", gap: 6,
+                  background: value === c ? "var(--surface-2)" : "transparent"
+                }}
+              >
+                <span
+                  style={{
+                    width: 12, height: 12, borderRadius: "50%",
+                    background: swatchColor(product, c),
+                    border: "1px solid rgba(0,0,0,0.15)",
+                    display: "inline-block", flexShrink: 0
+                  }}
+                />
+                <span style={{ color: "var(--text)", fontWeight: 505 }}>{c}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function SizeSelect({
+  value, sizes, onChange,
+}: { value: string; sizes: string[]; onChange: (v: string) => void }) {
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      style={{
+        border: "1px solid var(--border)", borderRadius: 8,
+        padding: "4px 8px", fontSize: 12, background: "var(--surface)",
+        outline: "none", cursor: "pointer", minWidth: 90, color: "var(--text)",
+        fontWeight: 500, height: 32,
+      }}
+    >
+      <option value="">Size</option>
+      {sizes.map(s => <option key={s} value={s}>{s}</option>)}
+    </select>
+  );
+}
+
 export function SendKitView(vm: SendKitVm) {
   const { draft, dispatch } = vm;
+  const [search, setSearch] = useState("");
 
-  if (vm.isLoading) {
-    return <LoadingState message="Loading kit…" fullScreen={false} />;
-  }
+  if (vm.isLoading) return <LoadingState message="Loading kit…" fullScreen={false} />;
   if (vm.notFound || !vm.kit) {
     return (
       <div className="card" style={{ padding: 16 }}>
         Kit not found.{" "}
-        <button type="button" className="lnk" onClick={vm.onExit}>
-          Back to kits
-        </button>
+        <button type="button" className="lnk" onClick={vm.onExit}>Back to kits</button>
       </div>
     );
   }
-  if (vm.isSending) {
-    return <LoadingState message="Placing order…" fullScreen={false} />;
-  }
+  if (vm.isSending) return <LoadingState message="Placing order…" fullScreen={false} />;
 
   const { totals, kit } = vm;
 
+  const kitItems = draft.picked
+    .map(idx => vm.catalog[idx])
+    .filter(Boolean)
+    .map(p => {
+      const ref = kit.productRefs?.find(r => r.catalogProductId === p.id) ?? {};
+      return { product: p, opts: resolveKitItemOptions(p, ref) };
+    });
+
+  const filteredContacts = vm.contacts.filter(c =>
+    !search || c.name.toLowerCase().includes(search.toLowerCase()) ||
+    c.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
   const footer = (
     <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-      {vm.step > 0 ? (
-        <button
-          type="button"
-          className="lnk"
-          style={{ background: "none", border: "none", cursor: "pointer" }}
-          onClick={vm.onBack}
-        >
-          Back
-        </button>
-      ) : (
-        <span />
-      )}
-      {vm.step < 3 ? (
-        <button type="button" className="btn btn-dark" onClick={vm.onNext}>
-          Next
-        </button>
-      ) : (
-        <span />
-      )}
+      {vm.step > 0
+        ? <button type="button" className="lnk" style={{ background: "none", border: "none", cursor: "pointer" }} onClick={vm.onBack}>Back</button>
+        : <span />}
+      {vm.step < 3
+        ? <button type="button" className="btn btn-dark" onClick={vm.onNext}>Next</button>
+        : <span />}
     </div>
   );
 
   return (
-    <WizardChrome
-      title="Send Items"
-      steps={STEPS}
-      activeIndex={vm.step}
-      onExit={vm.onExit}
-      exitLabel="Cancel"
-      footer={footer}
-    >
+    <WizardChrome title="Send Items" steps={STEPS} activeIndex={vm.step} onExit={vm.onExit} exitLabel="Cancel" footer={footer}>
+
+      {/* ── Step 0: Items ── */}
       {vm.step === 0 && (
-        <div style={{ maxWidth: 880, margin: "0 auto", padding: "10px 0" }}>
-          <h1 style={{ fontSize: 24, marginBottom: 8 }}>Choose Send Mode</h1>
-          <p className="muted" style={{ marginBottom: 24 }}>
-            Select how you would like to deliver this kit to your recipients.
-          </p>
-          <div className="grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-            <button
-              type="button"
-              className={`optcard ${draft.mode === "surprise" ? "on" : ""}`}
-              onClick={() => dispatch({ type: "setMode", mode: "surprise" })}
-              style={{ minHeight: 180, display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", cursor: "pointer", padding: 18 }}
-            >
-              <div className="rd" />
-              <div style={{ marginTop: 12 }}>
-                <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Surprise recipient</h4>
-                <p className="muted" style={{ fontSize: 13, lineHeight: 1.4 }}>
-                  Enter recipient details up front so gifts ship directly without requiring their input.
-                </p>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className={`optcard ${draft.mode === "single" ? "on" : ""}`}
-              onClick={() => dispatch({ type: "setMode", mode: "single" })}
-              style={{ minHeight: 180, display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", cursor: "pointer", padding: 18 }}
-            >
-              <div className="rd" />
-              <div style={{ marginTop: 12 }}>
-                <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Send all kits to given address</h4>
-                <p className="muted" style={{ fontSize: 13, lineHeight: 1.4 }}>
-                  Ship all units to one office, event venue or specific address.
-                </p>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className={`optcard ${draft.mode === "redeem" ? "on" : ""}`}
-              onClick={() => dispatch({ type: "setMode", mode: "redeem" })}
-              style={{ minHeight: 180, display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", cursor: "pointer", padding: 18 }}
-            >
-              <div className="rd" />
-              <div style={{ marginTop: 12 }}>
-                <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Let recipient choose the variants</h4>
-                <p className="muted" style={{ fontSize: 13, lineHeight: 1.4 }}>
-                  Recipients choose their own size, color & shipping address from a private link.
-                </p>
-              </div>
-            </button>
+        <div style={{ maxWidth: 900, margin: "0 auto", padding: "10px 0" }}>
+          <h1 style={{ fontSize: 24, marginBottom: 6 }}>Review Items</h1>
+          <p className="muted" style={{ marginBottom: 24 }}>Review the items included in this kit before continuing.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+            {kitItems.map(({ product: p, opts }) => {
+              const distinctSizes = (p.variants?.map(v => v.size).filter((v): v is string => Boolean(v)).filter((v, i, a) => a.indexOf(v) === i)) ?? [];
+              const distinctColors = (p.variants?.map(v => v.color).filter((v): v is string => Boolean(v)).filter((v, i, a) => a.indexOf(v) === i)) ?? [];
+              return (
+                <div key={p.id} className="card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10, borderRadius: 12 }}>
+                  <div style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: "#f4f6f4", position: "relative" }}>
+                    <DesignedProductThumb product={p} artworkUrl={kit.artworkUrl} />
+                  </div>
+                  {p.brand && <div className="mut3" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".04em" }}>{p.brand}</div>}
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{p.nm}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Qty: 1 unit</div>
+                  <div className="divider" style={{ margin: "2px 0" }} />
+                  {distinctSizes.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4, fontWeight: 500 }}>Sizes</div>
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {distinctSizes.map(s => (
+                          <span key={s} style={{ fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 4, background: "var(--surface-2)", border: "1px solid var(--border)" }}>{s}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {distinctColors.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4, fontWeight: 500 }}>Colors</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {distinctColors.map(c => (
+                          <div key={c} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                            <ColorSwatch color={c} product={p} />
+                            <span style={{ color: "var(--text)" }}>{c}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {distinctSizes.length === 0 && distinctColors.length === 0 && (
+                    <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Standard size/color</div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
+      {/* ── Step 1: Recipients (with Choose Mode above the table) ── */}
       {vm.step === 1 && (
-        <>
-          {draft.mode === "single" && (
-            <div className="card" style={{ padding: 20, marginBottom: 18 }}>
-              <h3 style={{ fontSize: 16, marginBottom: 5 }}>Single delivery location</h3>
-              <p className="muted" style={{ fontSize: 12.5, marginBottom: 16 }}>
-                All selected recipients' gifts will ship together to this address. A notification will
-                be sent to the email below.
-              </p>
-              <div className="row" style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-                <LocField label="Contact name" k="name" loc={draft.singleLocation} onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })} />
-                <LocField
-                  label="Notification email"
-                  k="email"
-                  type="email"
-                  loc={draft.singleLocation}
-                  onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })}
-                />
-                <LocField
-                  label="Phone (optional)"
-                  k="phone"
-                  loc={draft.singleLocation}
-                  onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })}
-                />
-              </div>
-              <div style={{ marginBottom: 12 }}>
-                <LocField label="Address" k="line1" loc={draft.singleLocation} onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })} block />
-              </div>
-              <div style={{ marginBottom: 12 }}>
-                <LocField
-                  label="Address line 2 (optional)"
-                  k="line2"
-                  loc={draft.singleLocation}
-                  onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })}
-                  block
-                />
-              </div>
-              <div className="row" style={{ display: "flex", gap: 12 }}>
-                <LocField label="City" k="city" loc={draft.singleLocation} onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })} />
-                <LocField label="State" k="state" loc={draft.singleLocation} onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })} />
-                <LocField
-                  label="PIN / Postal code"
-                  k="pincode"
-                  loc={draft.singleLocation}
-                  onChange={(key, val) => dispatch({ type: "setSingleLoc", key, value: val })}
-                />
-                <div className="field" style={{ flex: 1 }}>
-                  <label className="lbl">Country</label>
-                  <select
-                    className="inp"
-                    value={draft.singleLocation.country || "IN"}
-                    onChange={(e) => dispatch({ type: "setSingleLoc", key: "country", value: e.target.value })}
-                  >
-                    <option value="IN">India</option>
-                    <option value="AE">UAE</option>
-                    <option value="US">USA</option>
-                  </select>
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          {/* Mode Selection Cards */}
+          <div style={{ background: "var(--surface)", padding: 20, borderRadius: 12, border: "1px solid var(--border)" }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Choose Send Mode</h3>
+            <p className="muted" style={{ fontSize: 13, marginBottom: 16 }}>Select how you would like to deliver this kit to your recipients.</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+              {([
+                { mode: "surprise", title: "Surprise Recipient", desc: "Enter recipient details up front so gifts ship directly without requiring their input." },
+                { mode: "single", title: "Send All Kits to Single Location", desc: "Ship all units to one office, event venue or specific address." },
+                { mode: "redeem", title: "Let Recipient Choose the Variant", desc: "Recipients choose their own size, color & shipping address from a private link." },
+              ] as const).map(({ mode, title, desc }) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={`optcard ${draft.mode === mode ? "on" : ""}`}
+                  onClick={() => dispatch({ type: "setMode", mode })}
+                  style={{ minHeight: 140, display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", cursor: "pointer", padding: 18, borderRadius: 12 }}
+                >
+                  <div className="rd" />
+                  <div style={{ marginTop: 10 }}>
+                    <h4 style={{ fontSize: 14, fontWeight: 650, marginBottom: 4 }}>{title}</h4>
+                    <p className="muted" style={{ fontSize: 12, lineHeight: 1.4, margin: 0 }}>{desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Who's receiving this?</h1>
+            <p className="muted" style={{ fontSize: 13, marginBottom: 18 }}>Choose recipients and configure variants for each item.</p>
+
+            {draft.mode === "single" && (
+              <div className="card" style={{ padding: 20, marginBottom: 20 }}>
+                <h3 style={{ fontSize: 15, marginBottom: 12 }}>Single delivery location</h3>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+                  <LocField label="Contact name" k="name" loc={draft.singleLocation} onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })} />
+                  <LocField label="Notification email" k="email" type="email" loc={draft.singleLocation} onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })} />
+                  <LocField label="Phone (optional)" k="phone" loc={draft.singleLocation} onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })} />
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  <LocField label="Address" k="line1" loc={draft.singleLocation} onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })} block />
+                </div>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  <LocField label="City" k="city" loc={draft.singleLocation} onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })} />
+                  <LocField label="State" k="state" loc={draft.singleLocation} onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })} />
+                  <LocField label="PIN / Postal code" k="pincode" loc={draft.singleLocation} onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })} />
+                  <div className="field" style={{ flex: 1 }}>
+                    <label className="lbl">Country</label>
+                    <select className="inp" value={draft.singleLocation.country || "IN"} onChange={e => dispatch({ type: "setSingleLoc", key: "country", value: e.target.value })}>
+                      <option value="IN">India</option>
+                      <option value="AE">UAE</option>
+                      <option value="US">USA</option>
+                    </select>
+                  </div>
                 </div>
               </div>
+            )}
+
+            {/* Toolbar */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, fontWeight: 600, padding: "5px 12px", borderRadius: 6, background: "#eef7ee", color: "#1e4620", border: "1px solid #d0ebd0" }}>
+                {draft.selRecips.length} selected
+              </span>
+              <button type="button" className="btn btn-ghost btn-sm" style={{ border: "1px solid var(--border)", background: "var(--surface)", height: 32, padding: "0 12px", borderRadius: 6 }} onClick={() => dispatch({ type: "deselectRecips" })}>Deselect all</button>
+              <button type="button" className="btn btn-ghost btn-sm" style={{ border: "1px solid var(--border)", background: "var(--surface)", height: 32, padding: "0 12px", borderRadius: 6 }} onClick={() => toast.info("Manual email input functional modal placeholder triggered")}>Input emails</button>
+              <button type="button" className="btn btn-ghost btn-sm" style={{ border: "1px solid var(--border)", background: "var(--surface)", height: 32, padding: "0 12px", borderRadius: 6 }} onClick={() => toast.info("CSV import wizard functional overlay placeholder triggered")}>Add by CSV</button>
+              <div style={{ marginLeft: "auto" }}>
+                <input
+                  className="inp"
+                  placeholder="Search by name or email…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  style={{ width: 240, fontSize: 13, height: 32 }}
+                />
+              </div>
             </div>
-          )}
-          <RecipientPicker
-            title="Who's receiving this?"
-            subtitle="Choose who you would like to send these items to."
-            contacts={vm.contacts}
-            selected={draft.selRecips}
-            onToggle={(rid) => dispatch({ type: "toggleRecip", id: rid })}
-            onDeselectAll={() => dispatch({ type: "deselectRecips" })}
-            showModes={false}
-          />
-          {draft.mode === "surprise" && vm.surpriseMissing.length > 0 && (
-            <div className="banner" style={{ marginTop: 14 }}>
-              <b>{vm.surpriseMissing.length} recipient(s) missing a shipping address.</b> Surprise
-              sends need addresses up front. Add them on the Contacts page before continuing.
+
+            {/* Table */}
+            <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 10 }}>
+              <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "var(--surface-2)" }}>
+                    <th style={stickHeadCheckbox1}></th>
+                    <th style={stickHeadName1}>RECIPIENT</th>
+                    <th style={stickHeadEmail1}>EMAIL</th>
+                    <th style={stickHeadAddr1}>ADDRESS</th>
+                    <th
+                      colSpan={kitItems.length || 1}
+                      style={{ ...thStyle, borderLeft: "2px solid var(--border)", background: "var(--surface)" }}
+                    >
+                      <div style={{ fontWeight: 700, fontSize: 12, letterSpacing: ".05em" }}>KIT ITEMS &amp; VARIANTS</div>
+                      <div style={{ fontWeight: 400, fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                        Configure size, color &amp; other variants for each recipient
+                      </div>
+                    </th>
+                  </tr>
+                  {kitItems.length > 0 && (
+                    <tr style={{ background: "var(--surface)" }}>
+                      <th style={stickHeadCheckbox2}></th>
+                      <th style={stickHeadName2}></th>
+                      <th style={stickHeadEmail2}></th>
+                      <th style={stickHeadAddr2}></th>
+                      {kitItems.map(({ product: p, opts }) => (
+                        <th key={p.id} style={{ ...thStyle, borderLeft: "1px solid var(--border)", minWidth: 230 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 46, height: 36, borderRadius: 6, overflow: "hidden", background: "#f0f0f0", flexShrink: 0, position: "relative" }}>
+                              <DesignedProductThumb product={p} artworkUrl={kit.artworkUrl} />
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 2 }}>{p.nm}</div>
+                            </div>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  )}
+                </thead>
+                <tbody>
+                  {filteredContacts.map(contact => {
+                    const isSelected = draft.selRecips.includes(contact.id);
+                    const addr = [contact.city, contact.state, contact.country].filter(Boolean).join(", ");
+                    const bg = isSelected ? "var(--surface)" : "#ffffff";
+                    return (
+                      <tr
+                        key={contact.id}
+                        style={{ borderTop: "1px solid var(--border)", background: bg, opacity: isSelected ? 1 : 0.65, transition: "opacity .15s" }}
+                      >
+                        <td style={cellCheckbox(bg)}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => dispatch({ type: "toggleRecip", id: contact.id })}
+                            style={{ width: 16, height: 16, accentColor: "var(--brand)", cursor: "pointer" }}
+                          />
+                        </td>
+                        <td style={cellName(bg)}>{contact.name}</td>
+                        <td style={cellEmail(bg)}>{contact.email}</td>
+                        <td style={cellAddr(bg)}>{addr || "—"}</td>
+                        {kitItems.map(({ product: prod, opts }) => {
+                          const selection = draft.recipVariants[contact.id]?.[prod.id || ""] || {};
+                          const showVariants = draft.mode === "surprise" || draft.mode === "single";
+                          return (
+                            <td key={prod.id} style={{ ...tdStyle, borderLeft: "1px solid var(--border)" }}>
+                              {showVariants ? (
+                                <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", alignItems: "center" }}>
+                                  {opts.requiresSize && opts.sizes.length > 0 && (
+                                    <SizeSelect
+                                      value={selection.size || ""}
+                                      sizes={opts.sizes}
+                                      onChange={v => dispatch({ type: "setRecipVariant", contactId: contact.id, productId: prod.id || "", key: "size", value: v })}
+                                    />
+                                  )}
+                                  {opts.requiresColor && opts.colors.length > 0 && (
+                                    <ColorSelect
+                                      value={selection.color || ""}
+                                      colors={opts.colors}
+                                      onChange={v => dispatch({ type: "setRecipVariant", contactId: contact.id, productId: prod.id || "", key: "color", value: v })}
+                                      product={prod}
+                                    />
+                                  )}
+                                  {!opts.requiresSize && !opts.requiresColor && (
+                                    <span style={{ fontSize: 12, color: "var(--text-muted)" }}>—</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Chosen by recipient</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
-        </>
+
+            {draft.mode === "surprise" && vm.surpriseMissing.length > 0 && (
+              <div className="banner" style={{ marginTop: 14 }}>
+                <b>{vm.surpriseMissing.length} recipient(s) missing a shipping address.</b> Surprise sends need addresses up front.
+              </div>
+            )}
+            <div style={{ marginTop: 12, fontSize: 13, color: "var(--text-muted)" }}>
+              {draft.selRecips.length} recipient{draft.selRecips.length !== 1 ? "s" : ""} selected
+            </div>
+          </div>
+        </div>
       )}
 
+      {/* ── Step 2: Experience ── */}
       {vm.step === 2 && (
         <RecipientExperience
           shopName={vm.shopName}
@@ -205,54 +462,30 @@ export function SendKitView(vm: SendKitVm) {
           itemCount={draft.picked.length}
           from={draft.from}
           message={draft.msg}
-          onFrom={(from) => dispatch({ type: "setFrom", from })}
-          onMessage={(msg) => dispatch({ type: "setMsg", msg })}
+          onFrom={from => dispatch({ type: "setFrom", from })}
+          onMessage={msg => dispatch({ type: "setMsg", msg })}
           when={draft.when}
-          onWhen={(when) => dispatch({ type: "setWhen", when })}
+          onWhen={when => dispatch({ type: "setWhen", when })}
           schedule={draft.schedule}
           onSchedule={(key, value) => dispatch({ type: "setSchedule", key, value })}
           preview={draft.preview}
-          onPreview={(preview) => dispatch({ type: "setPreview", preview })}
+          onPreview={preview => dispatch({ type: "setPreview", preview })}
           extraLeft={
             <div className="card" style={{ padding: 20 }}>
               <h3 style={{ fontSize: 15, marginBottom: 6 }}>Printed card note</h3>
-              <p className="muted" style={{ fontSize: 12.5, marginBottom: 10 }}>
-                Printed on a card tucked inside every kit.
-              </p>
-              <textarea
-                className="inp"
-                rows={3}
-                value={draft.note}
-                onChange={(e) => dispatch({ type: "setNote", note: e.target.value })}
-              />
-              <div
-                className="card"
-                style={{ padding: 14, background: "var(--surface-2)", marginTop: 12 }}
-              >
-                <div
-                  className="mut3"
-                  style={{
-                    fontSize: 10,
-                    letterSpacing: ".08em",
-                    textTransform: "uppercase",
-                    fontWeight: 700,
-                    marginBottom: 6,
-                  }}
-                >
-                  Card preview
-                </div>
-                <div style={{ fontFamily: "var(--disp)", fontStyle: "italic", fontSize: 14 }}>
-                  {draft.note}
-                </div>
-                <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-                  The {vm.account} team
-                </div>
+              <p className="muted" style={{ fontSize: 12.5, marginBottom: 10 }}>Printed on a card tucked inside every kit.</p>
+              <textarea className="inp" rows={3} value={draft.note} onChange={e => dispatch({ type: "setNote", note: e.target.value })} />
+              <div className="card" style={{ padding: 14, background: "var(--surface-2)", marginTop: 12 }}>
+                <div className="mut3" style={{ fontSize: 10, letterSpacing: ".08em", textTransform: "uppercase", fontWeight: 700, marginBottom: 6 }}>Card preview</div>
+                <div style={{ fontFamily: "var(--disp)", fontStyle: "italic", fontSize: 14 }}>{draft.note}</div>
+                <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>The {vm.account} team</div>
               </div>
             </div>
           }
         />
       )}
 
+      {/* ── Step 3: Checkout ── */}
       {vm.step === 3 && (
         <>
           <h1 style={{ fontSize: 24, marginBottom: 16 }}>Checkout</h1>
@@ -261,7 +494,7 @@ export function SendKitView(vm: SendKitVm) {
               wallet={vm.wallet}
               wallets={vm.wallets}
               selected={draft.pay}
-              onSelect={(pay) => dispatch({ type: "setPay", pay })}
+              onSelect={pay => dispatch({ type: "setPay", pay })}
               selectedWalletId={vm.selectedWalletId}
               onWalletSelect={vm.onWalletSelect}
               walletAvailable={vm.walletAvailable}
@@ -277,21 +510,11 @@ export function SendKitView(vm: SendKitVm) {
               <SumRow k="Shipping" v={inr(totals.ship)} />
               <SumRow k="Estimated GST (18%)" v={inr(totals.tax)} />
               <div className="divider" />
-              <div
-                className="row"
-                style={{ justifyContent: "space-between", alignItems: "center" }}
-              >
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                 <b style={{ fontSize: 18 }}>You pay</b>
-                <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)" }}>
-                  {inr(totals.total)}
-                </b>
+                <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)" }}>{inr(totals.total)}</b>
               </div>
-              <button
-                type="button"
-                className="btn btn-brand btn-block btn-lg"
-                style={{ marginTop: 14 }}
-                onClick={vm.onPayAndSend}
-              >
+              <button type="button" className="btn btn-brand btn-block btn-lg" style={{ marginTop: 14 }} onClick={vm.onPayAndSend}>
                 Pay &amp; send
               </button>
             </div>
@@ -302,15 +525,53 @@ export function SendKitView(vm: SendKitVm) {
   );
 }
 
+const thStyle: React.CSSProperties = {
+  padding: "10px 14px", textAlign: "left", fontSize: 11,
+  fontWeight: 700, letterSpacing: ".06em", color: "var(--text-muted)",
+  whiteSpace: "nowrap",
+};
+
+const tdStyle: React.CSSProperties = {
+  padding: "12px 14px", verticalAlign: "middle",
+};
+
+// Sticky column styling & offsets:
+// Checkbox: width 40px (left 0)
+// Recipient: width 120px (left 40)
+// Email: width 160px (left 160)
+// Address: width 180px (left 320)
+
+const stickHeadCheckbox1: React.CSSProperties = { ...thStyle, position: "sticky", left: 0, zIndex: 20, background: "var(--surface-2)", width: 40, minWidth: 40 };
+const stickHeadName1: React.CSSProperties = { ...thStyle, position: "sticky", left: 40, zIndex: 20, background: "var(--surface-2)", width: 120, minWidth: 120 };
+const stickHeadEmail1: React.CSSProperties = { ...thStyle, position: "sticky", left: 160, zIndex: 20, background: "var(--surface-2)", width: 160, minWidth: 160 };
+const stickHeadAddr1: React.CSSProperties = { ...thStyle, position: "sticky", left: 320, zIndex: 20, background: "var(--surface-2)", width: 180, minWidth: 180, borderRight: "2px solid var(--border)" };
+
+const stickHeadCheckbox2: React.CSSProperties = { ...thStyle, position: "sticky", left: 0, zIndex: 20, background: "var(--surface)", width: 40, minWidth: 40 };
+const stickHeadName2: React.CSSProperties = { ...thStyle, position: "sticky", left: 40, zIndex: 20, background: "var(--surface)", width: 120, minWidth: 120 };
+const stickHeadEmail2: React.CSSProperties = { ...thStyle, position: "sticky", left: 160, zIndex: 20, background: "var(--surface)", width: 160, minWidth: 160 };
+const stickHeadAddr2: React.CSSProperties = { ...thStyle, position: "sticky", left: 320, zIndex: 20, background: "var(--surface)", width: 180, minWidth: 180, borderRight: "2px solid var(--border)" };
+
+const cellCheckbox = (bg: string): React.CSSProperties => ({
+  ...tdStyle, position: "sticky", left: 0, zIndex: 10, background: bg, width: 40, minWidth: 40
+});
+const cellName = (bg: string): React.CSSProperties => ({
+  ...tdStyle, position: "sticky", left: 40, zIndex: 10, background: bg, width: 120, minWidth: 120, fontWeight: 600,
+  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
+});
+const cellEmail = (bg: string): React.CSSProperties => ({
+  ...tdStyle, position: "sticky", left: 160, zIndex: 10, background: bg, width: 160, minWidth: 160, color: "var(--text-muted)", fontSize: 12,
+  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
+});
+const cellAddr = (bg: string): React.CSSProperties => ({
+  ...tdStyle, position: "sticky", left: 320, zIndex: 10, background: bg, width: 180, minWidth: 180, color: "var(--text-muted)", fontSize: 12, borderRight: "2px solid var(--border)",
+  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
+});
+
 function SumRow({ k, v }: { k: string; v: string }) {
   return (
     <div className="row" style={{ justifyContent: "space-between", padding: "7px 0" }}>
-      <span className="muted" style={{ fontSize: 13 }}>
-        {k}
-      </span>
-      <span className="num" style={{ fontWeight: 600, fontSize: 13 }}>
-        {v}
-      </span>
+      <span className="muted" style={{ fontSize: 13 }}>{k}</span>
+      <span className="num" style={{ fontWeight: 600, fontSize: 13 }}>{v}</span>
     </div>
   );
 }

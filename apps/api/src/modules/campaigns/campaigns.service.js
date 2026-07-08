@@ -259,6 +259,7 @@ async function upsertRecipientsFromList({ tenantId, campaign, rows }) {
           phone: row.phone ?? '',
           contactId,
           creditAmount: row.creditAmount ?? campaign.creditsPerRecipient ?? 0,
+          variants: row.variants,
         },
         $setOnInsert: {
           tenantId,

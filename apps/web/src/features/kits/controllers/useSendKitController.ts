@@ -19,6 +19,120 @@ import {
   type SendKitDraft,
 } from "../send/sendDraft";
 
+const NO_SIZE_GROUPS = new Set([
+  'bottle',
+  'mug',
+  'tumbler',
+  'drinkware',
+  'pen',
+  'notebook',
+  'pack',
+  'bag',
+  'cap',
+  'hat',
+  'keychain',
+  'sticker',
+  'tech',
+  'charger',
+  'speaker',
+]);
+
+const APPAREL_GROUPS = new Set([
+  'tee',
+  'hoodie',
+  'polo',
+  'shirt',
+  'sweatshirt',
+  'jacket',
+  'pant',
+  'pants',
+  'shorts',
+  'apron',
+  'tank',
+  'crew',
+]);
+
+const DEFAULT_APPAREL_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+const STANDARD_SIZES = new Set(['XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL', '5XL']);
+
+const GROUP_BY_CATEGORY: Record<string, string> = {
+  Apparel: 'tee',
+  Drinkware: 'bottle',
+  Bags: 'bag',
+  Technology: 'power',
+  Office: 'note',
+  'Health & Wellness': 'pillow',
+  'Food & Beverages': 'bottle',
+};
+
+const DRINKWARE_NAME = /\bbottle\b|\bmug\b|\btumbler\b|\bflask\b|\bdrinkware\b/i;
+
+function distinctVariantValues(variants: any[] | undefined, key: string): string[] {
+  return [...new Set((variants || []).map((v) => v[key]).filter(Boolean))] as string[];
+}
+
+function effectiveProductGroup(product: UiProduct, ref: any = {}) {
+  const fromProduct = String(product.g || '').toLowerCase().trim();
+  if (fromProduct) return fromProduct;
+  const fromCategory = GROUP_BY_CATEGORY[product.category || ''];
+  if (fromCategory) return fromCategory.toLowerCase();
+  return String(ref.group || '').toLowerCase().trim();
+}
+
+function isDrinkwareProduct(product: UiProduct, ref: any = {}) {
+  const group = effectiveProductGroup(product, ref);
+  const category = String(product.category || '').toLowerCase();
+  const name = String(ref.name || product.nm || '');
+
+  if (NO_SIZE_GROUPS.has(group) && !['pack', 'bag'].includes(group)) return true;
+  if (/drink|bottle|mug|tumbler|beverage/.test(category)) return true;
+  if (DRINKWARE_NAME.test(name)) return true;
+  return false;
+}
+
+function isApparelProduct(product: UiProduct, ref: any = {}) {
+  if (isDrinkwareProduct(product, ref)) return false;
+  const group = effectiveProductGroup(product, ref);
+  const category = String(product.category || '').toLowerCase();
+  return APPAREL_GROUPS.has(group) || category === 'apparel';
+}
+
+function hasStandardSizes(sizes: string[]) {
+  return sizes.some((s) => STANDARD_SIZES.has(String(s).toUpperCase()));
+}
+
+export function resolveKitItemOptions(product: UiProduct, ref: any = {}) {
+  const rawSizes = distinctVariantValues(product.variants, 'size');
+  const rawColors = distinctVariantValues(product.variants, 'color');
+
+  if (isDrinkwareProduct(product, ref)) {
+    return {
+      sizes: rawSizes,
+      colors: rawColors,
+      requiresSize: rawSizes.length > 0,
+      requiresColor: rawColors.length > 0,
+    };
+  }
+
+  if (isApparelProduct(product, ref)) {
+    let sizes = hasStandardSizes(rawSizes) ? rawSizes.filter((s) => STANDARD_SIZES.has(String(s).toUpperCase())) : [];
+    if (!sizes.length) sizes = DEFAULT_APPAREL_SIZES;
+    return {
+      sizes,
+      colors: rawColors,
+      requiresSize: sizes.length > 0,
+      requiresColor: rawColors.length > 0,
+    };
+  }
+
+  return {
+    sizes: rawSizes,
+    colors: rawColors,
+    requiresSize: rawSizes.length > 0,
+    requiresColor: rawColors.length > 0,
+  };
+}
+
 export type SendKitStep = 0 | 1 | 2 | 3;
 
 export type SendKitVm = {
@@ -32,6 +146,7 @@ export type SendKitVm = {
   draft: SendKitDraft;
   dispatch: Dispatch<SendKitAction>;
   contacts: UiContact[];
+  catalog: UiProduct[];
   totals: KitSendTotals;
   surpriseMissing: UiContact[];
   wallet: UiWallet | undefined;
@@ -87,10 +202,7 @@ export function useSendKitController(): SendKitVm {
     draft.mode === "surprise" ? missingAddress(contacts, draft.selRecips) : [];
 
   function onNext() {
-    if (step === 0) {
-      setStep(1);
-      return;
-    }
+    if (step === 0) { setStep(1); return; }
     if (step === 1) {
       if (!draft.selRecips.length) {
         toast.error("Select at least one recipient");
@@ -104,6 +216,26 @@ export function useSendKitController(): SendKitVm {
         const l = draft.singleLocation;
         if (!l.name || !l.email.includes("@") || !l.line1 || !l.city || !l.state || !l.pincode) {
           toast.error("Enter the location contact, email, and complete shipping address");
+          return;
+        }
+      }
+      if (draft.mode === "surprise" || draft.mode === "single") {
+        const missingList: string[] = [];
+        const pickedProds = draft.picked.map((idx) => catalog[idx]).filter(Boolean);
+        for (const rid of draft.selRecips) {
+          const contact = contacts.find((c) => c.id === rid);
+          const name = contact?.name || "Recipient";
+          const variants = draft.recipVariants[rid] || {};
+          for (const prod of pickedProds) {
+            const ref = kit?.productRefs?.find((r) => r.catalogProductId === prod.id) ?? {};
+            const opts = resolveKitItemOptions(prod, ref);
+            const sel = variants[prod.id || ""] || {};
+            if (opts.requiresSize && !sel.size) missingList.push(`${name}'s size for ${prod.nm}`);
+            if (opts.requiresColor && !sel.color) missingList.push(`${name}'s color for ${prod.nm}`);
+          }
+        }
+        if (missingList.length > 0) {
+          toast.error(`Please select variants: missing ${missingList.slice(0, 3).join(", ")}${missingList.length > 3 ? ` and ${missingList.length - 3} more` : ""}`);
           return;
         }
       }
@@ -177,6 +309,7 @@ export function useSendKitController(): SendKitVm {
           email: c.email,
           phone: c.phone,
         })),
+        recipVariants: draft.recipVariants,
       });
       await refreshWorkspace();
       toast.success(`Order placed for ${draft.selRecips.length} recipients! 📦`);
@@ -198,6 +331,7 @@ export function useSendKitController(): SendKitVm {
     draft,
     dispatch,
     contacts,
+    catalog,
     totals,
     surpriseMissing,
     wallet,

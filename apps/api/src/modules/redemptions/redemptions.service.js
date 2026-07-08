@@ -507,7 +507,11 @@ export async function createSurpriseOrdersForCampaign({ tenantId, campaign }) {
       const product = await CatalogProduct.findById(entryProduct._id).select('+costPriceInr');
       if (!product) throw new NotFoundError(`Product ${entryProduct._id} not found`);
       const options = resolveKitItemOptions(product, ref);
-      const variant = { size: options.sizes[0] || '', color: options.colors[0] || '' };
+      const chosen = recipient.variants?.[String(entryProduct._id)];
+      const variant = {
+        size: chosen?.size ?? options.sizes[0] ?? '',
+        color: chosen?.color ?? options.colors[0] ?? '',
+      };
       const selectedVariant = (product.variants || []).find(
         (v) =>
           (!variant.size || v.size === variant.size) &&
@@ -589,35 +593,52 @@ export async function createSingleLocationOrderForCampaign({ tenantId, campaign 
   const kitEntries = await loadActiveKitEntries(kit);
   if (!kitEntries.length) throw new ApiError(422, 'Kit has no active products', 'KIT_EMPTY');
 
-  const quantity = recipients.length;
   const lineItems = [];
   for (const { ref, product: entryProduct } of kitEntries) {
     const product = await CatalogProduct.findById(entryProduct._id).select('+costPriceInr');
     if (!product) throw new NotFoundError(`Product ${entryProduct._id} not found`);
     const options = resolveKitItemOptions(product, ref);
-    const variant = { size: options.sizes[0] || '', color: options.colors[0] || '' };
-    const selectedVariant = (product.variants || []).find(
-      (v) =>
-        (!variant.size || v.size === variant.size) &&
-        (!variant.color || v.color === variant.color),
-    );
-    lineItems.push({
-      catalogProductId: product._id,
-      name: product.name,
-      sku: selectedVariant?.sku || product.sku,
-      variant,
-      qty: quantity,
-      unitPriceInr: product.basePriceInr,
-      costPriceInr: product.costPriceInr ?? 0,
-      gstRate: product.gstRate ?? 18,
-      hsnCode: product.hsnCode ?? '',
-      imageUrl:
-        kitProductImageUrl(product, ref) ||
-        product.maskImageUrl ||
-        product.primaryImageUrl ||
-        product.imageUrls?.[0] ||
-        '',
-    });
+
+    const variantGroups = {}; // key: "size|color" -> { variant, qty }
+    for (const recipient of recipients) {
+      const chosen = recipient.variants?.[String(entryProduct._id)];
+      const size = chosen?.size ?? options.sizes[0] ?? '';
+      const color = chosen?.color ?? options.colors[0] ?? '';
+      const key = `${size}|${color}`;
+      if (!variantGroups[key]) {
+        variantGroups[key] = {
+          variant: { size, color },
+          qty: 0,
+        };
+      }
+      variantGroups[key].qty += 1;
+    }
+
+    for (const key of Object.keys(variantGroups)) {
+      const { variant, qty } = variantGroups[key];
+      const selectedVariant = (product.variants || []).find(
+        (v) =>
+          (!variant.size || v.size === variant.size) &&
+          (!variant.color || v.color === variant.color),
+      );
+      lineItems.push({
+        catalogProductId: product._id,
+        name: product.name,
+        sku: selectedVariant?.sku || product.sku,
+        variant,
+        qty,
+        unitPriceInr: product.basePriceInr,
+        costPriceInr: product.costPriceInr ?? 0,
+        gstRate: product.gstRate ?? 18,
+        hsnCode: product.hsnCode ?? '',
+        imageUrl:
+          kitProductImageUrl(product, ref) ||
+          product.maskImageUrl ||
+          product.primaryImageUrl ||
+          product.imageUrls?.[0] ||
+          '',
+      });
+    }
   }
 
   const order = await Order.create({

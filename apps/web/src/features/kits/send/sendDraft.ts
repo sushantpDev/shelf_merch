@@ -20,6 +20,7 @@ export type SendKitDraft = {
   preview: "landing" | "email";
   pay: PaymentMethod;
   pkg: "none" | "box";
+  recipVariants: Record<string, Record<string, { size?: string; color?: string }>>;
 };
 
 export type SendKitAction =
@@ -34,7 +35,8 @@ export type SendKitAction =
   | { type: "setWhen"; when: WhenMode }
   | { type: "setSchedule"; key: keyof ScheduleDraft; value: string }
   | { type: "setPreview"; preview: "landing" | "email" }
-  | { type: "setPay"; pay: PaymentMethod };
+  | { type: "setPay"; pay: PaymentMethod }
+  | { type: "setRecipVariant"; contactId: string; productId: string; key: "size" | "color"; value: string };
 
 export function sendKitReducer(state: SendKitDraft, action: SendKitAction): SendKitDraft {
   switch (action.type) {
@@ -76,6 +78,23 @@ export function sendKitReducer(state: SendKitDraft, action: SendKitAction): Send
       return { ...state, preview: action.preview };
     case "setPay":
       return { ...state, pay: action.pay };
+    case "setRecipVariant": {
+      const contactVariants = state.recipVariants[action.contactId] || {};
+      const productVariant = contactVariants[action.productId] || {};
+      return {
+        ...state,
+        recipVariants: {
+          ...state.recipVariants,
+          [action.contactId]: {
+            ...contactVariants,
+            [action.productId]: {
+              ...productVariant,
+              [action.key]: action.value,
+            },
+          },
+        },
+      };
+    }
     default:
       return state;
   }
@@ -101,5 +120,6 @@ export function initialSendKitDraft(
     preview: "landing",
     pay: "wallet",
     pkg: packaging,
+    recipVariants: {},
   };
 }

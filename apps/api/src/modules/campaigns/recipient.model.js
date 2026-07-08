@@ -30,6 +30,7 @@ const recipientSchema = new mongoose.Schema(
     otpHash: { type: String, default: null, select: false },
     otpExpiresAt: { type: Date, default: null },
     otpAttempts: { type: Number, default: 0 },
+    variants: { type: mongoose.Schema.Types.Mixed, default: undefined },
   },
   { timestamps: true },
 );

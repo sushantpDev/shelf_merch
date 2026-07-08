@@ -39,6 +39,7 @@ export type UiProduct = {
   mockupUrl?: string;
   /** Super-admin design zones — artwork is clipped to the first matching area. */
   printAreas?: UiPrintArea[];
+  variants?: Array<{ size?: string; color?: string; colorHex?: string; material?: string; sku?: string }>;
 };
 
 export type UiShop = {
@@ -264,6 +265,7 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
     imgUrl,
     maskImageUrl: resolveMediaUrl(p.maskImageUrl),
     printAreas: printAreas?.length ? printAreas : undefined,
+    variants: p.variants,
   };
 }
 
