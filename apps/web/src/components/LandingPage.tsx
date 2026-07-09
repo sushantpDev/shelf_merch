@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { ShelfMerchLogo } from "@/components/brand/ShelfMerchLogo";
 import type { LucideIcon } from "lucide-react";
 import consolidateImg from "../../assets/consolidate.png";
+import shelfmerch from "../../assets/shelfmerch.png";
 import {
   Award,
   Backpack,
@@ -508,7 +509,8 @@ export default function LandingPage() {
       <header className="lp-nav lp-nav--merch">
         <div className="lp-container lp-nav__inner lp-nav__inner--merch">
           <a href="/" className="lp-logo">
-            <ShelfMerchLogo height={44} className="lp-logo__img lp-logo__img--merch" />
+            {/* <ShelfMerchLogo height={44} className="lp-logo__img lp-logo__img--merch" /> */}
+            <img src={shelfmerch} alt="Shelf Merch logo" className="h-6 w-48" loading="eager" />
           </a>
 
           <nav className="lp-nav__links lp-nav__links--merch">
