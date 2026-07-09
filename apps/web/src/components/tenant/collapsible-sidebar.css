@@ -199,6 +199,31 @@
   text-overflow: ellipsis;
 }
 
+.sidebar-rail__footer {
+  flex: none;
+  padding: 0 10px 16px;
+}
+
+.sidebar-rail__cta-image-link {
+  display: block;
+  border-radius: 14px;
+  overflow: hidden;
+  line-height: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sidebar-rail__cta-image-link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(61, 95, 217, 0.22);
+}
+
+.sidebar-rail__cta-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+}
+
 @media (max-width: 760px) {
   .sidebar-mount,
   .sidebar-rail,

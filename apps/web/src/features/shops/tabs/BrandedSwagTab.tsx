@@ -45,8 +45,8 @@ export function BrandedSwagTab({
             aria-current={sub === key}
             onClick={() => setSub(key)}
           >
-            {key}
-            {count !== "" && <span className="ct">{count}</span>}
+            <span className="item-label">{key}</span>
+            {count !== "" ? <span className="ct">{count}</span> : null}
           </button>
         ))}
       </div>

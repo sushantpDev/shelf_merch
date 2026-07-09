@@ -14,7 +14,7 @@
   --lp-gold:#D4A24C;
   --lp-gold-strong:#c9922e;
   --lp-text-muted:#5a6b62;
-  --lp-nav-merch-height:52px;
+  --lp-nav-merch-height:72px;
   font-family:'Inter',system-ui,sans-serif;color:#1a1a1a;line-height:1.5;
   padding-top:var(--lp-nav-merch-height);
   overflow-x:clip;
@@ -57,10 +57,10 @@
 .lp-nav__inner{display:flex;align-items:center;justify-content:space-between;height:64px}
 .lp-logo{display:flex;align-items:center;text-decoration:none}
 .lp-logo__img{display:block;height:28px;width:auto;object-fit:contain}
-.lp-logo__img--merch{height:30px}
+.lp-logo__img--merch{height:36px}
 .lp-nav__actions--merch .lp-btn-pill{
-  padding:7px 18px;
-  font-size:.8125rem;
+  padding:10px 22px;
+  font-size:.9375rem;
 }
 .lp-nav__actions--merch{gap:10px}
 .lp-logo--footer .lp-logo__img{height:32px}
@@ -143,6 +143,42 @@
   box-shadow:0 1px 12px rgba(14,30,22,.04);
   z-index:200;
 }
+.lp-nav--merch .lp-nav__inner.lp-nav__inner--merch{
+  max-width:100%;
+  width:100%;
+  margin:0;
+  padding-left:clamp(28px,5vw,80px);
+  padding-right:clamp(28px,5vw,80px);
+}
+.lp-nav__inner--merch{
+  display:grid;
+  grid-template-columns:1fr auto;
+  align-items:center;
+  height:var(--lp-nav-merch-height);
+  gap:16px;
+}
+.lp-nav__inner--merch .lp-logo{justify-self:start}
+@media(min-width:1024px){
+  .lp-nav__inner--merch{grid-template-columns:auto 1fr auto}
+  .lp-nav__links--merch{justify-self:center}
+  .lp-nav__actions--merch{justify-self:end}
+}
+.lp-nav__links--merch{display:none;gap:32px}
+@media(min-width:1024px){.lp-nav__links--merch{display:flex}}
+.lp-nav__links--merch a{
+  color:#0E1E16;
+  text-decoration:none;
+  font-size:1rem;
+  font-weight:500;
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  transition:opacity .2s;
+}
+.lp-nav__links--merch a:hover{opacity:.7;color:#0E1E16}
+.lp-nav__chevron{width:16px;height:16px;opacity:.7;flex-shrink:0}
+.lp-nav__actions--merch{display:none;align-items:center;gap:14px}
+@media(min-width:1024px){.lp-nav__actions--merch{display:flex}}
 .lp-hero-zone--merch{
   position:relative;
   background:#FCFEFD;
@@ -162,34 +198,6 @@
   display:block;
   overflow:hidden;
 }
-.lp-nav__inner--merch{
-  display:grid;
-  grid-template-columns:1fr auto;
-  align-items:center;
-  height:var(--lp-nav-merch-height);
-  gap:12px;
-}
-@media(min-width:1024px){
-  .lp-nav__inner--merch{grid-template-columns:1fr auto 1fr}
-  .lp-nav__links--merch{justify-self:center}
-  .lp-nav__actions--merch{justify-self:end}
-}
-.lp-nav__links--merch{display:none;gap:28px}
-@media(min-width:1024px){.lp-nav__links--merch{display:flex}}
-.lp-nav__links--merch a{
-  color:#0E1E16;
-  text-decoration:none;
-  font-size:.875rem;
-  font-weight:500;
-  display:inline-flex;
-  align-items:center;
-  gap:4px;
-  transition:opacity .2s;
-}
-.lp-nav__links--merch a:hover{opacity:.7;color:#0E1E16}
-.lp-nav__chevron{width:14px;height:14px;opacity:.7;flex-shrink:0}
-.lp-nav__actions--merch{display:none;align-items:center;gap:16px}
-@media(min-width:1024px){.lp-nav__actions--merch{display:flex}}
 .lp-btn-ghost--merch{color:#0E1E16}
 .lp-btn-ghost--merch:hover{color:#1b3326;opacity:1}
 .lp-nav__menu{
@@ -1785,7 +1793,7 @@
 /* categories — Stadium-style catalog grid */
 .lp-categories-section{
   background:#fff;
-  padding:clamp(64px,8vw,96px) 0;
+  padding:clamp(64px,8vw,96px) 0 clamp(24px,3vw,32px);
 }
 .lp-categories-header{
   text-align:center;
@@ -1873,23 +1881,18 @@
   .lp-cat-card{border-radius:12px}
 }
 
-/* vendor consolidation — CSS illustration */
+/* vendor consolidation banner */
 .lp-consolidate{
-  /* background:#f6f7f9; */
-  /* padding:clamp(40px,6vw,72px) 0; */
-  padding: 0;
-}
-.lp-consolidate__card{
-  width:100%;
-  max-width:none;
-  margin:0 auto;
-  /* padding:clamp(36px,5vw,52px) clamp(32px,5vw,56px) clamp(32px,4vw,44px); */
-  padding: 0;
   background:#fff;
-  border-radius:20px;
-  border:1px solid rgba(15,23,42,.06);
-  box-shadow:0 8px 32px rgba(15,23,42,.06);
-  text-align:center;
+  padding:clamp(8px,1.5vw,16px) 24px clamp(48px,6vw,72px);
+}
+.lp-consolidate__img{
+  width:100%;
+  max-width:1200px;
+  height:auto;
+  display:block;
+  margin:0 auto;
+  background:#fff;
 }
 .lp-consolidate__header{margin-bottom:clamp(28px,4vw,36px)}
 .lp-consolidate__title{
@@ -1947,10 +1950,58 @@
   transform:translateY(-3px);
 }
 @media(max-width:640px){
-  .lp-consolidate__card{padding:28px 16px 24px}
+  .lp-consolidate{padding:8px 16px 40px}
   .lp-consolidate__visual{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px}
   .lp-consolidate__icons{min-width:520px;padding:0 8px}
   .lp-consolidate__path{min-width:520px;left:8px;right:8px;width:calc(100% - 16px)}
+}
+
+/* featured quote — full-width statement banner */
+.lp-feature-quote{
+  position:relative;
+  background:linear-gradient(180deg,#0a0a0f 0%,#0c0c14 100%);
+  color:#fff;
+  padding:clamp(72px,9vw,112px) 24px clamp(88px,10vw,128px);
+  text-align:center;
+  overflow:hidden;
+}
+.lp-feature-quote__inner{
+  margin:0 auto;
+  max-width:920px;
+  border:none;
+  padding:0;
+}
+.lp-feature-quote__inner p{
+  margin:0;
+  font-family:var(--disp);
+  font-size:clamp(1.65rem,3.8vw,2.75rem);
+  font-weight:800;
+  line-height:1.28;
+  letter-spacing:-.025em;
+  color:rgba(255,255,255,.97);
+  text-shadow:0 2px 28px rgba(0,0,0,.35);
+}
+.lp-feature-quote__stripe{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  height:6px;
+  background:linear-gradient(
+    90deg,
+    #7B2DAD 0%,
+    #7B2DAD 25%,
+    #E87868 25%,
+    #E87868 50%,
+    #F59A2E 50%,
+    #F59A2E 75%,
+    #28B86A 75%,
+    #28B86A 100%
+  );
+}
+@media(max-width:640px){
+  .lp-feature-quote{padding:56px 20px 72px}
+  .lp-feature-quote__inner p{font-size:clamp(1.45rem,6.2vw,1.85rem)}
 }
 
 /* teams — Stadium-style tabbed panel */

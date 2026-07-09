@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { LogOut, Upload } from "lucide-react";
 import { PageHeader } from "@/components/tenant/PageHeader";
+import { ShelfMerchLogo } from "@/components/brand/ShelfMerchLogo";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import type { SettingsVm } from "../controllers/useSettingsController";
 import { TransferOwnershipDialog } from "../TransferOwnershipDialog";
@@ -34,7 +35,7 @@ export function SettingsView(vm: SettingsVm) {
               className={`item${vm.tab === key ? " on" : ""}`}
               onClick={() => vm.onTab(key)}
             >
-              {label}
+              <span className="item-label">{label}</span>
             </button>
           ))}
         </div>
@@ -93,10 +94,7 @@ function WorkspaceSettingsView(vm: SettingsVm) {
               style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
             />
           ) : (
-            <svg viewBox="0 0 32 32" fill="none" width={26} height={26} aria-hidden="true">
-              <path d="M16 3 4 9l12 6 12-6-12-6Z" fill="var(--brand)" />
-              <path d="M4 15l12 6 12-6" stroke="var(--brand-d)" strokeWidth="2.4" strokeLinejoin="round" />
-            </svg>
+            <ShelfMerchLogo variant="icon" height={26} alt="" />
           )}
         </div>
         {vm.canEditWorkspace ? (

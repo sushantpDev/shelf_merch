@@ -3,7 +3,8 @@
      never depends on cross-layer custom-property resolution */
   --bg-page:         oklch(0.9851 0 0); /* pure neutral off-white */
   --bg:              oklch(0.9851 0 0);
-  --app-content-bg:  oklch(0.9851 0 0);
+  --app-content-bg:  #EDEEF3;
+  --app-chrome-bg:   #DBDFE6;
   --surface:         var(--bg-card);
   --surface-2:       var(--gray-50);
   --app-sidebar-bg:  var(--ink);
@@ -90,6 +91,7 @@ select.inp{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http
 .topbar{height:64px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 22px;gap:18px;flex:none;z-index:20}
 .brandmark{display:flex;align-items:center;gap:10px}
 .brandmark svg{width:30px;height:30px}
+.brandmark img{height:32px;width:auto;display:block}
 .topbar .spacer{flex:1}
 .topbar-right{display:flex;align-items:center;gap:10px;margin-left:auto}
 .topbar-wallet,.topbar-user{
@@ -401,7 +403,7 @@ select.inp{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:0;
-  background:var(--line-2);
+  background:var(--app-chrome-bg);
   border-bottom:1px solid var(--line);
 }
 .contacts-main-tabs button{
@@ -412,7 +414,7 @@ select.inp{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http
   letter-spacing:.1em;
   text-transform:uppercase;
   color:var(--ink-3);
-  background:var(--line-2);
+  background:var(--app-chrome-bg);
   border:none;
   border-bottom:2px solid transparent;
   transition:background .14s ease,color .14s ease,border-color .14s ease;
@@ -584,7 +586,7 @@ select.inp{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http
   margin-right:calc(-1 * var(--page-pad-x));
   margin-bottom:calc(-1 * var(--page-pad-bottom));
   padding:14px var(--page-pad-x);
-  background:var(--gray-100);
+  background:var(--app-chrome-bg);
   border-top:1px solid var(--line-2);
 }
 .contacts-footer-brand{
@@ -636,7 +638,7 @@ select.inp{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http
 .search input:focus{outline:none;border-color:var(--line-strong);box-shadow:none}
 
 /* tabs */
-.tabs{display:flex;gap:6px;background:var(--line-2);padding:5px;border-radius:var(--r-pill);overflow:auto}
+.tabs{display:flex;gap:6px;background:var(--app-chrome-bg);padding:5px;border-radius:var(--r-pill);overflow:auto}
 .tabs button{flex:1;height:36px;border-radius:var(--r-pill);font-weight:700;font-size:12px;letter-spacing:.04em;color:var(--ink-2);white-space:nowrap;padding:0 14px;text-transform:uppercase;transition:all 0.2s cubic-bezier(0.4, 0, 0.2, 1)}
 .tabs button.on{background:#fff;color:var(--ink);box-shadow:var(--sh-1)}
 .sw-pick-badge {
@@ -1794,7 +1796,7 @@ button.thumb{font:inherit;color:inherit}
 .tag-live-outline{background:#fff;border:1px solid var(--brand-100);color:var(--ink)}
 
 /* swag view toggle */
-.view-toggle{display:inline-flex;gap:4px;padding:4px;background:var(--surface-2);border-radius:var(--r-sm);border:1px solid var(--line)}
+.view-toggle{display:inline-flex;gap:4px;padding:4px;background:var(--app-chrome-bg);border-radius:var(--r-sm);border:1px solid var(--line)}
 .view-toggle-btn{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;color:var(--ink-3);background:transparent;transition:.14s ease}
 .view-toggle-btn svg{width:17px;height:17px}
 .view-toggle-btn:hover{background:#fff;color:var(--ink-2)}
@@ -2171,11 +2173,38 @@ a.shop-collection-cell:hover{background:var(--gray-100)}
 @keyframes sm-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
 /* --- left sub rail (branded swag / settings) --- */
-.subrail{width:188px;flex:none}
-.subrail .item{padding:10px 12px;border-radius:var(--r-sm);font-size:13.5px;font-weight:600;color:var(--ink-2);cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
-.subrail .item:hover{background:var(--surface-2)}
-.subrail .item.on{background:var(--surface-2);color:var(--ink);box-shadow:inset 2px 0 0 var(--brand)}
-.subrail .item .ct{font-size:11px;color:var(--ink-3);font-weight:700}
+.subrail{width:188px;flex:none;display:flex;flex-direction:column;gap:2px}
+.subrail .item{
+  width:100%;
+  padding:10px 12px;
+  border:none;
+  border-radius:var(--r-sm);
+  font:inherit;
+  font-size:13.5px;
+  font-weight:600;
+  color:var(--ink-2);
+  cursor:pointer;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  text-align:left;
+  background:transparent;
+  transition:background .14s ease,color .14s ease,box-shadow .14s ease;
+}
+.subrail .item:hover{background:var(--app-chrome-bg)}
+.subrail .item.on{background:#fff;color:var(--ink);box-shadow:inset 3px 0 0 var(--brand)}
+.subrail .item-label{flex:1;min-width:0;line-height:1.35}
+.subrail .item .ct{
+  flex:none;
+  min-width:20px;
+  font-size:11px;
+  color:var(--ink-3);
+  font-weight:700;
+  line-height:1.2;
+  text-align:right;
+  font-variant-numeric:tabular-nums;
+}
 .swag-empty-designer-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,400px);gap:32px;align-items:center}
 .swag-empty-designer-copy{text-align:left}
 .swag-empty-designer-art{border-radius:var(--r);overflow:hidden;background:var(--surface-2);border:1px solid var(--line);padding:20px;display:grid;place-items:center}
@@ -2228,7 +2257,7 @@ a.shop-collection-cell:hover{background:var(--gray-100)}
 .email-frame{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:#fff;box-shadow:var(--sh-1)}
 .email-frame .topline{height:30px;background:var(--surface-2);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px;padding:0 12px}
 .email-frame .topline i{width:9px;height:9px;border-radius:50%;background:#d6dcd8;display:block}
-.prevtabs{display:inline-flex;background:var(--surface-2);border-radius:999px;padding:3px;gap:2px}
+.prevtabs{display:inline-flex;background:var(--app-chrome-bg);border-radius:999px;padding:3px;gap:2px}
 .prevtabs button{border:none;background:none;font:inherit;font-size:12.5px;font-weight:600;color:var(--ink-2);padding:6px 14px;border-radius:999px;cursor:pointer}
 .prevtabs button.on{background:#fff;color:var(--ink);box-shadow:var(--sh-1)}
 

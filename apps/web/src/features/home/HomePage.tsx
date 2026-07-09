@@ -13,6 +13,8 @@ import {
 import { LoadingState } from "@/components/LoadingState";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useTenantAccess } from "@/hooks/useTenantAccess";
+import { getLastShop } from "@/features/shops/types";
+import { ShopBanner } from "@/features/shops/banner";
 import { getStoredUser } from "@/services/api-bridge";
 import "./home.css";
 
@@ -72,8 +74,7 @@ export function HomePage() {
       ? orgWallet.amount
       : wallets[0]?.balance ?? 0;
 
-  const pinnedShop =
-    workspace.shops.find((s) => s.live) ?? workspace.shops[0] ?? null;
+  const pinnedShop = getLastShop(workspace.shops);
 
   return (
     <div className="home-page fade-in">
@@ -219,10 +220,22 @@ export function HomePage() {
             <h2 className="home-card__title">Pinned shop</h2>
             {pinnedShop ? (
               <>
-                <div className="home-shop-banner">
-                  <div className="home-shop-banner__eyebrow">Shelf Merch shop</div>
-                  <div className="home-shop-banner__name">{pinnedShop.name}</div>
-                </div>
+                <Link to={`/app/shops/${pinnedShop.id}`} className="home-pinned-shop">
+                  <div className="home-pinned-shop__banner">
+                    <ShopBanner source={pinnedShop} height={140} layout="center" logoSize={52} />
+                  </div>
+                  <div className="home-pinned-shop__meta">
+                    <h3 className="home-pinned-shop__name">{pinnedShop.name}</h3>
+                    {pinnedShop.live ? (
+                      <span className="tag tag-live tag-live-outline">
+                        <span className="dot" />
+                        Live
+                      </span>
+                    ) : (
+                      <span className="tag tag-draft">Draft</span>
+                    )}
+                  </div>
+                </Link>
                 <div className="home-card__footer">
                   <Link to={`/app/shops/${pinnedShop.id}`} className="lnk">
                     Open shop

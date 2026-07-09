@@ -116,7 +116,7 @@ export function CatalogEditorDialog({
                     className={`item ${category === c ? "on" : ""}`}
                     onClick={() => setCategory(c)}
                   >
-                    {c}
+                    <span className="item-label">{c}</span>
                     <span className="ct">
                       ({sel}/{entries.length})
                     </span>

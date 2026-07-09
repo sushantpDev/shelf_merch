@@ -323,33 +323,45 @@
   flex: none;
 }
 
-.home-shop-banner {
+.home-pinned-shop {
+  display: block;
+  border: 1px solid var(--line);
   border-radius: var(--r-sm);
   overflow: hidden;
-  border: 1px solid var(--line);
-  flex: 1;
-  min-height: 140px;
-  background: linear-gradient(120deg, var(--brand-d), var(--brand) 45%, var(--brand-l));
-  color: #fff;
-  padding: 22px 20px;
+  color: inherit;
+  text-decoration: none;
+  transition: box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.home-pinned-shop:hover {
+  box-shadow: var(--sh-2);
+  transform: translateY(-1px);
+}
+
+.home-pinned-shop__banner {
+  overflow: hidden;
+}
+
+.home-pinned-shop__banner .shopbanner {
+  border-radius: 0;
+}
+
+.home-pinned-shop__meta {
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 16px;
+  background: #fff;
 }
 
-.home-shop-banner__eyebrow {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  opacity: 0.85;
-}
-
-.home-shop-banner__name {
+.home-pinned-shop__name {
+  margin: 0;
   font-family: var(--disp);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
+  line-height: 1.2;
+  color: var(--ink);
 }
 
 .home-empty-note {

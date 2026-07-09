@@ -65,7 +65,8 @@
 
 .kits-create-btn:hover,
 .kits-send-btn:hover {
-  background: var(--brand-active);
+  background: var(--brand-d);
+  color: #fff;
 }
 
 .kits-stats-grid {
@@ -209,7 +210,7 @@
 }
 
 .kits-tab--active {
-  color: var(--brand-active);
+  color: var(--brand-d);
 }
 
 .kits-tab--active::after {
