@@ -821,8 +821,8 @@ export async function syncOrgWizardApi(
     if (name) entityByName.set(name, entity);
   }
   const managerEmailOf = (entity: ApiEntityRow) => {
-    const populated =
-      typeof entity.managerUserId === "object" ? entity.managerUserId.email : "";
+    const mgrRef = entity.managerUserId;
+    const populated = mgrRef && typeof mgrRef === "object" ? mgrRef.email : "";
     return String(entity.managerEmail ?? populated ?? "").trim().toLowerCase();
   };
   const identityKey = (name?: string, email?: string) => {
