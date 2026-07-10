@@ -1,5 +1,6 @@
 import express from 'express';
 import helmet from 'helmet';
+import rateLimitExpress from 'express-rate-limit';
 import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,7 +14,6 @@ import { LOCAL_UPLOAD_DIR } from './services/storage.service.js';
 import { asyncHandler } from './utils/asyncHandler.js';
 import { notFoundHandler, errorHandler } from './middleware/error.middleware.js';
 import { sanitizeMongoInput } from './middleware/sanitize.middleware.js';
-import { globalRateLimit } from './middleware/rateLimit.middleware.js';
 import { razorpayWebhook } from './modules/payments/payments.controller.js';
 
 import authRoutes from './modules/auth/auth.routes.js';
@@ -177,11 +177,19 @@ export function createApp() {
     });
   });
 
-  // Coarse per-IP ceiling across the API (health excluded above). Production
-  // only — avoids a per-request Redis round-trip in dev/test.
-  if (env.NODE_ENV === 'production') {
-    api.use(globalRateLimit);
-  }
+  // Coarse per-IP ceiling across the whole API (health excluded above), as
+  // defence-in-depth in front of the fine-grained per-identity limits layered
+  // on auth/OTP routes. Mounted unconditionally so every route is covered;
+  // skipped under test so the suite's many requests aren't throttled.
+  api.use(
+    rateLimitExpress({
+      windowMs: 60_000,
+      max: 600,
+      standardHeaders: true,
+      legacyHeaders: false,
+      skip: () => env.NODE_ENV === 'test',
+    }),
+  );
 
   api.use('/auth', authRoutes);
   api.use('/media', mediaRoutes);

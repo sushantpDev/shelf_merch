@@ -26,6 +26,11 @@ function stripOperatorKeys(value, seen) {
 
   for (const key of Object.keys(value)) {
     if (key.startsWith('$')) {
+      // CodeQL (js/remote-property-injection) flags the computed member access,
+      // but this is the sanitizer itself: it only DELETES existing own keys that
+      // start with `$` (Mongo operators). It never writes a user-named property,
+      // so there is nothing to inject — this is a false positive.
+      // codeql[js/remote-property-injection]
       delete value[key];
       stripped = true;
       continue;
