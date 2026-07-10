@@ -29,10 +29,6 @@ jobs:
     name: Dependency audit (advisory)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Advisory only for now: the tree ships known-vulnerable transitive deps
-    # (e.g. xlsx). Flip to blocking once those are remediated (see
-    # docs/security_hardening_plan.md §B4).
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -44,5 +40,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      # Advisory only for now: the tree ships known-vulnerable transitive deps
+      # (e.g. xlsx), so the audit output is surfaced in the log but does not fail
+      # the check (`|| true`). Remove `|| true` to make it blocking once those
+      # are remediated (see docs/security_hardening_plan.md §B4).
+      - name: Audit production dependencies (non-blocking)
+        run: npm audit --omit=dev --audit-level=high || true
