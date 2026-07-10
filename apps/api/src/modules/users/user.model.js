@@ -18,6 +18,10 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, default: '' },
     status: { type: String, enum: ['invited', 'active', 'suspended'], default: 'invited' },
     lastLoginAt: { type: Date, default: null },
+    // §security hardening B2 — Mongo-backed brute-force lockout (holds even when
+    // Redis rate limiting is unavailable).
+    failedLoginCount: { type: Number, default: 0 },
+    lockedUntil: { type: Date, default: null },
     inviteTokenHash: { type: String, default: null, select: false },
     inviteTokenExpiresAt: { type: Date, default: null },
     passwordResetTokenHash: { type: String, default: null, select: false },

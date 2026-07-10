@@ -122,9 +122,9 @@ describe('collection shop links', () => {
     expect(forA.body.some((c) => String(c._id) === String(collection._id))).toBe(true);
     expect(forB.body.some((c) => String(c._id) === String(collection._id))).toBe(true);
 
-    const shopARecord = await Shop.findById(shopA._id);
+    const shopARecord = await Shop.findOne({ _id: shopA._id, tenantId: tenant._id });
     expect(shopARecord.selectedCatalogProductIds.map(String)).toContain(String(product._id));
-    const shopBRecord = await Shop.findById(shopB._id);
+    const shopBRecord = await Shop.findOne({ _id: shopB._id, tenantId: tenant._id });
     expect(shopBRecord.selectedCatalogProductIds.map(String)).toContain(String(product._id));
   });
 
@@ -141,7 +141,7 @@ describe('collection shop links', () => {
         productRefs: [{ catalogProductId: String(product._id), name: 'Core Cotton Tee', group: 'tee' }],
       });
     expect(res.status).toBe(201);
-    const updated = await Shop.findById(shop._id);
+    const updated = await Shop.findOne({ _id: shop._id, tenantId: tenant._id });
     expect(updated.selectedCatalogProductIds.map(String)).toContain(String(product._id));
   });
 });

@@ -1,0 +1,27 @@
+# gitleaks configuration — extends the default ruleset and allowlists the
+# intentional demo/sample credentials that live in docs, seeds, and templates so
+# the secret scan flags only real leaks.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Demo/sample credentials and env-var references (not real secrets)"
+# Match against the whole source line so a line that merely *reads* a secret
+# from process.env (e.g. `secretAccessKey: env.R2_SECRET_KEY`) is not flagged.
+regexTarget = "line"
+paths = [
+  '''\.env\.example$''',
+  '''(^|/)README\.md$''',
+  '''(^|/)docs/''',
+  '''(^|/)apps/api/src/seed/''',
+  '''(^|/)deploy/env\.production\.template$''',
+]
+regexes = [
+  '''dev-access-secret-change-me''',
+  '''dev-refresh-secret-change-me''',
+  '''demo1234''',
+  '''seedDemo[A-Za-z0-9]+''',
+  # References to env vars in code are not hardcoded secrets.
+  '''env\.[A-Z][A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD|WEBHOOK)[A-Z0-9_]*''',
+  '''process\.env\.[A-Z0-9_]+''',
+]

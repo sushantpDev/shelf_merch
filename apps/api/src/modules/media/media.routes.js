@@ -8,6 +8,8 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { ApiError } from '../../utils/errors.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const MAX_PROXY_BYTES = 10 * 1024 * 1024;
+const FETCH_TIMEOUT_MS = 5_000;
 
 function allowedRemotePrefixes() {
   const bucket = env.S3_BUCKET_NAME;
@@ -59,10 +61,36 @@ router.get(
       throw new ApiError(403, 'url not allowed', 'URL_DENIED');
     }
 
-    const upstream = await fetch(raw);
+    // §security hardening C2 — SSRF defence: refuse redirects (a 3xx could bounce
+    // an allowlisted URL to an internal host), cap the response, bound the wait,
+    // and only pass through image content types.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    let upstream;
+    try {
+      upstream = await fetch(raw, { redirect: 'error', signal: controller.signal });
+    } catch {
+      throw new ApiError(502, 'upstream fetch failed', 'UPSTREAM_ERROR');
+    } finally {
+      clearTimeout(timeout);
+    }
     if (!upstream.ok) throw new ApiError(502, 'upstream fetch failed', 'UPSTREAM_ERROR');
+
+    const contentType = (upstream.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    if (!contentType.startsWith('image/')) {
+      throw new ApiError(415, 'unsupported upstream content type', 'UNSUPPORTED_CONTENT');
+    }
+    const declaredLength = Number(upstream.headers.get('content-length') || 0);
+    if (declaredLength && declaredLength > MAX_PROXY_BYTES) {
+      throw new ApiError(413, 'upstream response too large', 'RESPONSE_TOO_LARGE');
+    }
+
     const buf = Buffer.from(await upstream.arrayBuffer());
-    res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/octet-stream');
+    if (buf.byteLength > MAX_PROXY_BYTES) {
+      throw new ApiError(413, 'upstream response too large', 'RESPONSE_TOO_LARGE');
+    }
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.send(buf);
   }),

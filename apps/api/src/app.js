@@ -12,6 +12,8 @@ import { ensureRedisReady } from './config/redis.js';
 import { LOCAL_UPLOAD_DIR } from './services/storage.service.js';
 import { asyncHandler } from './utils/asyncHandler.js';
 import { notFoundHandler, errorHandler } from './middleware/error.middleware.js';
+import { sanitizeMongoInput } from './middleware/sanitize.middleware.js';
+import { globalRateLimit } from './middleware/rateLimit.middleware.js';
 import { razorpayWebhook } from './modules/payments/payments.controller.js';
 
 import authRoutes from './modules/auth/auth.routes.js';
@@ -72,8 +74,11 @@ function resolveCorsOptions(req) {
   if (env.NODE_ENV !== 'production') {
     return { origin: true, credentials: true };
   }
+  // Fail closed: an unset CORS_ORIGINS must NOT mean "allow every origin with
+  // credentials". Same-origin (unified server) and non-browser requests send no
+  // Origin header and are still allowed; cross-origin requests are only allowed
+  // when explicitly listed or when the Origin matches the request Host.
   const origins = corsOrigins();
-  if (!origins.length) return { origin: true, credentials: true };
   return {
     origin(origin, callback) {
       if (!origin || origins.includes(origin)) return callback(null, true);
@@ -86,17 +91,46 @@ function resolveCorsOptions(req) {
   };
 }
 
+/**
+ * §security hardening A4 — production Content-Security-Policy. The SPA is served
+ * same-origin as the API, so 'self' covers scripts/XHR; images may come from
+ * R2/S3/data URIs. Defaults to report-only (env.CSP_MODE) so a wrong directive
+ * can't white-screen the app on first deploy — flip CSP_MODE=enforce once
+ * validated in staging.
+ */
+function helmetOptions() {
+  if (env.NODE_ENV !== 'production') return undefined;
+  if (env.CSP_MODE === 'off') return { contentSecurityPolicy: false };
+
+  return {
+    contentSecurityPolicy: {
+      useDefaults: true,
+      reportOnly: env.CSP_MODE === 'report-only',
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        // Vite/React inject hashed style tags at runtime; allow inline styles.
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+        fontSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'", 'https:'],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  };
+}
+
 export function createApp() {
   const app = express();
 
   app.set('trust proxy', 1);
-  app.use(
-    helmet(
-      env.NODE_ENV === 'production'
-        ? { contentSecurityPolicy: false }
-        : undefined,
-    ),
-  );
+  app.use(helmet(helmetOptions()));
   app.use((req, res, next) => cors(resolveCorsOptions(req))(req, res, next));
 
   // §9.3 — Razorpay webhook must verify signature against the raw body.
@@ -107,11 +141,28 @@ export function createApp() {
   );
 
   app.use(express.json({ limit: '1mb' }));
+  // Defence-in-depth against NoSQL operator injection on every parsed request.
+  app.use(sanitizeMongoInput);
   if (env.NODE_ENV !== 'test') {
     app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url.includes('/health') } }));
   }
 
-  app.use('/uploads', express.static(LOCAL_UPLOAD_DIR));
+  // Serve user uploads defused: never sniff the content type, sandbox any
+  // markup, and force download for non-image types so an uploaded file can't
+  // execute script on the app origin (stored XSS).
+  app.use(
+    '/uploads',
+    express.static(LOCAL_UPLOAD_DIR, {
+      setHeaders(res, filePath) {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+        const ext = path.extname(filePath).toLowerCase();
+        if (!['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(ext)) {
+          res.setHeader('Content-Disposition', 'attachment');
+        }
+      },
+    }),
+  );
 
   const api = express.Router();
 
@@ -125,6 +176,12 @@ export function createApp() {
       uptimeSec: Math.round(process.uptime()),
     });
   });
+
+  // Coarse per-IP ceiling across the API (health excluded above). Production
+  // only — avoids a per-request Redis round-trip in dev/test.
+  if (env.NODE_ENV === 'production') {
+    api.use(globalRateLimit);
+  }
 
   api.use('/auth', authRoutes);
   api.use('/media', mediaRoutes);

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import multer from 'multer';
+import { uploader, IMAGE_TYPES } from '../../middleware/upload.middleware.js';
 import { z } from 'zod';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
@@ -23,7 +23,7 @@ import {
 // Tenant-facing routes: /api/v1/tenants
 export const tenantsRouter = Router();
 tenantsRouter.use(authenticate, resolveTenant);
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const upload = uploader({ allow: IMAGE_TYPES, maxSizeMb: 5 });
 
 tenantsRouter.post(
   '/',

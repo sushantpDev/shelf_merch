@@ -65,8 +65,21 @@ const envSchema = z.object({
   EMAIL_PASSWORD: z.string().optional().default(''),
   EMAIL_FROM: z.string().optional().default(''),
   APP_URL: z.string().optional().default('http://localhost:8080'),
-  /** Comma-separated allowed CORS origins in production (e.g. http://72.62.76.198:8080). Empty = allow all. */
+  /**
+   * Comma-separated allowed CORS origins in production (e.g. http://72.62.76.198:8080).
+   * Empty no longer means "allow all" — cross-origin requests are refused unless the
+   * Origin is listed or matches the request Host (see resolveCorsOptions).
+   */
   CORS_ORIGINS: z.string().optional().default(''),
+
+  /**
+   * Content-Security-Policy mode for the production SPA + API:
+   *   report-only (default) — send CSP as report-only so a misconfigured policy
+   *     can't break the app; validate in staging, then switch to enforce.
+   *   enforce — send an enforcing Content-Security-Policy.
+   *   off — no CSP header (not recommended).
+   */
+  CSP_MODE: z.enum(['enforce', 'report-only', 'off']).default('report-only'),
   GOOGLE_CLIENT_ID: z.string().optional().default(''),
   GOOGLE_CLIENT_SECRET: z.string().optional().default(''),
   GOOGLE_CALLBACK_URL: z.string().optional().default(''),

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import multer from 'multer';
+import { uploader, DOCUMENT_TYPES } from '../../middleware/upload.middleware.js';
 import crypto from 'node:crypto';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
@@ -16,7 +16,7 @@ import { NotFoundError, ApiError } from '../../utils/errors.js';
 import { collectionsForShopFilter } from './collectionQueries.js';
 import { addCatalogProductsToShop } from '../shops/shopCatalogSync.js';
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const upload = uploader({ allow: DOCUMENT_TYPES, maxSizeMb: 25, files: 50 });
 const router = Router();
 
 router.use(authenticate, resolveTenant, requireTenantContext);
