@@ -419,23 +419,33 @@ export async function addProductToShopApi(payload: {
     isShopSpecific: true,
   };
 
-  const col = await apiFetch<Record<string, unknown>>("/collections", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-  let result = mapCollection(col, "", catalogById);
+  let createdId: string | undefined;
+  try {
+    const col = await apiFetch<Record<string, unknown>>("/collections", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    let result = mapCollection(col, "", catalogById);
+    createdId = result.id;
 
-  const mockup = resolveMediaUrl(payload.product.mockupUrl);
-  if (mockup?.startsWith("data:") && catalogProduct.id) {
-    const withMockups = await uploadCollectionMockupsApi(
-      result.id,
-      [{ catalogProductId: catalogProduct.id, dataUrl: mockup }],
-      catalogById,
-    );
-    if (withMockups) result = withMockups;
+    const mockup = resolveMediaUrl(payload.product.mockupUrl);
+    if (mockup?.startsWith("data:") && catalogProduct.id) {
+      const withMockups = await uploadCollectionMockupsApi(
+        result.id,
+        [{ catalogProductId: catalogProduct.id, dataUrl: mockup }],
+        catalogById,
+      );
+      if (!withMockups) {
+        throw new Error("Failed to save product mockups — try again");
+      }
+      result = withMockups;
+    }
+
+    return result;
+  } catch (err) {
+    if (createdId) await rollbackFailedCollection(createdId);
+    throw err;
   }
-
-  return result;
 }
 
 export async function createCollectionApi(payload: {
@@ -465,23 +475,42 @@ export async function createCollectionApi(payload: {
   if (payload.shopId) body.shopId = payload.shopId;
   if (payload.artworkUrl) body.artworkUrl = collectionMediaUrl(payload.artworkUrl);
   if (payload.isShopSpecific) body.isShopSpecific = true;
-  const col = await apiFetch<Record<string, unknown>>("/collections", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-  let result = mapCollection(col, "", catalogById);
-  if (payload.artwork) {
-    const file = await artworkFileFromInput(payload.artwork);
-    if (file) result = await uploadCollectionArtworkApi(result.id, file);
-  }
-  if (payload.mockups?.length) {
-    const withMockups = await uploadCollectionMockupsApi(result.id, payload.mockups, catalogById);
-    if (!withMockups) {
-      throw new Error("Failed to save product mockups — try generating designs again");
+
+  let createdId: string | undefined;
+  try {
+    const col = await apiFetch<Record<string, unknown>>("/collections", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    let result = mapCollection(col, "", catalogById);
+    createdId = result.id;
+
+    if (payload.artwork) {
+      const file = await artworkFileFromInput(payload.artwork);
+      if (file) result = await uploadCollectionArtworkApi(result.id, file);
     }
-    result = withMockups;
+    if (payload.mockups?.length) {
+      const withMockups = await uploadCollectionMockupsApi(result.id, payload.mockups, catalogById);
+      if (!withMockups) {
+        throw new Error("Failed to save product mockups — try generating designs again");
+      }
+      result = withMockups;
+    }
+    return result;
+  } catch (err) {
+    // Create runs before artwork/mockup uploads — remove the orphan so a failed
+    // design never shows up in Branded Swag / shop UI.
+    if (createdId) await rollbackFailedCollection(createdId);
+    throw err;
   }
-  return result;
+}
+
+async function rollbackFailedCollection(collectionId: string): Promise<void> {
+  try {
+    await deleteCollectionApi(collectionId);
+  } catch {
+    // Best-effort cleanup; the original design error is still thrown.
+  }
 }
 
 export async function getCampaignApi(campaignId: string) {

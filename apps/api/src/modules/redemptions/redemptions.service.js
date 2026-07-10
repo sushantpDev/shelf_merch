@@ -246,6 +246,7 @@ export async function getRedemptionPortal(token) {
         logoUrl: shop.logoUrl || '',
         bannerTheme: shop.bannerConfig?.theme || 'light',
         bannerPreset: shop.bannerConfig?.preset || '',
+        featuredCatalogProductIds: (shop.featuredCatalogProductIds || []).map(String),
       }
     : null;
 

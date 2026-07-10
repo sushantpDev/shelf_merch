@@ -65,8 +65,15 @@ export function CatalogEditorDialog({
 
   async function save() {
     const ids = [...picked].filter((id) => !id.startsWith("demo:"));
+    const enabled = new Set(ids);
+    const featuredCatalogProductIds = (shop.featuredCatalogProductIds || []).filter((id) =>
+      enabled.has(id),
+    );
     try {
-      await updateShop.mutateAsync({ shopId: shop.id, input: { selectedCatalogProductIds: ids } });
+      await updateShop.mutateAsync({
+        shopId: shop.id,
+        input: { selectedCatalogProductIds: ids, featuredCatalogProductIds },
+      });
       toast.success("Shop catalog updated");
       onOpenChange(false);
     } catch (err) {
@@ -76,34 +83,23 @@ export function CatalogEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm-modal" style={{ maxWidth: "min(1140px,96vw)", width: "100%" }}>
-        <div className="modal-pad">
-          <DialogTitle>Edit catalog</DialogTitle>
-          <p className="muted" style={{ marginTop: 4, fontSize: 13 }}>
-            Select products to show in <b>{shop.name}</b>
-          </p>
-          {picked.size === 0 && (
-            <div
-              className="banner"
-              style={{
-                marginTop: 12,
-                borderColor: "var(--red-600)",
-                background: "var(--red-50)",
-                color: "var(--red-600)",
-              }}
-            >
-              <div>
-                Your current selection shows no available products. Enable some before sending
-                points.
+      <DialogContent className="sm-modal sm-catalog-modal">
+        <div className="sm-catalog-modal-inner">
+          <div className="sm-catalog-modal-head">
+            <DialogTitle>Edit catalog</DialogTitle>
+            <p className="muted sm-catalog-modal-sub">
+              Hide or show products in <b>{shop.name}</b>. Deselected items will not appear on the
+              live shop.
+            </p>
+            {picked.size === 0 ? (
+              <div className="sm-catalog-modal-warn">
+                No products selected. Enable some so recipients can shop them.
               </div>
-            </div>
-          )}
+            ) : null}
+          </div>
 
-          <div style={{ display: "flex", gap: 20, marginTop: 18, minHeight: 380 }}>
-            <div
-              className="subrail"
-              style={{ width: 210, flex: "none", maxHeight: "58vh", overflow: "auto" }}
-            >
+          <div className="sm-catalog-modal-body">
+            <aside className="sm-catalog-modal-rail">
               {categories.map((c) => {
                 const entries = indexed.filter(
                   ({ p }) => c === "All Products" || catalogCategoryLabel(p) === c,
@@ -123,11 +119,11 @@ export function CatalogEditorDialog({
                   </button>
                 );
               })}
-            </div>
+            </aside>
 
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="row" style={{ gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-                <div className="search" style={{ flex: 1, minWidth: 220 }}>
+            <div className="sm-catalog-modal-main">
+              <div className="sm-catalog-modal-toolbar">
+                <div className="search sm-catalog-modal-search">
                   <Search size={16} aria-hidden="true" />
                   <input
                     aria-label="Search products"
@@ -136,47 +132,40 @@ export function CatalogEditorDialog({
                     onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => setPicked(new Set())}
-                >
-                  Deselect all
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() =>
-                    setPicked((prev) => {
-                      const next = new Set(prev);
-                      filtered.forEach(({ key }) => next.add(key));
-                      return next;
-                    })
-                  }
-                >
-                  Select all
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-ghost btn-sm ${viewSelected ? "on" : ""}`}
-                  onClick={() => setViewSelected((v) => !v)}
-                >
-                  {viewSelected ? "View all" : "View selected"}
-                </button>
+                <div className="sm-catalog-modal-actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setPicked(new Set())}
+                  >
+                    Deselect all
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() =>
+                      setPicked((prev) => {
+                        const next = new Set(prev);
+                        filtered.forEach(({ key }) => next.add(key));
+                        return next;
+                      })
+                    }
+                  >
+                    Select all
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-ghost btn-sm ${viewSelected ? "on" : ""}`}
+                    onClick={() => setViewSelected((v) => !v)}
+                  >
+                    {viewSelected ? "View all" : "View selected"}
+                  </button>
+                </div>
               </div>
 
-              <div
-                className="grid"
-                style={{
-                  gridTemplateColumns: "repeat(auto-fill,minmax(170px,1fr))",
-                  maxHeight: "55vh",
-                  overflow: "auto",
-                  paddingRight: 4,
-                  gap: 12,
-                }}
-              >
+              <div className="sm-catalog-modal-grid">
                 {filtered.length === 0 ? (
-                  <p className="muted" style={{ padding: "20px 0" }}>
+                  <p className="muted" style={{ padding: "16px 0" }}>
                     No products match your filters.
                   </p>
                 ) : (
@@ -186,44 +175,14 @@ export function CatalogEditorDialog({
                       <button
                         key={key}
                         type="button"
-                        className="pcard"
-                        style={{
-                          position: "relative",
-                          cursor: "pointer",
-                          textAlign: "left",
-                          ...(on
-                            ? {
-                                borderColor: "var(--brand)",
-                                boxShadow: "0 0 0 2px var(--brand-50)",
-                              }
-                            : {}),
-                        }}
+                        className={`pcard sm-catalog-product${on ? " on" : ""}`}
                         aria-pressed={on}
                         onClick={() => toggle(key)}
                       >
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: 10,
-                            left: 10,
-                            zIndex: 2,
-                            width: 20,
-                            height: 20,
-                            borderRadius: 4,
-                            background: on ? "var(--brand)" : "#fff",
-                            border: `2px solid ${on ? "var(--brand)" : "var(--line)"}`,
-                            display: "grid",
-                            placeItems: "center",
-                            color: "#fff",
-                            fontSize: 12,
-                            fontWeight: 700,
-                          }}
-                        >
-                          {on ? "✓" : ""}
-                        </div>
+                        <div className={`sm-catalog-check${on ? " on" : ""}`}>{on ? "✓" : ""}</div>
                         <ProductThumb product={p} />
                         <div className="meta">
-                          {p.brand && <div className="brand">{p.brand}</div>}
+                          {p.brand ? <div className="brand">{p.brand}</div> : null}
                           <div className="nm">{p.nm}</div>
                           <div className="pr">{p.price || ""}</div>
                         </div>
@@ -235,16 +194,7 @@ export function CatalogEditorDialog({
             </div>
           </div>
 
-          <div
-            className="row"
-            style={{
-              justifyContent: "space-between",
-              marginTop: 22,
-              paddingTop: 16,
-              borderTop: "1px solid var(--line)",
-              alignItems: "center",
-            }}
-          >
+          <div className="sm-catalog-modal-footer">
             <span className="mut3">
               {picked.size} of {products.length} selected
             </span>

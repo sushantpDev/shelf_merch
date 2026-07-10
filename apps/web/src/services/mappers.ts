@@ -53,6 +53,7 @@ export type UiShop = {
   categories: string[];
   collections: string[];
   selectedCatalogProductIds: string[];
+  featuredCatalogProductIds: string[];
   logoUrl?: string;
   bannerConfig?: Record<string, unknown>;
   createdAt?: string;
@@ -337,6 +338,9 @@ export function mapShop(s: ApiProduct): UiShop {
     collections: [],
     selectedCatalogProductIds: Array.isArray(s.selectedCatalogProductIds)
       ? s.selectedCatalogProductIds.map(String)
+      : [],
+    featuredCatalogProductIds: Array.isArray((s as { featuredCatalogProductIds?: unknown }).featuredCatalogProductIds)
+      ? ((s as { featuredCatalogProductIds: unknown[] }).featuredCatalogProductIds).map(String)
       : [],
     logoUrl: s.logoUrl || "",
     bannerConfig: s.bannerConfig || {},

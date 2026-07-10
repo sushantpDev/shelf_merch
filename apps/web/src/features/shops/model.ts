@@ -22,6 +22,7 @@ export type UpdateShopInput = {
   logoUrl?: string;
   bannerConfig?: Record<string, unknown>;
   selectedCatalogProductIds?: string[];
+  featuredCatalogProductIds?: string[];
 };
 
 export function useCreateShop() {

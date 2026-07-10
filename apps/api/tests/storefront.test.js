@@ -92,7 +92,7 @@ describe('public storefront (no auth)', () => {
     expect(res.body.products.every((p) => p.catalogProductId === String(bottle._id))).toBe(true);
   });
 
-  it('lists branded products from shop-linked collections even when catalog is not manually curated', async () => {
+  it('hides branded designs when Shop Catalog selection is empty', async () => {
     const shop = await Shop.create({ tenantId: tenant._id, name: 'Empty Store', status: 'live' });
     await Collection.create({
       tenantId: tenant._id, shopId: shop._id, code: 'C0', name: 'Picks', status: 'ready',
@@ -101,12 +101,27 @@ describe('public storefront (no auth)', () => {
     });
     const res = await request(app).get(`/api/v1/storefront/${shop._id}`);
     expect(res.status).toBe(200);
-    expect(res.body.products).toHaveLength(1);
-    expect(res.body.products[0]).toMatchObject({
-      catalogProductId: String(curated._id),
-      name: 'Welcome Tee',
-      artworkUrl: '/uploads/test/swag.png',
+    expect(res.body.products).toHaveLength(0);
+  });
+
+  it('hides branded designs deselected from Shop Catalog', async () => {
+    const shop = await Shop.create({
+      tenantId: tenant._id,
+      name: 'Curated Store',
+      status: 'live',
+      selectedCatalogProductIds: [],
     });
+    await Collection.create({
+      tenantId: tenant._id,
+      shopId: shop._id,
+      code: 'C-DES',
+      name: 'Picks',
+      status: 'ready',
+      productRefs: [{ catalogProductId: curated._id, brand: 'Uber', name: 'Welcome Tee', group: 'tee' }],
+    });
+    const res = await request(app).get(`/api/v1/storefront/${shop._id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.products).toHaveLength(0);
   });
 
   it('hides products enabled in Shop Catalog when no Branded Swag design covers them', async () => {

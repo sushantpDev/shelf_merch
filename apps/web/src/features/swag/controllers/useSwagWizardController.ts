@@ -92,6 +92,13 @@ export function useSwagWizardController(): SwagWizardVm {
         })
         .filter((m): m is { catalogProductId: string; dataUrl: string } => m !== null);
 
+      if (!mockups.length) {
+        throw new Error("Failed to generate designs — try again");
+      }
+      if (mockups.length < draft.picked.length) {
+        throw new Error("Failed to generate designs for all products — try again");
+      }
+
       const col = await createCollection.mutateAsync({
         shopId,
         name: draft.name || "New collection",

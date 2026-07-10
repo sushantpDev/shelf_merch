@@ -14,6 +14,8 @@ const shopSchema = new mongoose.Schema(
     categories: { type: [String], default: [] },
     /** Catalog products enabled for this shop's public storefront. Empty = no products visible. */
     selectedCatalogProductIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'CatalogProduct' }],
+    /** Optional homepage Featured Products picks (subset of selected catalog). */
+    featuredCatalogProductIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'CatalogProduct' }],
     status: { type: String, enum: ['draft', 'live'], default: 'draft' },
   },
   { timestamps: true },

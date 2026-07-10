@@ -268,6 +268,7 @@ export async function updateShopFlow(
     logoUrl?: string;
     bannerConfig?: Record<string, unknown>;
     selectedCatalogProductIds?: string[];
+    featuredCatalogProductIds?: string[];
   },
 ) {
   return updateShopApi(shopId, payload);
@@ -545,7 +546,15 @@ export async function getRedemptionPortal(token: string) {
 }
 
 export type StorefrontData = {
-  shop: { id: string; name: string; logoUrl?: string; bannerTheme?: string; bannerPreset?: string; currencyMode: string };
+  shop: {
+    id: string;
+    name: string;
+    logoUrl?: string;
+    bannerTheme?: string;
+    bannerPreset?: string;
+    currencyMode: string;
+    featuredCatalogProductIds?: string[];
+  };
   products: Array<{
     _id: string;
     catalogProductId?: string;

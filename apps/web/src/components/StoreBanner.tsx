@@ -5,6 +5,7 @@ export type StoreShop = {
   logoUrl?: string;
   bannerTheme?: string;
   bannerPreset?: string;
+  featuredCatalogProductIds?: string[];
 };
 
 // Banner theme presets shared with the tenant shop builder.

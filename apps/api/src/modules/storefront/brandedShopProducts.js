@@ -48,10 +48,13 @@ export async function loadShopCollections(shop, { skipTenantGuard = true } = {})
 }
 
 /**
- * Public shop listings: one entry per active Branded Swag design.
- * Shop Catalog curation alone does not surface a product without a design.
+ * Public shop listings: one entry per active Branded Swag design that is also
+ * enabled in Shop Catalog (`selectedCatalogProductIds`). Empty selection = none.
  */
 export async function buildBrandedProductListings(shop, { skipTenantGuard = true } = {}) {
+  const allowed = new Set((shop.selectedCatalogProductIds || []).map(String).filter(Boolean));
+  if (!allowed.size) return [];
+
   const collections = await loadShopCollections(shop, { skipTenantGuard });
   const catalogIds = [];
   for (const col of collections) {
@@ -59,7 +62,7 @@ export async function buildBrandedProductListings(shop, { skipTenantGuard = true
       if (ref.catalogProductId) catalogIds.push(String(ref.catalogProductId));
     }
   }
-  const uniqueIds = [...new Set(catalogIds)];
+  const uniqueIds = [...new Set(catalogIds)].filter((id) => allowed.has(id));
   if (!uniqueIds.length) return [];
 
   const catalogRows = await CatalogProduct.find({
@@ -76,7 +79,7 @@ export async function buildBrandedProductListings(shop, { skipTenantGuard = true
   for (const col of collections) {
     for (const ref of col.productRefs || []) {
       const catalogProductId = ref.catalogProductId ? String(ref.catalogProductId) : '';
-      if (!catalogProductId) continue;
+      if (!catalogProductId || !allowed.has(catalogProductId)) continue;
       const base = catalogById.get(catalogProductId);
       if (!base) continue;
       products.push(mapBrandedListing(col, ref, base));

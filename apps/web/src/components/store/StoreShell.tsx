@@ -984,6 +984,35 @@ export default function StoreShell({
     );
   }, [products, searchQuery]);
 
+  const { featuredProducts, remainingProducts } = useMemo(() => {
+    const featuredIds = (shop.featuredCatalogProductIds || []).map(String).filter(Boolean);
+    if (!featuredIds.length) {
+      return {
+        featuredProducts: filteredBySearch.slice(0, 5),
+        remainingProducts: filteredBySearch.slice(5),
+      };
+    }
+    const byCatalogId = new Map(
+      filteredBySearch.map((p) => [String(p.catalogProductId || p._id), p] as const),
+    );
+    const featured: typeof filteredBySearch = [];
+    for (const id of featuredIds) {
+      const hit = byCatalogId.get(id);
+      if (hit) featured.push(hit);
+    }
+    if (!featured.length) {
+      return {
+        featuredProducts: filteredBySearch.slice(0, 5),
+        remainingProducts: filteredBySearch.slice(5),
+      };
+    }
+    const featuredKeys = new Set(featured.map((p) => p._id));
+    return {
+      featuredProducts: featured,
+      remainingProducts: filteredBySearch.filter((p) => !featuredKeys.has(p._id)),
+    };
+  }, [filteredBySearch, shop.featuredCatalogProductIds]);
+
   const userInitials = recipientName
     ? recipientName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
     : "SM";
@@ -1216,12 +1245,12 @@ export default function StoreShell({
                   ) : null}
                 </div>
                 <StadiumProductGrid
-                  products={filteredBySearch.slice(0, 5)}
+                  products={featuredProducts}
                   shopBrand={shop.name}
                   onOpen={openProduct}
                   priceLabel={fmtCardPrice}
                 />
-                {products.length > 5 ? (
+                {remainingProducts.length > 0 ? (
                   <>
                     <div className="sf-section-header sf-section-header--stadium" style={{ marginTop: 48 }}>
                       <h2 className="sf-section-title sf-section-title--stadium">All Products</h2>
@@ -1230,7 +1259,7 @@ export default function StoreShell({
                       </p>
                     </div>
                     <StadiumProductGrid
-                      products={filteredBySearch.slice(5)}
+                      products={remainingProducts}
                       shopBrand={shop.name}
                       onOpen={openProduct}
                       priceLabel={fmtCardPrice}

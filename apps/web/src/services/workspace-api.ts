@@ -585,6 +585,7 @@ export async function updateShopApi(
     bannerConfig?: Record<string, unknown>;
     categories?: string[];
     selectedCatalogProductIds?: string[];
+    featuredCatalogProductIds?: string[];
   },
 ) {
   const shop = await apiFetch<unknown>(`/shops/${shopId}`, {

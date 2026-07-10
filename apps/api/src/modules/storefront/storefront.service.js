@@ -8,8 +8,8 @@ import { buildBrandedProductListings } from './brandedShopProducts.js';
 const POOLED_REDEMPTION_STATUSES = ['opened', 'verified'];
 
 /**
- * Public, no-auth storefront for a live shop. Listings are driven entirely by
- * Branded Swag: one entry per (active collection × productRef).
+ * Public, no-auth storefront for a live shop. Listings require both a Branded
+ * Swag design and an enabled Shop Catalog selection.
  */
 export async function getStorefront(shopId) {
   const shop = await Shop.findById(shopId).setOptions({ skipTenantGuard: true });
@@ -32,6 +32,7 @@ function shopPublicPayload(shop) {
     bannerTheme: shop.bannerConfig?.theme || 'light',
     bannerPreset: shop.bannerConfig?.preset || '',
     currencyMode: shop.currencyMode,
+    featuredCatalogProductIds: (shop.featuredCatalogProductIds || []).map(String),
   };
 }
 
