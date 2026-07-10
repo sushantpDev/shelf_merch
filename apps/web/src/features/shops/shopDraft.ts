@@ -16,8 +16,8 @@ export const INITIAL_SHOP_DRAFT: ShopDraft = {
   currency: "Points",
   logoUrl: "",
   categories: DEFAULT_BUILDER_CATEGORIES,
-  bannerTheme: "light",
-  bannerPreset: "thats-a-wrap",
+  bannerTheme: "dark",
+  bannerPreset: "solid-pattern",
 };
 
 export type ShopDraftAction =

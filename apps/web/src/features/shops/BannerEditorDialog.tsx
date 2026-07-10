@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/dialog";
 import type { UiShop } from "@/services/mappers";
 import {
-  BANNER_THEMES,
   SHOP_BANNER_PRESETS,
   ShopBanner,
   bannerConfigFromSource,
@@ -150,43 +149,28 @@ export function BannerEditorDialog({
             </div>
 
             <div className="lbl" style={{ marginTop: 18 }}>
-              Solid color
+              Solid
             </div>
             <div
               className="grid"
               style={{ gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginTop: 8 }}
             >
-              {Object.keys(BANNER_THEMES).map((k) => {
-                const t = BANNER_THEMES[k];
-                const swatch = t.dots
-                  ? {
-                      backgroundImage: `radial-gradient(rgba(255,255,255,.18) 1.4px,transparent 1.4px),${t.bg.startsWith("linear-gradient") ? t.bg : `linear-gradient(${t.bg},${t.bg})`}`,
-                      backgroundSize: "14px 14px,auto",
-                    }
-                  : { background: t.bg };
-                return (
-                  <button
-                    key={k}
-                    type="button"
-                    className={`optcard ${state.theme === k && !state.preset ? "on" : ""}`}
-                    style={{ padding: 12, textAlign: "center" }}
-                    aria-pressed={state.theme === k && !state.preset}
-                    onClick={() => setState((s) => ({ ...s, theme: k, preset: "" }))}
-                  >
-                    <div style={{ height: 40, borderRadius: 8, ...swatch }} />
-                    <div
-                      style={{
-                        fontSize: 12,
-                        marginTop: 8,
-                        fontWeight: 600,
-                        textTransform: "capitalize",
-                      }}
-                    >
-                      {k}
-                    </div>
-                  </button>
-                );
-              })}
+              <button
+                type="button"
+                className={`optcard banner-preset-card ${state.preset === "solid-pattern" ? "on" : ""}`}
+                aria-pressed={state.preset === "solid-pattern"}
+                onClick={() => setState((s) => ({ ...s, preset: "solid-pattern", theme: "dark" }))}
+              >
+                <img
+                  src="/shop-banners/solid-pattern.png"
+                  alt="Pattern"
+                  loading="lazy"
+                  className="banner-preset-thumb"
+                  width={160}
+                  height={52}
+                />
+                <span className="banner-preset-label">Pattern</span>
+              </button>
             </div>
 
             <div className="lbl" style={{ marginTop: 18 }}>

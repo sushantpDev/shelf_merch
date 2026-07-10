@@ -1,11 +1,12 @@
 import { Link } from "react-router";
+import shelfmerchWordmark from "../../../assets/shelfmerch.png";
 
-export const SHELF_MERCH_LOGO_DARK = "/images/logo/shelfmerch-logo-dark.svg";
+export const SHELF_MERCH_LOGO_DARK = shelfmerchWordmark;
 export const SHELF_MERCH_LOGO_LIGHT = "/images/logo/shelfmerch-logo-light.svg";
 export const SHELF_MERCH_LOGO_ICON = "/images/logo/shelfmerch-logo-icon.svg";
 
 type ShelfMerchLogoProps = {
-  /** `dark` = dark text on light backgrounds; `light` = white text on dark backgrounds. */
+  /** `dark` = dark wordmark on light backgrounds; `light` = light wordmark on dark backgrounds. */
   theme?: "dark" | "light";
   /** Full wordmark or icon mark only. */
   variant?: "full" | "icon";

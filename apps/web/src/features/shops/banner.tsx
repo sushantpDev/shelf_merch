@@ -94,6 +94,7 @@ function bannerClasses(src: BannerSource): string {
 export function ShopBanner({
   source,
   height = 96,
+  aspect,
   radius = 0,
   logoSize = 48,
   layout = "left",
@@ -101,6 +102,8 @@ export function ShopBanner({
 }: {
   source: BannerSource;
   height?: number;
+  /** When set (e.g. `"3 / 1"`), sizes by width and matches banner asset ratio so cover does not crop. */
+  aspect?: string;
   radius?: number;
   logoSize?: number;
   layout?: "left" | "center";
@@ -114,8 +117,15 @@ export function ShopBanner({
 
   return (
     <div
-      className={bannerClasses(source)}
-      style={{ height, borderRadius: radius, position: "relative", ...bannerStyle(source) }}
+      className={`${bannerClasses(source)}${aspect ? " shopbanner-aspect-fit" : ""}`}
+      style={{
+        ...(aspect
+          ? { aspectRatio: aspect, height: "auto", width: "100%" }
+          : { height }),
+        borderRadius: radius,
+        position: "relative",
+        ...bannerStyle(source),
+      }}
     >
       {logoUrl && (
         <div
