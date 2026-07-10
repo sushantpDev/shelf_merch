@@ -11,9 +11,10 @@ export type KitWizardStep = 0 | 1 | 2 | 3;
 const INITIAL: KitDraft = {
   name: "Welcome Kit",
   desc: "",
-  picked: [0, 2, 3],
+  picked: [],
   art: null,
   placements: {},
+  placementEpoch: 0,
   notes: "",
   packaging: "box",
 };

@@ -29,6 +29,7 @@ const EMPTY_DRAFT: KitDraft = {
   picked: [],
   art: null,
   placements: {},
+  placementEpoch: 0,
   notes: "",
   packaging: "box",
 };
@@ -53,6 +54,7 @@ export function useEditKitController(): EditKitVm {
       picked: kitPickedIndices(kit, catalog),
       art: kit.artworkUrl ? { name: "Kit artwork", preview: kit.artworkUrl, existing: true } : null,
       placements: {},
+      placementEpoch: 0,
       notes: kit.designNotes || "",
       packaging: kit.packaging === "none" ? "none" : "box",
     };

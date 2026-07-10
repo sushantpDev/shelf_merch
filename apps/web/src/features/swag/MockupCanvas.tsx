@@ -21,11 +21,14 @@ export function MockupCanvas({
   product,
   artUrl,
   placement,
+  resetEpoch = 0,
   onChange,
 }: {
   product: UiProduct;
   artUrl: string;
   placement: Placement | undefined;
+  /** Bumps when placements are reset so Konva remounts at default positions. */
+  resetEpoch?: number;
   onChange: (placement: Placement) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -154,8 +157,8 @@ export function MockupCanvas({
         /* noop */
       }
     };
-    // Remount when the product or artwork changes (placement read via ref).
-  }, [product, artUrl]);
+    // Remount when the product, artwork, or placement reset epoch changes.
+  }, [product, artUrl, resetEpoch]);
 
   return (
     <div

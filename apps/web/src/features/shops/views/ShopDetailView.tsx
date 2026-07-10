@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { ArrowLeft, Coins } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { ShopBanner } from "../banner";
+import { ShopWelcomeDialog } from "../ShopWelcomeDialog";
 import { BrandedSwagTab } from "../tabs/BrandedSwagTab";
 import { ShopCatalogTab } from "../tabs/ShopCatalogTab";
 import { SentGiftsTab } from "../tabs/SentGiftsTab";
@@ -12,32 +13,53 @@ import type { ShopDetailVm } from "../controllers/useShopDetailController";
 
 /** Shop detail page: banner header, tab bar, and the active tab's content. */
 export function ShopDetailView(vm: ShopDetailVm) {
+  const welcome = (
+    <ShopWelcomeDialog
+      open={vm.showWelcome}
+      shopName={vm.welcomeShopName}
+      onDone={vm.onDismissWelcome}
+    />
+  );
+
   if (vm.isLoading) {
-    return <LoadingState message="Loading shop…" fullScreen={false} />;
+    return (
+      <>
+        {welcome}
+        <LoadingState message="Loading shop…" fullScreen={false} />
+      </>
+    );
   }
   if (vm.errorMessage) {
     return (
-      <div className="card" style={{ padding: 16, color: "var(--danger)" }}>
-        {vm.errorMessage}
-      </div>
+      <>
+        {welcome}
+        <div className="card" style={{ padding: 16, color: "var(--danger)" }}>
+          {vm.errorMessage}
+        </div>
+      </>
     );
   }
 
   const { shop } = vm;
   if (!shop) {
     return (
-      <div className="card empty" style={{ padding: 48 }}>
-        <h3>Shop not found</h3>
-        <p>This shop may have been removed.</p>
-        <Link to="/app/shops" className="btn btn-soft" style={{ marginTop: 14 }}>
-          Back to shops
-        </Link>
-      </div>
+      <>
+        {welcome}
+        <div className="card empty" style={{ padding: 48 }}>
+          <h3>Shop not found</h3>
+          <p>This shop may have been removed.</p>
+          <Link to="/app/shops" className="btn btn-soft" style={{ marginTop: 14 }}>
+            Back to shops
+          </Link>
+        </div>
+      </>
     );
   }
 
   return (
     <>
+      {welcome}
+
       <Link
         to="/app/shops"
         className="lnk"

@@ -29,6 +29,7 @@ export type ContactsVm = {
   canManageContacts: boolean;
   canManageContactRoles: boolean;
   adding: boolean;
+  addInitialTab: "manual" | "csv";
   editing: UiContact | null;
   onTab: (tab: ContactsTab) => void;
   onQuery: (query: string) => void;
@@ -38,11 +39,10 @@ export type ContactsVm = {
   onToggleAll: () => void;
   onToggleOne: (id: string) => void;
   onRoleChange: (contact: UiContact, role: string) => void;
-  onAddOpen: () => void;
+  onAddOpen: (tab?: "manual" | "csv") => void;
   onAddOpenChange: (open: boolean) => void;
   onEdit: (contact: UiContact) => void;
   onEditOpenChange: (open: boolean) => void;
-  onMoreActions: () => void;
   onRestrict: () => void;
   onFooterLink: (link: string) => void;
 };
@@ -87,6 +87,7 @@ export function useContactsController(): ContactsVm {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
+  const [addInitialTab, setAddInitialTab] = useState<"manual" | "csv">("manual");
   const [editing, setEditing] = useState<UiContact | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -169,6 +170,7 @@ export function useContactsController(): ContactsVm {
     canManageContacts: canManageContacts(),
     canManageContactRoles: canManageUsers(),
     adding,
+    addInitialTab,
     editing,
     onTab: setTab,
     onQuery: setQuery,
@@ -181,13 +183,15 @@ export function useContactsController(): ContactsVm {
     onToggleAll,
     onToggleOne,
     onRoleChange,
-    onAddOpen: () => setAdding(true),
+    onAddOpen: (tab: "manual" | "csv" = "manual") => {
+      setAddInitialTab(tab);
+      setAdding(true);
+    },
     onAddOpenChange: setAdding,
     onEdit: setEditing,
     onEditOpenChange: (open) => {
       if (!open) setEditing(null);
     },
-    onMoreActions: () => toast.message("Import and bulk actions — use Add contacts"),
     onRestrict: () => toast.message("Contact restrictions — coming soon"),
     onFooterLink: (link) => toast.message(`${link} — coming soon`),
   };

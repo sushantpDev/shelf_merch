@@ -9,6 +9,7 @@ export type KitDraft = {
   picked: number[];
   art: KitArtFile | null;
   placements: Record<string, Placement>;
+  placementEpoch: number;
   notes: string;
   packaging: "none" | "box";
 };
@@ -45,11 +46,20 @@ export function kitReducer(state: KitDraft, action: KitAction): KitDraft {
     case "setArt":
       return { ...state, art: action.art };
     case "clearArt":
-      return { ...state, art: null, placements: {} };
+      return {
+        ...state,
+        art: null,
+        placements: {},
+        placementEpoch: (state.placementEpoch ?? 0) + 1,
+      };
     case "setPlacement":
       return { ...state, placements: { ...state.placements, [action.key]: action.placement } };
     case "resetPlacements":
-      return { ...state, placements: {} };
+      return {
+        ...state,
+        placements: {},
+        placementEpoch: (state.placementEpoch ?? 0) + 1,
+      };
     case "setNotes":
       return { ...state, notes: action.notes };
     case "setPackaging":

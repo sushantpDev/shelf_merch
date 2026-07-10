@@ -19,6 +19,8 @@ export type ContactFormProps = {
   mode: "add" | "edit";
   contact?: UiContact;
   canImportContacts?: boolean;
+  /** When opening add dialog, start on manual or CSV import tab. */
+  initialTab?: "manual" | "csv";
 };
 
 export type ContactFormVm = {
@@ -44,6 +46,7 @@ export function useContactFormController({
   mode,
   contact,
   canImportContacts = true,
+  initialTab = "manual",
 }: ContactFormProps): ContactFormVm {
   const [tab, setTab] = useState<"manual" | "csv">("manual");
   const addContact = useAddContact();
@@ -64,9 +67,9 @@ export function useContactFormController({
   // Reset the form whenever the dialog opens or the target contact changes.
   useEffect(() => {
     if (!open) return;
-    setTab("manual");
+    setTab(mode === "add" ? initialTab : "manual");
     reset(mode === "edit" && contact ? contactToForm(contact) : EMPTY_CONTACT);
-  }, [open, mode, contact, reset]);
+  }, [open, mode, contact, initialTab, reset]);
 
   async function submit(values: ContactFormValues) {
     try {

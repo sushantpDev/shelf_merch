@@ -11,9 +11,11 @@ import { createPortal } from "react-dom";
 export function FullscreenOverlay({
   children,
   style,
+  className,
 }: {
   children: ReactNode;
   style?: CSSProperties;
+  className?: string;
 }) {
   useEffect(() => {
     window.dispatchEvent(
@@ -27,7 +29,7 @@ export function FullscreenOverlay({
   }, []);
 
   return createPortal(
-    <div className="sm-fullscreen" style={style}>
+    <div className={["sm-fullscreen", className].filter(Boolean).join(" ")} style={style}>
       {children}
     </div>,
     document.body,

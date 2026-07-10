@@ -444,12 +444,18 @@ export function SentGiftsTab({
     <div className="card sent-gifts-empty">
       <div className="sent-gifts-empty-inner">
         <img src={sentGiftsEmptyImg} alt="" className="sent-gifts-empty-art" />
-        <div className="sent-gifts-empty-content">
-          <h3>You haven&apos;t sent any points</h3>
-          <p className="muted">
-            Send points to employees, customers, or partners — they can redeem from your shop catalog.
-          </p>
-        </div>
+        <h3>You haven&apos;t sent any points</h3>
+        <p className="muted">
+          Send points so recipients can redeem in &lsquo;{shop.name}&rsquo;!
+        </p>
+        <button
+          type="button"
+          className="btn btn-ghost sent-gifts-empty-cta"
+          onClick={() => onSendPoints()}
+          disabled={!canSendPoints}
+        >
+          Send points
+        </button>
       </div>
     </div>
   );

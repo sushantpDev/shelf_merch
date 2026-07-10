@@ -171,6 +171,7 @@ export function EditKitView(vm: EditKitVm) {
         products={selected}
         art={draft.art}
         placements={draft.placements}
+        placementEpoch={draft.placementEpoch}
         notes={draft.notes}
         onSetArt={(art) => dispatch({ type: "setArt", art })}
         onClearArt={() => dispatch({ type: "clearArt" })}

@@ -3,6 +3,10 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { collectionLinkedToShop, SHOP_TABS, shopTabFromSearch, type ShopTab } from "../types";
+import {
+  clearShopCelebration,
+  peekShopCelebration,
+} from "../shopCelebration";
 import type { UiCollection, UiProduct, UiShop } from "../model";
 
 const MANAGER_TABS: ShopTab[] = ["Branded Swag", "Shop Catalog", "Sent Gifts", "Reports"];
@@ -18,6 +22,9 @@ export type ShopDetailVm = {
   canEditShop: boolean;
   canDesignSwag: boolean;
   canSendPoints: boolean;
+  showWelcome: boolean;
+  welcomeShopName: string;
+  onDismissWelcome: () => void;
   onSelectTab: (tab: ShopTab) => void;
   onSendPoints: (campaignId?: string) => void;
   onStartDesigning: () => void;
@@ -27,7 +34,9 @@ export type ShopDetailVm = {
 /** Controller for the shop detail page: route param, tab state (URL-synced), navigation. */
 export function useShopDetailController(): ShopDetailVm {
   const { id } = useParams() as { id: string };
-  const tabSearch = useSearchParams()[0].get("tab") ?? undefined;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabSearch = searchParams.get("tab") ?? undefined;
+  const welcomeParam = searchParams.get("welcome") === "1";
   const navigate = useNavigate();
   const { data: workspace, isLoading, isError, error } = useWorkspace();
   const { canWrite, canOperateCampaigns } = useTenantAccess();
@@ -35,6 +44,15 @@ export function useShopDetailController(): ShopDetailVm {
   const canDesignSwag = canWrite("swag");
   const canSendPoints = canOperateCampaigns();
   const visibleTabs = canEditShop ? [...SHOP_TABS] : MANAGER_TABS;
+
+  const celebration = peekShopCelebration(id);
+  const [showWelcome, setShowWelcome] = useState(
+    () => welcomeParam || Boolean(celebration),
+  );
+  const [welcomeShopName] = useState(
+    () => celebration?.shopName || "",
+  );
+
   const [tab, setTab] = useState<ShopTab>(() => {
     const fromSearch = shopTabFromSearch(tabSearch);
     if (fromSearch && (canEditShop || MANAGER_TABS.includes(fromSearch))) return fromSearch;
@@ -49,6 +67,13 @@ export function useShopDetailController(): ShopDetailVm {
   );
 
   useEffect(() => {
+    if (!welcomeParam) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("welcome");
+    setSearchParams(next, { replace: true });
+  }, [welcomeParam, searchParams, setSearchParams]);
+
+  useEffect(() => {
     const fromSearch = shopTabFromSearch(tabSearch);
     if (fromSearch && visibleTabs.includes(fromSearch)) setTab(fromSearch);
   }, [tabSearch, visibleTabs]);
@@ -56,6 +81,11 @@ export function useShopDetailController(): ShopDetailVm {
   useEffect(() => {
     if (!visibleTabs.includes(tab)) setTab(visibleTabs[0] ?? "Branded Swag");
   }, [tab, visibleTabs]);
+
+  function dismissWelcome() {
+    setShowWelcome(false);
+    clearShopCelebration();
+  }
 
   function onSelectTab(next: ShopTab) {
     setTab(next);
@@ -86,6 +116,9 @@ export function useShopDetailController(): ShopDetailVm {
     canEditShop,
     canDesignSwag,
     canSendPoints,
+    showWelcome,
+    welcomeShopName: welcomeShopName || shop?.name || "your shop",
+    onDismissWelcome: dismissWelcome,
     onSelectTab,
     onSendPoints,
     onStartDesigning: () =>
