@@ -6,7 +6,7 @@ import capAsset from "../../assets/cap.png";
 import bottleAsset from "../../assets/bottle.png";
 import diaryAsset from "../../assets/diary.png";
 import templateAsset from "../../assets/template.png";
-import shelfmerch from "../../assets/shelfmerch.png";
+import { ShelfMerchLogo } from "@/components/brand/ShelfMerchLogo";
 import {
   CheckCircle2,
   ChevronDown,
@@ -23,8 +23,7 @@ export default function HeroNav() {
       <div className="mx-auto flex h-full w-full max-w-[1520px] flex-col px-6 pb-4 pt-3 sm:px-8 lg:px-12">
         <nav className="flex items-center justify-between gap-6 py-2">
           <div className="flex items-center gap-3">
-            <img src={shelfmerch} alt="Shelf Merch logo" className="h-8 w-8" loading="eager" />
-            {/* <span className="text-[20px] font-semibold tracking-normal">Shelf Merch</span> */}
+            <ShelfMerchLogo height={28} />
           </div>
 
           <div className="hidden items-center gap-8 text-[14px] font-medium lg:flex">

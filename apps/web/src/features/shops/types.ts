@@ -28,14 +28,15 @@ export const SHOP_CURRENCIES = [
   },
 ] as const;
 
-export const BUILDER_CATEGORIES: [string, string][] = [
-  ["Food & Beverages", "mug"],
-  ["Work Essentials", "note"],
-  ["Merch", "tee"],
-  ["Life & Hobbies", "cap"],
-  ["Wellness", "bottle"],
-  ["Experiences", "spark"],
-  ["Luxury", "bag"],
+/** Shop builder category chips: [label, product group key, thumbnail under /images/landing/categories]. */
+export const BUILDER_CATEGORIES: [string, string, string][] = [
+  ["Food & Beverages", "mug", "/images/landing/categories/food-beverages.png"],
+  ["Work Essentials", "note", "/images/landing/categories/work-essentials.png"],
+  ["Merch", "tee", "/images/landing/categories/apparel-wearables.png"],
+  ["Life & Hobbies", "cap", "/images/landing/categories/life-hobbies.png"],
+  ["Wellness", "bottle", "/images/landing/categories/wellness.png"],
+  ["Experiences", "spark", "/images/landing/categories/experiences.png"],
+  ["Luxury", "bag", "/images/landing/categories/luxury.png"],
 ];
 
 export const DEFAULT_BUILDER_CATEGORIES = ["Food & Beverages", "Work Essentials", "Merch"];

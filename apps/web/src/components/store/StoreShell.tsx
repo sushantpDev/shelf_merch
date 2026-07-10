@@ -11,6 +11,7 @@ import { POINT_VALUE } from "@/features/send/money";
 import { createRedemptionRazorpayOrder } from "@/services/api-bridge";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 import walletIconImg from "../../../assets/wallet-icon.svg";
+import emptyBagImg from "../../../assets/empty-bag.svg";
 import { StoreAccountMenu, type StoreOrderItem, type StoreOrderSummary } from "./StoreAccountMenu";
 import { StoreEmptyState } from "./StoreEmptyState";
 import { StorePageShell } from "./StorePageShell";
@@ -1238,11 +1239,17 @@ export default function StoreShell({
                 ) : null}
               </>
             ) : (
-              <StoreEmptyState
-                variant="search"
-                title="No products yet"
-                description="Your reward catalog will appear here once products are added to this shop."
-              />
+              <div className="sf-no-products">
+                <img
+                  src={emptyBagImg}
+                  alt=""
+                  className="sf-no-products-icon"
+                  width={119}
+                  height={104}
+                  aria-hidden="true"
+                />
+                <p className="sf-no-products-title">No products yet</p>
+              </div>
             )}
           </div>
         </>
@@ -1863,9 +1870,11 @@ export default function StoreShell({
       {page !== "orders" && page !== "order-detail" ? (
       <div className="sf-footer">
         <div className="sf-footer-inner">
-          <ShelfMerchLogo variant="icon" height={20} />
-          Powered by Shelf Merch
-          {mode === "preview" ? " · Recipients redeem from a private invite link." : ""}
+          <span className="sf-footer-powered">Powered by</span>
+          <ShelfMerchLogo height={20} className="sf-footer-logo" />
+          {mode === "preview" ? (
+            <span className="sf-footer-note"> · Recipients redeem from a private invite link.</span>
+          ) : null}
         </div>
       </div>
       ) : null}

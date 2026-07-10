@@ -56,24 +56,26 @@ export const SHOP_BANNER_PRESETS: ShopBannerPreset[] = [
 
 const presetIds = new Set(SHOP_BANNER_PRESETS.map((p) => p.id));
 
+/** Solid-section banners (pattern backgrounds, not themed occasion art). */
+export const SOLID_BANNER_PRESETS: ShopBannerPreset[] = [
+  { id: "solid-pattern", label: "Pattern" },
+];
 
+const solidPresetIds = new Set(SOLID_BANNER_PRESETS.map((p) => p.id));
 
 export function shopBannerPresetUrl(id?: string) {
-
-  if (!id || !presetIds.has(id)) return "";
-
-  return `/shop-banners/${id}.png`;
-
+  if (!id) return "";
+  if (presetIds.has(id) || solidPresetIds.has(id)) return `/shop-banners/${id}.png`;
+  return "";
 }
 
-
-
 export function shopBannerPresetLabel(id?: string) {
-
   if (!id) return "";
-
-  return SHOP_BANNER_PRESETS.find((p) => p.id === id)?.label || "";
-
+  return (
+    SHOP_BANNER_PRESETS.find((p) => p.id === id)?.label ||
+    SOLID_BANNER_PRESETS.find((p) => p.id === id)?.label ||
+    ""
+  );
 }
 
 

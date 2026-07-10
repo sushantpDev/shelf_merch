@@ -68,13 +68,13 @@ export function ShopDetailView(vm: ShopDetailVm) {
         <ArrowLeft size={15} /> Back to shops
       </Link>
 
-      <div className="row" style={{ alignItems: "center", gap: 16, marginBottom: 18 }}>
-        <div style={{ width: 160, flex: "none" }}>
-          <ShopBanner source={shop} height={84} layout="center" logoSize={46} radius={10} />
+      <div className="shop-detail-head">
+        <div className="shop-detail-banner">
+          <ShopBanner source={shop} aspect="3 / 1" layout="center" logoSize={40} radius={10} />
         </div>
-        <div style={{ flex: 1 }}>
-          <h1 style={{ fontSize: 26 }}>{shop.name}</h1>
-          <div style={{ marginTop: 6 }}>
+        <div className="shop-detail-head-info">
+          <h1 className="shop-detail-head-title">{shop.name}</h1>
+          <div className="shop-detail-head-meta">
             {shop.live ? (
               <>
                 <span className="tag tag-live">
@@ -85,7 +85,6 @@ export function ShopDetailView(vm: ShopDetailVm) {
                   type="button"
                   className="lnk"
                   style={{
-                    marginLeft: 8,
                     background: "none",
                     border: "none",
                     cursor: "pointer",
@@ -96,14 +95,14 @@ export function ShopDetailView(vm: ShopDetailVm) {
                 </button>
               </>
             ) : (
-              <span className="mut3" style={{ marginLeft: 8, fontSize: 13 }}>
+              <span className="mut3" style={{ fontSize: 13 }}>
                 Publish to view shop
               </span>
             )}
           </div>
         </div>
         {vm.canSendPoints ? (
-          <button type="button" className="btn btn-brand" onClick={() => vm.onSendPoints()}>
+          <button type="button" className="btn btn-brand shop-detail-head-action" onClick={() => vm.onSendPoints()}>
             <Coins size={16} /> Send points
           </button>
         ) : null}
