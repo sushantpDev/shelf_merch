@@ -10,9 +10,15 @@ export function excludeSeedProductsFilter() {
   return { 'source.provider': { $ne: 'seed' } };
 }
 
-/** Tenant catalog: only super-admin (manual) or Shopify-imported products. */
+/** Tenant catalog: active platform products tenants can brand (incl. legacy rows without source). */
 export function tenantCatalogFilter() {
-  return { 'source.provider': { $in: ['manual', 'shopify'] } };
+  return {
+    $or: [
+      { 'source.provider': { $in: ['manual', 'shopify', 'seed'] } },
+      { source: { $exists: false } },
+      { 'source.provider': { $exists: false } },
+    ],
+  };
 }
 
 export function productSourceLabel(source) {

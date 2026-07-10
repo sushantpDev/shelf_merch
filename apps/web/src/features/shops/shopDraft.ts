@@ -17,7 +17,7 @@ export const INITIAL_SHOP_DRAFT: ShopDraft = {
   logoUrl: "",
   categories: DEFAULT_BUILDER_CATEGORIES,
   bannerTheme: "light",
-  bannerPreset: "",
+  bannerPreset: "thats-a-wrap",
 };
 
 export type ShopDraftAction =

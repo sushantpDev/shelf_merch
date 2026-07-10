@@ -8,6 +8,7 @@ export type SwagDraft = {
   picked: number[];
   art: ArtFile | null;
   placements: Record<string, Placement>;
+  placementEpoch: number;
 };
 
 export const INITIAL_SWAG_DRAFT: SwagDraft = {
@@ -16,6 +17,7 @@ export const INITIAL_SWAG_DRAFT: SwagDraft = {
   picked: [],
   art: null,
   placements: {},
+  placementEpoch: 0,
 };
 
 export type SwagAction =
@@ -45,11 +47,20 @@ export function swagDraftReducer(state: SwagDraft, action: SwagAction): SwagDraf
     case "setArt":
       return { ...state, art: action.art };
     case "clearArt":
-      return { ...state, art: null, placements: {} };
+      return {
+        ...state,
+        art: null,
+        placements: {},
+        placementEpoch: (state.placementEpoch ?? 0) + 1,
+      };
     case "setPlacement":
       return { ...state, placements: { ...state.placements, [action.key]: action.placement } };
     case "resetPlacements":
-      return { ...state, placements: {} };
+      return {
+        ...state,
+        placements: {},
+        placementEpoch: (state.placementEpoch ?? 0) + 1,
+      };
     default:
       return state;
   }

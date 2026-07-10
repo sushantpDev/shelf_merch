@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { Upload } from "lucide-react";
+import { useRef, useState } from "react";
+import { FileSpreadsheet, Upload } from "lucide-react";
 import type { ContactImportStatus } from "../model";
 import type { ImportContactsVm } from "../controllers/useImportContactsController";
 
@@ -21,10 +21,16 @@ function fmtSize(bytes: number) {
 
 export function ImportContactsPanelView(vm: ImportContactsVm) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+
+  function takeFile(file: File | null | undefined) {
+    if (!file) return;
+    vm.onPickFile(file);
+  }
 
   return (
-    <div>
-      <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
+    <div className="ac-import">
+      <p className="ac-import-hint">
         Download the template, fill in employee details, and upload a CSV or Excel file.{" "}
         <button type="button" className="lnk" onClick={vm.onDownloadTemplate}>
           Download template
@@ -35,108 +41,114 @@ export function ImportContactsPanelView(vm: ImportContactsVm) {
         ref={inputRef}
         type="file"
         accept={ACCEPT}
-        style={{ display: "none" }}
-        onChange={(e) => vm.onPickFile(e.target.files?.[0] ?? null)}
+        className="sr-only"
+        onChange={(e) => {
+          takeFile(e.target.files?.[0]);
+          e.target.value = "";
+        }}
       />
 
       {!vm.file ? (
-        <button
-          type="button"
-          className="ac-import-zone"
+        <div
+          className={`ac-import-zone${dragging ? " is-dragging" : ""}`}
           onClick={() => inputRef.current?.click()}
-          style={{
-            width: "100%",
-            border: "1.5px dashed var(--line)",
-            borderRadius: "var(--r-sm)",
-            padding: 22,
-            textAlign: "center",
-            color: "var(--ink-2)",
-            background: "#fff",
-            cursor: "pointer",
+          onDragEnter={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragging(true);
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragging(true);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+            setDragging(false);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragging(false);
+            takeFile(e.dataTransfer.files?.[0]);
+          }}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              inputRef.current?.click();
+            }
           }}
         >
-          <Upload size={20} aria-hidden="true" />
-          <div style={{ fontWeight: 600, fontSize: 13 }}>Drag and drop file</div>
-          <div className="mut3" style={{ fontSize: 11, margin: "6px 0" }}>
-            CSV, XLSX, or XLS · max 5 MB
-          </div>
+          <span className="ac-import-icon" aria-hidden="true">
+            <Upload size={18} />
+          </span>
+          <div className="ac-import-zone-title">Drag and drop file</div>
+          <div className="ac-import-zone-sub">CSV, XLSX, or XLS · max 5 MB</div>
           <span className="btn btn-soft btn-sm">Browse files</span>
-        </button>
+        </div>
       ) : (
         <div className="ac-import-file-card">
-          <div
-            className="row"
-            style={{ alignItems: "center", justifyContent: "space-between", gap: 10 }}
-          >
-            <div style={{ minWidth: 0, textAlign: "left" }}>
-              <div
-                style={{
-                  fontWeight: 600,
-                  fontSize: 13,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {vm.file.name}
-              </div>
-              <div className="mut3" style={{ fontSize: 11 }}>
-                {fmtSize(vm.file.size)}
-              </div>
+          <div className="ac-import-file-meta">
+            <span className="ac-import-file-icon" aria-hidden="true">
+              <FileSpreadsheet size={18} />
+            </span>
+            <div className="ac-import-file-text">
+              <div className="ac-import-file-name">{vm.file.name}</div>
+              <div className="ac-import-file-size">{fmtSize(vm.file.size)}</div>
             </div>
-            {!vm.busy && (
-              <button
-                type="button"
-                className="xbtn"
-                aria-label="Remove file"
-                onClick={vm.onClearFile}
-              >
-                ✕
-              </button>
-            )}
           </div>
+          {!vm.busy && (
+            <button
+              type="button"
+              className="xbtn"
+              aria-label="Remove file"
+              onClick={vm.onClearFile}
+            >
+              ✕
+            </button>
+          )}
         </div>
       )}
 
       {vm.status && (
         <div
-          className="ac-import-status"
-          style={{ marginTop: 12 }}
+          className={`ac-import-status${vm.busy ? " is-busy" : ""}`}
           role="status"
           aria-live="polite"
         >
-          <div style={{ fontWeight: 600 }}>{STAGE_LABEL[vm.status.status]}</div>
+          <div className="ac-import-status-title">
+            {vm.busy ? <span className="ac-import-spin" aria-hidden="true" /> : null}
+            {STAGE_LABEL[vm.status.status]}
+          </div>
           {vm.status.status === "done" && (
-            <div className="mut3" style={{ fontSize: 12, marginTop: 4 }}>
+            <div className="ac-import-status-meta">
               {vm.status.validCount} of {vm.status.totalRows} rows imported
               {vm.status.errorCount > 0 ? ` · ${vm.status.errorCount} skipped` : ""}
             </div>
           )}
           {vm.status.errors.length > 0 && (
-            <div
-              style={{
-                marginTop: 8,
-                maxHeight: 120,
-                overflow: "auto",
-                fontSize: 12,
-                color: "var(--ink-2)",
-              }}
-            >
+            <div className="ac-import-errors">
               {vm.status.errors.slice(0, 5).map((e, i) => (
                 <div key={i}>
                   Row {e.row}: {e.message}
                 </div>
               ))}
-              {vm.status.errors.length > 5 && <div>…and {vm.status.errors.length - 5} more</div>}
+              {vm.status.errors.length > 5 && (
+                <div>…and {vm.status.errors.length - 5} more</div>
+              )}
             </div>
           )}
         </div>
       )}
 
-      <div className="row" style={{ marginTop: 16 }}>
+      <div className="contact-form-footer">
         <button
           type="button"
-          className="btn btn-ghost btn-block"
+          className="btn btn-ghost"
           onClick={vm.onDone}
           disabled={vm.busy}
         >
@@ -145,7 +157,7 @@ export function ImportContactsPanelView(vm: ImportContactsVm) {
         {!vm.finished && (
           <button
             type="button"
-            className="btn btn-brand btn-block"
+            className="btn btn-brand"
             onClick={vm.onRunImport}
             disabled={!vm.file || vm.busy}
           >

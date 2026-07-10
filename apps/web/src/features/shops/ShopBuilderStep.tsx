@@ -81,56 +81,37 @@ export function ShopBuilderStep({
       </div>
 
       <div className="scroll" style={{ flex: 1 }}>
-        <div
-          style={{
-            position: "relative",
-            height: 170,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 24,
-            ...bannerBackgroundStyle(source),
-          }}
-        >
-          {draft.logoUrl && (
+        <div className={`shop-builder-banner${hasPreset ? " has-preset" : ""}`}>
+          {hasPreset ? (
+            <img
+              src={`/shop-banners/${draft.bannerPreset}.png`}
+              alt=""
+              className="shop-builder-banner-img"
+            />
+          ) : (
             <div
-              style={{
-                width: 96,
-                height: 96,
-                background: "#fff",
-                borderRadius: 16,
-                display: "grid",
-                placeItems: "center",
-                overflow: "hidden",
-                padding: 10,
-                ...(hasPreset
-                  ? { position: "absolute", left: 24, top: "50%", transform: "translateY(-50%)" }
-                  : {}),
-              }}
-            >
-              <img
-                src={draft.logoUrl}
-                alt="Shop logo"
-                style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-              />
-            </div>
+              className="shop-builder-banner-solid"
+              style={bannerBackgroundStyle(source)}
+              aria-hidden
+            />
           )}
-          {!hasPreset && (
-            <div
-              style={{
-                fontFamily: "var(--disp)",
-                fontWeight: 800,
-                fontSize: 40,
-                color: theme.text,
-              }}
-            >
-              {draft.name || "Your shop name"}
-            </div>
-          )}
+
+          <div className="shop-builder-banner-content">
+            {draft.logoUrl ? (
+              <div className={`shop-builder-banner-logo${hasPreset ? " corner" : ""}`}>
+                <img src={draft.logoUrl} alt="Shop logo" />
+              </div>
+            ) : null}
+            {!hasPreset ? (
+              <div className="shop-builder-banner-title" style={{ color: theme.text }}>
+                {draft.name || "Your shop name"}
+              </div>
+            ) : null}
+          </div>
+
           <button
             type="button"
-            className="btn btn-soft btn-sm"
-            style={{ position: "absolute", top: 16, right: 16 }}
+            className="btn btn-soft btn-sm shop-builder-banner-edit"
             onClick={() => setBannerOpen(true)}
           >
             <Pencil size={14} /> Edit banner
@@ -143,7 +124,7 @@ export function ShopBuilderStep({
             Pick categories for recipients to shop from. After saving, you can enable/disable
             individual products.
           </p>
-          <div className="grid" style={{ gridTemplateColumns: "repeat(4,1fr)" }}>
+          <div className="shop-builder-cats">
             {BUILDER_CATEGORIES.map(([category, group]) => {
               const selected = draft.categories.includes(category);
               const Icon = GROUP_ICON[group] || Sparkles;
@@ -151,38 +132,23 @@ export function ShopBuilderStep({
                 <button
                   key={category}
                   type="button"
-                  className={`optcard ${selected ? "on" : ""}`}
+                  className={`optcard shop-builder-cat ${selected ? "on" : ""}`}
                   aria-pressed={selected}
                   onClick={() => dispatch({ type: "toggleCategory", category })}
                 >
                   <div
+                    className="shop-builder-cat-check"
                     style={{
-                      width: 18,
-                      height: 18,
-                      border: `2px solid ${selected ? "var(--brand)" : "var(--line-strong)"}`,
-                      borderRadius: 4,
-                      display: "grid",
-                      placeItems: "center",
+                      borderColor: selected ? "var(--brand)" : "var(--line-strong)",
                       background: selected ? "var(--brand)" : "#fff",
-                      flex: "none",
                     }}
                   >
-                    {selected && <Check size={12} color="#fff" />}
+                    {selected ? <Check size={12} color="#fff" /> : null}
                   </div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <h4>{category}</h4>
                   </div>
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 8,
-                      background: "var(--surface-2)",
-                      display: "grid",
-                      placeItems: "center",
-                      flex: "none",
-                    }}
-                  >
+                  <div className="shop-builder-cat-icon">
                     <Icon size={18} color="var(--ink-3)" />
                   </div>
                 </button>

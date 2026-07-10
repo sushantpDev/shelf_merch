@@ -23,44 +23,32 @@ export function CreateShopView(vm: CreateShopVm) {
   }
 
   return (
-    <FullscreenOverlay style={{ background: "var(--ink)" }}>
+    <FullscreenOverlay className="sm-create-shop-bg">
       <div style={{ flex: 1, display: "grid", placeItems: "center", padding: 24 }}>
-        <div
-          className="card"
-          style={{
-            width: "100%",
-            maxWidth: 980,
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            overflow: "hidden",
-            boxShadow: "var(--sh-3)",
-          }}
-        >
-          <div
-            style={{
-              padding: "48px 40px",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-            }}
-          >
+        <div className="card sm-create-shop-card">
+          <div className="sm-create-shop-intro">
             <h1 style={{ fontSize: 40, color: "var(--brand)", lineHeight: 1.05 }}>
-              Let&apos;s create
-              <br />
-              your shop
+              {draft.step === 0 ? (
+                <>
+                  Let&apos;s create
+                  <br />
+                  your shop
+                </>
+              ) : (
+                <>
+                  Make it
+                  <br />
+                  yours
+                </>
+              )}
             </h1>
             <p className="muted" style={{ marginTop: 20, maxWidth: "34ch", lineHeight: 1.55 }}>
-              Create a shop for gifting recipients and beyond. Total control over branding, banner
-              and products.
+              {draft.step === 0
+                ? "Create a shop for gifting recipients and beyond. Total control over branding, banner and products."
+                : "Upload your logo so we can brand your shop. You can skip this and add it later from settings."}
             </p>
           </div>
-          <div
-            style={{
-              padding: "40px 38px",
-              background: "var(--surface-2)",
-              borderLeft: "1px solid var(--line)",
-            }}
-          >
+          <div className="sm-create-shop-form">
             {draft.step === 0 ? (
               <>
                 <h3 style={{ fontSize: 19, marginBottom: 16 }}>Shop details</h3>
@@ -109,47 +97,23 @@ export function CreateShopView(vm: CreateShopVm) {
               <>
                 <button
                   type="button"
-                  className="lnk"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    marginBottom: 12,
-                  }}
+                  className="lnk sm-create-shop-back"
                   onClick={() => dispatch({ type: "set", patch: { step: 0 } })}
                 >
                   <ArrowLeft size={15} /> Back
                 </button>
-                <h3 style={{ fontSize: 22, fontFamily: "var(--disp)" }}>Add your logo</h3>
-                <p className="muted" style={{ fontSize: 13, margin: "4px 0 12px" }}>
+                <h3 style={{ fontSize: 22, fontFamily: "var(--disp)", margin: "0 0 4px" }}>
+                  Add your logo
+                </h3>
+                <p className="muted" style={{ fontSize: 13, margin: "0 0 16px" }}>
                   We&apos;ll use your logo to generate assets for your shop.
                 </p>
                 {draft.logoUrl ? (
-                  <div
-                    className="row"
-                    style={{
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      border: "1px solid var(--brand)",
-                      borderRadius: "var(--r-sm)",
-                      padding: "12px 14px",
-                      background: "var(--brand-50)",
-                    }}
-                  >
-                    <div
-                      className="logo-chip"
-                      style={{ width: 38, height: 38, overflow: "hidden", padding: 4 }}
-                    >
-                      <img
-                        src={draft.logoUrl}
-                        alt="Shop logo"
-                        style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-                      />
+                  <div className="sm-create-shop-logo-preview">
+                    <div className="sm-create-shop-logo-thumb">
+                      <img src={draft.logoUrl} alt="Shop logo" />
                     </div>
+                    <span className="sm-create-shop-logo-name">Logo uploaded</span>
                     <button
                       type="button"
                       className="xbtn"
@@ -162,23 +126,14 @@ export function CreateShopView(vm: CreateShopVm) {
                 ) : (
                   <button
                     type="button"
-                    style={{
-                      width: "100%",
-                      border: "1.5px dashed var(--line)",
-                      borderRadius: "var(--r)",
-                      padding: 30,
-                      textAlign: "center",
-                      color: "var(--ink-2)",
-                      background: "#fff",
-                      cursor: "pointer",
-                    }}
+                    className="sm-create-shop-dropzone"
                     onClick={() => fileRef.current?.click()}
                   >
-                    <Upload size={22} color="var(--brand)" />
-                    <div style={{ fontWeight: 600, marginTop: 8 }}>Drag and drop file</div>
-                    <div className="mut3" style={{ fontSize: 11.5, margin: "8px 0 4px" }}>
+                    <Upload size={28} strokeWidth={1.75} />
+                    <span className="sm-create-shop-dropzone-title">Drag and drop file</span>
+                    <span className="sm-create-shop-dropzone-hint">
                       Accepted: SVG, PNG, WEBP, JPEG, JPG · Max 5 MB
-                    </div>
+                    </span>
                   </button>
                 )}
                 <input
@@ -192,17 +147,17 @@ export function CreateShopView(vm: CreateShopVm) {
                     e.target.value = "";
                   }}
                 />
-                <div className="row" style={{ marginTop: 18 }}>
+                <div className="sm-create-shop-actions">
                   <button
                     type="button"
-                    className="btn btn-ghost btn-block"
+                    className="btn btn-ghost"
                     onClick={() => dispatch({ type: "set", patch: { step: 2 } })}
                   >
                     Skip for now
                   </button>
                   <button
                     type="button"
-                    className="btn btn-dark btn-block"
+                    className="btn btn-dark"
                     onClick={() => dispatch({ type: "set", patch: { step: 2 } })}
                   >
                     Create shop

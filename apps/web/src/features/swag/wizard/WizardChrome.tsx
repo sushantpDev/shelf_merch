@@ -54,11 +54,15 @@ export function WizardChrome({
         )}
       </div>
       <div className="main scroll" style={{ flex: 1 }}>
-        <div style={{ maxWidth: 1180, margin: "0 auto", padding: 34 }} className="fade-in">
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 34px 40px", width: "100%" }} className="fade-in">
           {children}
         </div>
       </div>
-      {footer && <div className="wzfoot">{footer}</div>}
+      {footer && (
+        <div className="wzfoot">
+          <div className="wzfoot-inner">{footer}</div>
+        </div>
+      )}
     </FullscreenOverlay>
   );
 }

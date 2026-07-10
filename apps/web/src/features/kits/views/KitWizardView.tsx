@@ -144,6 +144,7 @@ export function KitWizardView(vm: KitWizardVm) {
           products={vm.pickedProducts}
           art={draft.art}
           placements={draft.placements}
+          placementEpoch={draft.placementEpoch}
           notes={draft.notes}
           onSetArt={(art) => dispatch({ type: "setArt", art })}
           onClearArt={() => dispatch({ type: "clearArt" })}

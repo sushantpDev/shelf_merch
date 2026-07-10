@@ -24,7 +24,11 @@ export function ContactFormDialogView(vm: ContactFormVm) {
       <DialogContent className="sm-modal">
         <DialogHeader className="contact-dialog-header">
           <DialogTitle>
-            {vm.mode === "edit" ? "Fix recipient information" : "Add contacts"}
+            {vm.mode === "edit"
+              ? "Fix recipient information"
+              : vm.tab === "csv"
+                ? "Import contacts"
+                : "Add contacts"}
           </DialogTitle>
           {vm.mode === "edit" && (
             <DialogDescription>
