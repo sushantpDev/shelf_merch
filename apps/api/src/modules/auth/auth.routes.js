@@ -36,4 +36,7 @@ router.post(
   asyncHandler(controller.resetPassword),
 );
 
+router.get('/google', asyncHandler(controller.googleStart));
+router.get('/google/callback', asyncHandler(controller.googleCallback));
+
 export default router;

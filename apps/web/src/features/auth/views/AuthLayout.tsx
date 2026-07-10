@@ -1,7 +1,6 @@
 import { Link } from "react-router";
 import type { ReactNode } from "react";
-
-const LOGO_SRC = "/images/logo/shelfmerch-logo-dark.svg";
+import { ShelfMerchLogo } from "@/components/brand/ShelfMerchLogo";
 
 type AuthLayoutProps = {
   children: ReactNode;
@@ -16,7 +15,7 @@ export function AuthLayout({ children, title, subtitle, footerLink }: AuthLayout
       <div className="auth-simple-body">
         <div className="auth-simple-card">
           <Link to="/login" className="auth-simple-logo" aria-label="Shelf Merch home">
-            <img src={LOGO_SRC} alt="Shelf Merch" className="auth-simple-logo-img" />
+            <ShelfMerchLogo height={48} className="auth-simple-logo-img" />
           </Link>
 
           <h1 className="auth-simple-title">{title}</h1>

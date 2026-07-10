@@ -38,7 +38,7 @@ export function ReportsTab() {
               style={{
                 flex: 1,
                 height: `${(h / max) * 100}%`,
-                background: "linear-gradient(180deg,#1E8E5C,#15784C)",
+                background: "linear-gradient(180deg, var(--blue-500), var(--blue-700))",
                 borderRadius: "6px 6px 0 0",
               }}
             />

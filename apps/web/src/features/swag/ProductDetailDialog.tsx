@@ -77,7 +77,7 @@ function Body({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 14 }}>
         <div
           style={{
-            background: "#f4f6f4",
+            background: "var(--gray-100)",
             borderRadius: "var(--r-sm)",
             aspectRatio: "1 / 1",
             overflow: "hidden",

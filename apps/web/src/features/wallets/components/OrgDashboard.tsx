@@ -51,7 +51,7 @@ export function OrgDashboard({
         />
         <div className="card empty" style={{ padding: 50 }}>
           <div className="ic" aria-hidden="true">
-            <Wallet size={34} color="#cdd6cf" />
+            <Wallet size={34} color="var(--gray-300)" />
           </div>
           <h3>No merchandise wallet yet</h3>
           <p>

@@ -184,9 +184,9 @@ export function ArtworkStep({
                 gap: 8,
                 alignItems: "center",
                 fontSize: 12,
-                color: "#1A6E45",
-                background: "var(--brand-50)",
-                border: "1px solid #cfe9da",
+                color: "var(--green-600)",
+                background: "var(--green-50)",
+                border: "1px solid var(--green-600)",
                 borderRadius: 999,
                 padding: "5px 12px",
                 fontWeight: 600,
@@ -198,7 +198,7 @@ export function ArtworkStep({
         ) : (
           <div
             className="banner"
-            style={{ marginBottom: 16, background: "#eaf1fb", color: "#1c2a52", border: "none" }}
+            style={{ marginBottom: 16, background: "var(--blue-50)", color: "var(--blue-500)", border: "none" }}
           >
             Add your artwork on the left to preview it on every product — all colour variants are
             included.

@@ -66,9 +66,9 @@ export function ShopCatalogTab({
             className="banner"
             style={{
               marginTop: 18,
-              borderColor: "#f3c4cb",
-              background: "#fff5f6",
-              color: "#9b1c1c",
+              borderColor: "var(--red-600)",
+              background: "var(--red-50)",
+              color: "var(--red-600)",
             }}
           >
             <div>

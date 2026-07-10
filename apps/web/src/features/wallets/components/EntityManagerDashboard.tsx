@@ -22,7 +22,7 @@ export function EntityManagerDashboard({
         <PageHeader title="My department budget" subtitle={account} />
         <div className="card empty" style={{ padding: 50 }}>
           <div className="ic" aria-hidden="true">
-            <Wallet size={34} color="#cdd6cf" />
+            <Wallet size={34} color="var(--gray-300)" />
           </div>
           <h3>Budget not available yet</h3>
           <p>

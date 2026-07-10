@@ -121,6 +121,12 @@ export async function register(payload: {
   return establishSession(result);
 }
 
+/** Redirect browser to Google OAuth (login or signup). */
+export function startGoogleAuth(mode: "login" | "signup" = "login") {
+  const params = new URLSearchParams({ mode });
+  window.location.assign(`/api/v1/auth/google?${params.toString()}`);
+}
+
 export async function logout() {
   const refreshToken = getRefreshToken();
   clearSession();

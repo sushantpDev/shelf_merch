@@ -45,8 +45,8 @@ export function BrandedSwagTab({
             aria-current={sub === key}
             onClick={() => setSub(key)}
           >
-            {key}
-            {count !== "" && <span className="ct">{count}</span>}
+            <span className="item-label">{key}</span>
+            {count !== "" ? <span className="ct">{count}</span> : null}
           </button>
         ))}
       </div>
@@ -119,7 +119,7 @@ export function BrandedSwagTab({
           (archived.length === 0 ? (
             <div className="card empty">
               <div className="ic" aria-hidden="true">
-                <Shirt size={34} color="#cdd6cf" />
+                <Shirt size={34} color="var(--gray-300)" />
               </div>
               <h3>No archived designs</h3>
               <p>Designs you archive will be stored here and can be restored any time.</p>
@@ -145,7 +145,7 @@ export function BrandedSwagTab({
     return (
       <div className="card empty" style={{ padding: 48 }}>
         <div className="ic" aria-hidden="true">
-          <Shirt size={34} color="#cdd6cf" />
+          <Shirt size={34} color="var(--gray-300)" />
         </div>
         <h3>Design branded swag for {shop.name}</h3>
         <p>

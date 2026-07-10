@@ -69,7 +69,7 @@ export function MockupCanvas({
           y: by,
           width: bw,
           height: bh,
-          stroke: "rgba(21,120,76,.55)",
+          stroke: "rgba(61,95,217,.55)",
           strokeWidth: 1.5,
           dash: [5, 4],
           listening: false,
@@ -113,8 +113,8 @@ export function MockupCanvas({
         enabledAnchors: ["top-left", "top-right", "bottom-left", "bottom-right"],
         rotationSnaps: [0, 45, 90, 135, 180, 225, 270, 315],
         anchorSize: 9,
-        anchorStroke: "#15784C",
-        borderStroke: "#15784C",
+        anchorStroke: "#3D5FD9",
+        borderStroke: "#3D5FD9",
         boundBoxFunc: (o, n) => (n.width < 16 || n.height < 16 ? o : n),
       });
       layer.add(tr);

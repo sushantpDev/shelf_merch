@@ -35,7 +35,7 @@ export function Step3Allocate({ state, dispatch }: StepProps) {
   const barTotal = isEdit ? unallocatedStart : total;
   const segments = isEdit
     ? fromPool > 0
-      ? [{ id: "from-pool", name: "From wallet", allocated: fromPool, color: "#DB2777" }]
+      ? [{ id: "from-pool", name: "From wallet", allocated: fromPool, color: "var(--brand)" }]
       : []
     : depts.filter((d) => d.allocated > 0);
 
@@ -100,7 +100,7 @@ export function Step3Allocate({ state, dispatch }: StepProps) {
             <>
               {fromPool > 0 && (
                 <div className="leg">
-                  <span className="lc" style={{ background: "#DB2777" }} />
+                  <span className="lc" style={{ background: "var(--brand)" }} />
                   From wallet · {inr(fromPool)}
                 </div>
               )}

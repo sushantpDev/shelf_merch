@@ -251,7 +251,7 @@ export function SendKitView(vm: SendKitVm) {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16 }}>
                   {curatedMeta.imageUrls && curatedMeta.imageUrls.slice(1).map((imgUrl, idx) => (
                     <div key={idx} className="card" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8, borderRadius: 12 }}>
-                      <div style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: "#f4f6f4", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <img
                           src={resolveMediaUrl(imgUrl)}
                           alt=""
@@ -270,7 +270,7 @@ export function SendKitView(vm: SendKitVm) {
                 const distinctColors = (p.variants?.map(v => v.color).filter((v): v is string => Boolean(v)).filter((v, i, a) => a.indexOf(v) === i)) ?? [];
                 return (
                   <div key={p.id} className="card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10, borderRadius: 12 }}>
-                    <div style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: "#f4f6f4", position: "relative" }}>
+                    <div style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: "var(--gray-100)", position: "relative" }}>
                       <DesignedProductThumb product={p} artworkUrl={kit.artworkUrl} />
                     </div>
                     {p.brand && <div className="mut3" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".04em" }}>{p.brand}</div>}
@@ -376,7 +376,7 @@ export function SendKitView(vm: SendKitVm) {
 
             {/* Toolbar */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, fontWeight: 600, padding: "5px 12px", borderRadius: 6, background: "#eef7ee", color: "#1e4620", border: "1px solid #d0ebd0" }}>
+              <span style={{ fontSize: 13, fontWeight: 600, padding: "5px 12px", borderRadius: 6, background: "var(--brand-50)", color: "var(--brand-d)", border: "1px solid var(--brand-100)" }}>
                 {draft.selRecips.length} selected
               </span>
               <button type="button" className="btn btn-ghost btn-sm" style={{ border: "1px solid var(--border)", background: "var(--surface)", height: 32, padding: "0 12px", borderRadius: 6 }} onClick={() => dispatch({ type: "deselectRecips" })}>Deselect all</button>

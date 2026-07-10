@@ -11,7 +11,7 @@ export type StoreShop = {
 // branding the admin picked in the shop builder.
 export const BANNER_THEMES: Record<string, { bg: string; text: string }> = {
   light: { bg: "#FBFCFB", text: "#0E1E16" },
-  brand: { bg: "linear-gradient(135deg,#15784C,#0E5536)", text: "#fff" },
+  brand: { bg: "linear-gradient(135deg, var(--brand), var(--brand-d))", text: "#fff" },
   dark: { bg: "#0E1E16", text: "#fff" },
   blue: { bg: "linear-gradient(135deg,#2563C9,#1e40af)", text: "#fff" },
   purple: { bg: "linear-gradient(135deg,#7a3fb0,#5b21b6)", text: "#fff" },
@@ -100,7 +100,7 @@ export function StoreBanner({ shop, eyebrow = "Welcome to" }: { shop: StoreShop;
             style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
           />
         ) : (
-          <span style={{ fontWeight: 800, color: "#15784C", fontSize: 20 }}>
+          <span style={{ fontWeight: 800, color: "var(--brand)", fontSize: 20 }}>
             {shop.name.charAt(0).toUpperCase()}
           </span>
         )}

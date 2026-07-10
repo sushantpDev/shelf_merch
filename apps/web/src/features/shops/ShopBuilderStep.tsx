@@ -159,7 +159,7 @@ export function ShopBuilderStep({
                     style={{
                       width: 18,
                       height: 18,
-                      border: `2px solid ${selected ? "var(--brand)" : "#c4ccc6"}`,
+                      border: `2px solid ${selected ? "var(--brand)" : "var(--line-strong)"}`,
                       borderRadius: 4,
                       display: "grid",
                       placeItems: "center",
@@ -183,7 +183,7 @@ export function ShopBuilderStep({
                       flex: "none",
                     }}
                   >
-                    <Icon size={18} color="#9aa39c" />
+                    <Icon size={18} color="var(--ink-3)" />
                   </div>
                 </button>
               );

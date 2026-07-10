@@ -14,6 +14,7 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, default: null, select: false },
+    googleId: { type: String, default: null, sparse: true, index: true },
     phone: { type: String, default: '' },
     status: { type: String, enum: ['invited', 'active', 'suspended'], default: 'invited' },
     lastLoginAt: { type: Date, default: null },

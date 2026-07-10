@@ -132,7 +132,7 @@ export function SwagView(vm: SwagVm) {
         vm.tab === "Archived" ? (
           <div className="card empty" style={{ padding: 48 }}>
             <div className="ic" aria-hidden="true">
-              <Shirt size={34} color="#cdd6cf" />
+              <Shirt size={34} color="var(--gray-300)" />
             </div>
             <h3>No archived designs</h3>
             <p>Designs you archive will be stored here and can be restored any time.</p>

@@ -40,6 +40,14 @@ export const BUILDER_CATEGORIES: [string, string][] = [
 
 export const DEFAULT_BUILDER_CATEGORIES = ["Food & Beverages", "Work Essentials", "Merch"];
 
+/** Most recently created shop (shown on home pinned shop). */
+export function getLastShop(shops: UiShop[]): UiShop | null {
+  if (!shops.length) return null;
+  return [...shops].sort(
+    (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
+  )[0];
+}
+
 /** "Created: 06/26/2026 | Jane Doe | Points" meta line for a shop card. */
 export function shopCardMeta(shop: UiShop, fallbackUser: string): string {
   const date = shop.createdAt ? new Date(shop.createdAt) : new Date();

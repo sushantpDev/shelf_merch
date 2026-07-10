@@ -40,7 +40,7 @@ export function SwagProductDetail({
       >
         <div
           style={{
-            background: "#f4f6f4",
+            background: "var(--gray-100)",
             borderRadius: "var(--r-sm)",
             aspectRatio: "1 / 1",
             overflow: "hidden",

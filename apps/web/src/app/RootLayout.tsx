@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 import { Link, Outlet, useRouteError, useRevalidator } from "react-router";
 import { ChatWidget } from "@/components/ChatWidget";
 import { Toaster } from "@/components/ui/sonner";
+import { ShelfMerchLogo } from "@/components/brand/ShelfMerchLogo";
 import { ShopSubdomainGate } from "./ShopSubdomainGate";
 
-const LOGO_SRC = "/images/logo/shelfmerch-logo-dark.svg";
 const queryClient = new QueryClient();
 
 function StatusPageShell({
@@ -25,7 +25,7 @@ function StatusPageShell({
       <div className="auth-simple-body">
         <div className="auth-simple-card">
           <Link to="/" className="auth-simple-logo" aria-label="Shelf Merch home">
-            <img src={LOGO_SRC} alt="Shelf Merch" className="auth-simple-logo-img" />
+            <ShelfMerchLogo height={48} className="auth-simple-logo-img" />
           </Link>
 
           <div className="status-page-icon">{icon}</div>

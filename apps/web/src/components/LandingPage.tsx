@@ -1,8 +1,10 @@
 import { useState, type ReactNode } from "react";
 import "./landing-page.css";
 import { Link } from "react-router";
+import { ShelfMerchLogo } from "@/components/brand/ShelfMerchLogo";
 import type { LucideIcon } from "lucide-react";
 import consolidateImg from "../../assets/consolidate.png";
+import shelfmerch from "../../assets/shelfmerch.png";
 import {
   Award,
   Backpack,
@@ -455,6 +457,9 @@ const USE_CASES: { label: string; icon: LucideIcon }[] = [
   { label: "Recognizing DEI Events", icon: HeartHandshake },
 ];
 
+const FEATURE_QUOTE =
+  "Saying goodbye to 9 vendors allowed us to reinvest our budget into experiences you actually love.";
+
 const TESTIMONIALS = [
   {
     content:
@@ -504,13 +509,8 @@ export default function LandingPage() {
       <header className="lp-nav lp-nav--merch">
         <div className="lp-container lp-nav__inner lp-nav__inner--merch">
           <a href="/" className="lp-logo">
-            <img
-              src="/images/logo/shelfmerch-logo-dark.svg"
-              alt="Shelf Merch"
-              width={188}
-              height={40}
-              className="lp-logo__img lp-logo__img--merch"
-            />
+            {/* <ShelfMerchLogo height={44} className="lp-logo__img lp-logo__img--merch" /> */}
+            <img src={shelfmerch} alt="Shelf Merch logo" className="h-6 w-48" loading="eager" />
           </a>
 
           <nav className="lp-nav__links lp-nav__links--merch">
@@ -929,50 +929,16 @@ export default function LandingPage() {
       </section>
 
       {/* ── VENDOR CONSOLIDATION ── */}
-      <section className="lp-section lp-consolidate" id="integrations">
-        <div className="lp-container">
-          <div className="lp-consolidate__card">
-            {/* <header className="lp-consolidate__header">
-              <h2 className="lp-consolidate__title">One platform for employee gifting and swag</h2>
-              <p className="lp-consolidate__sub">Replace the vendor sprawl.</p>
-            </header> */}
-
-            {/* <div className="lp-consolidate__visual" aria-hidden="true">
-              <svg className="lp-consolidate__path" viewBox="0 0 900 80" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="lp-consolidate-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#7C3AED" />
-                    <stop offset="16%" stopColor="#2563EB" />
-                    <stop offset="33%" stopColor="#0D9488" />
-                    <stop offset="50%" stopColor="#F59E0B" />
-                    <stop offset="66%" stopColor="#F97316" />
-                    <stop offset="83%" stopColor="#EC4899" />
-                    <stop offset="100%" stopColor="#6366F1" />
-                  </linearGradient>
-                </defs>
-                <path
-                  d="M 0 52 Q 112 18, 225 48 T 450 44 T 675 50 T 900 38"
-                  fill="none"
-                  stroke="url(#lp-consolidate-grad)"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-
-              <ul className="lp-consolidate__icons">
-                {CONSOLIDATE_ICONS.map((item) => (
-                  <li key={item.color}>
-                    <span className="lp-consolidate__icon" style={{ background: item.color }}>
-                      <LpIcon icon={item.icon} size={22} strokeWidth={2} />
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div> */}
-
-            <img src={consolidateImg} alt="Consolidate" />
-          </div>
-        </div>
+      <section className="lp-consolidate" id="integrations" aria-label="Vendor consolidation">
+        <img
+          src={consolidateImg}
+          alt="Consolidate all your gifting, swag, and recognition vendors"
+          className="lp-consolidate__img"
+          width={7932}
+          height={3172}
+          loading="lazy"
+          decoding="async"
+        />
       </section>
 
       {/* ── TEAMS TABS ── */}
@@ -1036,6 +1002,14 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* ── FEATURE QUOTE ── */}
+      <section className="lp-feature-quote" aria-label="Customer quote">
+        <blockquote className="lp-feature-quote__inner">
+          <p>&ldquo;{FEATURE_QUOTE}&rdquo;</p>
+        </blockquote>
+        <div className="lp-feature-quote__stripe" aria-hidden="true" />
       </section>
 
       {/* ── USE CASES ── */}
@@ -1154,13 +1128,7 @@ export default function LandingPage() {
           <div className="lp-footer__grid">
             <div className="lp-footer__brand">
               <a href="/" className="lp-logo lp-logo--footer">
-                <img
-                  src="/images/logo/shelfmerch-logo-light.svg"
-                  alt="ShelfMerch"
-                  width={168}
-                  height={32}
-                  className="lp-logo__img"
-                />
+                <ShelfMerchLogo theme="light" height={32} className="lp-logo__img" />
               </a>
               <p className="lp-footer__tagline">
                 Gifting, swag &amp; recognition. One platform.

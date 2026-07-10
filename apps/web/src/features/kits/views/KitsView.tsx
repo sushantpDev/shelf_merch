@@ -75,7 +75,7 @@ function getCuratedKitMeta(kit: any) {
     if (parsed && parsed.curated) {
       return parsed;
     }
-  } catch (e) {}
+  } catch (e) { }
   return null;
 }
 
@@ -165,8 +165,8 @@ function StatCard({ label, value, delta, icon: Icon }: StatCardProps) {
   return (
     <article
       style={{
-        background: "#ffffff",
-        border: "1px solid #e3e8e4",
+        background: "var(--bg-card)",
+        border: "1px solid var(--line)",
         borderRadius: 16,
         padding: "20px 24px",
         display: "flex",
@@ -178,13 +178,13 @@ function StatCard({ label, value, delta, icon: Icon }: StatCardProps) {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: "#5b665f" }}>{label}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-500)" }}>{label}</span>
         <div
           style={{
             width: 36,
             height: 36,
             borderRadius: "50%",
-            background: "#eef7f2",
+            background: "var(--brand-50)",
             color: "var(--brand)",
             display: "grid",
             placeItems: "center",
@@ -194,7 +194,7 @@ function StatCard({ label, value, delta, icon: Icon }: StatCardProps) {
         </div>
       </div>
       <div>
-        <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "var(--disp)", color: "#07140f", lineHeight: 1 }}>
+        <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "var(--disp)", color: "var(--ink)", lineHeight: 1 }}>
           {value}
         </div>
         <div
@@ -203,13 +203,13 @@ function StatCard({ label, value, delta, icon: Icon }: StatCardProps) {
             alignItems: "center",
             gap: 4,
             marginTop: 10,
-            background: "#eef7f2",
+            background: "var(--brand-50)",
             color: "var(--brand)",
             fontSize: 11,
             fontWeight: 600,
             padding: "2px 8px",
             borderRadius: 12,
-            border: "1px solid #d0ebd0",
+            border: "1px solid var(--brand-100)",
           }}
         >
           <span style={{ fontSize: 9 }}>▲</span> {delta}
@@ -223,8 +223,8 @@ function StatCard({ label, value, delta, icon: Icon }: StatCardProps) {
 //   return (
 //     <div
 //       style={{
-//         background: "#f9fafb",
-//         border: "1px solid #e3e8e4",
+//         background: "var(--gray-50)",
+//         border: "1px solid var(--line)",
 //         borderRadius: 12,
 //         padding: "16px 24px",
 //         display: "flex",
@@ -235,7 +235,7 @@ function StatCard({ label, value, delta, icon: Icon }: StatCardProps) {
 //         flexWrap: "wrap",
 //       }}
 //     >
-      {/* <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 220 }}>
+{/* <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 220 }}>
         <div
           style={{
             width: 32,
@@ -255,7 +255,7 @@ function StatCard({ label, value, delta, icon: Icon }: StatCardProps) {
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <Box size={18} color="var(--brand)" />
         </div> */}
-        {/* <div>
+{/* <div>
           <div style={{ fontWeight: 700, fontSize: 13, color: "#101a15" }}>Create a kit</div>
           <div style={{ fontSize: 11, color: "#5b665f", lineHeight: 1.3 }}>
             Choose products from catalog and name kit.
@@ -317,9 +317,9 @@ function StatCard({ label, value, delta, icon: Icon }: StatCardProps) {
             Launch your kit and monitor delivery status.
           </div>
         </div> */}
-      {/* </div>
+{/* </div>
     </div> */}
-  // );
+// );
 // }
 
 // ─── Main view ───────────────────────────────────────────────────────────────
@@ -653,7 +653,7 @@ export function KitsView(vm: KitsVm) {
           onClick={() => setOpen(!open)}
           style={{
             background: "transparent",
-            border: "1px solid #d9e0dc",
+            border: "1px solid var(--line)",
             width: 32,
             height: 32,
             display: "flex",
@@ -677,8 +677,8 @@ export function KitsView(vm: KitsVm) {
                 right: 0,
                 bottom: "100%",
                 marginBottom: 4,
-                background: "#fff",
-                border: "1px solid #d9e0dc",
+                background: "var(--bg-card)",
+                border: "1px solid var(--line)",
                 borderRadius: 6,
                 boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                 zIndex: 100,
@@ -752,8 +752,8 @@ export function KitsView(vm: KitsVm) {
         {/* Hero Row */}
         <div className="kits-hero-row" style={{ margin: "0 0 10px" }}>
           <div>
-            <h1 style={{ fontSize: 32, fontWeight: 800, color: "#052f22" }}>Kits &amp; Items</h1>
-            <p style={{ margin: "8px 0 0", color: "#5b665f" }}>
+            <h1 style={{ fontSize: 32, fontWeight: 800, color: "var(--ink)" }}>Kits &amp; Items</h1>
+            <p style={{ margin: "8px 0 0", color: "var(--gray-500)" }}>
               Create reusable gift kits with your products and send them at scale.
             </p>
           </div>
@@ -781,7 +781,7 @@ export function KitsView(vm: KitsVm) {
           style={{
             display: "flex",
             gap: 32,
-            borderBottom: "1px solid #d9e0dc",
+            borderBottom: "1px solid var(--line)",
             margin: "12px 0 0",
             paddingBottom: 0,
           }}
@@ -794,7 +794,7 @@ export function KitsView(vm: KitsVm) {
               padding: "12px 0",
               fontSize: 16,
               fontWeight: 700,
-              color: activeSection === "recent" ? "var(--brand)" : "#5b665f",
+              color: activeSection === "recent" ? "var(--brand)" : "var(--gray-500)",
               borderBottom: activeSection === "recent" ? "3px solid var(--brand)" : "3px solid transparent",
               cursor: "pointer",
               transition: "all 0.15s",
@@ -811,7 +811,7 @@ export function KitsView(vm: KitsVm) {
               padding: "12px 0",
               fontSize: 16,
               fontWeight: 700,
-              color: activeSection === "customized" ? "var(--brand)" : "#5b665f",
+              color: activeSection === "customized" ? "var(--brand)" : "var(--gray-500)",
               borderBottom: activeSection === "customized" ? "3px solid var(--brand)" : "3px solid transparent",
               cursor: "pointer",
               transition: "all 0.15s",
@@ -828,7 +828,7 @@ export function KitsView(vm: KitsVm) {
               padding: "12px 0",
               fontSize: 16,
               fontWeight: 700,
-              color: activeSection === "curated" ? "var(--brand)" : "#5b665f",
+              color: activeSection === "curated" ? "var(--brand)" : "var(--gray-500)",
               borderBottom: activeSection === "curated" ? "3px solid var(--brand)" : "3px solid transparent",
               cursor: "pointer",
               transition: "all 0.15s",
@@ -840,7 +840,7 @@ export function KitsView(vm: KitsVm) {
         </div>
 
         {/* Section Heading */}
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: "#052f22", margin: "12px 0 0" }}>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--ink)", margin: "12px 0 0" }}>
           {activeSection === "recent"
             ? "Recent activity"
             : activeSection === "customized"
@@ -899,8 +899,8 @@ export function KitsView(vm: KitsVm) {
                     style={{
                       padding: "0 28px 0 12px",
                       borderRadius: 8,
-                      border: "1px solid #d9e0dc",
-                      background: "#fff",
+                      border: "1px solid var(--line)",
+                      background: "var(--bg-card)",
                       fontSize: 13,
                       fontWeight: 800,
                       height: 40,
@@ -918,7 +918,7 @@ export function KitsView(vm: KitsVm) {
                       position: "absolute",
                       right: 10,
                       pointerEvents: "none",
-                      color: "#24312a",
+                      color: "var(--ink-2)",
                     }}
                   />
                 </div>
@@ -1005,7 +1005,7 @@ export function KitsView(vm: KitsVm) {
                   </div>
                 ))
               ) : (
-                <div style={{ padding: 40, textAlign: "center", color: "#5b665f" }}>
+                <div style={{ padding: 40, textAlign: "center", color: "var(--gray-500)" }}>
                   No recent activity matches the current filters.
                 </div>
               )}
@@ -1018,10 +1018,10 @@ export function KitsView(vm: KitsVm) {
                 justifyContent: "space-between",
                 alignItems: "center",
                 padding: "16px 20px",
-                borderTop: "1px solid #e6ebe7",
+                borderTop: "1px solid var(--line)",
               }}
             >
-              <span style={{ fontSize: 13, color: "#5b665f" }}>
+              <span style={{ fontSize: 13, color: "var(--gray-500)" }}>
                 Showing {processedRecentRows.length > 0 ? (recentPage - 1) * RECENT_ITEMS_PER_PAGE + 1 : 0} to{" "}
                 {Math.min(processedRecentRows.length, recentPage * RECENT_ITEMS_PER_PAGE)} of{" "}
                 {processedRecentRows.length} records
@@ -1034,7 +1034,7 @@ export function KitsView(vm: KitsVm) {
                     onClick={() => setRecentPage(recentPage - 1)}
                     style={{
                       padding: "6px 12px",
-                      border: "1px solid #d9e0dc",
+                      border: "1px solid var(--line)",
                       background: "transparent",
                       borderRadius: 6,
                       fontSize: 13,
@@ -1051,7 +1051,7 @@ export function KitsView(vm: KitsVm) {
                     onClick={() => setRecentPage(recentPage + 1)}
                     style={{
                       padding: "6px 12px",
-                      border: "1px solid #d9e0dc",
+                      border: "1px solid var(--line)",
                       background: "transparent",
                       borderRadius: 6,
                       fontSize: 13,
@@ -1074,7 +1074,7 @@ export function KitsView(vm: KitsVm) {
             {/* Toolbar */}
             <div
               className="kits-list-toolbar"
-              style={{ border: "1px solid #e0e6e1", borderRadius: "12px 12px 0 0", background: "#fff" }}
+              style={{ border: "1px solid var(--line)", borderRadius: "12px 12px 0 0", background: "var(--bg-card)" }}
             >
               <div className="kits-tabs" aria-label="Kit filters">
                 {(["all", "live", "draft", "archived"] as const).map((tab) => (
@@ -1122,8 +1122,8 @@ export function KitsView(vm: KitsVm) {
                     style={{
                       padding: "0 28px 0 12px",
                       borderRadius: 8,
-                      border: "1px solid #d9e0dc",
-                      background: "#fff",
+                      border: "1px solid var(--line)",
+                      background: "var(--bg-card)",
                       fontSize: 13,
                       fontWeight: 800,
                       height: 40,
@@ -1141,7 +1141,7 @@ export function KitsView(vm: KitsVm) {
                       position: "absolute",
                       right: 10,
                       pointerEvents: "none",
-                      color: "#24312a",
+                      color: "var(--ink)",
                     }}
                   />
                 </div>
@@ -1151,10 +1151,10 @@ export function KitsView(vm: KitsVm) {
             {/* Grid */}
             <div
               style={{
-                background: "#fff",
-                borderLeft: "1px solid #e0e6e1",
-                borderRight: "1px solid #e0e6e1",
-                borderBottom: "1px solid #e0e6e1",
+                background: "var(--bg-card)",
+                borderLeft: "1px solid var(--line)",
+                borderRight: "1px solid var(--line)",
+                borderBottom: "1px solid var(--line)",
                 padding: 24,
                 borderRadius: "0 0 12px 12px",
               }}
@@ -1171,7 +1171,7 @@ export function KitsView(vm: KitsVm) {
                         padding: 0,
                         overflow: "hidden",
                         borderRadius: 12,
-                        border: "1px solid #e0e6e1",
+                        border: "1px solid var(--line)",
                         boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
                       }}
                     >
@@ -1179,7 +1179,7 @@ export function KitsView(vm: KitsVm) {
                         style={{
                           position: "relative",
                           height: 180,
-                          background: "#f9fafb",
+                          background: "var(--gray-50)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -1221,7 +1221,7 @@ export function KitsView(vm: KitsVm) {
                         }}
                       >
                         <div>
-                          <h4 style={{ fontSize: 15, fontWeight: 800, color: "#101a15", margin: "0 0 6px 0" }}>
+                          <h4 style={{ fontSize: 15, fontWeight: 800, color: "var(--ink)", margin: "0 0 6px 0" }}>
                             {row.name}
                           </h4>
                           <div
@@ -1232,7 +1232,7 @@ export function KitsView(vm: KitsVm) {
                               flexWrap: "wrap",
                               gap: 12,
                               marginBottom: 16,
-                              color: "#5b665f",
+                              color: "var(--gray-500)",
                             }}
                           >
                             <span>
@@ -1261,7 +1261,7 @@ export function KitsView(vm: KitsVm) {
                                 className="btn btn-ghost btn-sm"
                                 style={{
                                   flex: 1,
-                                  border: "1px solid #d9e0dc",
+                                  border: "1px solid var(--line)",
                                   height: 32,
                                   fontSize: 13,
                                   fontWeight: 700,
@@ -1269,7 +1269,7 @@ export function KitsView(vm: KitsVm) {
                                   alignItems: "center",
                                   justifyContent: "center",
                                   borderRadius: 6,
-                                  color: "#24312a",
+                                  color: "var(--ink)",
                                 }}
                               >
                                 Edit
@@ -1280,7 +1280,7 @@ export function KitsView(vm: KitsVm) {
                                 className="btn btn-ghost btn-sm"
                                 style={{
                                   flex: 1,
-                                  border: "1px solid #d9e0dc",
+                                  border: "1px solid var(--line)",
                                   height: 32,
                                   fontSize: 13,
                                   fontWeight: 700,
@@ -1288,7 +1288,7 @@ export function KitsView(vm: KitsVm) {
                                   alignItems: "center",
                                   justifyContent: "center",
                                   borderRadius: 6,
-                                  color: "#24312a",
+                                  color: "var(--ink)",
                                 }}
                               >
                                 Edit
@@ -1339,7 +1339,7 @@ export function KitsView(vm: KitsVm) {
                   ))}
                 </div>
               ) : (
-                <div style={{ padding: 40, textAlign: "center", color: "#5b665f" }}>
+                <div style={{ padding: 40, textAlign: "center", color: "var(--gray-500)" }}>
                   No customized kits found. Create a kit to get started!
                 </div>
               )}
@@ -1353,10 +1353,10 @@ export function KitsView(vm: KitsVm) {
                     alignItems: "center",
                     marginTop: 24,
                     paddingTop: 16,
-                    borderTop: "1px solid #e6ebe7",
+                    borderTop: "1px solid var(--line)",
                   }}
                 >
-                  <span style={{ fontSize: 13, color: "#5b665f" }}>
+                  <span style={{ fontSize: 13, color: "var(--gray-500)" }}>
                     Showing {processedCustomRows.length > 0 ? (customPage - 1) * GRID_ITEMS_PER_PAGE + 1 : 0} to{" "}
                     {Math.min(processedCustomRows.length, customPage * GRID_ITEMS_PER_PAGE)} of{" "}
                     {processedCustomRows.length} kits
@@ -1368,7 +1368,7 @@ export function KitsView(vm: KitsVm) {
                       onClick={() => setCustomPage(customPage - 1)}
                       style={{
                         padding: "6px 12px",
-                        border: "1px solid #d9e0dc",
+                        border: "1px solid var(--line)",
                         background: "transparent",
                         borderRadius: 6,
                         fontSize: 13,
@@ -1385,7 +1385,7 @@ export function KitsView(vm: KitsVm) {
                       onClick={() => setCustomPage(customPage + 1)}
                       style={{
                         padding: "6px 12px",
-                        border: "1px solid #d9e0dc",
+                        border: "1px solid var(--line)",
                         background: "transparent",
                         borderRadius: 6,
                         fontSize: 13,
@@ -1409,7 +1409,7 @@ export function KitsView(vm: KitsVm) {
             {/* Toolbar */}
             <div
               className="kits-list-toolbar"
-              style={{ border: "1px solid #e0e6e1", borderRadius: "12px 12px 0 0", background: "#fff" }}
+              style={{ border: "1px solid var(--line)", borderRadius: "12px 12px 0 0", background: "var(--bg-card)" }}
             >
               <div className="kits-tabs" aria-label="Kit filters">
                 {(["all", "live", "draft", "archived"] as const).map((tab) => (
@@ -1457,8 +1457,8 @@ export function KitsView(vm: KitsVm) {
                     style={{
                       padding: "0 28px 0 12px",
                       borderRadius: 8,
-                      border: "1px solid #d9e0dc",
-                      background: "#fff",
+                      border: "1px solid var(--line)",
+                      background: "var(--bg-card)",
                       fontSize: 13,
                       fontWeight: 800,
                       height: 40,
@@ -1476,7 +1476,7 @@ export function KitsView(vm: KitsVm) {
                       position: "absolute",
                       right: 10,
                       pointerEvents: "none",
-                      color: "#24312a",
+                      color: "var(--ink)",
                     }}
                   />
                 </div>
@@ -1486,10 +1486,10 @@ export function KitsView(vm: KitsVm) {
             {/* Grid */}
             <div
               style={{
-                background: "#fff",
-                borderLeft: "1px solid #e0e6e1",
-                borderRight: "1px solid #e0e6e1",
-                borderBottom: "1px solid #e0e6e1",
+                background: "var(--bg-card)",
+                borderLeft: "1px solid var(--line)",
+                borderRight: "1px solid var(--line)",
+                borderBottom: "1px solid var(--line)",
                 padding: 24,
                 borderRadius: "0 0 12px 12px",
               }}
@@ -1506,7 +1506,7 @@ export function KitsView(vm: KitsVm) {
                         padding: 0,
                         overflow: "hidden",
                         borderRadius: 12,
-                        border: "1px solid #e0e6e1",
+                        border: "1px solid var(--line)",
                         boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
                       }}
                     >
@@ -1514,7 +1514,7 @@ export function KitsView(vm: KitsVm) {
                         style={{
                           position: "relative",
                           height: 180,
-                          background: "#f9fafb",
+                          background: "var(--gray-50)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -1537,7 +1537,7 @@ export function KitsView(vm: KitsVm) {
                         }}
                       >
                         <div>
-                          <h4 style={{ fontSize: 15, fontWeight: 800, color: "#101a15", margin: "0 0 6px 0" }}>
+                          <h4 style={{ fontSize: 15, fontWeight: 800, color: "var(--ink)", margin: "0 0 6px 0" }}>
                             {row.name}
                           </h4>
                           <div
@@ -1548,7 +1548,7 @@ export function KitsView(vm: KitsVm) {
                               flexWrap: "wrap",
                               gap: 12,
                               marginBottom: 16,
-                              color: "#5b665f",
+                              color: "var(--gray-500)",
                             }}
                           >
                             <span>
@@ -1580,7 +1580,7 @@ export function KitsView(vm: KitsVm) {
                             }}
                             style={{
                               flex: 1,
-                              border: "1px solid #d9e0dc",
+                              border: "1px solid var(--line)",
                               height: 32,
                               fontSize: 13,
                               fontWeight: 700,
@@ -1588,7 +1588,7 @@ export function KitsView(vm: KitsVm) {
                               alignItems: "center",
                               justifyContent: "center",
                               borderRadius: 6,
-                              color: "#24312a",
+                              color: "var(--ink)",
                             }}
                           >
                             Preview
@@ -1623,7 +1623,7 @@ export function KitsView(vm: KitsVm) {
                   ))}
                 </div>
               ) : (
-                <div style={{ padding: 40, textAlign: "center", color: "#5b665f" }}>
+                <div style={{ padding: 40, textAlign: "center", color: "var(--gray-500)" }}>
                   No curated kits match your filters.
                 </div>
               )}
@@ -1637,10 +1637,10 @@ export function KitsView(vm: KitsVm) {
                     alignItems: "center",
                     marginTop: 24,
                     paddingTop: 16,
-                    borderTop: "1px solid #e6ebe7",
+                    borderTop: "1px solid var(--line)",
                   }}
                 >
-                  <span style={{ fontSize: 13, color: "#5b665f" }}>
+                  <span style={{ fontSize: 13, color: "var(--gray-500)" }}>
                     Showing {processedCuratedRows.length > 0 ? (curatedPage - 1) * GRID_ITEMS_PER_PAGE + 1 : 0} to{" "}
                     {Math.min(processedCuratedRows.length, curatedPage * GRID_ITEMS_PER_PAGE)} of{" "}
                     {processedCuratedRows.length} kits
@@ -1652,7 +1652,7 @@ export function KitsView(vm: KitsVm) {
                       onClick={() => setCuratedPage(curatedPage - 1)}
                       style={{
                         padding: "6px 12px",
-                        border: "1px solid #d9e0dc",
+                        border: "1px solid var(--line)",
                         background: "transparent",
                         borderRadius: 6,
                         fontSize: 13,
@@ -1669,7 +1669,7 @@ export function KitsView(vm: KitsVm) {
                       onClick={() => setCuratedPage(curatedPage + 1)}
                       style={{
                         padding: "6px 12px",
-                        border: "1px solid #d9e0dc",
+                        border: "1px solid var(--line)",
                         background: "transparent",
                         borderRadius: 6,
                         fontSize: 13,
@@ -1710,19 +1710,19 @@ export function KitsView(vm: KitsVm) {
           >
             <div className="modal-pad" style={{ padding: "24px 32px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <DialogTitle style={{ fontSize: 20, fontWeight: 800, color: "#052f22", margin: 0 }}>
+                <DialogTitle style={{ fontSize: 20, fontWeight: 800, color: "var(--ink)", margin: 0 }}>
                   {curatedPreviewKit.name}
                 </DialogTitle>
               </div>
-              
-              <p style={{ color: "#5b665f", fontSize: 14, lineHeight: 1.5, margin: "0 0 20px" }}>
+
+              <p style={{ color: "var(--gray-500)", fontSize: 14, lineHeight: 1.5, margin: "0 0 20px" }}>
                 {curatedPreviewKit.description || "No description available."}
               </p>
 
-              <div style={{ borderBottom: "1px solid #e3e8e4", marginBottom: 16 }} />
+              <div style={{ borderBottom: "1px solid var(--line)", marginBottom: 16 }} />
 
               <div style={{ marginBottom: 20 }}>
-                <h4 style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#5b665f", marginBottom: 12 }}>
+                <h4 style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "var(--gray-500)", marginBottom: 12 }}>
                   Included Products ({Math.max(0, (curatedPreviewKit.imageUrls?.length ?? 0) - 1)})
                 </h4>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 16 }}>
@@ -1730,10 +1730,10 @@ export function KitsView(vm: KitsVm) {
                     <div
                       key={i}
                       style={{
-                        border: "1px solid #e3e8e4",
+                        border: "1px solid var(--line)",
                         borderRadius: 8,
                         padding: 12,
-                        background: "#f9fafb",
+                        background: "var(--gray-50)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -1755,7 +1755,7 @@ export function KitsView(vm: KitsVm) {
                   type="button"
                   className="btn btn-ghost"
                   onClick={() => setCuratedPreviewKit(null)}
-                  style={{ border: "1px solid #d9e0dc", padding: "8px 24px", borderRadius: 6, fontWeight: 700 }}
+                  style={{ border: "1px solid var(--line)", padding: "8px 24px", borderRadius: 6, fontWeight: 700 }}
                 >
                   Close
                 </button>

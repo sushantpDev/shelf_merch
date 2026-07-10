@@ -21,7 +21,7 @@ const DEFAULT_BOX = { xPct: 30, yPct: 30, widthPct: 40, heightPct: 30 };
 const SNAP = 6; // px snap distance to the centre lines
 const MIN_PX = 16; // minimum print-area size in px
 
-const BRAND = "#2ea067";
+const BRAND = "#3D5FD9";
 
 /**
  * POD-style design-placeholder editor. The recoloured garment is an HTML layer;
@@ -267,7 +267,7 @@ export function PrintAreaEditor({
                       stroke={isSel ? BRAND : "rgba(0,0,0,.45)"}
                       strokeWidth={isSel ? 2 : 1.5}
                       dash={isSel ? undefined : [5, 4]}
-                      fill={isSel ? "rgba(46,160,103,.12)" : "rgba(0,0,0,.04)"}
+                      fill={isSel ? "rgba(61,95,217,.12)" : "rgba(0,0,0,.04)"}
                       onMouseDown={() => setSelected(i)}
                       onTap={() => setSelected(i)}
                       onDragMove={(e) => snapDrag(e.target as Konva.Rect)}

@@ -193,7 +193,7 @@ export function RecipientPicker({
                       style={{
                         width: 18,
                         height: 18,
-                        border: `2px solid ${on ? "var(--brand)" : "#c4ccc6"}`,
+                        border: `2px solid ${on ? "var(--brand)" : "var(--line-strong)"}`,
                         borderRadius: 4,
                         display: "grid",
                         placeItems: "center",

@@ -159,7 +159,7 @@ export function SwagDesignDetail({
 
       <div className="pd-body">
         <div className="pd-gallery">
-          <div className="pd-img" style={{ background: "#f4f6f4" }}>
+          <div className="pd-img" style={{ background: "var(--gray-100)" }}>
             <div className="pd-img-inner pd-img-mockup">
               <DesignedProductThumb product={product} artworkUrl={collection.artworkUrl} tintHex={productColorHex(product, colorNames[selColor])} />
             </div>
@@ -274,7 +274,7 @@ export function SwagDesignDetail({
                     height: 80,
                     borderRadius: 10,
                     border: "1px solid var(--line)",
-                    background: "#f7f9f7",
+                    background: "var(--gray-50)",
                     display: "grid",
                     placeItems: "center",
                     overflow: "hidden",

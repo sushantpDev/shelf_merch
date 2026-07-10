@@ -3,10 +3,10 @@ import { type StoreShop } from "../StoreBanner";
 import { resolveColorHex } from "@/lib/colorMap";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { shopBannerPresetLabel, shopHeroBannerUrl } from "@/lib/shop-banners";
-import {
-  DesignedProductThumb,
+import { DesignedProductThumb,
   storeProductAsUi,
 } from "@/features/swag/DesignedProductThumb";
+import { ShelfMerchLogo } from "@/components/brand/ShelfMerchLogo";
 import { POINT_VALUE } from "@/features/send/money";
 import { createRedemptionRazorpayOrder } from "@/services/api-bridge";
 import { openRazorpayCheckout } from "@/lib/razorpay";
@@ -258,17 +258,6 @@ function storeProductThumb(p: StoreProduct) {
 }
 
 /* ─── SVG Icons (inline for zero dependencies) ─── */
-function ShelfMerchLogo() {
-  return (
-    <svg viewBox="0 0 32 32" fill="none">
-      <path d="M16 2L4 8v16l12 6 12-6V8L16 2z" fill="currentColor" opacity=".15" />
-      <path d="M16 2L4 8v16l12 6 12-6V8L16 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
-      <path d="M4 8l12 6 12-6M16 14v16" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      <circle cx="16" cy="14" r="3" fill="currentColor" opacity=".3" />
-    </svg>
-  );
-}
-
 function PointsIcon() {
   return (
     <svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" style={{ flex: "none" }}>
@@ -643,9 +632,9 @@ export default function StoreShell({
   const [checkoutFirst, setCheckoutFirst] = useState("");
   const [checkoutLast, setCheckoutLast] = useState("");
   const [checkoutBusiness, setCheckoutBusiness] = useState("");
-  const [addressSaved, setAddressSaved] = useState(false);
   const [shippingConfirmed, setShippingConfirmed] = useState(false);
   const [itemsExpanded, setItemsExpanded] = useState(false);
+  const checkoutSummaryRef = useRef<HTMLElement>(null);
   const [useRewardPoints, setUseRewardPoints] = useState(true);
   const [addedToBag, setAddedToBag] = useState<AddedToBagInfo | null>(null);
   const catalogRef = useRef<HTMLDivElement>(null);
@@ -689,7 +678,6 @@ export default function StoreShell({
 
   useEffect(() => {
     if (page !== "checkout") {
-      setAddressSaved(false);
       setShippingConfirmed(false);
       setItemsExpanded(false);
       return;
@@ -797,7 +785,6 @@ export default function StoreShell({
   }
 
   function resetCheckoutProgress() {
-    setAddressSaved(false);
     setShippingConfirmed(false);
   }
 
@@ -808,7 +795,7 @@ export default function StoreShell({
     };
   }
 
-  function saveShipping() {
+  function continueToOrderSummary() {
     const next = buildAddressFromCheckout();
     const missing = (["name", "phone", "line1", "city", "state", "pincode"] as const).filter(
       (k) => !(k === "name" ? next.name : next[k]).trim(),
@@ -819,12 +806,10 @@ export default function StoreShell({
     }
     setAddress(next);
     setError("");
-    setAddressSaved(true);
-  }
-
-  function confirmShipping() {
-    if (!addressSaved) return;
     setShippingConfirmed(true);
+    window.setTimeout(() => {
+      checkoutSummaryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   }
 
   function openProduct(id: string) {
@@ -1033,13 +1018,9 @@ export default function StoreShell({
 
               <span className="sf-topbar-vrule" aria-hidden="true" />
 
-              <div className="sf-powered-by" aria-label="Powered by ShelfMerch">
+              <div className="sf-powered-by" aria-label="Powered by Shelf Merch">
                 <span className="sf-powered-by-label">Powered by</span>
-                <img
-                  src="/images/logo/shelfmerch-logo-dark.svg"
-                  alt="ShelfMerch"
-                  className="sf-powered-by-logo"
-                />
+                <ShelfMerchLogo height={22} className="sf-powered-by-logo" />
               </div>
             </div>
 
@@ -1584,7 +1565,7 @@ export default function StoreShell({
 
                   <div className="sf-checkout-form-row sf-checkout-form-row--2">
                     <label className="sf-checkout-field">
-                      <span className="sf-checkout-label">Suite / Apt / Other</span>
+                      <span className="sf-checkout-label">Suite / Apt / Other (optional)</span>
                       <input
                         className="sf-checkout-inp"
                         placeholder="Apt 000"
@@ -1636,22 +1617,20 @@ export default function StoreShell({
                   </div>
                 </div>
 
-                <button type="button" className="sf-checkout-save" onClick={saveShipping}>
-                  Save
+                <button
+                  type="button"
+                  className="sf-checkout-continue sf-checkout-continue--inline"
+                  onClick={continueToOrderSummary}
+                >
+                  Continue to order summary
                 </button>
+                <p className="sf-checkout-continue-hint">
+                  Review your totals and pay in the order summary below.
+                </p>
               </div>
-
-              <button
-                type="button"
-                className="sf-checkout-continue"
-                disabled={!addressSaved}
-                onClick={confirmShipping}
-              >
-                Continue
-              </button>
             </div>
 
-            <aside className="sf-checkout-sidebar">
+            <aside ref={checkoutSummaryRef} className="sf-checkout-sidebar">
               <div className="sf-checkout-summary">
                 <h2 className="sf-checkout-summary-title">Order Summary</h2>
                 {mode === "redeem" && balanceInr != null ? (
@@ -1714,6 +1693,9 @@ export default function StoreShell({
                       ? `Pay ${fmtUpiAmount(upiDueInr)} via UPI`
                       : "Pay now"}
                 </button>
+                {!shippingConfirmed ? (
+                  <p className="sf-checkout-pay-hint">Complete shipping above, then continue to pay here.</p>
+                ) : null}
               </div>
 
               <div className="sf-checkout-items">
@@ -1761,7 +1743,7 @@ export default function StoreShell({
         <div className="sf-content sf-order-success">
           <div className="card sf-fade-in sf-order-success-card">
             <div className="sf-order-success-icon" aria-hidden="true">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#15784C" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3D5FD9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
             </div>
             <div className="eyebrow">Order placed</div>
             <h1 className="sf-order-success-title">Thank you{recipientName ? `, ${recipientName}` : ""}!</h1>
@@ -1881,7 +1863,7 @@ export default function StoreShell({
       {page !== "orders" && page !== "order-detail" ? (
       <div className="sf-footer">
         <div className="sf-footer-inner">
-          <ShelfMerchLogo />
+          <ShelfMerchLogo variant="icon" height={20} />
           Powered by Shelf Merch
           {mode === "preview" ? " · Recipients redeem from a private invite link." : ""}
         </div>

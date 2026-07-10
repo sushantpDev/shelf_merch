@@ -75,7 +75,7 @@ export async function openRazorpayCheckout(opts: {
       order_id: opts.order.orderId,
       name: opts.title ?? "Shelf Merch",
       description: opts.description ?? (opts.walletName ? `Add funds to ${opts.walletName}` : "Complete your order"),
-      theme: { color: "#1a5c45" },
+      theme: { color: "#3D5FD9" },
       handler: (response) => {
         opts.onSuccess(response);
         resolve();

@@ -34,7 +34,7 @@ export function ShopsView(vm: ShopsVm) {
         />
         <div className="card empty">
           <div className="ic" aria-hidden="true">
-            <Store size={34} color="#cdd6cf" />
+            <Store size={34} color="var(--gray-300)" />
           </div>
           <h3>No shops yet</h3>
           <p>Create one to celebrate a moment.</p>

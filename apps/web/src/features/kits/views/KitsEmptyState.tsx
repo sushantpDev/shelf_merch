@@ -9,7 +9,7 @@ const ICON_CHIP: React.CSSProperties = {
   width: 28,
   height: 28,
   borderRadius: 8,
-  background: "#EAF5EF",
+  background: "var(--brand-50)",
   display: "grid",
   placeItems: "center",
   color: "var(--brand)",
@@ -90,7 +90,7 @@ function FlowStep({
           width: 34,
           height: 34,
           borderRadius: "50%",
-          background: "#EAF5EF",
+          background: "var(--brand-50)",
           color: "var(--brand)",
           display: "grid",
           placeItems: "center",
@@ -141,7 +141,7 @@ export function KitsEmptyState({ contactCount = 0, canCreateKits = true }: KitsE
             display: "flex",
             alignItems: "stretch",
             justifyContent: "space-between",
-            background: "#fff",
+            background: "var(--bg-card)",
           }}
         >
           <div
@@ -231,7 +231,7 @@ export function KitsEmptyState({ contactCount = 0, canCreateKits = true }: KitsE
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          background: "#fff",
+          background: "var(--bg-card)",
         }}
       >
         <FlowStep
@@ -271,7 +271,7 @@ export function KitsEmptyState({ contactCount = 0, canCreateKits = true }: KitsE
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
-            background: "#fff",
+            background: "var(--bg-card)",
           }}
         >
           <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", marginBottom: 16 }}>
@@ -347,7 +347,7 @@ export function KitsEmptyState({ contactCount = 0, canCreateKits = true }: KitsE
       <div
         id="pre-designed-section"
         className="card"
-        style={{ marginTop: 24, padding: 24, background: "#fff" }}
+        style={{ marginTop: 24, padding: 24, background: "var(--bg-card)" }}
       >
         <div
           className="row"

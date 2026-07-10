@@ -23,7 +23,7 @@ export function CreateShopView(vm: CreateShopVm) {
   }
 
   return (
-    <FullscreenOverlay style={{ background: "#0E1E16" }}>
+    <FullscreenOverlay style={{ background: "var(--ink)" }}>
       <div style={{ flex: 1, display: "grid", placeItems: "center", padding: 24 }}>
         <div
           className="card"
@@ -174,7 +174,7 @@ export function CreateShopView(vm: CreateShopVm) {
                     }}
                     onClick={() => fileRef.current?.click()}
                   >
-                    <Upload size={22} color="#15784C" />
+                    <Upload size={22} color="var(--brand)" />
                     <div style={{ fontWeight: 600, marginTop: 8 }}>Drag and drop file</div>
                     <div className="mut3" style={{ fontSize: 11.5, margin: "8px 0 4px" }}>
                       Accepted: SVG, PNG, WEBP, JPEG, JPG · Max 5 MB

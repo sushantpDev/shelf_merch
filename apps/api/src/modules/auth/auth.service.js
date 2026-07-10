@@ -73,7 +73,7 @@ export function signImpersonationAccessToken(user, roleAssignment, impersonation
   );
 }
 
-async function issueRefreshToken(userId, { ip = '', userAgent = '' } = {}) {
+export async function issueRefreshToken(userId, { ip = '', userAgent = '' } = {}) {
   const token = crypto.randomBytes(48).toString('hex');
   const tokenHash = sha256(token);
   if (await isSessionStoreReady()) {
@@ -143,7 +143,7 @@ async function uniqueTenantSlug(companyName) {
  * open → tenant starts active; approval (default) → tenant starts in trial
  * until a super admin activates it; closed → signup refused.
  */
-export async function register({ name, email, password, companyName, ip, userAgent }) {
+export async function register({ name, email, password, companyName, ip, userAgent, googleId = null }) {
   const { getSetting } = await import('../platform/platformSettings.service.js');
   const signupMode = await getSetting('signup.mode');
   if (signupMode === 'closed') {
@@ -156,7 +156,7 @@ export async function register({ name, email, password, companyName, ip, userAge
     throw new ConflictError('An account with this email already exists — try logging in instead');
   }
 
-  const passwordHash = await hashPassword(password);
+  const passwordHash = password ? await hashPassword(password) : null;
   const slug = await uniqueTenantSlug(companyName);
   const tenantStatus = signupMode === 'open' ? 'active' : 'trial';
 
@@ -176,6 +176,7 @@ export async function register({ name, email, password, companyName, ip, userAge
             name,
             email: normalizedEmail,
             passwordHash,
+            googleId,
             status: 'active',
           },
         ],

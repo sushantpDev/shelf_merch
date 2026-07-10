@@ -3,11 +3,11 @@ import { MoreHorizontal } from "lucide-react";
 
 /** Solid-colour banner themes (ported from the legacy BANNER_THEMES). */
 export const BANNER_THEMES: Record<string, { bg: string; text: string; dots: boolean }> = {
-  light: { bg: "#FBFCFB", text: "#0E1E16", dots: false },
-  brand: { bg: "linear-gradient(135deg,#15784C,#0E5536)", text: "#fff", dots: true },
-  dark: { bg: "#0E1E16", text: "#fff", dots: true },
-  blue: { bg: "linear-gradient(135deg,#2563C9,#1e40af)", text: "#fff", dots: true },
-  purple: { bg: "linear-gradient(135deg,#7a3fb0,#5b21b6)", text: "#fff", dots: true },
+  light: { bg: "var(--gray-50)", text: "var(--gray-900)", dots: false },
+  brand: { bg: "linear-gradient(135deg, var(--blue-500), var(--blue-700))", text: "#fff", dots: true },
+  dark: { bg: "var(--ink)", text: "var(--cream)", dots: true },
+  blue: { bg: "linear-gradient(135deg, var(--blue-500), var(--blue-700))", text: "#fff", dots: true },
+  purple: { bg: "linear-gradient(135deg, var(--navy-500), var(--navy-700))", text: "#fff", dots: true },
 };
 
 export const SHOP_BANNER_PRESETS: [string, string][] = [

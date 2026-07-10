@@ -1,6 +1,7 @@
 import { Eye, EyeOff } from "lucide-react";
 import type { SignupVm } from "../controllers/useSignupController";
 import { AuthLabel, AuthLayout, authInputClassName } from "./AuthLayout";
+import { GoogleButton } from "./GoogleButton";
 
 export function SignupView(vm: SignupVm) {
   return (
@@ -8,6 +9,16 @@ export function SignupView(vm: SignupVm) {
       title="Create your account"
       footerLink={{ hint: "Already have an account?", label: "Log in", to: "/login" }}
     >
+      <GoogleButton
+        label="Sign up with Google"
+        disabled={vm.busy}
+        onClick={vm.onGoogleSignUp}
+      />
+
+      <div className="auth-simple-divider" aria-hidden>
+        <span>or</span>
+      </div>
+
       <form className="auth-simple-form" onSubmit={vm.onSubmit}>
         <div className="auth-simple-name-row">
           <div className="auth-simple-field">

@@ -28,7 +28,9 @@ import { getStoredUser } from "@/services/api-bridge";
 import { navItemsForTenantRole } from "@/services/tenant-access";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import "./collapsible-sidebar.css";
-import NavFooterImage from "../../../assets/nav_footer_img.png";
+import SidebarDemoCtaImage from "../../../assets/sidebar-demo-cta.png";
+
+const DEMO_MAILTO = "mailto:hello@shelfmerch.io?subject=Book%20a%20demo";
 
 const STORAGE_KEY = "shelfmerch.sidebar.expanded";
 
@@ -111,7 +113,6 @@ export function CollapsibleSidebar() {
   const [expanded, setExpanded] = useState(readExpandedPreference);
   const [flyout, setFlyout] = useState<HoverFlyout | null>(null);
   const [togglePos, setTogglePos] = useState<{ top: number; left: number } | null>(null);
-  const [showFooterImage, setShowFooterImage] = useState(true);
 
 
   const syncTogglePosition = useCallback(() => {
@@ -167,11 +168,7 @@ export function CollapsibleSidebar() {
   const hideFlyout = () => setFlyout(null);
 
   const handleToggle = () => {
-    setExpanded((prev) => {
-      const next = !prev;
-      setShowFooterImage(!prev);
-      return next;
-    });
+    setExpanded((prev) => !prev);
   };
 
   const toggleButton =
@@ -221,9 +218,17 @@ export function CollapsibleSidebar() {
           })}
         </div>
 
-        <div className="sidebar-rail__footer" style={{ marginTop: 0, paddingTop: 0 }}>
-          {showFooterImage && <img src={NavFooterImage} alt="Nav Footer" />}
-        </div>
+        {expanded ? (
+          <div className="sidebar-rail__footer">
+            <a href={DEMO_MAILTO} className="sidebar-rail__cta-image-link" aria-label="Book a demo with our product expert">
+              <img
+                src={SidebarDemoCtaImage}
+                alt="Need help scaling your gifting? Book a demo with our product expert"
+                className="sidebar-rail__cta-image"
+              />
+            </a>
+          </div>
+        ) : null}
       </nav>
 
       {toggleButton}

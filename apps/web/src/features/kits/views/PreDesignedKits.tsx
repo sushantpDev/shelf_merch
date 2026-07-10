@@ -49,7 +49,7 @@ export function PreDesignedKitsView({ isLoading, kits, canCreateKits }: PreDesig
             style={{
               width: "100%",
               aspectRatio: "1.4",
-              background: "#f4f6f4",
+              background: "var(--gray-100)",
               borderRadius: "var(--r-sm)",
               display: "flex",
               alignItems: "center",

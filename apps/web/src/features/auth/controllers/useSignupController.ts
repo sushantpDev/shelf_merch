@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import { register, isPlatformUser } from "../model";
+import { register, isPlatformUser, startGoogleAuth } from "../model";
 
 export type SignupVm = {
   email: string;
@@ -18,6 +18,7 @@ export type SignupVm = {
   onCompany: (company: string) => void;
   onToggleShowPassword: () => void;
   onSubmit: (e: React.FormEvent) => void;
+  onGoogleSignUp: () => void;
 };
 
 /** Controller for the signup screen: form state, register flow, redirect by role. */
@@ -77,5 +78,6 @@ export function useSignupController(): SignupVm {
     onCompany: setCompany,
     onToggleShowPassword: () => setShowPassword((s) => !s),
     onSubmit: submit,
+    onGoogleSignUp: () => startGoogleAuth("signup"),
   };
 }

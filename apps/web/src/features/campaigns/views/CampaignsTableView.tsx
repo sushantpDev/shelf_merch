@@ -73,8 +73,8 @@ function campaignSubtext(c: UiCampaign) {
 function CampaignAvatar({ c }: { c: UiCampaign }) {
   const points = isPointsCampaign(c);
   return (
-    <div className="camp-avatar" style={{ background: "#15784C" }}>
-      {points ? <CalendarDays size={16} color="#fff" /> : <Box size={16} color="#fff" />}
+    <div className="camp-avatar" style={{ background: "#ffffffff" }}>
+      {points ? <CalendarDays size={16} color="#080808ff" /> : <Box size={16} color="#fff" />}
     </div>
   );
 }

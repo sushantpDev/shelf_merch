@@ -4,12 +4,12 @@ import { ShopBanner } from "@/features/shops/banner";
 import type { SendMode, ScheduleDraft, WhenMode } from "./types";
 
 const LOGO_DECO = (
-  <svg viewBox="0 0 48 48" fill="#15784C" width={28} height={28} aria-hidden="true">
+  <svg viewBox="0 0 48 48" fill="var(--brand)" width={28} height={28} aria-hidden="true">
     <path
       d="M24 6c2 5 7 8 13 8-3 5-3 11 0 16-6 0-11 3-13 8-2-5-7-8-13-8 3-5 3-11 0-16 6 0 11-3 13-8Z"
       opacity=".9"
     />
-    <circle cx="24" cy="24" r="6" fill="#0E5536" />
+    <circle cx="24" cy="24" r="6" fill="var(--brand-d)" />
   </svg>
 );
 
@@ -21,7 +21,7 @@ const TZ_OPTIONS = [
   "Asia/Singapore (SGT)",
 ];
 
-const RAINBOW = "linear-gradient(90deg,#7a3fb0,#2b54d6,#f5d000,#d33b30,#15784c)";
+const RAINBOW = "linear-gradient(90deg, var(--brand-l) 0%, var(--brand) 50%, var(--brand-d) 100%)";
 
 function LogoBanner() {
   return (

@@ -196,7 +196,7 @@ export function OrgDoneScreen({
           <div className="wallet-done-next">
             <div className="row" style={{ gap: 12, alignItems: "flex-start" }}>
               <div className="logo-chip" style={{ width: 40, height: 40, flex: "none" }}>
-                <Store size={20} color="#15784C" />
+                <Store size={20} color="var(--brand)" />
               </div>
               <div>
                 <div className="wallet-done-next__k">Recommended next step</div>

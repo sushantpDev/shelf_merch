@@ -34,8 +34,8 @@ function statusPill(campaign: UiCampaign) {
             width: 16,
             height: 16,
             borderRadius: 2,
-            border: "1.5px solid #F2B31B",
-            background: "#FFF7D6",
+            border: "1.5px solid var(--amber-700)",
+            background: "var(--amber-50)",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
@@ -48,7 +48,7 @@ function statusPill(campaign: UiCampaign) {
               width: 8,
               height: 8,
               borderRadius: "50%",
-              background: "#F2B31B",
+              background: "var(--amber-700)",
               display: "block",
             }}
           />

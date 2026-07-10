@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { login, isPlatformUser, ApiError } from "../model";
+import { login, isPlatformUser, ApiError, startGoogleAuth } from "../model";
 
 export type LoginVm = {
   email: string;
@@ -79,6 +79,6 @@ export function useLoginController(): LoginVm {
     onToggleShowPassword: () => setShowPassword((s) => !s),
     onSubmit: submit,
     onForgotPassword: () => toast("Reset link sent"),
-    onGoogleSignIn: () => toast("Google sign-in coming soon"),
+    onGoogleSignIn: () => startGoogleAuth("login"),
   };
 }

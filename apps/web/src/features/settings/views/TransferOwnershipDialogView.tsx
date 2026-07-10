@@ -21,7 +21,7 @@ function getInitials(name: string) {
 }
 
 const AVATAR_PALETTES: [string, string][] = [
-  ["#E8F5EE", "#15784C"],
+  ["var(--brand-50)", "var(--brand)"],
   ["#EAF1FB", "#2563C9"],
   ["#F5EAF5", "#7C3A9E"],
   ["#FFF3E0", "#C97A20"],
@@ -73,7 +73,7 @@ export function TransferOwnershipDialogView(vm: TransferOwnershipVm) {
           style={{
             background: confirming
               ? "linear-gradient(135deg, #FBEDEB 0%, #FFF7F6 100%)"
-              : "linear-gradient(135deg, var(--brand-50) 0%, #F0FAF5 100%)",
+              : "linear-gradient(135deg, var(--brand-50) 0%, #ffffff 100%)",
             padding: "24px 28px 20px",
             borderBottom: "1px solid var(--line-2)",
             transition: "background 0.3s ease",

@@ -28,7 +28,7 @@ export function OrdersView(vm: OrdersVm) {
       {!vm.hasOrders ? (
         <div className="card empty">
           <div className="ic" aria-hidden="true">
-            <Receipt size={34} color="#cdd6cf" />
+            <Receipt size={34} color="var(--ink-3)" />
           </div>
           <h3>No orders yet</h3>
           <p>Orders appear here when recipients redeem gifts or you send kits at scale.</p>
