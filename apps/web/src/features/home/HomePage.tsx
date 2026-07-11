@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import {
   ChevronRight,
   Gift,
+  LockKeyhole,
   Monitor,
   Play,
   Plus,
@@ -11,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { getLastShop } from "@/features/shops/types";
@@ -40,6 +42,55 @@ const HELP_LINKS = [
   { label: "Manage workspace contacts", icon: Users, href: "/app/contacts" },
 ] as const;
 
+function LockedStepChip({ label }: { label: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="home-onboarding-step home-onboarding-step--locked" tabIndex={0}>
+          <LockKeyhole size={13} strokeWidth={2.4} aria-hidden="true" />
+          {label}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Complete the previous step first</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function GettingStartedOnboarding() {
+  return (
+    <TooltipProvider>
+      <section className="home-onboarding card" aria-labelledby="home-onboarding-title">
+        <div className="home-onboarding__header">
+          <h2 id="home-onboarding-title">Getting started</h2>
+          <span>0 of 3 complete</span>
+        </div>
+
+        <div className="home-onboarding__steps" aria-label="Onboarding progress">
+          <span className="home-onboarding-step home-onboarding-step--current">
+            <span className="home-onboarding-step__num">1</span>
+            Create wallet
+          </span>
+          <LockedStepChip label="Add funds" />
+          <LockedStepChip label="Create shop" />
+        </div>
+
+        <div className="home-onboarding-card">
+          <span className="home-onboarding-card__icon" aria-hidden="true">
+            <Wallet size={22} strokeWidth={2} />
+          </span>
+          <div className="home-onboarding-card__copy">
+            <h3>Create your wallet</h3>
+            <p>Your wallet is required before creating a shop or sending gifts.</p>
+          </div>
+          <Link to="/app/wallets" state={{ startCreateWallet: true }} className="btn btn-brand">
+            Create wallet
+          </Link>
+        </div>
+      </section>
+    </TooltipProvider>
+  );
+}
+
 export function HomePage() {
   const { data: workspace, isLoading, isError, error } = useWorkspace();
   const { canWrite, canManageContacts } = useTenantAccess();
@@ -68,6 +119,7 @@ export function HomePage() {
   const senderCount = workspace.orders?.length ?? 0;
 
   const wallets = workspace.wallets ?? [];
+  const showOnboarding = wallets.length === 0;
   const orgWallet = workspace.org?.wallet;
   const mainBalance =
     workspace.org.active && orgWallet?.amount != null
@@ -103,7 +155,9 @@ export function HomePage() {
         </div>
       </section>
 
-      <div className="home-layout">
+      {showOnboarding ? <GettingStartedOnboarding /> : null}
+
+      <div className={showOnboarding ? "home-layout home-layout--onboarding-muted" : "home-layout"}>
         <div className="home-layout__span-4 home-layout__stack">
           <div className="card home-stats">
             <div className="home-stat">
@@ -182,7 +236,7 @@ export function HomePage() {
           ) : null}
         </div>
 
-        <div className="home-layout__span-7">
+        <div className="home-layout__span-9">
           <div className="home-card card">
             <h2 className="home-card__title">
               Wallets{wallets.length > 0 ? ` (${wallets.length})` : ""}
@@ -193,19 +247,19 @@ export function HomePage() {
                 <div className="home-wallet-tile__balance">{formatInr(mainBalance)}</div>
                 <div className="home-wallet-tile__sub">Your balance</div>
               </div>
-              {wallets[0] ? (
-                <div className="home-wallet-tile">
-                  <div className="home-wallet-tile__label">{wallets[0].name}</div>
-                  <div className="home-wallet-tile__balance">{formatInr(wallets[0].balance)}</div>
-                  <div className="home-wallet-tile__sub">Allocated funds</div>
-                </div>
+              {/* {wallets[0] ? (
+                // <div className="home-wallet-tile">
+                //   <div className="home-wallet-tile__label">{wallets[0].name}</div>
+                //   <div className="home-wallet-tile__balance">{formatInr(wallets[0].balance)}</div>
+                //   <div className="home-wallet-tile__sub">Allocated funds</div>
+                // </div>
               ) : (
                 <div className="home-wallet-tile">
                   <div className="home-wallet-tile__label">Points wallet</div>
                   <div className="home-wallet-tile__balance">{formatInr(0)}</div>
                   <div className="home-wallet-tile__sub">Send kits &amp; gifts at scale</div>
                 </div>
-              )}
+              )} */}
             </div>
             <div className="home-card__footer">
               <Link to="/app/wallets" className="lnk">

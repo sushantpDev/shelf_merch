@@ -9,7 +9,6 @@ import { User } from '../users/user.model.js';
 import { RoleAssignment } from '../roles/roleAssignment.model.js';
 import { RefreshToken } from './refreshToken.model.js';
 import { Tenant } from '../tenants/tenant.model.js';
-import { Wallet } from '../wallets/wallet.model.js';
 import {
   createSession,
   getSession,
@@ -189,18 +188,6 @@ export async function register({ name, email, password, companyName, ip, userAge
             userId: user._id,
             role: 'company_admin',
             scopeType: 'tenant',
-          },
-        ],
-        { session },
-      );
-      await Wallet.create(
-        [
-          {
-            tenantId: tenant._id,
-            ownerUserId: user._id,
-            name: `${companyName} Merchandise Budget`,
-            currency: 'INR',
-            status: 'draft',
           },
         ],
         { session },

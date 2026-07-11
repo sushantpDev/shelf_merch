@@ -1,5 +1,5 @@
 import { useReducer, useState, type Dispatch } from "react";
-import { useSearchParams } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { orgForWallet, type WorkspaceSnapshot } from "@/services/workspace-api";
 import { seedAllocateWizard, seedNewWizard, wizardReducer, type WizardAction } from "../reducer";
@@ -35,10 +35,13 @@ export type WalletsScreen =
  */
 export function useWalletsController(): WalletsScreen {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const walletId = searchParams.get("wallet") ?? undefined;
   const addFunds = searchParams.get("addFunds") ?? undefined;
   const { data: workspace, isLoading, isError, error } = useWorkspace();
-  const [inWizard, setInWizard] = useState(false);
+  const [inWizard, setInWizard] = useState(
+    () => (location.state as { startCreateWallet?: boolean } | null)?.startCreateWallet === true,
+  );
   const [wizard, dispatch] = useReducer(wizardReducer, undefined, seedNewWizard);
 
   if (isLoading && !workspace) {
