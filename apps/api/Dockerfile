@@ -7,7 +7,9 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 # Workspace install needs the root manifest + every workspace's package.json.
-COPY package.json package-lock.json ./
+# .npmrc carries legacy-peer-deps=true (see repo root) so `npm ci` resolves the
+# tree the same way CI does.
+COPY .npmrc package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 RUN npm ci --omit=dev --ignore-scripts
