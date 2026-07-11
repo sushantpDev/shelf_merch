@@ -1,8 +1,9 @@
 import { type ReactNode } from "react";
-import { Box, Check, Send, Store, Users, Wallet } from "lucide-react";
+import { ArrowRight, Box, Check, Send, Store, Users, Wallet } from "lucide-react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { inr } from "@/components/platform/platform-ui";
+import walletSubmittedIllust from "../../../../assets/wallet-submitted-illust-blend.png";
 import { selectedDepartments, type WizardState } from "../types";
 
 function StatusTag({ label, tone = "live" }: { label: string; tone?: "live" | "warn" }) {
@@ -67,24 +68,56 @@ export function OrgDoneScreen({
 
   if (isWalletFlow) {
     return (
-      <div className="wallet-done fade-in">
-        <header className="wallet-done-hero">
-          <div className="wallet-done-hero__icon" aria-hidden="true">
-            <Check />
+      <div className="wallet-done wallet-done--wallet fade-in">
+        <div className="wallet-submit">
+          <div className="wallet-submit__art" aria-hidden="true">
+            <img src={walletSubmittedIllust} alt="" />
           </div>
-          <div>
-            <h1>Wallet submitted for review</h1>
-            <p>
-              Platform finance will review your PO. Once approved, {inr(o.amount)} will be credited
-              to <strong>{o.name}</strong> and you can allocate funds to departments.
-            </p>
-          </div>
-        </header>
 
-        <div className="wallet-done-actions" style={{ maxWidth: 320, marginTop: 24 }}>
-          <button type="button" className="btn btn-brand btn-lg" onClick={onGoToDashboard}>
-            Go to wallet dashboard
-          </button>
+          <div className="wallet-submit__content">
+            <header className="wallet-submit__card">
+              <div className="wallet-submit__check" aria-hidden="true">
+                <Check strokeWidth={2.75} />
+                <span className="wallet-submit__spark wallet-submit__spark--1" />
+                <span className="wallet-submit__spark wallet-submit__spark--2" />
+                <span className="wallet-submit__spark wallet-submit__spark--3" />
+              </div>
+              <div>
+                <h1>Wallet submitted for review</h1>
+                <p>
+                  Platform finance will review your PO. Once approved,{" "}
+                  <strong className="wallet-submit__hl">{inr(o.amount)}</strong> will be credited
+                  to <strong className="wallet-submit__hl">{o.name}</strong> and you can allocate
+                  funds to departments.
+                </p>
+              </div>
+            </header>
+
+            <Link to="/app/shops/new" className="wallet-submit__next">
+              <span className="wallet-submit__next-icon" aria-hidden="true">
+                <Store size={18} strokeWidth={2} />
+              </span>
+              <span className="wallet-submit__next-text">Next step — create your shop.</span>
+              <span className="wallet-submit__next-arrow" aria-hidden="true">
+                <ArrowRight size={16} strokeWidth={2.5} />
+              </span>
+            </Link>
+
+            <div className="wallet-submit__actions">
+              <Link to="/app/shops/new" className="wallet-submit__btn wallet-submit__btn--primary">
+                <Store size={16} strokeWidth={2} aria-hidden="true" />
+                Create shop
+              </Link>
+              <button
+                type="button"
+                className="wallet-submit__btn wallet-submit__btn--outline"
+                onClick={onGoToDashboard}
+              >
+                <Wallet size={16} strokeWidth={2} aria-hidden="true" />
+                Go to wallet dashboard
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );

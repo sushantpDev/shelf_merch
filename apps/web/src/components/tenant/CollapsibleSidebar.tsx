@@ -222,7 +222,11 @@ export function CollapsibleSidebar() {
         </div>
 
         <div className="sidebar-rail__footer" style={{ marginTop: 0, paddingTop: 0 }}>
-          {showFooterImage && <img src={NavFooterImage} alt="Nav Footer" />}
+          {showFooterImage && (
+            <Link to="/app/settings" aria-label="Workspace settings">
+              <img src={NavFooterImage} alt="Nav Footer" />
+            </Link>
+          )}
         </div>
       </nav>
 

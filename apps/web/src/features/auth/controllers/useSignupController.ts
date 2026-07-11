@@ -54,7 +54,7 @@ export function useSignupController(): SignupVm {
       if (isPlatformUser(user)) {
         navigate("/platform/dashboard");
       } else {
-        navigate("/app/orders");
+        navigate("/app");
       }
     } catch (err) {
       submitInFlight.current = false;

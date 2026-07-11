@@ -196,7 +196,7 @@ export function OrgWizard({
               >
                 <div className="snum">{s < n ? "✓" : i + 1}</div>
                 <div className="smeta">
-                  <span className="seye">Step {i + 1}</span>
+                  {/* <span className="seye">Step {i + 1}</span> */}
                   <span className="slabel">{label}</span>
                 </div>
               </button>
@@ -233,9 +233,9 @@ export function OrgWizard({
             <ArrowLeft size={15} /> Back
           </button>
         </span>
-        <div className="note">
+        {/* <div className="note">
           Step {displayStepIndex + 1} of {displayStepTotal} · <b>{displayStepLabel}</b>
-        </div>
+        </div> */}
         <button
           type="button"
           className="btn btn-brand"

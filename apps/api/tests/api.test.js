@@ -386,11 +386,10 @@ describe('auth flow', () => {
     expect(res.body.user.role).toBe('company_admin');
     expect(res.body.user.email).toBe(email);
 
-    const tenant = await Tenant.findOne({ slug: 'fresh-corp' });
-    const seededWallet = await Wallet.findOne({ tenantId: tenant._id });
-    expect(seededWallet).toBeTruthy();
-    expect(seededWallet.name).toContain('Fresh Corp');
+    const tenant = await Tenant.findById(res.body.user.tenantId);
     expect(tenant).toBeTruthy();
+    const seededWallet = await Wallet.findOne({ tenantId: tenant._id });
+    expect(seededWallet).toBeNull();
     expect(tenant.name).toBe('Fresh Corp');
 
     const duplicate = await request(app)

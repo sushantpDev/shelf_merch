@@ -111,6 +111,20 @@ type ApiWalletRow = {
   updatedAt?: string;
 };
 
+function isEmptyDraftWallet(w: ApiWalletRow): boolean {
+  const doc = w.fundingDocument ?? {};
+  return (
+    (w.status ?? "draft") === "draft" &&
+    Number(w.balance ?? 0) === 0 &&
+    Number(w.totalAmount ?? 0) === 0 &&
+    Number(w.allocatedAmount ?? 0) === 0 &&
+    Number(doc.requestedAmount ?? 0) === 0 &&
+    !doc.fileUrl &&
+    !doc.docNumber &&
+    !doc.approvalStatus
+  );
+}
+
 function mapWalletOrgFields(
   w: ApiWalletRow,
   isEntityManager: boolean,
@@ -454,8 +468,9 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
   }
 
   const walletList = wallets as ApiWalletRow[];
+  const visibleWalletList = walletList.filter((w) => !isEmptyDraftWallet(w));
   // Surface an in-progress wallet that still needs allocation before the live one.
-  const stuckSetup = [...walletList]
+  const stuckSetup = [...visibleWalletList]
     .filter(
       (w) =>
         ["entities_added", "budget_allocated", "managers_assigned"].includes(w.status ?? "") &&
@@ -466,7 +481,7 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
       (a, b) =>
         new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime(),
     )[0];
-  const fundedSetup = [...walletList]
+  const fundedSetup = [...visibleWalletList]
     .filter((w) => (w.balance ?? 0) > 0 || (w.totalAmount ?? 0) > 0)
     .sort(
       (a, b) =>
@@ -474,9 +489,9 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
     )[0];
   const primaryWallet =
     stuckSetup ??
-    walletList.find((w) => w.status === "active") ??
+    visibleWalletList.find((w) => w.status === "active") ??
     fundedSetup ??
-    [...walletList].sort((a, b) => (b.balance ?? 0) - (a.balance ?? 0))[0];
+    [...visibleWalletList].sort((a, b) => (b.balance ?? 0) - (a.balance ?? 0))[0];
 
   const primaryWalletId = primaryWallet
     ? String(primaryWallet._id ?? primaryWallet.id ?? "")
@@ -499,7 +514,7 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
 
   const entityRows = entities as never[];
   const walletViews: Record<string, WalletOrgView> = {};
-  for (const w of walletList) {
+  for (const w of visibleWalletList) {
     const id = String(w._id ?? w.id ?? "");
     if (!id) continue;
     const ents = entityRows.filter(
@@ -528,7 +543,7 @@ export async function fetchWorkspaceSnapshot(sessionUser?: AuthUser | null): Pro
     orders: (ordersPage.items || []).map((o) =>
       mapOrder(o, (o as { campaignName?: string }).campaignName || ""),
     ),
-    wallets: (wallets as never[]).map((w) => mapWallet(w, walletOwner)),
+    wallets: (visibleWalletList as never[]).map((w) => mapWallet(w, walletOwner)),
     primaryWalletId: primaryWalletId || undefined,
     walletViews,
     primaryEntityId: isEntityManager

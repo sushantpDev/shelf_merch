@@ -13,11 +13,11 @@ function page(loader: () => Promise<Record<string, unknown>>, name = "default") 
 function redirectIfAuthed() {
   if (!isAuthenticated()) return null;
   if (isPlatformUser(getStoredUser())) return redirect("/platform/dashboard");
-  return redirect("/app/orders");
+  return redirect("/app");
 }
 
 const tenantChildren: RouteObject[] = [
-  { index: true, lazy: page(() => import("@/features/home/HomePage"), "HomePage") },
+  { index: true, lazy: page(() => import("@/features/dashboard/DashboardPage"), "DashboardPage") },
   { path: "orders", lazy: page(() => import("@/features/orders/OrdersPage"), "OrdersPage") },
   { path: "wallets", lazy: page(() => import("@/features/wallets/WalletsPage"), "WalletsPage") },
   {
