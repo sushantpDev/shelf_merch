@@ -29,9 +29,7 @@ import {
   Heart,
   HeartHandshake,
   IdCard,
-  Instagram,
   Laptop,
-  Linkedin,
   Megaphone,
   Menu,
   MessageCircle,
@@ -58,8 +56,8 @@ import {
   UserCircle,
   Users,
   Wallet,
-  Youtube,
 } from "lucide-react";
+import { Instagram, Linkedin, Youtube } from "@/components/brand/SocialIcons";
 
 const LP_ICONS = {
   monitor: Monitor,
