@@ -20,15 +20,15 @@
     "bcryptjs": "^3.0.2",
     "bullmq": "^5.80.2",
     "cors": "^2.8.5",
-    "csv-parse": "^6.2.1",
+    "csv-parse": "^7.0.1",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "express-rate-limit": "^7.5.1",
     "helmet": "^8.3.0",
     "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.16.0",
-    "multer": "^2.2.0",
+    "mongoose": "^9.7.4",
+    "multer": "^2.1.1",
     "nanoid": "^5.1.5",
     "nodemailer": "^9.0.3",
     "pdfkit": "^0.19.1",
@@ -40,9 +40,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "mongodb-memory-server": "^10.1.4",
+    "mongodb-memory-server": "^11.2.0",
     "pino-pretty": "^13.0.0",
     "supertest": "^7.1.1",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.10"
   }
 }
