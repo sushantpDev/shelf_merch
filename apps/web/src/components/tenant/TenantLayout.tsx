@@ -3,6 +3,7 @@ import { Outlet, useLocation, useSearchParams } from "react-router";
 import { CollapsibleSidebar } from "@/components/tenant/CollapsibleSidebar";
 import { UserMenu } from "@/components/tenant/UserMenu";
 import { WalletBalanceMenu } from "@/components/tenant/WalletBalanceMenu";
+import { ShelfMerchLogo } from "@/components/brand/ShelfMerchLogo";
 import { getStoredUser, isAuthenticated } from "@/services/api-bridge";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { formatWalletAmount, formatWalletsTotal } from "@/lib/walletFormat";
@@ -87,21 +88,7 @@ export default function TenantLayout() {
     <div className="tenant-shell">
       <header className="topbar">
         <div className="brandmark">
-          <svg viewBox="0 0 32 32" fill="none" width={28} height={28} aria-hidden="true">
-            <path d="M16 3 4 9l12 6 12-6-12-6Z" fill="#3D5FD9" />
-            <path d="M4 15l12 6 12-6" stroke="#2B4E8F" strokeWidth="2.4" strokeLinejoin="round" />
-            <path d="M4 21l12 6 12-6" stroke="#F4741F" strokeWidth="2.4" strokeLinejoin="round" />
-          </svg>
-          <span
-            style={{
-              fontFamily: "var(--disp)",
-              fontWeight: 800,
-              fontSize: 18,
-              letterSpacing: "-.02em",
-            }}
-          >
-            Shelf Merch
-          </span>
+          <ShelfMerchLogo href="/app" height={32} />
         </div>
         <div className="spacer" />
         <div className="topbar-right">

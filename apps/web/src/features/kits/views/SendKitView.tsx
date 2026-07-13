@@ -186,12 +186,22 @@ export function SendKitView(vm: SendKitVm) {
   const isCurated = !!curatedMeta;
 
   const kitItems = draft.picked
-    .map(idx => vm.catalog[idx])
+    .map((idx) => vm.catalog[idx])
     .filter(Boolean)
-    .map(p => {
-      const ref = kit.productRefs?.find(r => r.catalogProductId === p.id) ?? {};
+    .map((p) => {
+      const ref = kit.productRefs?.find((r) => r.catalogProductId === p.id) ?? {};
       return { product: p, opts: resolveKitItemOptions(p, ref) };
     });
+
+  /** Only show when sender must configure real size/color options. */
+  const showVariantCols =
+    !isCurated &&
+    (draft.mode === "surprise" || draft.mode === "single") &&
+    kitItems.some(
+      ({ opts }) =>
+        (opts.requiresSize && opts.sizes.length > 0) ||
+        (opts.requiresColor && opts.colors.length > 0),
+    );
 
   const filteredContacts = vm.contacts.filter(c =>
     !search || c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -313,58 +323,124 @@ export function SendKitView(vm: SendKitVm) {
 
       {/* ── Step 1: Recipients ── */}
       {vm.step === 1 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          {/* Mode Selection Cards */}
-          <div style={{ background: "var(--surface)", padding: 20, borderRadius: 12, border: "1px solid var(--border)" }}>
-            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Choose Send Mode</h3>
-            <p className="muted" style={{ fontSize: 13, marginBottom: 16 }}>Select how you would like to deliver this kit to your recipients.</p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-              {([
-                { mode: "surprise", title: "Surprise Recipient", desc: "Enter recipient details up front so gifts ship directly without requiring their input." },
-                { mode: "single", title: "Send All Kits to Single Location", desc: "Ship all units to one office, event venue or specific address." },
-                { mode: "redeem", title: "Let Recipient Choose the Variant", desc: "Recipients choose their own size, color & shipping address from a private link." },
-              ] as const).map(({ mode, title, desc }) => (
+        <div className="sk-recip-step">
+          <div className="card sk-recip-modes">
+            <h3>Choose send mode</h3>
+            <p className="sk-recip-modes-lead">
+              Select how you would like to deliver this kit to your recipients.
+            </p>
+            <div className="sk-recip-mode-grid">
+              {(
+                [
+                  {
+                    mode: "surprise",
+                    title: "Surprise recipient",
+                    desc: "Enter recipient details up front so gifts ship directly without requiring their input.",
+                  },
+                  {
+                    mode: "single",
+                    title: "Send all kits to a single location",
+                    desc: "Ship all units to one office, event venue, or specific address.",
+                  },
+                  {
+                    mode: "redeem",
+                    title: "Let recipient choose the variant",
+                    desc: "Recipients choose their own size, color & shipping address from a private link.",
+                  },
+                ] as const
+              ).map(({ mode, title, desc }) => (
                 <button
                   key={mode}
                   type="button"
                   className={`optcard ${draft.mode === mode ? "on" : ""}`}
                   onClick={() => dispatch({ type: "setMode", mode })}
-                  style={{ minHeight: 140, display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", cursor: "pointer", padding: 18, borderRadius: 12 }}
                 >
                   <div className="rd" />
-                  <div style={{ marginTop: 10 }}>
-                    <h4 style={{ fontSize: 14, fontWeight: 650, marginBottom: 4 }}>{title}</h4>
-                    <p className="muted" style={{ fontSize: 12, lineHeight: 1.4, margin: 0 }}>{desc}</p>
+                  <div>
+                    <h4>{title}</h4>
+                    <p>{desc}</p>
                   </div>
                 </button>
               ))}
             </div>
           </div>
 
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Who's receiving this?</h1>
-            <p className="muted" style={{ fontSize: 13, marginBottom: 18 }}>
-              {isCurated ? "Choose recipients to receive this curated kit." : "Choose recipients and configure variants for each item."}
+          <div className="card sk-recip-panel">
+            <h2>Who&apos;s receiving this?</h2>
+            <p className="sk-recip-panel-lead">
+              {isCurated
+                ? "Choose recipients to receive this curated kit."
+                : draft.mode === "redeem"
+                  ? "Choose who should receive a private link to pick their size, color & address."
+                  : showVariantCols
+                    ? "Choose recipients and configure variants for each item."
+                    : "Choose who should receive this kit."}
             </p>
 
             {draft.mode === "single" && (
-              <div className="card" style={{ padding: 20, marginBottom: 20 }}>
+              <div
+                className="card"
+                style={{ padding: 18, marginBottom: 18, background: "var(--surface-2)", boxShadow: "none" }}
+              >
                 <h3 style={{ fontSize: 15, marginBottom: 12 }}>Single delivery location</h3>
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-                  <LocField label="Contact name" k="name" loc={draft.singleLocation} onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })} />
-                  <LocField label="Notification email" k="email" type="email" loc={draft.singleLocation} onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })} />
-                  <LocField label="Phone (optional)" k="phone" loc={draft.singleLocation} onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })} />
+                  <LocField
+                    label="Contact name"
+                    k="name"
+                    loc={draft.singleLocation}
+                    onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })}
+                  />
+                  <LocField
+                    label="Notification email"
+                    k="email"
+                    type="email"
+                    loc={draft.singleLocation}
+                    onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })}
+                  />
+                  <LocField
+                    label="Phone (optional)"
+                    k="phone"
+                    loc={draft.singleLocation}
+                    onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })}
+                  />
                 </div>
                 <div style={{ marginBottom: 12 }}>
-                  <LocField label="Address" k="line1" loc={draft.singleLocation} onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })} block />
+                  <LocField
+                    label="Address"
+                    k="line1"
+                    loc={draft.singleLocation}
+                    onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })}
+                    block
+                  />
                 </div>
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  <LocField label="City" k="city" loc={draft.singleLocation} onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })} />
-                  <LocField label="State" k="state" loc={draft.singleLocation} onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })} />
-                  <LocField label="PIN / Postal code" k="pincode" loc={draft.singleLocation} onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })} />
+                  <LocField
+                    label="City"
+                    k="city"
+                    loc={draft.singleLocation}
+                    onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })}
+                  />
+                  <LocField
+                    label="State"
+                    k="state"
+                    loc={draft.singleLocation}
+                    onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })}
+                  />
+                  <LocField
+                    label="PIN / Postal code"
+                    k="pincode"
+                    loc={draft.singleLocation}
+                    onChange={(k, v) => dispatch({ type: "setSingleLoc", key: k, value: v })}
+                  />
                   <div className="field" style={{ flex: 1 }}>
                     <label className="lbl">Country</label>
-                    <select className="inp" value={draft.singleLocation.country || "IN"} onChange={e => dispatch({ type: "setSingleLoc", key: "country", value: e.target.value })}>
+                    <select
+                      className="inp"
+                      value={draft.singleLocation.country || "IN"}
+                      onChange={(e) =>
+                        dispatch({ type: "setSingleLoc", key: "country", value: e.target.value })
+                      }
+                    >
                       <option value="IN">India</option>
                       <option value="AE">UAE</option>
                       <option value="US">USA</option>
@@ -374,60 +450,105 @@ export function SendKitView(vm: SendKitVm) {
               </div>
             )}
 
-            {/* Toolbar */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, fontWeight: 600, padding: "5px 12px", borderRadius: 6, background: "var(--brand-50)", color: "var(--brand-d)", border: "1px solid var(--brand-100)" }}>
-                {draft.selRecips.length} selected
-              </span>
-              <button type="button" className="btn btn-ghost btn-sm" style={{ border: "1px solid var(--border)", background: "var(--surface)", height: 32, padding: "0 12px", borderRadius: 6 }} onClick={() => dispatch({ type: "deselectRecips" })}>Deselect all</button>
-              <button type="button" className="btn btn-ghost btn-sm" style={{ border: "1px solid var(--border)", background: "var(--surface)", height: 32, padding: "0 12px", borderRadius: 6 }} onClick={() => toast.info("Manual email input modal placeholder triggered")}>Input emails</button>
-              <button type="button" className="btn btn-ghost btn-sm" style={{ border: "1px solid var(--border)", background: "var(--surface)", height: 32, padding: "0 12px", borderRadius: 6 }} onClick={() => toast.info("CSV import wizard placeholder triggered")}>Add by CSV</button>
-              <div style={{ marginLeft: "auto" }}>
-                <input
-                  className="inp"
-                  placeholder="Search by name or email…"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  style={{ width: 240, fontSize: 13, height: 32 }}
-                />
-              </div>
+            <div className="sk-recip-toolbar">
+              <span className="sk-recip-count">{draft.selRecips.length} selected</span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => dispatch({ type: "deselectRecips" })}
+              >
+                Deselect all
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => toast.info("Manual email input modal placeholder triggered")}
+              >
+                Input emails
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => toast.info("CSV import wizard placeholder triggered")}
+              >
+                Add by CSV
+              </button>
+              <input
+                className="inp sk-recip-search"
+                placeholder="Search by name or email…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
 
-            {/* Table */}
-            <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 10 }}>
-              <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }}>
+            <div className="sk-recip-table-wrap">
+              <table className="sk-recip-table">
                 <thead>
                   <tr style={{ background: "var(--surface-2)" }}>
                     <th style={stickHeadCheckbox1}></th>
-                    <th style={stickHeadName1}>RECIPIENT</th>
-                    <th style={stickHeadEmail1}>EMAIL</th>
-                    <th style={{ ...stickHeadAddr1, ...(!isCurated ? {} : { borderRight: "none" }) }}>ADDRESS</th>
-                    {!isCurated && (
+                    <th style={stickHeadName1}>Recipient</th>
+                    <th style={stickHeadEmail1}>Email</th>
+                    <th style={{ ...stickHeadAddr1, borderRight: "none" }}>
+                      Address
+                    </th>
+                    {showVariantCols && (
                       <th
                         colSpan={kitItems.length || 1}
-                        style={{ ...thStyle, borderLeft: "2px solid var(--border)", background: "var(--surface)" }}
+                        style={{
+                          ...thStyle,
+                          borderLeft: "2px solid var(--line)",
+                          background: "var(--surface-2)",
+                        }}
                       >
-                        <div style={{ fontWeight: 700, fontSize: 12, letterSpacing: ".05em" }}>KIT ITEMS &amp; VARIANTS</div>
-                        <div style={{ fontWeight: 400, fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                          Configure size, color &amp; other variants for each recipient
+                        <div style={{ fontWeight: 700, fontSize: 11, letterSpacing: ".05em" }}>
+                          Kit items &amp; variants
+                        </div>
+                        <div
+                          style={{
+                            fontWeight: 400,
+                            fontSize: 11,
+                            color: "var(--ink-2)",
+                            marginTop: 2,
+                            textTransform: "none",
+                            letterSpacing: 0,
+                          }}
+                        >
+                          Configure size &amp; color for each recipient
                         </div>
                       </th>
                     )}
                   </tr>
-                  {!isCurated && kitItems.length > 0 && (
-                    <tr style={{ background: "var(--surface)" }}>
+                  {showVariantCols && kitItems.length > 0 && (
+                    <tr style={{ background: "#fff" }}>
                       <th style={stickHeadCheckbox2}></th>
                       <th style={stickHeadName2}></th>
                       <th style={stickHeadEmail2}></th>
-                      <th style={stickHeadAddr2}></th>
-                      {kitItems.map(({ product: p, opts }) => (
-                        <th key={p.id} style={{ ...thStyle, borderLeft: "1px solid var(--border)", minWidth: 230 }}>
+                      <th style={{ ...stickHeadAddr2, borderRight: "none" }}></th>
+                      {kitItems.map(({ product: p }) => (
+                        <th
+                          key={p.id}
+                          style={{
+                            ...thStyle,
+                            borderLeft: "1px solid var(--line)",
+                            minWidth: 200,
+                            background: "#fff",
+                          }}
+                        >
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <div style={{ width: 46, height: 36, borderRadius: 6, overflow: "hidden", background: "#f0f0f0", flexShrink: 0, position: "relative" }}>
+                            <div
+                              style={{
+                                width: 44,
+                                height: 34,
+                                borderRadius: 6,
+                                overflow: "hidden",
+                                background: "var(--surface-2)",
+                                flexShrink: 0,
+                              }}
+                            >
                               <DesignedProductThumb product={p} artworkUrl={kit.artworkUrl} />
                             </div>
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 2 }}>{p.nm}</div>
+                            <div style={{ fontWeight: 600, fontSize: 12, color: "var(--ink)" }}>
+                              {p.nm}
                             </div>
                           </div>
                         </th>
@@ -436,58 +557,94 @@ export function SendKitView(vm: SendKitVm) {
                   )}
                 </thead>
                 <tbody>
-                  {filteredContacts.map(contact => {
+                  {filteredContacts.map((contact) => {
                     const isSelected = draft.selRecips.includes(contact.id);
-                    const addr = [contact.city, contact.state, contact.country].filter(Boolean).join(", ");
-                    const bg = isSelected ? "var(--surface)" : "#ffffff";
+                    const addr = [contact.city, contact.state, contact.country]
+                      .filter(Boolean)
+                      .join(", ");
+                    const bg = isSelected ? "var(--brand-50)" : "#fff";
                     return (
                       <tr
                         key={contact.id}
-                        style={{ borderTop: "1px solid var(--border)", background: bg, opacity: isSelected ? 1 : 0.65, transition: "opacity .15s" }}
+                        style={{
+                          borderTop: "1px solid var(--line)",
+                          background: bg,
+                          opacity: isSelected ? 1 : 0.72,
+                        }}
                       >
                         <td style={cellCheckbox(bg)}>
                           <input
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => dispatch({ type: "toggleRecip", id: contact.id })}
-                            style={{ width: 16, height: 16, accentColor: "var(--brand)", cursor: "pointer" }}
+                            style={{
+                              width: 16,
+                              height: 16,
+                              accentColor: "var(--brand)",
+                              cursor: "pointer",
+                            }}
                           />
                         </td>
                         <td style={cellName(bg)}>{contact.name}</td>
                         <td style={cellEmail(bg)}>{contact.email}</td>
-                        <td style={{ ...cellAddr(bg), ...(!isCurated ? {} : { borderRight: "none" }) }}>{addr || "—"}</td>
-                        {!isCurated && kitItems.map(({ product: prod, opts }) => {
-                          const selection = draft.recipVariants[contact.id]?.[prod.id || ""] || {};
-                          const showVariants = draft.mode === "surprise" || draft.mode === "single";
-                          return (
-                            <td key={prod.id} style={{ ...tdStyle, borderLeft: "1px solid var(--border)" }}>
-                              {showVariants ? (
-                                <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", alignItems: "center" }}>
+                        <td style={{ ...cellAddr(bg), borderRight: "none" }}>
+                          {addr || "—"}
+                        </td>
+                        {showVariantCols &&
+                          kitItems.map(({ product: prod, opts }) => {
+                            const selection =
+                              draft.recipVariants[contact.id]?.[prod.id || ""] || {};
+                            return (
+                              <td
+                                key={prod.id}
+                                style={{ ...tdStyle, borderLeft: "1px solid var(--line)" }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    gap: 4,
+                                    flexWrap: "nowrap",
+                                    alignItems: "center",
+                                  }}
+                                >
                                   {opts.requiresSize && opts.sizes.length > 0 && (
                                     <SizeSelect
                                       value={selection.size || ""}
                                       sizes={opts.sizes}
-                                      onChange={v => dispatch({ type: "setRecipVariant", contactId: contact.id, productId: prod.id || "", key: "size", value: v })}
+                                      onChange={(v) =>
+                                        dispatch({
+                                          type: "setRecipVariant",
+                                          contactId: contact.id,
+                                          productId: prod.id || "",
+                                          key: "size",
+                                          value: v,
+                                        })
+                                      }
                                     />
                                   )}
                                   {opts.requiresColor && opts.colors.length > 0 && (
                                     <ColorSelect
                                       value={selection.color || ""}
                                       colors={opts.colors}
-                                      onChange={v => dispatch({ type: "setRecipVariant", contactId: contact.id, productId: prod.id || "", key: "color", value: v })}
+                                      onChange={(v) =>
+                                        dispatch({
+                                          type: "setRecipVariant",
+                                          contactId: contact.id,
+                                          productId: prod.id || "",
+                                          key: "color",
+                                          value: v,
+                                        })
+                                      }
                                       product={prod}
                                     />
                                   )}
                                   {!opts.requiresSize && !opts.requiresColor && (
-                                    <span style={{ fontSize: 12, color: "var(--text-muted)" }}>—</span>
+                                    <span style={{ fontSize: 12, color: "var(--ink-2)" }}>—</span>
                                   )}
                                 </div>
-                              ) : (
-                                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Chosen by recipient</span>
-                              )}
-                            </td>
-                          );
-                        })}
+                              </td>
+                            );
+                          })}
                       </tr>
                     );
                   })}
@@ -497,10 +654,11 @@ export function SendKitView(vm: SendKitVm) {
 
             {draft.mode === "surprise" && vm.surpriseMissing.length > 0 && (
               <div className="banner" style={{ marginTop: 14 }}>
-                <b>{vm.surpriseMissing.length} recipient(s) missing a shipping address.</b> Surprise sends need addresses up front.
+                <b>{vm.surpriseMissing.length} recipient(s) missing a shipping address.</b> Surprise
+                sends need addresses up front.
               </div>
             )}
-            <div style={{ marginTop: 12, fontSize: 13, color: "var(--text-muted)" }}>
+            <div className="sk-recip-foot">
               {draft.selRecips.length} recipient{draft.selRecips.length !== 1 ? "s" : ""} selected
             </div>
           </div>
@@ -589,28 +747,28 @@ const tdStyle: React.CSSProperties = {
 };
 
 const stickHeadCheckbox1: React.CSSProperties = { ...thStyle, position: "sticky", left: 0, zIndex: 20, background: "var(--surface-2)", width: 40, minWidth: 40 };
-const stickHeadName1: React.CSSProperties = { ...thStyle, position: "sticky", left: 40, zIndex: 20, background: "var(--surface-2)", width: 120, minWidth: 120 };
-const stickHeadEmail1: React.CSSProperties = { ...thStyle, position: "sticky", left: 160, zIndex: 20, background: "var(--surface-2)", width: 160, minWidth: 160 };
-const stickHeadAddr1: React.CSSProperties = { ...thStyle, position: "sticky", left: 320, zIndex: 20, background: "var(--surface-2)", width: 180, minWidth: 180, borderRight: "2px solid var(--border)" };
+const stickHeadName1: React.CSSProperties = { ...thStyle, position: "sticky", left: 40, zIndex: 20, background: "var(--surface-2)", width: 140, minWidth: 140 };
+const stickHeadEmail1: React.CSSProperties = { ...thStyle, position: "sticky", left: 180, zIndex: 20, background: "var(--surface-2)", width: 180, minWidth: 180 };
+const stickHeadAddr1: React.CSSProperties = { ...thStyle, position: "sticky", left: 360, zIndex: 20, background: "var(--surface-2)", width: 160, minWidth: 160, borderRight: "2px solid var(--line)" };
 
-const stickHeadCheckbox2: React.CSSProperties = { ...thStyle, position: "sticky", left: 0, zIndex: 20, background: "var(--surface)", width: 40, minWidth: 40 };
-const stickHeadName2: React.CSSProperties = { ...thStyle, position: "sticky", left: 40, zIndex: 20, background: "var(--surface)", width: 120, minWidth: 120 };
-const stickHeadEmail2: React.CSSProperties = { ...thStyle, position: "sticky", left: 160, zIndex: 20, background: "var(--surface)", width: 160, minWidth: 160 };
-const stickHeadAddr2: React.CSSProperties = { ...thStyle, position: "sticky", left: 320, zIndex: 20, background: "var(--surface)", width: 180, minWidth: 180, borderRight: "2px solid var(--border)" };
+const stickHeadCheckbox2: React.CSSProperties = { ...thStyle, position: "sticky", left: 0, zIndex: 20, background: "#fff", width: 40, minWidth: 40 };
+const stickHeadName2: React.CSSProperties = { ...thStyle, position: "sticky", left: 40, zIndex: 20, background: "#fff", width: 140, minWidth: 140 };
+const stickHeadEmail2: React.CSSProperties = { ...thStyle, position: "sticky", left: 180, zIndex: 20, background: "#fff", width: 180, minWidth: 180 };
+const stickHeadAddr2: React.CSSProperties = { ...thStyle, position: "sticky", left: 360, zIndex: 20, background: "#fff", width: 160, minWidth: 160, borderRight: "2px solid var(--line)" };
 
 const cellCheckbox = (bg: string): React.CSSProperties => ({
   ...tdStyle, position: "sticky", left: 0, zIndex: 10, background: bg, width: 40, minWidth: 40
 });
 const cellName = (bg: string): React.CSSProperties => ({
-  ...tdStyle, position: "sticky", left: 40, zIndex: 10, background: bg, width: 120, minWidth: 120, fontWeight: 600,
-  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
+  ...tdStyle, position: "sticky", left: 40, zIndex: 10, background: bg, width: 140, minWidth: 140, fontWeight: 600,
+  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--ink)",
 });
 const cellEmail = (bg: string): React.CSSProperties => ({
-  ...tdStyle, position: "sticky", left: 160, zIndex: 10, background: bg, width: 160, minWidth: 160, color: "var(--text-muted)", fontSize: 12,
+  ...tdStyle, position: "sticky", left: 180, zIndex: 10, background: bg, width: 180, minWidth: 180, color: "var(--ink-2)", fontSize: 12,
   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
 });
 const cellAddr = (bg: string): React.CSSProperties => ({
-  ...tdStyle, position: "sticky", left: 320, zIndex: 10, background: bg, width: 180, minWidth: 180, color: "var(--text-muted)", fontSize: 12, borderRight: "2px solid var(--border)",
+  ...tdStyle, position: "sticky", left: 360, zIndex: 10, background: bg, width: 160, minWidth: 160, color: "var(--ink-2)", fontSize: 12, borderRight: "2px solid var(--line)",
   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
 });
 

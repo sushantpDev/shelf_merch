@@ -1,8 +1,10 @@
 import { useReducer, type Dispatch } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+import { useInvalidateWorkspace } from "@/hooks/useWorkspace";
 import { bannerConfigFromSource } from "../banner";
 import { useCreateShop } from "../model";
+import { markShopCelebration } from "../shopCelebration";
 import {
   INITIAL_SHOP_DRAFT,
   shopDraftReducer,
@@ -27,6 +29,7 @@ export type CreateShopVm = {
 export function useCreateShopController(): CreateShopVm {
   const navigate = useNavigate();
   const createShop = useCreateShop();
+  const invalidateWorkspace = useInvalidateWorkspace();
   const [draft, dispatch] = useReducer(shopDraftReducer, INITIAL_SHOP_DRAFT);
 
   function onNext() {
@@ -69,8 +72,15 @@ export function useCreateShopController(): CreateShopVm {
           bannerPreset: draft.bannerPreset,
         }),
       });
-      toast.success(`"${shop.name}" shop published successfully!`);
-      navigate(`/app/shops/${shop.id}`);
+
+      markShopCelebration({ shopId: shop.id, shopName: shop.name });
+      toast.success("Success!", {
+        description: `"${shop.name}" shop published successfully!`,
+      });
+
+      // Ensure the new shop is in the workspace cache before opening detail.
+      await invalidateWorkspace();
+      navigate(`/app/shops/${shop.id}?welcome=1`, { replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to publish shop");
     }

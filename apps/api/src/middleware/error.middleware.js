@@ -16,6 +16,13 @@ export function errorHandler(err, req, res, _next) {
   if (err?.name === 'CastError') {
     return res.status(400).json({ error: { code: 'INVALID_ID', message: 'Malformed id' } });
   }
+  // Multer upload errors (file too large, too many files, unexpected field).
+  if (err?.name === 'MulterError') {
+    const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    const message =
+      err.code === 'LIMIT_FILE_SIZE' ? 'Uploaded file is too large' : `Upload error: ${err.message}`;
+    return res.status(status).json({ error: { code: err.code ?? 'UPLOAD_ERROR', message } });
+  }
   if (err?.code === 11000) {
     return res.status(409).json({
       error: { code: 'DUPLICATE', message: 'A record with this value already exists' },

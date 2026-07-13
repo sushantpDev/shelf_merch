@@ -73,7 +73,7 @@ export function ShopCard({ shop, fallbackUser }: { shop: UiShop; fallbackUser: s
             aria-label={`Open ${shop.name}`}
             style={{ display: "block", color: "inherit", textDecoration: "none" }}
           >
-            <ShopBanner source={shop} height={168} layout="center" logoSize={58} />
+            <ShopBanner source={shop} aspect="3 / 1" layout="center" logoSize={48} />
           </Link>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

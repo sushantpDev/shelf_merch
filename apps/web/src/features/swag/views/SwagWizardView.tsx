@@ -38,22 +38,26 @@ export function SwagWizardView(vm: SwagWizardVm) {
         onExit={vm.onExit}
         exitLabel="Back to my swag"
         footer={
-          <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+          <>
             <button
               type="button"
               className="lnk"
               style={{ background: "none", border: "none", cursor: "pointer" }}
               onClick={vm.onExit}
             >
-              Back to my swag
+              Cancel
             </button>
-            <button type="button" className="btn btn-dark" onClick={vm.onSubmitName}>
+            <button type="button" className="btn btn-brand" onClick={vm.onSubmitName}>
               Next
             </button>
-          </div>
+          </>
         }
       >
-        <NameStep name={draft.name} onChange={(name) => dispatch({ type: "setName", name })} />
+        <NameStep
+          name={draft.name}
+          shopName={vm.shopName}
+          onChange={(name) => dispatch({ type: "setName", name })}
+        />
       </WizardChrome>
     );
   }
@@ -84,7 +88,7 @@ export function SwagWizardView(vm: SwagWizardVm) {
               {backLink("Back", 0)}
               <button
                 type="button"
-                className="btn btn-dark"
+                className="btn btn-brand"
                 disabled={!draft.picked.length}
                 onClick={() => vm.onStep(2)}
               >
@@ -109,15 +113,9 @@ export function SwagWizardView(vm: SwagWizardVm) {
       steps={STEPS}
       activeIndex={2}
       onExit={vm.onExit}
+      exitLabel="Back to my swag"
       footer={
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            width: "100%",
-          }}
-        >
+        <>
           <div className="row" style={{ gap: 12, alignItems: "center" }}>
             <b style={{ fontSize: 15 }}>{draft.name}</b>
             <span className="tag tag-soft" style={{ fontWeight: 700 }}>
@@ -135,13 +133,15 @@ export function SwagWizardView(vm: SwagWizardVm) {
               Generate designs
             </button>
           </div>
-        </div>
+        </>
       }
     >
       <ArtworkStep
         products={vm.pickedProducts}
+        previousUploads={vm.previousUploads}
         art={draft.art}
         placements={draft.placements}
+        placementEpoch={draft.placementEpoch}
         onSetArt={(art) => dispatch({ type: "setArt", art })}
         onClearArt={() => dispatch({ type: "clearArt" })}
         onResetPlacements={() => dispatch({ type: "resetPlacements" })}

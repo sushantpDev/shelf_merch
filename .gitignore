@@ -24,3 +24,6 @@ Thumbs.db
 
 # Test artifacts
 coverage/
+
+# Local file-storage uploads (runtime/test artifacts)
+apps/api/uploads/

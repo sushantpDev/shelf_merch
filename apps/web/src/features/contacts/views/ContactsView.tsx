@@ -4,11 +4,18 @@ import {
   ChevronDown,
   HelpCircle,
   MoreHorizontal,
-  Plus,
   Search,
   SquareArrowOutUpRight,
+  Upload,
+  UserPlus,
 } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ContactFormDialog } from "../ContactFormDialog";
 import { ROLES } from "../types";
 import type { UiContact } from "../model";
@@ -104,19 +111,21 @@ export function ContactsView(vm: ContactsVm) {
                 <HelpCircle size={15} />
               </button>
             </div>
-            {vm.canManageContacts ? (
-              <button type="button" className="btn btn-dark contacts-add-btn" onClick={vm.onAddOpen}>
-                <Plus size={16} /> Add contacts
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="contacts-more-btn"
-              aria-label="More actions"
-              onClick={vm.onMoreActions}
-            >
-              <MoreHorizontal size={18} />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="contacts-more-btn" aria-label="More actions">
+                  <MoreHorizontal size={18} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="contacts-more-menu">
+                <DropdownMenuItem onSelect={() => vm.onAddOpen("manual")}>
+                  <UserPlus size={15} /> Add contacts
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => vm.onAddOpen("csv")}>
+                  <Upload size={15} /> Import
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -331,7 +340,8 @@ export function ContactsView(vm: ContactsVm) {
         open={vm.adding}
         onOpenChange={vm.onAddOpenChange}
         mode="add"
-        canImportContacts={vm.canManageContacts}
+        canImportContacts
+        initialTab={vm.addInitialTab}
       />
       <ContactFormDialog
         open={vm.editing !== null}

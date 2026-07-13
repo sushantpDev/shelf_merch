@@ -405,8 +405,13 @@ describe('redemption portal (§11.1)', () => {
     expect(track.body.status).toBe('created');
 
     expect(await Order.countDocuments({ tenantId: tenant._id })).toBe(1);
+    // Pooled points: the redemption stays open ('verified') so the recipient
+    // can keep ordering against remaining credit; submit reports what's left.
     const updated = await Recipient.findOne({ _id: recipient._id, tenantId: tenant._id });
-    expect(updated.redemptionStatus).toBe('order_created');
+    expect(updated.redemptionStatus).toBe('verified');
+    expect(typeof submit.body.remainingCredit).toBe('number');
+    expect(submit.body.remainingCredit).toBeLessThanOrEqual(4000);
+    expect(submit.body.remainingCredit).toBeGreaterThanOrEqual(0);
   });
 
   it('aggregates open point credits across multiple sends to the same employee', async () => {
@@ -843,7 +848,10 @@ describe('redemption portal (§11.1)', () => {
       .get(`/api/v1/redemptions/${token}/catalog`)
       .set('Authorization', `Bearer ${sessionToken}`);
     expect(catalog.status).toBe(200);
-    const ids = catalog.body.products.map((p) => p._id);
+    // Branded shop listings are one row per collection×product design; the raw
+    // catalog id is exposed as `catalogProductId` (the `_id` is a composite
+    // `collectionId:catalogProductId`).
+    const ids = catalog.body.products.map((p) => p.catalogProductId);
     expect(ids).toContain(String(product._id));
     expect(ids).not.toContain(String(offShelf._id));
     expect(catalog.body.products).toHaveLength(1);

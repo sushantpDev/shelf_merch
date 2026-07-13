@@ -3,14 +3,15 @@ import { type StoreShop } from "../StoreBanner";
 import { resolveColorHex } from "@/lib/colorMap";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { shopBannerPresetLabel, shopHeroBannerUrl } from "@/lib/shop-banners";
-import {
-  DesignedProductThumb,
+import { DesignedProductThumb,
   storeProductAsUi,
 } from "@/features/swag/DesignedProductThumb";
+import { ShelfMerchLogo } from "@/components/brand/ShelfMerchLogo";
 import { POINT_VALUE } from "@/features/send/money";
 import { createRedemptionRazorpayOrder } from "@/services/api-bridge";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 import walletIconImg from "../../../assets/wallet-icon.svg";
+import emptyBagImg from "../../../assets/empty-bag.svg";
 import { StoreAccountMenu, type StoreOrderItem, type StoreOrderSummary } from "./StoreAccountMenu";
 import { StoreEmptyState } from "./StoreEmptyState";
 import { StorePageShell } from "./StorePageShell";
@@ -258,17 +259,6 @@ function storeProductThumb(p: StoreProduct) {
 }
 
 /* ─── SVG Icons (inline for zero dependencies) ─── */
-function ShelfMerchLogo() {
-  return (
-    <svg viewBox="0 0 32 32" fill="none">
-      <path d="M16 2L4 8v16l12 6 12-6V8L16 2z" fill="currentColor" opacity=".15" />
-      <path d="M16 2L4 8v16l12 6 12-6V8L16 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
-      <path d="M4 8l12 6 12-6M16 14v16" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      <circle cx="16" cy="14" r="3" fill="currentColor" opacity=".3" />
-    </svg>
-  );
-}
-
 function PointsIcon() {
   return (
     <svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" style={{ flex: "none" }}>
@@ -1029,13 +1019,9 @@ export default function StoreShell({
 
               <span className="sf-topbar-vrule" aria-hidden="true" />
 
-              <div className="sf-powered-by" aria-label="Powered by ShelfMerch">
+              <div className="sf-powered-by" aria-label="Powered by Shelf Merch">
                 <span className="sf-powered-by-label">Powered by</span>
-                <img
-                  src="/images/logo/shelfmerch-logo-dark.svg"
-                  alt="ShelfMerch"
-                  className="sf-powered-by-logo"
-                />
+                <ShelfMerchLogo height={22} className="sf-powered-by-logo" />
               </div>
             </div>
 
@@ -1253,11 +1239,17 @@ export default function StoreShell({
                 ) : null}
               </>
             ) : (
-              <StoreEmptyState
-                variant="search"
-                title="No products yet"
-                description="Your reward catalog will appear here once products are added to this shop."
-              />
+              <div className="sf-no-products">
+                <img
+                  src={emptyBagImg}
+                  alt=""
+                  className="sf-no-products-icon"
+                  width={119}
+                  height={104}
+                  aria-hidden="true"
+                />
+                <p className="sf-no-products-title">No products yet</p>
+              </div>
             )}
           </div>
         </>
@@ -1878,9 +1870,11 @@ export default function StoreShell({
       {page !== "orders" && page !== "order-detail" ? (
       <div className="sf-footer">
         <div className="sf-footer-inner">
-          <ShelfMerchLogo />
-          Powered by Shelf Merch
-          {mode === "preview" ? " · Recipients redeem from a private invite link." : ""}
+          <span className="sf-footer-powered">Powered by</span>
+          <ShelfMerchLogo height={20} className="sf-footer-logo" />
+          {mode === "preview" ? (
+            <span className="sf-footer-note"> · Recipients redeem from a private invite link.</span>
+          ) : null}
         </div>
       </div>
       ) : null}

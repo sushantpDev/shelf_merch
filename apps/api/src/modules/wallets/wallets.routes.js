@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import multer from 'multer';
+import { uploader, DOCUMENT_TYPES } from '../../middleware/upload.middleware.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { resolveTenant, requireTenantContext, blockDuringImpersonation } from '../../middleware/tenant.middleware.js';
@@ -19,7 +19,7 @@ import {
 } from './wallets.validation.js';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const upload = uploader({ allow: DOCUMENT_TYPES, maxSizeMb: 25 });
 
 router.use(authenticate, resolveTenant, requireTenantContext);
 

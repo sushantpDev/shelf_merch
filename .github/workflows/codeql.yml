@@ -1,0 +1,34 @@
+name: CodeQL
+
+# Scans the default branch on push and weekly. Pull-request scanning is
+# intentionally NOT enabled yet: enabling code scanning on an existing codebase
+# surfaces a backlog of pre-existing findings that would otherwise be attributed
+# to (and block) every open PR. Re-add a `pull_request` trigger once that
+# backlog is triaged in the Security tab so PR annotations are actionable signal.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 4 * * 1"
+
+jobs:
+  analyze:
+    name: Analyze JavaScript/TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:javascript-typescript"

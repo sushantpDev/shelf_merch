@@ -174,10 +174,17 @@ describe('catalog (§3.1)', () => {
       .set(auth(tokens.platform_catalog_admin))
       .send({ hsnCode: '6109', reason: 'Initial HSN classification' })
       .expect(200);
+    // The publish gate needs both a visible stage image (role 'base') and the
+    // transparent design/production mask (role 'mask').
     await request(app)
       .post(`/api/v1/platform/products/${product._id}/images`)
       .set(auth(tokens.platform_catalog_admin))
-      .send({ urls: ['/uploads/test/tee.png'], primary: true })
+      .send({ urls: ['/uploads/test/tee.png'], role: 'base' })
+      .expect(201);
+    await request(app)
+      .post(`/api/v1/platform/products/${product._id}/images`)
+      .set(auth(tokens.platform_catalog_admin))
+      .send({ urls: ['/uploads/test/tee-mask.png'], role: 'mask' })
       .expect(201);
 
     const published = await request(app)
@@ -209,7 +216,11 @@ describe('catalog (§3.1)', () => {
     await request(app)
       .post(`/api/v1/platform/products/${product._id}/images`)
       .set(auth(tokens.platform_catalog_admin))
-      .send({ urls: ['/uploads/test/tee.png'] });
+      .send({ urls: ['/uploads/test/tee.png'], role: 'base' });
+    await request(app)
+      .post(`/api/v1/platform/products/${product._id}/images`)
+      .set(auth(tokens.platform_catalog_admin))
+      .send({ urls: ['/uploads/test/tee-mask.png'], role: 'mask' });
     await request(app)
       .post(`/api/v1/platform/products/${product._id}/publish`)
       .set(auth(tokens.platform_catalog_admin))

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { strongPassword } from '../auth/auth.validation.js';
 
 export const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid id');
 
@@ -14,7 +15,7 @@ export const inviteUserSchema = z.object({
 
 export const acceptInviteSchema = z.object({
   token: z.string().min(1),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: strongPassword,
 });
 
 export const changeRoleSchema = z.object({

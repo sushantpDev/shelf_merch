@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
+import { accessVerifyOptions } from '../config/jwt.js';
 import { RoleAssignment } from '../modules/roles/roleAssignment.model.js';
 import { UnauthorizedError } from '../utils/errors.js';
 
@@ -14,7 +15,7 @@ export async function authenticate(req, _res, next) {
   if (!token) return next(new UnauthorizedError('Missing access token'));
 
   try {
-    const payload = jwt.verify(token, env.JWT_ACCESS_SECRET);
+    const payload = jwt.verify(token, env.JWT_ACCESS_SECRET, accessVerifyOptions());
     const user = {
       userId: payload.sub,
       tenantId: payload.tenantId ?? null,

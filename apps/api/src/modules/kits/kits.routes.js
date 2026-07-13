@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import multer from 'multer';
+import { uploader, DOCUMENT_TYPES } from '../../middleware/upload.middleware.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { resolveTenant, requireTenantContext } from '../../middleware/tenant.middleware.js';
@@ -12,7 +12,7 @@ import { uploadFile } from '../../services/storage.service.js';
 import { writeAudit } from '../../services/audit.service.js';
 import { NotFoundError } from '../../utils/errors.js';
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const upload = uploader({ allow: DOCUMENT_TYPES, maxSizeMb: 25 });
 const router = Router();
 
 router.use(authenticate, resolveTenant, requireTenantContext);

@@ -1,174 +1,165 @@
-import { Box, Lightbulb, Pencil, Store } from "lucide-react";
+import { Box, Check, Gift, Lightbulb, Pencil, Sparkles, Store, Sun, Users } from "lucide-react";
 import collectionPreview from "../../../../assets/collection-preview.png";
 
-const EXAMPLES = ["Welcome Kit", "Summer Swag", "Team Essentials"];
-
+const EXAMPLES = [
+  { label: "Welcome kit", count: 6, icon: Gift },
+  { label: "Summer swag", count: 4, icon: Sun },
+  { label: "Team essentials", count: 8, icon: Users },
+];
 const NEXT_STEPS: { icon: typeof Box; title: string; desc: string }[] = [
   {
     icon: Box,
-    title: "1. Choose products",
+    title: "Choose products",
     desc: "Select apparel, bags, drinkware, or technology items from the catalog.",
   },
   {
     icon: Pencil,
-    title: "2. Add artwork",
+    title: "Add artwork",
     desc: "Position your logo and design elements directly on items in real-time.",
   },
   {
     icon: Store,
-    title: "3. Publish collection",
+    title: "Publish collection",
     desc: "Make it live instantly in your department or corporate merchandise store.",
   },
 ];
 
-export function NameStep({ name, onChange }: { name: string; onChange: (name: string) => void }) {
+export function NameStep({
+  name,
+  onChange,
+  shopName,
+}: {
+  name: string;
+  onChange: (name: string) => void;
+  shopName?: string;
+}) {
+  const trimmed = name.trim();
+  const looksGood = trimmed.length > 0;
+
   return (
     <div className="sw-name-layout">
-      <div className="sw-form-card">
-        <div className="sw-eyebrow-badge">Step 1 of 3 · Setup</div>
-        <h1
-          style={{
-            fontSize: 28,
-            margin: "10px 0",
-            fontFamily: "var(--disp)",
-            letterSpacing: "-.03em",
-          }}
-        >
-          Name your collection
-        </h1>
-        <p
-          className="muted"
-          style={{ marginBottom: 24, maxWidth: "48ch", lineHeight: 1.6, fontSize: 14 }}
-        >
-          Create a collection for your brand store. Give it a clear name so employees or customers
-          can easily recognize it.
-        </p>
+      <div className="card sw-name-main-card">
+        <header className="sw-name-header">
+          <div className="sw-name-title-row">
+            <h1>Name your collection</h1>
+            <span className="tag tag-ready">Step 1 of 3</span>
+          </div>
+          <p className="muted sw-name-lead">
+            Create a collection for your brand store. Give it a clear name so employees or
+            customers can easily recognize it.
+          </p>
+          {shopName ? (
+            <p className="muted sw-name-shop">
+              Creating for <b>{shopName}</b>
+            </p>
+          ) : null}
+        </header>
 
-        <div className="field" style={{ marginBottom: 20 }}>
-          <label className="lbl" htmlFor="sw-name" style={{ fontWeight: 700, marginBottom: 8 }}>
-            Collection name
-          </label>
-          <input
-            id="sw-name"
-            className="inp"
-            value={name}
-            maxLength={32}
-            autoFocus
-            placeholder="e.g. Welcome Kit"
-            onChange={(e) => onChange(e.target.value)}
-          />
-          <div
-            className="row"
-            style={{ justifyContent: "space-between", marginTop: 8, fontSize: 12, gap: 8 }}
-          >
-            <span className="mut3">{name.trim() ? "Looks good" : "Enter a collection name"}</span>
-            <span className="mut3">{name.length}/32</span>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 28 }}>
-          <div
-            className="mut3"
-            style={{
-              fontSize: 12,
-              marginBottom: 10,
-              fontWeight: 600,
-              letterSpacing: ".03em",
-              textTransform: "uppercase",
-            }}
-          >
-            Suggestions
-          </div>
-          <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-            {EXAMPLES.map((ex) => (
-              <button key={ex} type="button" className="sw-name-chip" onClick={() => onChange(ex)}>
-                {ex}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="sw-name-tips">
-          <div
-            className="row"
-            style={{
-              gap: 10,
-              alignItems: "center",
-              fontWeight: 700,
-              fontSize: 13.5,
-              marginBottom: 10,
-              color: "var(--brand-700)",
-            }}
-          >
-            <Lightbulb size={18} /> Naming Best Practices
-          </div>
-          <ul className="sw-name-tips-list">
-            <li>Use your campaign name, seasonal event, or department name</li>
-            <li>Keep it short, clear, and recognizable for recipients</li>
-            <li>Don&apos;t worry — you can easily change this name later</li>
-          </ul>
-        </div>
-      </div>
-
-      <div className="sw-name-aside">
-        <div className="sw-name-preview-card">
-          <div
-            style={{
-              fontWeight: 700,
-              fontSize: 14,
-              marginBottom: 14,
-              color: "var(--ink-2)",
-              letterSpacing: ".03em",
-              textTransform: "uppercase",
-            }}
-          >
-            Collection Preview
-          </div>
-          <div className="sw-name-preview-imgwrap">
-            <img src={collectionPreview} alt="Collection merchandise preview" />
-            <div className="sw-name-preview-float">
-              <div className="sw-name-preview-icon">
-                <Store size={18} />
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div className="sw-name-preview-label">{name || "New Collection"}</div>
-              </div>
+        <div className="sw-name-body">
+          <div className="field sw-name-field">
+            <label className="lbl" htmlFor="sw-name">
+              Collection name
+            </label>
+            <div className="sw-name-input-container">
+              <input
+                id="sw-name"
+                className="inp"
+                value={name}
+                maxLength={32}
+                autoFocus
+                placeholder="e.g. Welcome Kit"
+                onChange={(e) => onChange(e.target.value)}
+              />
+            </div>
+            <div className="row sw-name-field-meta">
+              <span className={looksGood ? "sw-name-ok" : "mut3"}>
+                {looksGood ? "Looks good" : "Enter a collection name"}
+              </span>
+              <span className="mut3">{name.length}/32</span>
             </div>
           </div>
+
+          <div className="sw-name-suggest-block">
+            <div className="sw-name-suggest-head">
+              <div className="sw-name-suggest-intro">
+                <span className="sw-name-suggest-badge">
+                  <Sparkles size={14} />
+                </span>
+                <div>
+                  <div className="sw-name-suggest-label">Quick picks</div>
+                </div>
+              </div>
+              <span className="mut3 sw-name-suggest-hint">Click a card to use</span>
+            </div>
+            <div className="sw-name-pick-grid">
+              {EXAMPLES.map((ex) => {
+                const selected = name === ex.label;
+                const Icon = ex.icon;
+                return (
+                  <button
+                    key={ex.label}
+                    type="button"
+                    className={`sw-name-pick-card${selected ? " on" : ""}`}
+                    onClick={() => onChange(ex.label)}
+                  >
+                    {selected ? (
+                      <span className="sw-name-pick-check">
+                        <Check size={12} strokeWidth={3} />
+                      </span>
+                    ) : null}
+                    <span className="sw-name-pick-icon">
+                      <Icon size={15} strokeWidth={2} />
+                    </span>
+                    <span className="sw-name-pick-copy">
+                      <span className="sw-name-pick-title">{ex.label}</span>
+                      <span className="sw-name-pick-count">{ex.count} items</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="sw-name-tips">
+            <div className="row sw-name-tips-head">
+              <Lightbulb size={15} /> Naming best practices
+            </div>
+            <ul className="sw-name-tips-list">
+              <li>Use your campaign name, seasonal event, or department name</li>
+              <li>Keep it short, clear, and recognizable for recipients</li>
+              <li>Don&apos;t worry, you can easily change this name later</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <aside className="sw-name-aside">
+        <div className="card sw-name-preview-card">
+          <div className="lbl sw-name-aside-label">Collection preview</div>
+          <div className="sw-name-preview-imgwrap">
+            <img src={collectionPreview} alt="Branded merchandise preview" />
+          </div>
         </div>
 
-        <div className="sw-name-next-card">
-          <div
-            style={{
-              fontWeight: 700,
-              fontSize: 14,
-              marginBottom: 18,
-              color: "var(--ink-2)",
-              letterSpacing: ".03em",
-              textTransform: "uppercase",
-            }}
-          >
-            Next Steps
-          </div>
+        <div className="card sw-name-next-card">
+          <div className="lbl sw-name-aside-label">Next steps</div>
           <div className="sw-name-next-steps">
-            {NEXT_STEPS.map((step) => (
+            {NEXT_STEPS.map((step, i) => (
               <div key={step.title} className="sw-name-next-step">
                 <div className="sw-name-next-icon">
-                  <step.icon size={18} />
+                  <step.icon size={15} />
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--ink)" }}>
-                    {step.title}
+                  <div className="sw-name-next-title">
+                    {i + 1}. {step.title}
                   </div>
-                  <div className="mut3" style={{ fontSize: 12, marginTop: 3, lineHeight: 1.4 }}>
-                    {step.desc}
-                  </div>
+                  <div className="mut3 sw-name-next-desc">{step.desc}</div>
                 </div>
               </div>
             ))}
           </div>
         </div>
-      </div>
+      </aside>
     </div>
   );
 }

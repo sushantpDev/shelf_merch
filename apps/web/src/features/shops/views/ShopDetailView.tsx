@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { ArrowLeft, Coins } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { ShopBanner } from "../banner";
+import { ShopWelcomeDialog } from "../ShopWelcomeDialog";
 import { BrandedSwagTab } from "../tabs/BrandedSwagTab";
 import { ShopCatalogTab } from "../tabs/ShopCatalogTab";
 import { SentGiftsTab } from "../tabs/SentGiftsTab";
@@ -12,32 +13,53 @@ import type { ShopDetailVm } from "../controllers/useShopDetailController";
 
 /** Shop detail page: banner header, tab bar, and the active tab's content. */
 export function ShopDetailView(vm: ShopDetailVm) {
+  const welcome = (
+    <ShopWelcomeDialog
+      open={vm.showWelcome}
+      shopName={vm.welcomeShopName}
+      onDone={vm.onDismissWelcome}
+    />
+  );
+
   if (vm.isLoading) {
-    return <LoadingState message="Loading shop…" fullScreen={false} />;
+    return (
+      <>
+        {welcome}
+        <LoadingState message="Loading shop…" fullScreen={false} />
+      </>
+    );
   }
   if (vm.errorMessage) {
     return (
-      <div className="card" style={{ padding: 16, color: "var(--danger)" }}>
-        {vm.errorMessage}
-      </div>
+      <>
+        {welcome}
+        <div className="card" style={{ padding: 16, color: "var(--danger)" }}>
+          {vm.errorMessage}
+        </div>
+      </>
     );
   }
 
   const { shop } = vm;
   if (!shop) {
     return (
-      <div className="card empty" style={{ padding: 48 }}>
-        <h3>Shop not found</h3>
-        <p>This shop may have been removed.</p>
-        <Link to="/app/shops" className="btn btn-soft" style={{ marginTop: 14 }}>
-          Back to shops
-        </Link>
-      </div>
+      <>
+        {welcome}
+        <div className="card empty" style={{ padding: 48 }}>
+          <h3>Shop not found</h3>
+          <p>This shop may have been removed.</p>
+          <Link to="/app/shops" className="btn btn-soft" style={{ marginTop: 14 }}>
+            Back to shops
+          </Link>
+        </div>
+      </>
     );
   }
 
   return (
     <>
+      {welcome}
+
       <Link
         to="/app/shops"
         className="lnk"
@@ -46,13 +68,13 @@ export function ShopDetailView(vm: ShopDetailVm) {
         <ArrowLeft size={15} /> Back to shops
       </Link>
 
-      <div className="row" style={{ alignItems: "center", gap: 16, marginBottom: 18 }}>
-        <div style={{ width: 160, flex: "none" }}>
-          <ShopBanner source={shop} height={84} layout="center" logoSize={46} radius={10} />
+      <div className="shop-detail-head">
+        <div className="shop-detail-banner">
+          <ShopBanner source={shop} aspect="3 / 1" layout="center" logoSize={40} radius={10} />
         </div>
-        <div style={{ flex: 1 }}>
-          <h1 style={{ fontSize: 26 }}>{shop.name}</h1>
-          <div style={{ marginTop: 6 }}>
+        <div className="shop-detail-head-info">
+          <h1 className="shop-detail-head-title">{shop.name}</h1>
+          <div className="shop-detail-head-meta">
             {shop.live ? (
               <>
                 <span className="tag tag-live">
@@ -63,7 +85,6 @@ export function ShopDetailView(vm: ShopDetailVm) {
                   type="button"
                   className="lnk"
                   style={{
-                    marginLeft: 8,
                     background: "none",
                     border: "none",
                     cursor: "pointer",
@@ -74,14 +95,14 @@ export function ShopDetailView(vm: ShopDetailVm) {
                 </button>
               </>
             ) : (
-              <span className="mut3" style={{ marginLeft: 8, fontSize: 13 }}>
+              <span className="mut3" style={{ fontSize: 13 }}>
                 Publish to view shop
               </span>
             )}
           </div>
         </div>
         {vm.canSendPoints ? (
-          <button type="button" className="btn btn-brand" onClick={() => vm.onSendPoints()}>
+          <button type="button" className="btn btn-brand shop-detail-head-action" onClick={() => vm.onSendPoints()}>
             <Coins size={16} /> Send points
           </button>
         ) : null}

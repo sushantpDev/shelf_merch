@@ -28,6 +28,13 @@ const envSchema = z.object({
   /** Bind address — use 0.0.0.0 in production so the VPS IP is reachable. */
   HOST: z.string().default(isProd ? '0.0.0.0' : '0.0.0.0'),
   PORT: z.coerce.number().int().positive().default(isProd ? 8080 : 4000),
+  /**
+   * Number of trusted reverse-proxy hops in front of the app (Express `trust
+   * proxy`). Behind the HAProxy LB = 1; behind Cloudflare → HAProxy = 2. Only
+   * trusted hops may set `X-Forwarded-For`, so this must match the real topology
+   * or per-IP rate limits can be spoofed.
+   */
+  TRUST_PROXY: z.coerce.number().int().min(0).default(1),
 
   MONGODB_URI: mongoUriSchema,
   REDIS_URL: z.string().default('redis://localhost:6379'),
@@ -65,8 +72,21 @@ const envSchema = z.object({
   EMAIL_PASSWORD: z.string().optional().default(''),
   EMAIL_FROM: z.string().optional().default(''),
   APP_URL: z.string().optional().default('http://localhost:8080'),
-  /** Comma-separated allowed CORS origins in production (e.g. http://72.62.76.198:8080). Empty = allow all. */
+  /**
+   * Comma-separated allowed CORS origins in production (e.g. http://72.62.76.198:8080).
+   * Empty no longer means "allow all" — cross-origin requests are refused unless the
+   * Origin is listed or matches the request Host (see resolveCorsOptions).
+   */
   CORS_ORIGINS: z.string().optional().default(''),
+
+  /**
+   * Content-Security-Policy mode for the production SPA + API:
+   *   report-only (default) — send CSP as report-only so a misconfigured policy
+   *     can't break the app; validate in staging, then switch to enforce.
+   *   enforce — send an enforcing Content-Security-Policy.
+   *   off — no CSP header (not recommended).
+   */
+  CSP_MODE: z.enum(['enforce', 'report-only', 'off']).default('report-only'),
   GOOGLE_CLIENT_ID: z.string().optional().default(''),
   GOOGLE_CLIENT_SECRET: z.string().optional().default(''),
   GOOGLE_CALLBACK_URL: z.string().optional().default(''),

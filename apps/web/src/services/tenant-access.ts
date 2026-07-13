@@ -28,7 +28,7 @@ const MATRIX: Record<TenantArea, { write: string[]; read: string[] }> = {
   swag: { read: BOTH, write: [COMPANY_ADMIN] },
   kits: { read: BOTH, write: [COMPANY_ADMIN] },
   campaigns: { read: BOTH, write: BOTH },
-  campaignOps: { read: BOTH, write: BOTH },
+  campaignOps: { read: BOTH, write: [ENTITY_MANAGER] },
   contacts: { read: BOTH, write: [ENTITY_MANAGER] },
   settings: { read: BOTH, write: [COMPANY_ADMIN] },
   catalog: { read: BOTH, write: [] },

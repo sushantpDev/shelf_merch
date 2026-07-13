@@ -1,0 +1,76 @@
+# Docker Swarm stack — replaces the single-instance PM2 setup (ecosystem.config.cjs).
+#
+#   # once per fleet, on the manager VPS:
+#   docker swarm init --advertise-addr <manager-ip>
+#   docker swarm join-token worker           # run the printed command on VPS-B/C
+#
+#   # build + ship the image (from repo root), then deploy:
+#   docker build -f apps/api/Dockerfile -t shelfmerch/api:latest .
+#   docker stack deploy -c deploy/docker-stack.yml shelfmerch
+#
+# MongoDB Atlas + managed Redis are external (set in .env / Docker secrets) — the
+# only stateful tiers, deliberately kept off the app VPSs.
+version: "3.9"
+
+services:
+  api:
+    image: shelfmerch/api:latest
+    command: ["node", "src/server.js"]
+    env_file:
+      - ../.env            # prefer `docker secret` for JWT/Mongo/Redis creds in prod
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "8080"
+      TRUST_PROXY: "1"     # requests arrive via the HAProxy LB
+    networks:
+      - edge
+    ports:
+      # Published on the Swarm routing mesh so the external HAProxy can reach any
+      # node. Firewall this port to the LB hosts only (never the public internet).
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: ingress
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+      update_config:
+        parallelism: 1
+        order: start-first   # zero-downtime rolling deploys
+        delay: 10s
+        failure_action: rollback
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8080/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    stop_grace_period: 30s   # drain in-flight requests on SIGTERM
+
+  worker:
+    image: shelfmerch/api:latest
+    command: ["node", "src/jobs/index.js"]
+    env_file:
+      - ../.env
+    environment:
+      NODE_ENV: production
+    networks:
+      - edge
+    deploy:
+      replicas: 2            # scale on queue depth
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+    stop_grace_period: 30s
+
+networks:
+  edge:
+    driver: overlay
+    attachable: true

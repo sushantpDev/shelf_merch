@@ -70,6 +70,10 @@
   opacity:.6;
   cursor:not-allowed;
 }
+.auth-simple-google__icon{
+  display:block;
+  flex-shrink:0;
+}
 .auth-simple-divider{
   display:flex;
   align-items:center;

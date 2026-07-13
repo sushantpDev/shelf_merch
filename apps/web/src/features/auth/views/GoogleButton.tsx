@@ -13,7 +13,14 @@ export function GoogleButton({ label, disabled, onClick }: GoogleButtonProps) {
       disabled={disabled}
       aria-label={label}
     >
-      <img src="/images/logos/google.svg" alt="" width={20} height={20} aria-hidden />
+      <img
+        src="/images/logos/google-g.svg"
+        alt=""
+        width={18}
+        height={18}
+        className="auth-simple-google__icon"
+        aria-hidden
+      />
       <span>{label}</span>
     </button>
   );

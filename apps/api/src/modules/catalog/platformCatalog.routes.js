@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import multer from 'multer';
+import { uploader, IMAGE_TYPES } from '../../middleware/upload.middleware.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { resolveTenant } from '../../middleware/tenant.middleware.js';
@@ -15,7 +15,7 @@ import * as catalogService from './platformCatalog.service.js';
 import * as inventoryService from './inventory.service.js';
 import { importFromShopify } from './shopifyImport.service.js';
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const upload = uploader({ allow: IMAGE_TYPES, maxSizeMb: 25, files: 8 });
 
 const idParam = z.object({ id: objectId });
 

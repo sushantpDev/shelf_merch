@@ -7,8 +7,7 @@ import {
   logout,
 } from "@/services/api-bridge";
 import { navItemsForRole } from "@/services/platform-access";
-
-const LOGO = `<svg viewBox="0 0 32 32" fill="none"><path d="M16 3 4 9l12 6 12-6-12-6Z" fill="#3D5FD9"/><path d="M4 15l12 6 12-6" stroke="#2B4E8F" stroke-width="2.4" stroke-linejoin="round"/><path d="M4 21l12 6 12-6" stroke="#F4741F" stroke-width="2.4" stroke-linejoin="round"/></svg>`;
+import { ShelfMerchLogo } from "@/components/brand/ShelfMerchLogo";
 
 export default function PlatformLayout() {
   const user = getStoredUser();
@@ -33,11 +32,8 @@ export default function PlatformLayout() {
     <div id="app" style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
       <header className="topbar">
         <div className="brandmark">
-          <span dangerouslySetInnerHTML={{ __html: LOGO }} />
+          <ShelfMerchLogo height={32} />
           <div>
-            <div className="k" style={{ fontSize: 10, letterSpacing: ".12em", color: "var(--ink-3)" }}>
-              SHELF MERCH
-            </div>
             <div className="v" style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 16 }}>
               Control Plane
             </div>

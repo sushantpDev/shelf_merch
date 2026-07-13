@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env.js';
+import { accessSignOptions } from '../../config/jwt.js';
 import { sendPasswordResetEmail } from '../../services/email.service.js';
 import mongoose from 'mongoose';
 import { User } from '../users/user.model.js';
@@ -20,6 +21,19 @@ import { ApiError, ConflictError, UnauthorizedError } from '../../utils/errors.j
 
 const BCRYPT_ROUNDS = 12;
 const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+// §security hardening B2 — lock an account after this many consecutive failures.
+const MAX_FAILED_LOGINS = 10;
+const LOCKOUT_MS = 15 * 60 * 1000;
+
+async function registerFailedLogin(user) {
+  const failed = (user.failedLoginCount ?? 0) + 1;
+  const update = { failedLoginCount: failed };
+  if (failed >= MAX_FAILED_LOGINS) {
+    update.lockedUntil = new Date(Date.now() + LOCKOUT_MS);
+    update.failedLoginCount = 0;
+  }
+  await User.updateOne({ _id: user._id }, update);
+}
 
 export const hashPassword = (plain) => bcrypt.hash(plain, BCRYPT_ROUNDS);
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
@@ -34,7 +48,11 @@ export function signAccessToken(user, roleAssignment, impersonation = null, { ex
     assignedEntityIds: (roleAssignment.assignedEntityIds ?? []).map(String),
     ...(impersonation ? { impersonation } : {}),
   };
-  return jwt.sign(payload, env.JWT_ACCESS_SECRET, { expiresIn: expiresIn ?? env.JWT_ACCESS_TTL });
+  return jwt.sign(
+    payload,
+    env.JWT_ACCESS_SECRET,
+    accessSignOptions({ expiresIn: expiresIn ?? env.JWT_ACCESS_TTL, jwtid: crypto.randomUUID() }),
+  );
 }
 
 /** Short-lived token for platform impersonation (§6.4). */
@@ -48,7 +66,11 @@ export function signImpersonationAccessToken(user, roleAssignment, impersonation
     assignedEntityIds: (roleAssignment.assignedEntityIds ?? []).map(String),
     impersonation,
   };
-  return jwt.sign(payload, env.JWT_ACCESS_SECRET, { expiresIn: '15m' });
+  return jwt.sign(
+    payload,
+    env.JWT_ACCESS_SECRET,
+    accessSignOptions({ expiresIn: '15m', jwtid: crypto.randomUUID() }),
+  );
 }
 
 export async function issueRefreshToken(userId, { ip = '', userAgent = '' } = {}) {
@@ -203,8 +225,21 @@ export async function login({ email, password, ip, userAgent }) {
     throw new ApiError(403, 'Invite not yet accepted — set your password first', 'INVITE_PENDING');
   }
 
+  if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+    const retryAfterSec = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000);
+    throw new ApiError(
+      423,
+      'Account temporarily locked due to repeated failed logins — try again later',
+      'ACCOUNT_LOCKED',
+      { retryAfterSec },
+    );
+  }
+
   const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) throw new UnauthorizedError('Invalid email or password');
+  if (!ok) {
+    await registerFailedLogin(user);
+    throw new UnauthorizedError('Invalid email or password');
+  }
 
   // §3.4 — archived tenants have logins refused.
   if (user.tenantId) {
@@ -216,6 +251,10 @@ export async function login({ email, password, ip, userAgent }) {
 
   const roleAssignment = await getPrimaryRoleAssignment(user._id);
   user.lastLoginAt = new Date();
+  if (user.failedLoginCount || user.lockedUntil) {
+    user.failedLoginCount = 0;
+    user.lockedUntil = null;
+  }
   await user.save();
 
   return {

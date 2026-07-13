@@ -15,9 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -38,9 +38,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -58,3 +58,15 @@ jobs:
 
       - name: Build
         run: npm run build -w @shelfmerch/web
+
+  docker-build:
+    name: API image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Validates apps/api/Dockerfile (multi-stage prod install + runtime) on
+      # every PR. Build only — no registry push.
+      - name: Build API image
+        run: docker build -f apps/api/Dockerfile -t shelfmerch/api:ci .

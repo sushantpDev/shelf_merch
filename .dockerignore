@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+apps/web/dist
+apps/api/uploads
+.git
+.github
+**/*.log
+npm-debug.log*
+.env
+.env.*
+!.env.example
+coverage
+**/coverage
+.DS_Store
+docs
+*.md

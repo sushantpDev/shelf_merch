@@ -67,7 +67,14 @@ export function CatalogStep({
         ))}
       </div>
 
-      {entries.length === 0 ? (
+      {catalog.length === 0 ? (
+        <div className="card empty" style={{ padding: 48 }}>
+          <h3>No catalog products yet</h3>
+          <p className="muted" style={{ marginTop: 6 }}>
+            Publish products in the catalog first, then return here to pick items for your collection.
+          </p>
+        </div>
+      ) : entries.length === 0 ? (
         <div className="card empty" style={{ padding: 48 }}>
           <h3>No products in this category</h3>
           <p className="muted" style={{ marginTop: 6 }}>

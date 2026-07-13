@@ -22,9 +22,13 @@ describe('catalogFilters', () => {
     expect(productSourceLabel(undefined)).toBe('native');
   });
 
-  it('tenant catalog only includes manual and shopify products', () => {
+  it('tenant catalog includes manual, shopify, seed, and legacy products', () => {
     expect(tenantCatalogFilter()).toEqual({
-      'source.provider': { $in: ['manual', 'shopify'] },
+      $or: [
+        { 'source.provider': { $in: ['manual', 'shopify', 'seed'] } },
+        { source: { $exists: false } },
+        { 'source.provider': { $exists: false } },
+      ],
     });
   });
 
