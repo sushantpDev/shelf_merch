@@ -94,8 +94,16 @@ const ChartTooltip = RechartsPrimitive.Tooltip;
 
 const ChartTooltipContent = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
-    React.ComponentProps<"div"> & {
+  React.ComponentProps<"div"> & {
+      // Typed explicitly (not via recharts' shifting Tooltip Props) so the
+      // component compiles across recharts minor/major bumps.
+      active?: boolean;
+      payload?: any[];
+      label?: any;
+      labelFormatter?: (label: any, payload: any[]) => React.ReactNode;
+      labelClassName?: string;
+      formatter?: (...args: any[]) => React.ReactNode;
+      color?: string;
       hideLabel?: boolean;
       hideIndicator?: boolean;
       indicator?: "line" | "dot" | "dashed";
@@ -242,8 +250,9 @@ const ChartLegend = RechartsPrimitive.Legend;
 
 const ChartLegendContent = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<"div"> &
-    Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
+  React.ComponentProps<"div"> & {
+      payload?: any[];
+      verticalAlign?: "top" | "middle" | "bottom";
       hideIcon?: boolean;
       nameKey?: string;
     }
