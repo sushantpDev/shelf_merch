@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Validates apps/api/Dockerfile (multi-stage prod install + runtime) on
       # every PR. Build only — no registry push.
