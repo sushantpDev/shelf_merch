@@ -1020,8 +1020,9 @@ export default function StoreShell({
   const workspaceLabel = shop.name.toLowerCase();
 
   const heroBannerUrl = shopHeroBannerUrl(shop) || "/images/hero-banner.png";
-  const heroBannerLabel =
-    shopBannerPresetLabel(shop.bannerPreset) || "Feliz Dia de los Muertos";
+  const heroBannerLabel = shop.bannerImageUrl
+    ? `${shop.name} banner`
+    : shopBannerPresetLabel(shop.bannerPreset) || "Feliz Dia de los Muertos";
 
   /* ─── RENDER ─── */
   return (

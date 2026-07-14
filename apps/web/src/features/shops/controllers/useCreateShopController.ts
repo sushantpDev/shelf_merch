@@ -70,6 +70,7 @@ export function useCreateShopController(): CreateShopVm {
         bannerConfig: bannerConfigFromSource({
           bannerTheme: draft.bannerTheme,
           bannerPreset: draft.bannerPreset,
+          bannerImageUrl: draft.bannerImageUrl,
         }),
       });
 

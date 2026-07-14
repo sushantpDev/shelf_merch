@@ -30,7 +30,7 @@ export function BrandedSwagTab({
 
   const subItems: [Sub, number | ""][] = [
     ["Saved Designs", active.length],
-    ["Locker Inventory", ""],
+    // ["Locker Inventory", ""],
     ["Archived", archived.length],
   ];
 
@@ -79,7 +79,7 @@ export function BrandedSwagTab({
             </div>
           ))}
 
-        {sub === "Locker Inventory" && (
+        {/* {sub === "Locker Inventory" && (
           <div className="card" style={{ padding: 22 }}>
             <h3 style={{ fontSize: 17, marginBottom: 14 }}>Locker inventory</h3>
             <table className="tbl">
@@ -113,7 +113,7 @@ export function BrandedSwagTab({
               </tbody>
             </table>
           </div>
-        )}
+        )} */}
 
         {sub === "Archived" &&
           (archived.length === 0 ? (

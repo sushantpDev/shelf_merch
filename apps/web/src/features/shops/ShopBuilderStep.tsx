@@ -6,8 +6,10 @@ import {
   BANNER_THEMES,
   SHOP_BANNER_PRESETS,
   bannerBackgroundStyle,
+  bannerDisplayUrl,
   type BannerSource,
 } from "./banner";
+import { BannerCustomUpload } from "./BannerCustomUpload";
 import type { ShopDraft, ShopDraftAction } from "./shopDraft";
 import { BUILDER_CATEGORIES } from "./types";
 
@@ -28,11 +30,13 @@ export function ShopBuilderStep({
   const source: BannerSource = {
     bannerTheme: draft.bannerTheme,
     bannerPreset: draft.bannerPreset,
+    bannerImageUrl: draft.bannerImageUrl,
     logoUrl: draft.logoUrl,
   };
   const theme = BANNER_THEMES[draft.bannerTheme] || BANNER_THEMES.light;
-  const hasPreset = Boolean(draft.bannerPreset);
-  const isEmptyBanner = !hasPreset && !draft.logoUrl;
+  const imageUrl = bannerDisplayUrl(source);
+  const hasImage = Boolean(imageUrl);
+  const isEmptyBanner = !hasImage && !draft.logoUrl;
 
   return (
     <FullscreenOverlay style={{ background: "var(--bg)" }}>
@@ -73,14 +77,10 @@ export function ShopBuilderStep({
 
       <div className="scroll" style={{ flex: 1 }}>
         <div
-          className={`shop-builder-banner${hasPreset || isEmptyBanner ? " has-preset" : ""}${isEmptyBanner ? " is-empty" : ""}`}
+          className={`shop-builder-banner${hasImage || isEmptyBanner ? " has-preset" : ""}${isEmptyBanner ? " is-empty" : ""}`}
         >
-          {hasPreset ? (
-            <img
-              src={`/shop-banners/${draft.bannerPreset}.png`}
-              alt=""
-              className="shop-builder-banner-img"
-            />
+          {hasImage ? (
+            <img src={imageUrl} alt="" className="shop-builder-banner-img" />
           ) : isEmptyBanner ? (
             <img
               src="/shop-banners/default-welcome.png"
@@ -97,12 +97,12 @@ export function ShopBuilderStep({
 
           <div className="shop-builder-banner-content">
             {draft.logoUrl ? (
-              <div className={`shop-builder-banner-logo${hasPreset || isEmptyBanner ? " corner" : ""}`}>
+              <div className={`shop-builder-banner-logo${hasImage || isEmptyBanner ? " corner" : ""}`}>
                 <img src={draft.logoUrl} alt="Shop logo" />
               </div>
             ) : null}
 
-            {!hasPreset && !isEmptyBanner ? (
+            {!hasImage && !isEmptyBanner ? (
               <div className="shop-builder-banner-title" style={{ color: theme.text }}>
                 {draft.name || "Your shop name"}
               </div>
@@ -167,9 +167,27 @@ export function ShopBuilderStep({
               <DialogTitle>Edit banner</DialogTitle>
             </DialogHeader>
             <p className="muted" style={{ fontSize: 13, margin: "6px 0 12px" }}>
-              Choose a banner image or solid pattern for your shop.
+              Choose a library banner, solid pattern, or upload your own image.
             </p>
-            <div className="lbl">Banner image</div>
+
+            <BannerCustomUpload
+              imageUrl={draft.bannerImageUrl}
+              onChange={(bannerImageUrl) =>
+                dispatch({
+                  type: "set",
+                  patch: {
+                    bannerImageUrl,
+                    ...(bannerImageUrl
+                      ? { bannerPreset: "", bannerTheme: draft.bannerTheme || "light" }
+                      : {}),
+                  },
+                })
+              }
+            />
+
+            <div className="lbl" style={{ marginTop: 16 }}>
+              Banner library
+            </div>
             <div
               className="grid"
               style={{
@@ -185,10 +203,13 @@ export function ShopBuilderStep({
                 <button
                   key={id}
                   type="button"
-                  className={`optcard banner-preset-card ${draft.bannerPreset === id ? "on" : ""}`}
-                  aria-pressed={draft.bannerPreset === id}
+                  className={`optcard banner-preset-card ${!draft.bannerImageUrl && draft.bannerPreset === id ? "on" : ""}`}
+                  aria-pressed={!draft.bannerImageUrl && draft.bannerPreset === id}
                   onClick={() =>
-                    dispatch({ type: "set", patch: { bannerPreset: id, bannerTheme: "light" } })
+                    dispatch({
+                      type: "set",
+                      patch: { bannerPreset: id, bannerTheme: "light", bannerImageUrl: "" },
+                    })
                   }
                 >
                   <img
@@ -212,12 +233,16 @@ export function ShopBuilderStep({
             >
               <button
                 type="button"
-                className={`optcard banner-preset-card ${draft.bannerPreset === "solid-pattern" ? "on" : ""}`}
-                aria-pressed={draft.bannerPreset === "solid-pattern"}
+                className={`optcard banner-preset-card ${!draft.bannerImageUrl && draft.bannerPreset === "solid-pattern" ? "on" : ""}`}
+                aria-pressed={!draft.bannerImageUrl && draft.bannerPreset === "solid-pattern"}
                 onClick={() =>
                   dispatch({
                     type: "set",
-                    patch: { bannerPreset: "solid-pattern", bannerTheme: "dark" },
+                    patch: {
+                      bannerPreset: "solid-pattern",
+                      bannerTheme: "dark",
+                      bannerImageUrl: "",
+                    },
                   })
                 }
               >

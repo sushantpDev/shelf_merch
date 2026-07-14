@@ -13,15 +13,17 @@ import {
   SHOP_BANNER_PRESETS,
   ShopBanner,
   bannerConfigFromSource,
+  bannerImageUrlKey,
   bannerPresetKey,
   bannerThemeKey,
 } from "./banner";
+import { BannerCustomUpload } from "./BannerCustomUpload";
 import { useUpdateShop } from "./model";
 
 const LOGO_ACCEPT = /\.(svg|png|webp|jpe?g)$/i;
 const LOGO_MAX = 5 * 1024 * 1024;
 
-type EditorState = { theme: string; preset: string; logoUrl: string };
+type EditorState = { theme: string; preset: string; imageUrl: string; logoUrl: string };
 
 export function BannerEditorDialog({
   shop,
@@ -32,13 +34,19 @@ export function BannerEditorDialog({
 }) {
   const updateShop = useUpdateShop();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [state, setState] = useState<EditorState>({ theme: "light", preset: "", logoUrl: "" });
+  const [state, setState] = useState<EditorState>({
+    theme: "light",
+    preset: "",
+    imageUrl: "",
+    logoUrl: "",
+  });
 
   useEffect(() => {
     if (shop) {
       setState({
         theme: bannerThemeKey(shop),
         preset: bannerPresetKey(shop),
+        imageUrl: bannerImageUrlKey(shop),
         logoUrl: shop.logoUrl || "",
       });
     }
@@ -68,6 +76,7 @@ export function BannerEditorDialog({
           bannerConfig: bannerConfigFromSource({
             bannerTheme: state.theme,
             bannerPreset: state.preset,
+            bannerImageUrl: state.imageUrl,
           }),
         },
       });
@@ -81,6 +90,7 @@ export function BannerEditorDialog({
   const previewSource = {
     bannerTheme: state.theme,
     bannerPreset: state.preset,
+    bannerImageUrl: state.imageUrl,
     logoUrl: state.logoUrl,
   };
 
@@ -113,9 +123,22 @@ export function BannerEditorDialog({
               />
             </div>
 
-            <div className="lbl">Banner image</div>
+            <BannerCustomUpload
+              imageUrl={state.imageUrl}
+              onChange={(imageUrl) =>
+                setState((s) => ({
+                  ...s,
+                  imageUrl,
+                  ...(imageUrl ? { preset: "" } : {}),
+                }))
+              }
+            />
+
+            <div className="lbl" style={{ marginTop: 18 }}>
+              Banner library
+            </div>
             <p className="mut3" style={{ fontSize: 12, margin: "4px 0 8px" }}>
-              Pick a ready-made banner for your shop storefront.
+              Or pick a ready-made banner for your shop storefront.
             </p>
             <div
               className="grid"
@@ -131,9 +154,9 @@ export function BannerEditorDialog({
                 <button
                   key={id}
                   type="button"
-                  className={`optcard banner-preset-card ${state.preset === id ? "on" : ""}`}
-                  aria-pressed={state.preset === id}
-                  onClick={() => setState((s) => ({ ...s, preset: id }))}
+                  className={`optcard banner-preset-card ${!state.imageUrl && state.preset === id ? "on" : ""}`}
+                  aria-pressed={!state.imageUrl && state.preset === id}
+                  onClick={() => setState((s) => ({ ...s, preset: id, imageUrl: "" }))}
                 >
                   <img
                     src={`/shop-banners/${id}.png`}
@@ -157,9 +180,11 @@ export function BannerEditorDialog({
             >
               <button
                 type="button"
-                className={`optcard banner-preset-card ${state.preset === "solid-pattern" ? "on" : ""}`}
-                aria-pressed={state.preset === "solid-pattern"}
-                onClick={() => setState((s) => ({ ...s, preset: "solid-pattern", theme: "dark" }))}
+                className={`optcard banner-preset-card ${!state.imageUrl && state.preset === "solid-pattern" ? "on" : ""}`}
+                aria-pressed={!state.imageUrl && state.preset === "solid-pattern"}
+                onClick={() =>
+                  setState((s) => ({ ...s, preset: "solid-pattern", theme: "dark", imageUrl: "" }))
+                }
               >
                 <img
                   src="/shop-banners/solid-pattern.png"

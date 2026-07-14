@@ -1,4 +1,4 @@
-import { ArrowLeftRight, CircleHelp } from "lucide-react";
+import { ArrowLeftRight } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { inr } from "@/components/platform/platform-ui";
 import { WizardChrome } from "@/features/swag/wizard/WizardChrome";
@@ -20,10 +20,8 @@ export function SendPointsView({
   draft,
   dispatch,
   totals,
-  contacts,
   shop,
   shopCurrencyLabel,
-  stadiumPointsAllowed,
   wallet,
   wallets,
   selectedWalletId,
@@ -35,6 +33,11 @@ export function SendPointsView({
   onPayNow,
   onSaveAndExit,
   onApplyPromo,
+  pickerContacts,
+  onToggleRecip,
+  onSelectAllRecips,
+  onAddRecipientEmails,
+  onImportRecipientCsv,
 }: SendPointsVm) {
   if (isLoading) {
     return <LoadingState message="Loading…" fullScreen={false} />;
@@ -154,41 +157,44 @@ export function SendPointsView({
             No minimum budget. Shipping included.
           </p>
           <div className="divider" style={{ marginTop: 18 }} />
-          <div style={{ marginTop: 18 }}>
-            <div
-              className="lbl"
-              style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}
-            >
-              Choose the type of currency you want to send <CircleHelp size={14} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <ScopeCard
-                selected={draft.pointsScope === "stadium"}
-                disabled={!stadiumPointsAllowed}
-                title="Shelf Merch Points (can be used anywhere)"
-                description="Recipients will be directed to this shop but can spend Shelf Merch Points anywhere. Shelf Merch Points can be forwarded and accrued. This will always show as points to your recipients, regardless of the shop currency you've set."
-                disabledNote="Enable Points Conversion in shop settings to allow Shelf Merch Points."
-                onClick={() => dispatch({ type: "setPointsScope", pointsScope: "stadium" })}
-              />
-              <ScopeCard
-                selected={draft.pointsScope === "shop"}
-                title="Shop Points (can only be used in this shop)"
-                description={`Points will be restricted to this shop only and cannot be forwarded. Choose this option to use MagicLink, where you can allow anyone to redeem. You'll only pay for recipients you approve. This currency will always match the shop currency you've set (${shopCurrencyLabel}).`}
-                onClick={() => dispatch({ type: "setPointsScope", pointsScope: "shop" })}
-              />
-            </div>
+          <div
+            className="card"
+            style={{
+              marginTop: 18,
+              padding: 18,
+              background: "var(--surface-2)", 
+              border: "1px solid var(--line)",
+            }}
+          >
+            <h3 style={{ fontSize: 16, marginBottom: 6 }}>Shop Points</h3>
+            <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.55, margin: 0 }}>
+              {shop ? (
+                <>
+                  These points belong to <b>{shop.name}</b>. They will be allocated to the recipients selected in the next step. They can only be redeemed in this shop and cannot be transferred or used in any other shop.
+                </>
+              ) : (
+                <>
+                  These points will be allocated to the recipients selected in the next step and can
+                  only be redeemed in this shop.
+                </>
+              )}
+            </p>
           </div>
         </div>
       )}
-
+ 
       {step === 1 && (
         <RecipientPicker
           title="Add recipients"
           subtitle="Don't have all emails? You can add recipients later from the shop dashboard."
-          contacts={contacts}
+          contacts={pickerContacts}
           selected={draft.selRecips}
-          onToggle={(id) => dispatch({ type: "toggleRecip", id })}
+          maxRecipients={draft.recips || undefined}
+          onToggle={onToggleRecip}
           onDeselectAll={() => dispatch({ type: "deselectRecips" })}
+          onSelectAll={onSelectAllRecips}
+          onAddEmails={onAddRecipientEmails}
+          onCsvImport={onImportRecipientCsv}
         />
       )}
 
@@ -314,46 +320,5 @@ function SumRow({ k, v }: { k: string; v: string }) {
         {v}
       </span>
     </div>
-  );
-}
-
-function ScopeCard({
-  title,
-  description,
-  selected = false,
-  disabled = false,
-  disabledNote,
-  onClick,
-}: {
-  title: string;
-  description: string;
-  selected?: boolean;
-  disabled?: boolean;
-  disabledNote?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={`optcard ${selected ? "on" : ""}`}
-      disabled={disabled}
-      onClick={onClick}
-      style={{
-        alignItems: "flex-start",
-        textAlign: "left",
-        opacity: disabled ? 0.65 : 1,
-        cursor: disabled ? "not-allowed" : "pointer",
-        minHeight: 136,
-      }}
-    >
-      <div className="rd" />
-      <div>
-        <h4>{title}</h4>
-        <p style={{ marginTop: 6, color: "var(--ink-2)", lineHeight: 1.5 }}>{description}</p>
-        {disabled && disabledNote ? (
-          <p style={{ marginTop: 8, color: "var(--ink-3)", fontSize: 12 }}>{disabledNote}</p>
-        ) : null}
-      </div>
-    </button>
   );
 }

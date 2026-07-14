@@ -81,21 +81,21 @@ export function buildRedemptionInviteEmail({
   const isPoints = campaignType === 'points';
   const isUniversalPoints = isPoints && pointsScope === 'stadium';
   const heroHeading = isPoints
-    ? `You've been gifted reward points<br>to ${safeShopName}!`
+    ? `You've earned reward points!`
     : `${safeCompany} is sending<br>you something special.`;
   const ctaLabel = isPoints ? 'Redeem your points →' : 'Claim your gift →';
   const scopeCopy = isPoints
-    ? isUniversalPoints
-      ? 'These points can be used in this shop or anywhere Shelf Merch points are accepted.'
-      : `These points can only be redeemed in ${safeShopName}.`
-    : '';
+  ? isUniversalPoints
+    ? ''
+    : `Redeem these points exclusively in the ${safeShopName}.`
+  : ''; 
   const subject = isPoints
-    ? `${senderName} sent you points to ${shopName || giftName}`
+    ? `You've received reward points from ${senderName}`
     : `${senderName} sent you a gift`;
-
+ 
   const greeting = safeRecipient ? `Hi ${safeRecipient},` : 'Hi there,';
 
-  const html = `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>  
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -137,7 +137,7 @@ export function buildRedemptionInviteEmail({
           <!-- Hero -->
           <tr>
             <td style="background:#ffffff;padding:24px 32px 0;border-left:1px solid #E8E6E1;border-right:1px solid #E8E6E1;">
-              <div style="font-size:11px;font-weight:700;color:#9AA39C;letter-spacing:0.08em;text-transform:uppercase;text-align:center;">${safeSender.toUpperCase()} SENT YOU SOMETHING</div>
+              <div style="font-size:11px;font-weight:700;color:#9AA39C;letter-spacing:0.08em;text-transform:uppercase;text-align:center;">${safeSender.toUpperCase()} SENT YOU A GIFT</div>
               <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;font-weight:700;color:#1A1A1A;line-height:1.35;text-align:center;margin:10px 0 8px;">${heroHeading}</div>
             </td>
           </tr>
@@ -155,7 +155,7 @@ export function buildRedemptionInviteEmail({
                     ${safeMessage ? `<div style="font-size:14px;color:#555;line-height:1.7;text-align:center;">${safeMessage}</div>` : ''}
                     ${scopeCopy ? `<div style="font-size:12px;color:#6C756F;line-height:1.6;text-align:center;margin-top:12px;">${scopeCopy}</div>` : ''}
                     <div style="height:3px;border-radius:3px;margin:16px 0 14px;background:linear-gradient(90deg,#7a3fb0,#2b54d6,#f5d000,#d33b30,#15784c);"></div>
-                    <div style="font-size:12px;font-weight:700;color:#8A938D;letter-spacing:0.03em;text-transform:uppercase;text-align:center;">FROM ${safeSender.toUpperCase()}</div>
+                    ${!isPoints ? `<div style="font-size:12px;font-weight:700;color:#8A938D;letter-spacing:0.03em;text-transform:uppercase;text-align:center;">FROM ${safeSender.toUpperCase()}</div>` : ''}
                   </td>
                 </tr>
               </table>

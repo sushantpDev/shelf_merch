@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { toast } from "sonner";
 import type { UiContact } from "@/services/mappers";
@@ -26,6 +26,10 @@ export function RecipientPicker({
   selected,
   onToggle,
   onDeselectAll,
+  onSelectAll,
+  onAddEmails,
+  onCsvImport,
+  maxRecipients,
   showModes = false,
   mode = "redeem",
   onMode,
@@ -38,6 +42,10 @@ export function RecipientPicker({
   selected: string[];
   onToggle: (id: string) => void;
   onDeselectAll: () => void;
+  onSelectAll?: () => void;
+  onAddEmails?: (raw: string) => void;
+  onCsvImport?: (file: File) => void;
+  maxRecipients?: number;
   showModes?: boolean;
   mode?: SendMode;
   onMode?: (mode: SendMode) => void;
@@ -45,12 +53,34 @@ export function RecipientPicker({
   onSingleLocationChange?: (key: keyof SingleLocation, value: string) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [showEmailInput, setShowEmailInput] = useState(false);
+  const [emailDraft, setEmailDraft] = useState("");
+  const csvInputRef = useRef<HTMLInputElement>(null);
   const q = query.trim().toLowerCase();
   const rows = q
     ? contacts.filter((c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
     : contacts;
+  const atLimit = Boolean(maxRecipients && selected.length >= maxRecipients);
 
   const loc = singleLocation;
+
+  function handleAddEmails() {
+    if (!onAddEmails) return;
+    const raw = emailDraft.trim();
+    if (!raw) {
+      toast.error("Enter at least one email address");
+      return;
+    }
+    onAddEmails(raw);
+    setEmailDraft("");
+    setShowEmailInput(false);
+  }
+
+  function handleCsvChange(file: File | undefined) {
+    if (!file || !onCsvImport) return;
+    onCsvImport(file);
+    if (csvInputRef.current) csvInputRef.current.value = "";
+  }
 
   return (
     <>
@@ -140,25 +170,45 @@ export function RecipientPicker({
             className="tag tag-soft"
             style={{ background: "var(--brand-50)", color: "var(--brand-d)" }}
           >
-            {selected.length} selected
+            {selected.length}
+            {maxRecipients ? ` / ${maxRecipients}` : ""} selected
           </span>
+          {onSelectAll ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={atLimit}
+              onClick={onSelectAll}
+            >
+              Select all
+            </button>
+          ) : null}
           <button type="button" className="btn btn-ghost btn-sm" onClick={onDeselectAll}>
             Deselect all
           </button>
           <button
             type="button"
             className="btn btn-ghost btn-sm"
-            onClick={() => toast("Paste emails")}
+            disabled={atLimit || !onAddEmails}
+            onClick={() => setShowEmailInput((open) => !open)}
           >
             Input emails
           </button>
           <button
             type="button"
             className="btn btn-ghost btn-sm"
-            onClick={() => toast("Upload CSV")}
+            disabled={atLimit || !onCsvImport}
+            onClick={() => csvInputRef.current?.click()}
           >
             Add by CSV
           </button>
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: "none" }}
+            onChange={(e) => handleCsvChange(e.target.files?.[0])}
+          />
           <div className="search" style={{ flex: 1 }}>
             <Search size={16} aria-hidden="true" />
             <input
@@ -170,6 +220,41 @@ export function RecipientPicker({
             />
           </div>
         </div>
+
+        {showEmailInput && onAddEmails ? (
+          <div className="card" style={{ padding: 14, marginBottom: 12, background: "var(--surface-2)" }}>
+            <label className="lbl">Paste email addresses</label>
+            <textarea
+              className="inp"
+              rows={3}
+              placeholder="Separate emails with commas, spaces, or new lines"
+              value={emailDraft}
+              onChange={(e) => setEmailDraft(e.target.value)}
+            />
+            <div className="row" style={{ gap: 8, marginTop: 10 }}>
+              <button type="button" className="btn btn-brand btn-sm" onClick={handleAddEmails}>
+                Add recipients
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setShowEmailInput(false);
+                  setEmailDraft("");
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {atLimit && maxRecipients ? (
+          <p className="mut3" style={{ fontSize: 12, marginBottom: 10 }}>
+            Recipient limit reached ({maxRecipients}). Deselect someone to add more.
+          </p>
+        ) : null}
+
         <table className="tbl">
           <thead>
             <tr>
@@ -182,6 +267,7 @@ export function RecipientPicker({
           <tbody>
             {rows.map((c) => {
               const on = selected.includes(c.id);
+              const disabled = atLimit && !on;
               return (
                 <tr key={c.id}>
                   <td>
@@ -189,6 +275,7 @@ export function RecipientPicker({
                       type="button"
                       aria-pressed={on}
                       aria-label={`${on ? "Deselect" : "Select"} ${c.name}`}
+                      disabled={disabled}
                       onClick={() => onToggle(c.id)}
                       style={{
                         width: 18,
@@ -198,7 +285,8 @@ export function RecipientPicker({
                         display: "grid",
                         placeItems: "center",
                         background: on ? "var(--brand)" : "#fff",
-                        cursor: "pointer",
+                        cursor: disabled ? "not-allowed" : "pointer",
+                        opacity: disabled ? 0.45 : 1,
                         padding: 0,
                       }}
                     >

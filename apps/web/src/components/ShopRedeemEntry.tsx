@@ -12,6 +12,7 @@ type ShopInfo = {
   logoUrl?: string;
   bannerTheme?: string;
   bannerPreset?: string;
+  bannerImageUrl?: string;
   currencyMode?: string;
 };
 
@@ -86,6 +87,7 @@ export default function ShopRedeemEntry({ slug }: { slug: string }) {
             logoUrl: shop.logoUrl,
             bannerTheme: shop.bannerTheme,
             bannerPreset: shop.bannerPreset,
+            bannerImageUrl: shop.bannerImageUrl,
           }}
           eyebrow="Your reward store"
         />

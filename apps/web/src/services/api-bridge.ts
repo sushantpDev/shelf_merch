@@ -454,9 +454,25 @@ export async function launchPointsCampaignFlow(payload: {
   contacts: Array<{ id: string; name: string; email: string; phone?: string }>;
 }) {
   const recipients = payload.contactIds
-    .map((id) => payload.contacts.find((c) => c.id === id))
+    .map((id) => {
+      if (id.startsWith("email:")) {
+        const email = id.slice(6);
+        return {
+          name: email.split("@")[0] || email,
+          email,
+        };
+      }
+      const contact = payload.contacts.find((c) => c.id === id);
+      if (!contact) return null;
+      return {
+        contactId: contact.id,
+        name: contact.name,
+        email: contact.email,
+        phone: contact.phone,
+      };
+    })
     .filter(Boolean)
-    .map((c) => ({ contactId: c!.id, name: c!.name, email: c!.email, phone: c!.phone }));
+    .map((r) => r!);
   if (!recipients.length) throw new Error("Select at least one recipient");
   return launchPointsCampaignApi({
     campaignId: payload.campaignId,
@@ -552,6 +568,7 @@ export type StorefrontData = {
     logoUrl?: string;
     bannerTheme?: string;
     bannerPreset?: string;
+    bannerImageUrl?: string;
     currencyMode: string;
     featuredCatalogProductIds?: string[];
   };

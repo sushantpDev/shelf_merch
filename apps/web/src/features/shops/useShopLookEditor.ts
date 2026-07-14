@@ -1,23 +1,39 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { UiShop } from "@/services/mappers";
-import { bannerConfigFromSource, bannerPresetKey, bannerThemeKey } from "./banner";
+import {
+  bannerConfigFromSource,
+  bannerImageUrlKey,
+  bannerPresetKey,
+  bannerThemeKey,
+} from "./banner";
 import { useUpdateShop } from "./model";
 
 const LOGO_ACCEPT = /\.(svg|png|webp|jpe?g)$/i;
 const LOGO_MAX = 5 * 1024 * 1024;
 
-export type ShopLookState = { theme: string; preset: string; logoUrl: string };
+export type ShopLookState = {
+  theme: string;
+  preset: string;
+  imageUrl: string;
+  logoUrl: string;
+};
 
 export function useShopLookEditor(shop: UiShop) {
   const updateShop = useUpdateShop();
   const logoInputRef = useRef<HTMLInputElement>(null);
-  const [state, setState] = useState<ShopLookState>({ theme: "light", preset: "", logoUrl: "" });
+  const [state, setState] = useState<ShopLookState>({
+    theme: "light",
+    preset: "",
+    imageUrl: "",
+    logoUrl: "",
+  });
 
   useEffect(() => {
     setState({
       theme: bannerThemeKey(shop),
       preset: bannerPresetKey(shop),
+      imageUrl: bannerImageUrlKey(shop),
       logoUrl: shop.logoUrl || "",
     });
   }, [shop]);
@@ -45,6 +61,7 @@ export function useShopLookEditor(shop: UiShop) {
           bannerConfig: bannerConfigFromSource({
             bannerTheme: state.theme,
             bannerPreset: state.preset,
+            bannerImageUrl: state.imageUrl,
           }),
         },
       });
@@ -57,6 +74,7 @@ export function useShopLookEditor(shop: UiShop) {
   const previewSource = {
     bannerTheme: state.theme,
     bannerPreset: state.preset,
+    bannerImageUrl: state.imageUrl,
     logoUrl: state.logoUrl,
   };
 

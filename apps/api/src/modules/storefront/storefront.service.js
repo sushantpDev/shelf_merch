@@ -31,6 +31,7 @@ function shopPublicPayload(shop) {
     logoUrl: shop.logoUrl || '',
     bannerTheme: shop.bannerConfig?.theme || 'light',
     bannerPreset: shop.bannerConfig?.preset || '',
+    bannerImageUrl: shop.bannerConfig?.imageUrl || '',
     currencyMode: shop.currencyMode,
     featuredCatalogProductIds: (shop.featuredCatalogProductIds || []).map(String),
   };

@@ -14,12 +14,14 @@ export type AcceptInviteVm = {
   token: string;
   password: string;
   confirm: string;
+  showPassword: boolean;
   loading: boolean;
   error: string;
   done: boolean;
   showLoginHint: boolean;
   onPassword: (password: string) => void;
   onConfirm: (confirm: string) => void;
+  onToggleShowPassword: () => void;
   onSubmit: (e: FormEvent) => void;
 };
 
@@ -28,6 +30,7 @@ export function useAcceptInviteController(searchToken: string): AcceptInviteVm {
   const token = useMemo(() => readInviteToken(searchToken), [searchToken]);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [errorCode, setErrorCode] = useState("");
@@ -70,12 +73,14 @@ export function useAcceptInviteController(searchToken: string): AcceptInviteVm {
     token,
     password,
     confirm,
+    showPassword,
     loading,
     error,
     done,
     showLoginHint: errorCode === "INVALID_INVITE_TOKEN" || errorCode === "INVITE_EXPIRED",
     onPassword: setPassword,
     onConfirm: setConfirm,
+    onToggleShowPassword: () => setShowPassword((v) => !v),
     onSubmit,
   };
 }
