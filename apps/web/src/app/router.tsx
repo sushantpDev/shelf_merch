@@ -111,6 +111,10 @@ const tenantChildren: RouteObject[] = [
     lazy: page(() => import("@/features/contacts/ContactsPage"), "ContactsPage"),
   },
   {
+    path: "support",
+    lazy: page(() => import("@/features/support/SupportPage"), "SupportPage"),
+  },
+  {
     path: "integrations",
     lazy: page(() => import("@/features/integrations/IntegrationsPage"), "IntegrationsPage"),
   },

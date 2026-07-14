@@ -33,6 +33,18 @@ export const addMessageSchema = z.object({
   internal: z.boolean().optional().default(false),
 });
 
+/** Tenant help center: no tenantId/assignee filters — always scoped to the caller. */
+export const tenantListTicketsQuery = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().optional(),
+  status: z.enum(SUPPORT_TICKET_STATUSES).optional(),
+});
+
+/** Tenant replies can never be internal notes. */
+export const tenantAddMessageSchema = z.object({
+  body: z.string().min(1),
+});
+
 export const updateSupportTicketStatusSchema = z.object({
   status: z.enum(SUPPORT_TICKET_STATUSES),
 });

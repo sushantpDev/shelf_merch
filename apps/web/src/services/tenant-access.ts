@@ -16,6 +16,7 @@ export type TenantArea =
   | "campaigns"
   | "campaignOps"
   | "contacts"
+  | "support"
   | "settings"
   | "catalog"
   | "users";
@@ -30,6 +31,7 @@ const MATRIX: Record<TenantArea, { write: string[]; read: string[] }> = {
   campaigns: { read: BOTH, write: BOTH },
   campaignOps: { read: BOTH, write: [ENTITY_MANAGER] },
   contacts: { read: BOTH, write: [ENTITY_MANAGER] },
+  support: { read: BOTH, write: BOTH },
   settings: { read: BOTH, write: [COMPANY_ADMIN] },
   catalog: { read: BOTH, write: [] },
   users: { read: [COMPANY_ADMIN], write: [COMPANY_ADMIN] },
@@ -76,6 +78,7 @@ export const TENANT_NAV: TenantNavItem[] = [
   { area: "kits", key: "kits", label: "Kits", href: "/app/kits" },
   { area: "campaigns", key: "campaigns", label: "Campaigns", href: "/app/campaigns" },
   { area: "contacts", key: "contacts", label: "Contacts", href: "/app/contacts" },
+  { area: "support", key: "support", label: "Support", href: "/app/support" },
   { area: "settings", key: "settings", label: "Settings", href: "/app/settings" },
   { area: "catalog", key: "catalog", label: "Catalog", href: "/app/catalog" },
 ];

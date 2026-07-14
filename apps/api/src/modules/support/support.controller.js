@@ -2,11 +2,36 @@ import * as supportService from './support.service.js';
 import { writeAudit } from '../../services/audit.service.js';
 
 export async function listPlatform(req, res) {
-  res.json(await supportService.listSupportTickets({ query: req.query }));
+  res.json(await supportService.listSupportTicketsWithTenants({ query: req.query }));
 }
 
 export async function getOne(req, res) {
-  res.json(await supportService.getSupportTicket(req.params.id));
+  res.json(await supportService.getSupportTicketDetail(req.params.id));
+}
+
+export async function listMine(req, res) {
+  res.json(await supportService.listTenantTickets({ tenantId: req.tenantId, query: req.query }));
+}
+
+export async function getMine(req, res) {
+  res.json(await supportService.getTenantTicket({ ticketId: req.params.id, tenantId: req.tenantId }));
+}
+
+export async function addMyMessage(req, res) {
+  const ticket = await supportService.addTenantMessage({
+    ticketId: req.params.id,
+    tenantId: req.tenantId,
+    userId: req.user.userId,
+    body: req.body.body,
+  });
+  writeAudit({
+    req,
+    action: 'support_ticket.message',
+    entityType: 'SupportTicket',
+    entityId: ticket._id,
+    after: { messagesCount: ticket.messages.length, internal: false },
+  });
+  res.json(ticket);
 }
 
 export async function create(req, res) {

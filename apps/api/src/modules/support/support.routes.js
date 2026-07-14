@@ -16,14 +16,31 @@ import {
   linkOrderSchema,
   searchQuerySchema,
   updateAddressSchema,
+  tenantListTicketsQuery,
+  tenantAddMessageSchema,
 } from './support.validation.js';
 
 export const tenantSupportRouter = Router();
 tenantSupportRouter.use(authenticate, resolveTenant, requireTenantContext);
+tenantSupportRouter.get(
+  '/',
+  validate({ query: tenantListTicketsQuery }),
+  asyncHandler(controller.listMine),
+);
+tenantSupportRouter.get(
+  '/:id',
+  validate({ params: supportTicketIdParam }),
+  asyncHandler(controller.getMine),
+);
 tenantSupportRouter.post(
   '/',
   validate({ body: createSupportTicketSchema }),
   asyncHandler(controller.create),
+);
+tenantSupportRouter.post(
+  '/:id/messages',
+  validate({ params: supportTicketIdParam, body: tenantAddMessageSchema }),
+  asyncHandler(controller.addMyMessage),
 );
 
 // §3.9 — the help desk is cross-tenant.

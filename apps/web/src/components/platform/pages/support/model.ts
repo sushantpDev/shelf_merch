@@ -5,6 +5,7 @@ export {
   addTicketMessage,
   assignTicket,
   fetchPlatformTeam,
+  fetchPlatformTicket,
   resendRedemptionLink,
   resendTicketTracking,
   setTicketStatus,

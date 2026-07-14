@@ -3,10 +3,80 @@ import { Order } from '../orders/order.model.js';
 import { Recipient } from '../campaigns/recipient.model.js';
 import { Campaign } from '../campaigns/campaign.model.js';
 import { Shipment } from '../shipments/shipment.model.js';
+import { Tenant } from '../tenants/tenant.model.js';
+import { User } from '../users/user.model.js';
+import { RoleAssignment } from '../roles/roleAssignment.model.js';
+import { notify } from '../notifications/notifications.service.js';
 import { transitionState } from '../../services/stateMachine.service.js';
 import { sendNotificationEmail, appUrl } from '../../services/email.service.js';
+import { logger } from '../../config/logger.js';
 import { ApiError, NotFoundError } from '../../utils/errors.js';
 import { getPagination, paginatedResponse } from '../../utils/pagination.js';
+
+/** Roles that staff the help desk (see platformAccess MATRIX support.write + super). */
+const SUPPORT_STAFF_ROLES = ['platform_super_admin', 'platform_ops_admin', 'platform_support_agent'];
+
+/** Fire-and-forget — a notification failure must never block or fail a support request. */
+function notifyAsync(payload) {
+  notify(payload).catch((err) =>
+    logger.warn({ err: err?.message }, 'support notification delivery failed'),
+  );
+}
+
+async function userName(userId) {
+  if (!userId) return '';
+  const user = await User.findOne({ _id: userId }).select('name').lean();
+  return user?.name ?? '';
+}
+
+/** In-app ping to everyone staffing the help desk. */
+async function notifySupportStaff({ ticket, title, body }) {
+  const staff = await RoleAssignment.find({
+    scopeType: 'platform',
+    role: { $in: SUPPORT_STAFF_ROLES },
+  })
+    .select('userId')
+    .lean();
+  const seen = new Set();
+  for (const s of staff) {
+    const id = String(s.userId);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    notifyAsync({
+      type: 'support_ticket',
+      tenantId: ticket.tenantId,
+      userId: s.userId,
+      title,
+      body,
+      link: '/platform/support',
+    });
+  }
+}
+
+/** In-app (and optionally email) update to the user who raised the ticket. */
+async function notifyRaiser(ticket, { title, body, withEmail = false }) {
+  if (!ticket.raisedByUserId) return;
+  let email = null;
+  if (withEmail) {
+    const user = await User.findOne({ _id: ticket.raisedByUserId }).select('email').lean();
+    email = user?.email ?? null;
+  }
+  notifyAsync({
+    type: 'support_ticket_update',
+    tenantId: ticket.tenantId,
+    userId: ticket.raisedByUserId,
+    email,
+    title,
+    body,
+    link: '/app/support',
+  });
+}
+
+/** Tenant-safe projection: internal notes are platform-only. */
+export function toTenantView(ticket) {
+  const obj = ticket.toObject ? ticket.toObject() : ticket;
+  return { ...obj, messages: (obj.messages ?? []).filter((m) => !m.internal) };
+}
 
 function buildFilter(query) {
   const filter = {};
@@ -36,6 +106,92 @@ export async function listSupportTickets({ query, tenantId = null }) {
   return paginatedResponse(items, total, { page, limit });
 }
 
+/** Platform queue with tenant names resolved for the agent console. */
+export async function listSupportTicketsWithTenants({ query }) {
+  const result = await listSupportTickets({ query });
+  const tenantIds = [...new Set(result.items.map((t) => String(t.tenantId)).filter(Boolean))];
+  if (tenantIds.length) {
+    const tenants = await Tenant.find({ _id: { $in: tenantIds } }).select('name').lean();
+    const nameById = new Map(tenants.map((t) => [String(t._id), t.name]));
+    result.items = result.items.map((t) => ({
+      ...t,
+      tenantName: nameById.get(String(t.tenantId)) ?? '',
+    }));
+  }
+  return result;
+}
+
+/** Full ticket for the platform manage modal: tenant + raiser names resolved. */
+export async function getSupportTicketDetail(ticketId) {
+  const ticket = await getSupportTicket(ticketId);
+  const [tenant, raiser] = await Promise.all([
+    ticket.tenantId ? Tenant.findById(ticket.tenantId).select('name').lean() : null,
+    ticket.raisedByUserId
+      ? User.findOne({ _id: ticket.raisedByUserId }).select('name email').lean()
+      : null,
+  ]);
+  return {
+    ...ticket.toObject(),
+    tenantName: tenant?.name ?? '',
+    raisedByName: raiser?.name ?? '',
+    raisedByEmail: raiser?.email ?? '',
+  };
+}
+
+/** Tenant help center: list the workspace's own tickets (internal notes stripped). */
+export async function listTenantTickets({ tenantId, query }) {
+  const result = await listSupportTickets({ query, tenantId });
+  result.items = result.items.map(toTenantView);
+  return result;
+}
+
+/** Tenant help center: one own ticket with the public conversation. */
+export async function getTenantTicket({ ticketId, tenantId }) {
+  const ticket = await getSupportTicket(ticketId, { tenantId });
+  return toTenantView(ticket);
+}
+
+/**
+ * Tenant reply: never internal, reopens a waiting/resolved ticket, pings the
+ * assigned agent (or the whole desk when unassigned).
+ */
+export async function addTenantMessage({ ticketId, tenantId, userId, body }) {
+  const ticket = await getSupportTicket(ticketId, { tenantId });
+  if (ticket.status === 'closed') {
+    throw new ApiError(422, 'This ticket is closed — please open a new one', 'TICKET_CLOSED');
+  }
+
+  ticket.messages.push({
+    authorUserId: userId,
+    authorName: await userName(userId),
+    fromPlatform: false,
+    body,
+    internal: false,
+    at: new Date(),
+  });
+  if (['waiting_on_customer', 'resolved'].includes(ticket.status)) {
+    transitionState('supportTicket', ticket, 'in_progress', { userId }, 'Customer replied');
+  }
+  await ticket.save();
+
+  const ping = {
+    title: `Customer replied: ${ticket.subject}`,
+    body: body.slice(0, 200),
+  };
+  if (ticket.assignedToUserId) {
+    notifyAsync({
+      type: 'support_ticket_update',
+      tenantId: ticket.tenantId,
+      userId: ticket.assignedToUserId,
+      ...ping,
+      link: '/platform/support',
+    });
+  } else {
+    await notifySupportStaff({ ticket, ...ping });
+  }
+  return toTenantView(ticket);
+}
+
 export async function getSupportTicket(ticketId, { tenantId = null } = {}) {
   const filter = { _id: ticketId };
   if (tenantId) filter.tenantId = tenantId;
@@ -55,7 +211,7 @@ export async function createSupportTicket({
   relatedOrderId = null,
   relatedRecipientId = null,
 }) {
-  return SupportTicket.create({
+  const ticket = await SupportTicket.create({
     tenantId,
     raisedByUserId: userId,
     subject,
@@ -65,12 +221,34 @@ export async function createSupportTicket({
     relatedOrderId,
     relatedRecipientId,
   });
+  if (source !== 'platform') {
+    await notifySupportStaff({
+      ticket,
+      title: `New support ticket: ${subject}`,
+      body: (description || '').slice(0, 200),
+    });
+  }
+  return ticket;
 }
 
 export async function addMessage({ ticketId, authorUserId, body, internal = false, tenantId = null }) {
   const ticket = await getSupportTicket(ticketId, { tenantId });
-  ticket.messages.push({ authorUserId, body, internal, at: new Date() });
+  ticket.messages.push({
+    authorUserId,
+    authorName: await userName(authorUserId),
+    fromPlatform: true,
+    body,
+    internal,
+    at: new Date(),
+  });
   await ticket.save();
+  if (!internal) {
+    await notifyRaiser(ticket, {
+      title: `Support replied: ${ticket.subject}`,
+      body: body.slice(0, 200),
+      withEmail: true,
+    });
+  }
   return ticket;
 }
 
@@ -78,6 +256,11 @@ export async function updateSupportTicketStatus({ ticketId, status, actor, tenan
   const ticket = await getSupportTicket(ticketId, { tenantId });
   transitionState('supportTicket', ticket, status, actor);
   await ticket.save();
+  await notifyRaiser(ticket, {
+    title: `Support ticket ${status.replace(/_/g, ' ')}: ${ticket.subject}`,
+    body: '',
+    withEmail: status === 'resolved',
+  });
   return ticket;
 }
 
