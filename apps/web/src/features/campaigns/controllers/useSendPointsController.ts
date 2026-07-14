@@ -7,6 +7,15 @@ import { ensureSpendEntityForWalletApi, getCampaignApi } from "@/services/mutati
 import { entityIdForWallet, spendableForWallet, walletsForCheckout } from "@/services/workspace-api";
 import { pointsSendTotals } from "@/features/send/money";
 import { toSchedulePayload } from "@/features/send/types";
+import {
+  addRecipientsUpToLimit,
+  emailFromManualRecipientId,
+  isManualRecipientId,
+  mergePickerContacts,
+  parseCsvEmails,
+  parseEmailInput,
+  selectAllRecipientIds,
+} from "@/features/send/recipientSelection";
 import type { PointsSendTotals } from "@/features/send/money";
 import type { UiShop } from "@/services/mappers";
 import { useLaunchPointsCampaign, useSavePointsCampaignDraft } from "../model";
@@ -32,9 +41,9 @@ export type SendPointsVm = {
   dispatch: (action: SendPointsAction) => void;
   totals: PointsSendTotals;
   contacts: UiContact[];
+  pickerContacts: UiContact[];
   shop: UiShop | undefined;
   shopCurrencyLabel: string;
-  stadiumPointsAllowed: boolean;
   wallet: UiWallet | undefined;
   wallets: UiWallet[];
   selectedWalletId: string | undefined;
@@ -46,6 +55,10 @@ export type SendPointsVm = {
   onPayNow: () => void;
   onSaveAndExit: () => void;
   onApplyPromo: () => void;
+  onToggleRecip: (id: string) => void;
+  onSelectAllRecips: () => void;
+  onAddRecipientEmails: (raw: string) => void;
+  onImportRecipientCsv: (file: File) => void;
 };
 
 /** Controller for the send-points wizard: draft reducer, hydration, save, and launch. */
@@ -77,6 +90,11 @@ export function useSendPointsController(): SendPointsVm {
     [shop?.pointsConversionEnabled],
   );
   const [draft, dispatch] = useReducer(sendPointsReducer, initial);
+  const pickerContacts = useMemo(
+    () => mergePickerContacts(contacts, draft.selRecips),
+    [contacts, draft.selRecips],
+  );
+  const recipientLimit = draft.recips;
 
   useEffect(() => {
     if (!shop || seededScope.current) return;
@@ -143,7 +161,119 @@ export function useSendPointsController(): SendPointsVm {
   const wallet =
     checkoutWallets.find((w) => w.id === selectedWalletId) ?? checkoutWallets[0];
   const shopCurrencyLabel = shop?.currency || "Points";
-  const stadiumPointsAllowed = Boolean(shop?.pointsConversionEnabled);
+
+  function reportRecipientAddResult(result: {
+    added: string[];
+    invalid: string[];
+    duplicates: string[];
+    truncated: number;
+  }) {
+    if (result.invalid.length) {
+      toast.error(`Skipped ${result.invalid.length} invalid email${result.invalid.length === 1 ? "" : "s"}`);
+    }
+    if (result.duplicates.length) {
+      toast.message(
+        `Skipped ${result.duplicates.length} duplicate${result.duplicates.length === 1 ? "" : "s"}`,
+      );
+    }
+    if (result.truncated > 0) {
+      toast.error(`Recipient limit reached — only ${recipientLimit} allowed`);
+    }
+    if (result.added.length) {
+      toast.success(`Added ${result.added.length} recipient${result.added.length === 1 ? "" : "s"}`);
+    } else if (!result.invalid.length && !result.duplicates.length && !result.truncated) {
+      toast.error("No new recipients to add");
+    }
+  }
+
+  function autoSelectRecipients() {
+    if (!recipientLimit || draft.selRecips.length > 0) return;
+    const ids = selectAllRecipientIds(contacts, draft.selRecips, recipientLimit);
+    if (ids.length) dispatch({ type: "setSelRecips", selRecips: ids });
+  }
+
+  function onToggleRecip(id: string) {
+    const has = draft.selRecips.includes(id);
+    if (!has && recipientLimit && draft.selRecips.length >= recipientLimit) {
+      toast.error(`You can only select ${recipientLimit} recipients`);
+      return;
+    }
+    dispatch({ type: "toggleRecip", id });
+  }
+
+  function onSelectAllRecips() {
+    if (!recipientLimit) {
+      toast.error("Set the number of recipients in the budget step first");
+      return;
+    }
+    const ids = selectAllRecipientIds(contacts, draft.selRecips, recipientLimit);
+    if (ids.length === draft.selRecips.length) {
+      toast.message("All available recipients are already selected");
+      return;
+    }
+    dispatch({ type: "setSelRecips", selRecips: ids });
+  }
+
+  function onAddRecipientEmails(raw: string) {
+    if (!recipientLimit) {
+      toast.error("Set the number of recipients in the budget step first");
+      return;
+    }
+    const { ids, result } = addRecipientsUpToLimit(
+      parseEmailInput(raw),
+      draft.selRecips,
+      contacts,
+      recipientLimit,
+    );
+    dispatch({ type: "setSelRecips", selRecips: ids });
+    reportRecipientAddResult(result);
+  }
+
+  function onImportRecipientCsv(file: File) {
+    if (!recipientLimit) {
+      toast.error("Set the number of recipients in the budget step first");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === "string" ? reader.result : "";
+      const { ids, result } = addRecipientsUpToLimit(
+        parseCsvEmails(text),
+        draft.selRecips,
+        contacts,
+        recipientLimit,
+      );
+      dispatch({ type: "setSelRecips", selRecips: ids });
+      reportRecipientAddResult(result);
+    };
+    reader.onerror = () => toast.error("Could not read CSV file");
+    reader.readAsText(file);
+  }
+
+  function resolveRecipientPayload(id: string) {
+    if (isManualRecipientId(id)) {
+      const email = emailFromManualRecipientId(id);
+      return {
+        name: email.split("@")[0] || email,
+        email,
+      };
+    }
+    const contact = contacts.find((c) => c.id === id);
+    if (!contact) return null;
+    return {
+      contactId: contact.id,
+      name: contact.name,
+      email: contact.email,
+      phone: contact.phone,
+    };
+  }
+
+  function buildRecipients() {
+    return draft.selRecips
+      .map((id) => resolveRecipientPayload(id))
+      .filter(Boolean)
+      .map((r) => r!);
+  }
 
   function exit() {
     if (shopId) {
@@ -163,18 +293,6 @@ export function useSendPointsController(): SendPointsVm {
     if (workspace.userPatch.role === "entity_manager") return undefined;
 
     return ensureSpendEntityForWalletApi(walletId);
-  }
-
-  function buildRecipients() {
-    return draft.selRecips
-      .map((id) => contacts.find((c) => c.id === id))
-      .filter(Boolean)
-      .map((c) => ({
-        contactId: c!.id,
-        name: c!.name,
-        email: c!.email,
-        phone: c!.phone,
-      }));
   }
 
   async function saveAndExit() {
@@ -237,6 +355,17 @@ export function useSendPointsController(): SendPointsVm {
         toast.error("Enter number of recipients and budget per recipient");
         return;
       }
+      autoSelectRecipients();
+    }
+    if (step === 1) {
+      if (!draft.selRecips.length) {
+        toast.error("Select at least one recipient");
+        return;
+      }
+      if (recipientLimit && draft.selRecips.length > recipientLimit) {
+        toast.error(`You can only select ${recipientLimit} recipients`);
+        return;
+      }
     }
     setStep((s) => Math.min(s + 1, 3) as SendPointsStep);
   }
@@ -260,6 +389,10 @@ export function useSendPointsController(): SendPointsVm {
     }
     if (!draft.selRecips.length) {
       toast.error("Select at least one recipient");
+      return;
+    }
+    if (recipientLimit && draft.selRecips.length > recipientLimit) {
+      toast.error(`You can only select ${recipientLimit} recipients`);
       return;
     }
     const paymentTotal = Math.round(totals.total);
@@ -313,9 +446,9 @@ export function useSendPointsController(): SendPointsVm {
     dispatch,
     totals,
     contacts,
+    pickerContacts,
     shop,
     shopCurrencyLabel,
-    stadiumPointsAllowed,
     wallet,
     wallets: checkoutWallets,
     selectedWalletId: selectedWalletId || checkoutWallets[0]?.id,
@@ -327,5 +460,9 @@ export function useSendPointsController(): SendPointsVm {
     onPayNow: payNow,
     onSaveAndExit: saveAndExit,
     onApplyPromo: () => toast("Promo applied"),
+    onToggleRecip,
+    onSelectAllRecips,
+    onAddRecipientEmails,
+    onImportRecipientCsv,
   };
 }

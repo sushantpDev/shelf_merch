@@ -80,12 +80,13 @@ export function shopBannerPresetLabel(id?: string) {
 
 
 
-/** Image URL for a shop's preset banner (2560×853 / 3:1 in `/public/shop-banners/`). */
-
-export function shopHeroBannerUrl(shop: { bannerPreset?: string }) {
-
+/** Image URL for a shop banner — custom upload wins over library presets. */
+export function shopHeroBannerUrl(shop: {
+  bannerPreset?: string;
+  bannerImageUrl?: string;
+}) {
+  if (shop.bannerImageUrl) return shop.bannerImageUrl;
   return shopBannerPresetUrl(shop.bannerPreset);
-
 }
 
 

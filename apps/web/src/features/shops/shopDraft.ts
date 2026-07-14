@@ -8,6 +8,7 @@ export type ShopDraft = {
   categories: string[];
   bannerTheme: string;
   bannerPreset: string;
+  bannerImageUrl: string;
 };
 
 export const INITIAL_SHOP_DRAFT: ShopDraft = {
@@ -18,6 +19,7 @@ export const INITIAL_SHOP_DRAFT: ShopDraft = {
   categories: DEFAULT_BUILDER_CATEGORIES,
   bannerTheme: "dark",
   bannerPreset: "solid-pattern",
+  bannerImageUrl: "",
 };
 
 export type ShopDraftAction =

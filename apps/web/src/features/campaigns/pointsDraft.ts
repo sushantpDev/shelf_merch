@@ -20,6 +20,7 @@ export type SendPointsAction =
   | { type: "setPpr"; ppr: number }
   | { type: "setRecips"; recips: number }
   | { type: "toggleRecip"; id: string }
+  | { type: "setSelRecips"; selRecips: string[] }
   | { type: "deselectRecips" }
   | { type: "setPointsScope"; pointsScope: "stadium" | "shop" }
   | { type: "setFrom"; from: string }
@@ -40,8 +41,14 @@ export function sendPointsReducer(
       return { ...state, orderName: action.orderName };
     case "setPpr":
       return { ...state, ppr: action.ppr };
-    case "setRecips":
-      return { ...state, recips: action.recips };
+    case "setRecips": {
+      const recips = action.recips;
+      const selRecips =
+        recips > 0 && state.selRecips.length > recips
+          ? state.selRecips.slice(0, recips)
+          : state.selRecips;
+      return { ...state, recips, selRecips };
+    }
     case "toggleRecip": {
       const has = state.selRecips.includes(action.id);
       return {
@@ -51,6 +58,8 @@ export function sendPointsReducer(
           : [...state.selRecips, action.id],
       };
     }
+    case "setSelRecips":
+      return { ...state, selRecips: action.selRecips };
     case "deselectRecips":
       return { ...state, selRecips: [] };
     case "setPointsScope":

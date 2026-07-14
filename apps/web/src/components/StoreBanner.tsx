@@ -1,10 +1,11 @@
-import { shopBannerPresetLabel, shopBannerPresetUrl } from "@/lib/shop-banners";
+import { shopBannerPresetLabel, shopHeroBannerUrl } from "@/lib/shop-banners";
 
 export type StoreShop = {
   name: string;
   logoUrl?: string;
   bannerTheme?: string;
   bannerPreset?: string;
+  bannerImageUrl?: string;
   featuredCatalogProductIds?: string[];
 };
 
@@ -19,8 +20,8 @@ export const BANNER_THEMES: Record<string, { bg: string; text: string }> = {
 };
 
 export function StoreBanner({ shop, eyebrow = "Welcome to" }: { shop: StoreShop; eyebrow?: string }) {
-  const presetUrl = shopBannerPresetUrl(shop.bannerPreset);
-  if (presetUrl) {
+  const bannerUrl = shopHeroBannerUrl(shop);
+  if (bannerUrl) {
     return (
       <div
         style={{
@@ -32,9 +33,13 @@ export function StoreBanner({ shop, eyebrow = "Welcome to" }: { shop: StoreShop;
         }}
       >
         <img
-          src={presetUrl}
-          alt={shopBannerPresetLabel(shop.bannerPreset) || `${shop.name} banner`}
-          style={{ display: "block", width: "100%", height: "auto" }}
+          src={bannerUrl}
+          alt={
+            shop.bannerImageUrl
+              ? `${shop.name} banner`
+              : shopBannerPresetLabel(shop.bannerPreset) || `${shop.name} banner`
+          }
+          style={{ display: "block", width: "100%", height: "auto", aspectRatio: "4 / 1", objectFit: "cover" }}
         />
         {shop.logoUrl ? (
           <div

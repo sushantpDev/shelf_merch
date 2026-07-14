@@ -240,6 +240,18 @@ export async function getRedemptionPortal(token) {
     });
   }
 
+  // TEMPORARY: bypass OTP verification for shop-scoped point redemptions so recipients
+  // can enter the storefront directly. Remove this block when email/SMS verification is required again.
+  const isShopPointsRedemption =
+    campaign.type === 'points' && (campaign.pointsScope ?? 'shop') === 'shop';
+  if (isShopPointsRedemption && recipient.redemptionStatus !== 'verified') {
+    if (recipient.redemptionStatus === 'invited') {
+      transitionRedemption(recipient, 'opened');
+    }
+    transitionRedemption(recipient, 'verified');
+    await recipient.save();
+  }
+
   const shopPayload = shop
     ? {
         name: shop.name,
@@ -247,6 +259,7 @@ export async function getRedemptionPortal(token) {
         logoUrl: shop.logoUrl || '',
         bannerTheme: shop.bannerConfig?.theme || 'light',
         bannerPreset: shop.bannerConfig?.preset || '',
+        bannerImageUrl: shop.bannerConfig?.imageUrl || '',
         featuredCatalogProductIds: (shop.featuredCatalogProductIds || []).map(String),
       }
     : null;

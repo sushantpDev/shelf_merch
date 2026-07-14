@@ -32,11 +32,22 @@ export const SHOP_BANNER_PRESETS: [string, string][] = [
   ["we-did-it", "We Did It!"],
 ];
 
+/** Recommended upload size for custom shop banners (matches storefront 4:1 frame). */
+export const BANNER_IMAGE_DIMENSIONS = "960 × 240 px (4:1)";
+export const BANNER_IMAGE_ACCEPT = /\.(png|webp|jpe?g)$/i;
+export const BANNER_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+export const BANNER_IMAGE_ACCEPT_ATTR =
+  ".png,.webp,.jpeg,.jpg,image/png,image/webp,image/jpeg";
+
 /** A banner source — either a saved shop or the in-flight wizard/editor state. */
 export type BannerSource = {
   bannerTheme?: string;
   bannerPreset?: string;
-  bannerConfig?: { theme?: string; preset?: string } | Record<string, unknown>;
+  /** Custom uploaded banner (data URL or /uploads/… path). Takes priority over presets. */
+  bannerImageUrl?: string;
+  bannerConfig?:
+    | { theme?: string; preset?: string; imageUrl?: string }
+    | Record<string, unknown>;
   logoUrl?: string;
 };
 
@@ -50,10 +61,17 @@ export function bannerPresetKey(src: BannerSource): string {
   return src.bannerPreset || cfg?.preset || "";
 }
 
+export function bannerImageUrlKey(src: BannerSource): string {
+  const cfg = src.bannerConfig as { imageUrl?: string } | undefined;
+  return src.bannerImageUrl || cfg?.imageUrl || "";
+}
+
 /** Serialize a banner source into the `bannerConfig` the API expects. */
 export function bannerConfigFromSource(src: BannerSource): Record<string, string> {
-  const preset = bannerPresetKey(src);
+  const imageUrl = bannerImageUrlKey(src);
   const theme = bannerThemeKey(src) || "light";
+  if (imageUrl) return { imageUrl, theme };
+  const preset = bannerPresetKey(src);
   if (preset) return { preset, theme };
   return theme === "light" ? {} : { theme };
 }
@@ -66,11 +84,19 @@ export function bannerBackgroundStyle(src: BannerSource): CSSProperties {
   return bannerStyle(src);
 }
 
-function bannerStyle(src: BannerSource): CSSProperties {
+/** Display URL for an image banner (custom upload or library preset). */
+export function bannerDisplayUrl(src: BannerSource): string {
+  const custom = bannerImageUrlKey(src);
+  if (custom) return custom;
   const preset = bannerPresetKey(src);
-  if (preset) {
+  return preset ? `/shop-banners/${preset}.png` : "";
+}
+
+function bannerStyle(src: BannerSource): CSSProperties {
+  const imageUrl = bannerDisplayUrl(src);
+  if (imageUrl) {
     return {
-      backgroundImage: `url(/shop-banners/${preset}.png)`,
+      backgroundImage: `url(${JSON.stringify(imageUrl)})`,
       backgroundSize: "cover",
       backgroundPosition: "center",
     };
@@ -87,7 +113,32 @@ function bannerStyle(src: BannerSource): CSSProperties {
 
 function bannerClasses(src: BannerSource): string {
   const t = BANNER_THEMES[bannerThemeKey(src)] || BANNER_THEMES.light;
-  return `shopbanner${t.dots && !bannerPresetKey(src) ? " shopbanner-merch" : ""}`;
+  const hasImage = Boolean(bannerDisplayUrl(src));
+  return `shopbanner${t.dots && !hasImage ? " shopbanner-merch" : ""}`;
+}
+
+export function validateBannerImageFile(file: File): string | null {
+  if (!BANNER_IMAGE_ACCEPT.test(file.name)) {
+    return "Accepted formats: PNG, WEBP, JPEG, JPG";
+  }
+  if (file.size > BANNER_IMAGE_MAX_BYTES) {
+    return "File must be 10 MB or smaller";
+  }
+  return null;
+}
+
+export function readBannerImageFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const error = validateBannerImageFile(file);
+    if (error) {
+      reject(new Error(error));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Could not read image file"));
+    reader.readAsDataURL(file);
+  });
 }
 
 /** Renders a shop banner with optional centered/left logo overlay and edit menu. */
