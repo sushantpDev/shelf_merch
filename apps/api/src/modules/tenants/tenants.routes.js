@@ -99,6 +99,12 @@ platformTenantsRouter.patch(
   validate({ params: z.object({ id: objectId }), body: tenantLimitsSchema }),
   asyncHandler(controller.setLimits),
 );
+platformTenantsRouter.get(
+  '/:id/usage',
+  tenantsRead,
+  validate({ params: z.object({ id: objectId }) }),
+  asyncHandler(controller.usage),
+);
 platformTenantsRouter.post(
   '/:id/reset-admin-access',
   tenantsWrite,

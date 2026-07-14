@@ -1,9 +1,11 @@
 import { env } from './config/env.js';
 import { logger } from './config/logger.js';
 import { connectDb, disconnectDb } from './config/db.js';
+import { initObservability } from './config/observability.js';
 import { createApp } from './app.js';
 
 async function main() {
+  await initObservability();
   await connectDb();
 
   const app = createApp();

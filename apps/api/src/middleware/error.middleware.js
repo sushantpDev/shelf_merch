@@ -1,5 +1,6 @@
 import { ApiError } from '../utils/errors.js';
 import { logger } from '../config/logger.js';
+import { captureException } from '../config/observability.js';
 
 export function notFoundHandler(_req, res) {
   res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Route not found' } });
@@ -30,5 +31,6 @@ export function errorHandler(err, req, res, _next) {
   }
 
   logger.error({ err, path: req.originalUrl }, 'Unhandled error');
+  captureException(err, { path: req.originalUrl, requestId: req.requestId, tenantId: req.tenantId });
   res.status(500).json({ error: { code: 'INTERNAL', message: 'Internal server error' } });
 }

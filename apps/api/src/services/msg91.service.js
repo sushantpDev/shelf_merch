@@ -1,5 +1,6 @@
 import { env, msg91Configured } from '../config/env.js';
 import { logger } from '../config/logger.js';
+import { callExternal } from './resilience.js';
 import { ApiError } from '../utils/errors.js';
 
 /** Normalize to MSG91 format: 91XXXXXXXXXX */
@@ -23,19 +24,26 @@ export async function sendOtpSms(mobile, otp) {
     return { success: true, provider: 'stub' };
   }
 
-  const res = await fetch('https://control.msg91.com/api/v5/otp', {
-    method: 'POST',
-    headers: {
-      authkey: env.MSG91_AUTH_KEY,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      template_id: env.MSG91_OTP_TEMPLATE_ID,
-      mobile: normalized,
-      otp: String(otp),
-      sender: env.MSG91_SENDER_ID,
-    }),
-  });
+  // §Gap F — guard the external SMS provider with a timeout + circuit breaker so
+  // a slow/broken MSG91 can't stall OTP requests or hammer a failing dependency.
+  const res = await callExternal(
+    'msg91-otp',
+    () =>
+      fetch('https://control.msg91.com/api/v5/otp', {
+        method: 'POST',
+        headers: {
+          authkey: env.MSG91_AUTH_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          template_id: env.MSG91_OTP_TEMPLATE_ID,
+          mobile: normalized,
+          otp: String(otp),
+          sender: env.MSG91_SENDER_ID,
+        }),
+      }),
+    { timeoutMs: 8_000, failureThreshold: 5, cooldownMs: 30_000 },
+  );
 
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {

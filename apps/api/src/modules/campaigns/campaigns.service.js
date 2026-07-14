@@ -11,6 +11,7 @@ import { Tenant } from '../tenants/tenant.model.js';
 import * as ledger from '../../services/ledger.service.js';
 import { transitionState, validNextStatuses, canTransition } from '../../services/stateMachine.service.js';
 import { notify } from '../notifications/notifications.service.js';
+import { recordUsage } from '../../services/usage.service.js';
 import { ApiError, ForbiddenError, NotFoundError } from '../../utils/errors.js';
 import { assertEntityAccess } from '../../middleware/abac.middleware.js';
 
@@ -436,6 +437,7 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
   }
 
   await campaign.save();
+  recordUsage(tenantId, 'campaigns.launched'); // §Gap E metering
 
   const scheduleMode = campaign.schedule?.mode ?? 'now';
   const sendInvites = scheduleMode === 'now';

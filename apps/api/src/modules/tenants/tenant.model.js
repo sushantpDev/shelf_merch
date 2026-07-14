@@ -32,6 +32,8 @@ const tenantSchema = new mongoose.Schema(
       maxRecipientsPerCampaign: { type: Number, default: 500 },
       maxWallets: { type: Number, default: 3 },
       maxUsers: { type: Number, default: 10 },
+      // §Gap E — per-tenant request ceiling (noisy-neighbor protection).
+      requestsPerMinute: { type: Number, default: 600 },
     },
   },
   { timestamps: true },

@@ -13,6 +13,7 @@ import { LOCAL_UPLOAD_DIR } from './services/storage.service.js';
 import { asyncHandler } from './utils/asyncHandler.js';
 import { notFoundHandler, errorHandler } from './middleware/error.middleware.js';
 import { sanitizeMongoInput } from './middleware/sanitize.middleware.js';
+import { requestContextMiddleware } from './middleware/requestContext.middleware.js';
 import { globalHttpRateLimit } from './middleware/globalRateLimit.middleware.js';
 import { razorpayWebhook } from './modules/payments/payments.controller.js';
 
@@ -57,6 +58,7 @@ import {
 import { platformKitsRouter } from './modules/kits/platformKits.routes.js';
 import mediaRoutes from './modules/media/media.routes.js';
 import chatRoutes from './modules/chat/chat.routes.js';
+import { platformReportsRouter } from './modules/reports/reports.routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIST = path.resolve(__dirname, '../../web/dist');
@@ -130,6 +132,8 @@ export function createApp() {
   const app = express();
 
   app.set('trust proxy', env.TRUST_PROXY);
+  // Seed request-scoped context (requestId) first so every downstream log correlates.
+  app.use(requestContextMiddleware);
   app.use(helmet(helmetOptions()));
   app.use((req, res, next) => cors(resolveCorsOptions(req))(req, res, next));
 
@@ -144,7 +148,17 @@ export function createApp() {
   // Defence-in-depth against NoSQL operator injection on every parsed request.
   app.use(sanitizeMongoInput);
   if (env.NODE_ENV !== 'test') {
-    app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url.includes('/health') } }));
+    app.use(
+      pinoHttp({
+        logger,
+        genReqId: (req) => req.requestId,
+        customProps: (req) => ({
+          tenantId: req.tenantId ?? undefined,
+          userId: req.user?.userId ?? undefined,
+        }),
+        autoLogging: { ignore: (req) => req.url.includes('/health') },
+      }),
+    );
   }
 
   // Serve user uploads defused: never sniff the content type, sandbox any
@@ -237,6 +251,7 @@ export function createApp() {
   api.use('/platform/production', platformProductionRouter);
   api.use('/platform/finance', platformFinanceRoutes);
   api.use('/platform/audit-logs', platformAuditRouter);
+  api.use('/platform/reports', platformReportsRouter);
   api.use('/platform/support-tickets', platformSupportRouter);
   api.use('/platform/team', platformTeamRouter);
   api.use('/platform/settings', platformSettingsRouter);

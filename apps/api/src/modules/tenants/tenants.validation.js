@@ -54,6 +54,7 @@ export const tenantLimitsSchema = z.object({
       maxRecipientsPerCampaign: z.number().int().positive(),
       maxWallets: z.number().int().positive(),
       maxUsers: z.number().int().positive(),
+      requestsPerMinute: z.number().int().positive(),
     })
     .partial(),
 });

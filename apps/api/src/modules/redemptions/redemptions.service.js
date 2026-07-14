@@ -24,6 +24,7 @@ import { Order, sanitizeOrderItems } from '../orders/order.model.js';
 import { Contact } from '../contacts/contact.model.js';
 import { transitionRedemption, finalizeRecipientRedemption } from '../campaigns/campaigns.service.js';
 import { computeAmountBreakdown } from '../../services/pricing.service.js';
+import { recordUsage } from '../../services/usage.service.js';
 import { env } from '../../config/env.js';
 import { redemptionSignOptions, redemptionVerifyOptions } from '../../config/jwt.js';
 import { sendOtpSms } from '../../services/msg91.service.js';
@@ -845,6 +846,7 @@ export async function submitRedemption(
     status: 'created',
     statusHistory: [{ status: 'created', at: new Date(), actorUserId: null, note: 'Redemption submit' }],
   });
+  recordUsage(recipient.tenantId, 'orders.created'); // §Gap E metering
 
   // Points campaigns stay open (pooled credits — the recipient can keep
   // ordering against remaining credit). Everything else, including one-shot

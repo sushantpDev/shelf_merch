@@ -2,6 +2,8 @@ import * as tenantsService from './tenants.service.js';
 import { signAccessToken } from '../auth/auth.service.js';
 import { writeAudit } from '../../services/audit.service.js';
 import { uploadFile } from '../../services/storage.service.js';
+import { getTenantUsage } from '../../services/usage.service.js';
+import { clearTenantLimitCache } from '../../services/tenantGuardrails.service.js';
 import { ForbiddenError } from '../../utils/errors.js';
 import { env } from '../../config/env.js';
 
@@ -83,6 +85,7 @@ export async function setPlan(req, res) {
 
 export async function setLimits(req, res) {
   const { tenant, previous } = await tenantsService.setTenantLimits(req.params.id, req.body.limits);
+  clearTenantLimitCache(req.params.id); // new requestsPerMinute takes effect at once
   writeAudit({
     req,
     action: 'tenant.set_limits',
@@ -92,6 +95,11 @@ export async function setLimits(req, res) {
     after: { limits: tenant.toObject().limits },
   });
   res.json(tenant);
+}
+
+/** §Gap E — a tenant's usage for the current (or ?period=YYYY-MM) billing period. */
+export async function usage(req, res) {
+  res.json(await getTenantUsage(req.params.id, req.query.period));
 }
 
 export async function overview(req, res) {

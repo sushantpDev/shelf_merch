@@ -39,6 +39,13 @@ const envSchema = z.object({
   MONGODB_URI: mongoUriSchema,
   REDIS_URL: z.string().default('redis://localhost:6379'),
 
+  // §Gap F — observability. LOG_LEVEL tunes pino; SENTRY_DSN /
+  // OTEL_EXPORTER_OTLP_ENDPOINT activate error reporting + tracing when their
+  // (optional) packages are installed. Empty = disabled.
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  SENTRY_DSN: z.string().optional().default(''),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional().default(''),
+
   JWT_ACCESS_SECRET: requiredSecret('dev-access-secret-change-me'),
   JWT_REFRESH_SECRET: requiredSecret('dev-refresh-secret-change-me'),
   JWT_ACCESS_TTL: z.string().default('15m'),

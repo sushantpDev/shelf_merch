@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { accessVerifyOptions } from '../config/jwt.js';
+import { setRequestContext } from '../config/requestContext.js';
 import { RoleAssignment } from '../modules/roles/roleAssignment.model.js';
 import { UnauthorizedError } from '../utils/errors.js';
 
@@ -40,6 +41,7 @@ export async function authenticate(req, _res, next) {
 
     req.user = user;
     req.impersonation = payload.impersonation ?? { isImpersonating: false, originalUserId: null };
+    setRequestContext({ userId: user.userId });
     next();
   } catch {
     next(new UnauthorizedError('Invalid or expired access token'));
