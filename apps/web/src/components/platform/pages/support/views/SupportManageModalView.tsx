@@ -2,9 +2,11 @@ import { PlatformError, PlatformModal } from "../../../platform-ui";
 import { SUPPORT_TICKET_STATUSES } from "../model";
 import type { SupportManageVm } from "../controllers/useSupportManageController";
 
-/** Support ticket manage modal: status, assign, reply, resend links. */
+/** Support ticket manage modal: conversation, status, assign, reply, resend links. */
 export function SupportManageModalView({
   row,
+  ticket,
+  messages,
   status,
   team,
   assignee,
@@ -24,10 +26,15 @@ export function SupportManageModalView({
   onResendRedemption,
   onResendTracking,
 }: SupportManageVm) {
+  const tenantName = String(ticket?.tenantName ?? "");
+  const raisedByName = String(ticket?.raisedByName ?? "");
+  const description = String(ticket?.description ?? row.description ?? "");
   return (
     <PlatformModal
       title={String(row.subject ?? "Ticket")}
-      subtitle={String(row.type ?? "")}
+      subtitle={[String(row.type ?? ""), tenantName, raisedByName && `raised by ${raisedByName}`]
+        .filter(Boolean)
+        .join(" · ")}
       onClose={onClose}
     >
       {err && <PlatformError message={err} />}
@@ -39,6 +46,54 @@ export function SupportManageModalView({
           {okNote}
         </div>
       )}
+
+      {description && (
+        <p className="muted" style={{ fontSize: 13, whiteSpace: "pre-wrap", marginBottom: 12 }}>
+          {description}
+        </p>
+      )}
+
+      <div className="field">
+        <label className="lbl">Conversation</label>
+        {messages.length === 0 ? (
+          <p className="muted" style={{ fontSize: 13 }}>
+            No messages yet.
+          </p>
+        ) : (
+          <div style={{ maxHeight: 260, overflowY: "auto" }}>
+            {messages.map((m, i) => (
+              <div
+                key={m._id ?? i}
+                style={{
+                  border: "1px solid var(--line)",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  marginBottom: 6,
+                  opacity: m.internal ? 0.75 : 1,
+                }}
+              >
+                <div className="row" style={{ justifyContent: "space-between", fontSize: 12 }}>
+                  <strong>
+                    {m.fromPlatform === false
+                      ? m.authorName || "Customer"
+                      : m.authorName || "Agent"}
+                    {m.internal ? " · internal note" : ""}
+                  </strong>
+                  <span className="muted">
+                    {new Date(m.at).toLocaleString("en-IN", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                  </span>
+                </div>
+                <div style={{ fontSize: 13, whiteSpace: "pre-wrap", marginTop: 3 }}>{m.body}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="divider" style={{ margin: "18px 0" }} />
 
       <div className="field">
         <label className="lbl">Status</label>

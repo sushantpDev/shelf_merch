@@ -1,16 +1,28 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   addTicketMessage,
   assignTicket,
   fetchPlatformTeam,
+  fetchPlatformTicket,
   resendRedemptionLink,
   resendTicketTracking,
   setTicketStatus,
 } from "../model";
 
+export type TicketMessage = {
+  _id?: string;
+  authorName?: string;
+  fromPlatform?: boolean;
+  internal?: boolean;
+  body: string;
+  at: string;
+};
+
 export type SupportManageVm = {
   row: Record<string, unknown>;
   ticketId: string;
+  ticket: Record<string, unknown> | null;
+  messages: TicketMessage[];
   status: string;
   team: { userId: string; name: string }[];
   assignee: string;
@@ -38,6 +50,7 @@ export function useSupportManageController(
   onChanged: () => void,
 ): SupportManageVm {
   const ticketId = String(row._id);
+  const [ticket, setTicket] = useState<Record<string, unknown> | null>(null);
   const [status, setStatus] = useState(String(row.status ?? "open"));
   const [team, setTeam] = useState<{ userId: string; name: string }[]>([]);
   const [assignee, setAssignee] = useState("");
@@ -47,11 +60,18 @@ export function useSupportManageController(
   const [err, setErr] = useState("");
   const [okNote, setOkNote] = useState("");
 
+  const reloadTicket = useCallback(() => {
+    fetchPlatformTicket(ticketId)
+      .then(setTicket)
+      .catch(() => setTicket(null));
+  }, [ticketId]);
+
   useEffect(() => {
+    reloadTicket();
     fetchPlatformTeam()
       .then((t) => setTeam(t.filter((m) => m.status === "active")))
       .catch(() => setTeam([]));
-  }, []);
+  }, [reloadTicket]);
 
   async function run(fn: () => Promise<unknown>, ok: string) {
     setBusy(true);
@@ -60,6 +80,7 @@ export function useSupportManageController(
     try {
       await fn();
       setOkNote(ok);
+      reloadTicket();
       onChanged();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Request failed");
@@ -71,6 +92,8 @@ export function useSupportManageController(
   return {
     row,
     ticketId,
+    ticket,
+    messages: (ticket?.messages as TicketMessage[] | undefined) ?? [],
     status,
     team,
     assignee,

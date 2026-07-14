@@ -26,6 +26,7 @@ export function SupportView({
     render?: (row: Record<string, unknown>) => ReactNode;
   }[] = [
     { key: "subject", label: "Subject" },
+    { key: "tenantName", label: "Tenant", render: (r) => String(r.tenantName ?? "") || "—" },
     { key: "type", label: "Type" },
     { key: "status", label: "Status", render: (r) => <StatusTag status={String(r.status)} /> },
     {

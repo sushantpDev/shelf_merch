@@ -525,6 +525,9 @@ export function createOrderReplacement(id: string, reason: string) {
 }
 
 // ---- Support tickets ----
+export function fetchPlatformTicket(id: string) {
+  return apiFetch<Record<string, unknown>>(`/platform/support-tickets/${id}`);
+}
 export function setTicketStatus(id: string, status: string) {
   return apiFetch(`/platform/support-tickets/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
 }

@@ -36,6 +36,9 @@ const supportTicketSchema = new mongoose.Schema(
     messages: [
       {
         authorUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        authorName: { type: String, default: '' },
+        // true when written by platform staff, false for tenant/recipient authors.
+        fromPlatform: { type: Boolean, default: true },
         body: { type: String, required: true },
         // Internal notes are platform-only and never shown to tenants/recipients.
         internal: { type: Boolean, default: false },

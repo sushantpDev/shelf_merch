@@ -15,6 +15,7 @@ import {
   Gift,
   Home,
   LayoutGrid,
+  LifeBuoy,
   Megaphone,
   Settings,
   Shirt,
@@ -41,6 +42,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   kits: Gift,
   campaigns: Megaphone,
   contacts: Users,
+  support: LifeBuoy,
   settings: Settings,
   catalog: LayoutGrid,
 };
