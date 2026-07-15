@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   createKitFlow,
+  ensureCuratedKitFlow,
   launchKitCampaignFlow,
   refreshPlatformKits,
   updateKitFlow,
@@ -39,6 +40,23 @@ export function useCreateKit() {
   const invalidate = useInvalidateWorkspace();
   return useMutation({
     mutationFn: (input: CreateKitInput) => createKitFlow(input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** Clone/reuse a curated platform kit for send (campaignOps write — entity_manager OK). */
+export function useEnsureCuratedKit() {
+  const invalidate = useInvalidateWorkspace();
+  return useMutation({
+    mutationFn: (input: {
+      platformKitId: string;
+      productRefs?: Array<{
+        catalogProductId: string;
+        brand?: string;
+        name: string;
+        group?: string;
+      }>;
+    }) => ensureCuratedKitFlow(input.platformKitId, input.productRefs),
     onSuccess: () => invalidate(),
   });
 }

@@ -8,9 +8,11 @@ import { tenantArea } from '../../middleware/tenantAccess.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { objectId } from '../users/users.validation.js';
 import { Kit } from './kit.model.js';
+import { PlatformKit } from './platformKit.model.js';
+import { CatalogProduct } from '../catalog/catalogProduct.model.js';
 import { uploadFile } from '../../services/storage.service.js';
 import { writeAudit } from '../../services/audit.service.js';
-import { NotFoundError } from '../../utils/errors.js';
+import { ApiError, NotFoundError } from '../../utils/errors.js';
 
 const upload = uploader({ allow: DOCUMENT_TYPES, maxSizeMb: 25 });
 const router = Router();
@@ -18,6 +20,8 @@ const router = Router();
 router.use(authenticate, resolveTenant, requireTenantContext);
 const canWrite = tenantArea('kits', 'write');
 const canRead = tenantArea('kits', 'read');
+/** Clone a curated platform kit into the tenant workspace for send — ops only. */
+const canOperate = tenantArea('campaignOps', 'write');
 
 const productRef = z.object({
   catalogProductId: objectId,
@@ -37,11 +41,132 @@ const createSchema = z.object({
 
 const updateSchema = createSchema.partial();
 
+function parseCuratedMeta(designNotes) {
+  try {
+    if (!designNotes) return null;
+    const parsed = JSON.parse(designNotes);
+    if (parsed && parsed.curated) return parsed;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 router.get(
   '/',
   canRead,
   asyncHandler(async (req, res) => {
     res.json(await Kit.find({ tenantId: req.tenantId }).sort({ createdAt: -1 }));
+  }),
+);
+
+/**
+ * Ensure a tenant-scoped clone of a platform curated kit exists for sending.
+ * Reuses an existing curated clone when present. Allowed for campaignOps write
+ * (entity_manager + super) without granting general kits write.
+ *
+ * Body may include productRefs resolved from the tenant catalog (preferred).
+ * Falls back to platform kit items / active catalog products when needed.
+ */
+router.post(
+  '/from-platform/:platformKitId',
+  canOperate,
+  validate({
+    params: z.object({ platformKitId: objectId }),
+    body: z
+      .object({
+        productRefs: z.array(productRef).min(1).optional(),
+      })
+      .optional(),
+  }),
+  asyncHandler(async (req, res) => {
+    const platformKitId = String(req.params.platformKitId);
+    const existing = await Kit.find({ tenantId: req.tenantId }).sort({ createdAt: -1 });
+    const reuse = existing.find((k) => {
+      const meta = parseCuratedMeta(k.designNotes);
+      return meta && String(meta.originalId) === platformKitId;
+    });
+    if (reuse) {
+      return res.json(reuse);
+    }
+
+    const platformKit = await PlatformKit.findOne({ _id: platformKitId, status: 'active' });
+    if (!platformKit) throw new NotFoundError('Curated kit not found');
+
+    let productRefs = Array.isArray(req.body?.productRefs) ? [...req.body.productRefs] : [];
+
+    if (productRefs.length === 0) {
+      const catalogIds = (platformKit.items || [])
+        .map((item) => item.catalogProductId)
+        .filter(Boolean);
+      const products = catalogIds.length
+        ? await CatalogProduct.find({ _id: { $in: catalogIds } }).lean()
+        : [];
+      const byId = new Map(products.map((p) => [String(p._id), p]));
+
+      for (const item of platformKit.items || []) {
+        const pid = item.catalogProductId;
+        if (!pid) continue;
+        const product = byId.get(String(pid));
+        productRefs.push({
+          catalogProductId: pid,
+          brand: product?.brand || '',
+          name: product?.name || 'Product',
+          group: product?.category || product?.group || '',
+        });
+      }
+    }
+
+    // Shopify-imported curated kits often have empty `items`. Fall back to
+    // active catalog products so Send still works (mirrors prior frontend behaviour).
+    if (productRefs.length === 0) {
+      const fallbackCount = Math.max(1, (platformKit.imageUrls?.length || 1) - 1 || 1);
+      const fallbackProducts = await CatalogProduct.find({ status: 'active' })
+        .sort({ name: 1 })
+        .limit(fallbackCount)
+        .lean();
+      productRefs = fallbackProducts.map((product) => ({
+        catalogProductId: product._id,
+        brand: product.brand || '',
+        name: product.name || 'Product',
+        group: product.category || product.group || '',
+      }));
+    }
+
+    if (productRefs.length === 0) {
+      throw new ApiError(
+        422,
+        'Curated kit has no resolvable catalog products. Add products to the catalog first.',
+        'EMPTY_CURATED_KIT',
+      );
+    }
+
+    const designNotes = JSON.stringify({
+      curated: true,
+      originalId: platformKitId,
+      description: platformKit.description || '',
+      imageUrls: platformKit.imageUrls || [],
+    });
+
+    const kit = await Kit.create({
+      tenantId: req.tenantId,
+      name: platformKit.name,
+      description: platformKit.description || '',
+      productRefs,
+      packaging: platformKit.packaging === 'none' ? 'none' : 'box',
+      designNotes,
+      status: 'live',
+      artworkUrl: platformKit.imageUrls?.[0] || '',
+    });
+
+    writeAudit({
+      req,
+      action: 'kit.clone_curated',
+      entityType: 'Kit',
+      entityId: kit._id,
+      after: kit.toObject(),
+    });
+    res.status(201).json(kit);
   }),
 );
 

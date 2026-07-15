@@ -15,6 +15,7 @@ import { USE_MOCKS } from "./config";
 import {
   createCollectionApi,
   createKitApi,
+  ensureCuratedKitApi,
   updateKitApi,
   uploadCollectionArtworkApi,
   uploadCollectionMockupsApi,
@@ -361,6 +362,19 @@ export async function createKitFlow(payload: {
     return uploadKitArtworkApi(kit.id, payload.artwork.file);
   }
   return kit;
+}
+
+/** Clone (or reuse) a curated platform kit for the send workflow. */
+export async function ensureCuratedKitFlow(
+  platformKitId: string,
+  productRefs?: Array<{
+    catalogProductId: string;
+    brand?: string;
+    name: string;
+    group?: string;
+  }>,
+) {
+  return ensureCuratedKitApi(platformKitId, productRefs);
 }
 
 export async function updateKitFlow(payload: {
