@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import { useContacts, useUpdateContact } from "../model";
+import { useContacts, useDeleteContact, useUpdateContact } from "../model";
 import type { UiContact } from "../model";
 import { contactToForm, ROLES } from "../types";
 
@@ -26,6 +26,7 @@ export type ContactsVm = {
   allSelected: boolean;
   someSelected: boolean;
   isRolePending: boolean;
+  isDeletePending: boolean;
   canManageContacts: boolean;
   canManageContactRoles: boolean;
   adding: boolean;
@@ -39,6 +40,7 @@ export type ContactsVm = {
   onToggleAll: () => void;
   onToggleOne: (id: string) => void;
   onRoleChange: (contact: UiContact, role: string) => void;
+  onDelete: (contact: UiContact) => void;
   onAddOpen: (tab?: "manual" | "csv") => void;
   onAddOpenChange: (open: boolean) => void;
   onEdit: (contact: UiContact) => void;
@@ -79,6 +81,7 @@ export function useContactsController(): ContactsVm {
   const { canManageContacts, canManageUsers } = useTenantAccess();
   const { data: contacts, isLoading, isError, error } = useContacts(workspace.data?.contacts);
   const updateContact = useUpdateContact();
+  const deleteContact = useDeleteContact();
 
   const [tab, setTab] = useState<ContactsTab>("permissions");
   const [query, setQuery] = useState("");
@@ -149,6 +152,27 @@ export function useContactsController(): ContactsVm {
     }
   }
 
+  async function onDelete(contact: UiContact) {
+    if (contact.role === "Owner") {
+      toast.error("The workspace owner contact cannot be deleted");
+      return;
+    }
+    const label = contact.name || contact.email;
+    if (!window.confirm(`Delete contact "${label}"? This cannot be undone.`)) return;
+    try {
+      await deleteContact.mutateAsync(contact.id);
+      setSelected((prev) => {
+        const next = new Set(prev);
+        next.delete(contact.id);
+        return next;
+      });
+      if (editing?.id === contact.id) setEditing(null);
+      toast.success("Contact deleted");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not delete contact");
+    }
+  }
+
   return {
     isLoading: isLoading && !contacts,
     errorMessage: isError
@@ -167,6 +191,7 @@ export function useContactsController(): ContactsVm {
     allSelected,
     someSelected,
     isRolePending: updateContact.isPending,
+    isDeletePending: deleteContact.isPending,
     canManageContacts: canManageContacts(),
     canManageContactRoles: canManageUsers(),
     adding,
@@ -183,6 +208,7 @@ export function useContactsController(): ContactsVm {
     onToggleAll,
     onToggleOne,
     onRoleChange,
+    onDelete,
     onAddOpen: (tab: "manual" | "csv" = "manual") => {
       setAddInitialTab(tab);
       setAdding(true);

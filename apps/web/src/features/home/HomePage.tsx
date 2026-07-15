@@ -18,6 +18,8 @@ import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { getLastShop } from "@/features/shops/types";
 import { ShopBanner } from "@/features/shops/banner";
 import { getStoredUser } from "@/services/api-bridge";
+import { entityManagerBudgetRemaining } from "@/services/workspace-api";
+import { walletUnallocated } from "@/lib/walletFormat";
 import "./home.css";
 
 function formatInr(amount: number) {
@@ -121,10 +123,16 @@ export function HomePage() {
   const wallets = workspace.wallets ?? [];
   const showOnboarding = wallets.length === 0;
   const orgWallet = workspace.org?.wallet;
-  const mainBalance =
-    workspace.org.active && orgWallet?.amount != null
-      ? orgWallet.amount
-      : wallets[0]?.balance ?? 0;
+  // Match Wallets page: entity managers see remaining dept budget (allocated − spent);
+  // company admins see unallocated wallet cash.
+  const remainingBalance =
+    workspace.userPatch.role === "entity_manager"
+      ? entityManagerBudgetRemaining(workspace)
+      : workspace.org.active && orgWallet?.unallocated != null
+        ? orgWallet.unallocated
+        : wallets[0]
+          ? walletUnallocated(wallets[0])
+          : 0;
 
   const pinnedShop = getLastShop(workspace.shops);
 
@@ -244,8 +252,8 @@ export function HomePage() {
             <div className="home-wallet-grid">
               <div className="home-wallet-tile">
                 <div className="home-wallet-tile__label">{account} wallet</div>
-                <div className="home-wallet-tile__balance">{formatInr(mainBalance)}</div>
-                <div className="home-wallet-tile__sub">Your balance</div>
+                <div className="home-wallet-tile__balance">{formatInr(remainingBalance)}</div>
+                <div className="home-wallet-tile__sub">Available to spend</div>
               </div>
               {/* {wallets[0] ? (
                 // <div className="home-wallet-tile">

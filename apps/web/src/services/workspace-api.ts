@@ -697,6 +697,10 @@ export async function updateContactApi(
   return mapContact(contact as never);
 }
 
+export async function deleteContactApi(contactId: string) {
+  await apiFetch<void>(`/contacts/${contactId}`, { method: "DELETE" });
+}
+
 export type ContactImportStatus = {
   status: "queued" | "processing" | "done" | "failed";
   totalRows: number;

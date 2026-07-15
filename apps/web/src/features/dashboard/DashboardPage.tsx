@@ -28,6 +28,8 @@ import { ShopBanner } from "@/features/shops/banner";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { getStoredUser } from "@/services/api-bridge";
+import { entityManagerBudgetRemaining } from "@/services/workspace-api";
+import { walletUnallocated } from "@/lib/walletFormat";
 import startDesigningImg from "../../../assets/dashb-start-designing.png";
 import workspaceSettingsImg from "../../../assets/workspace-setting-tab.png";
 import setupHeroImg from "../../../assets/dash-setup-hero.png";
@@ -481,7 +483,7 @@ function WalletsSection({ account, wallets, mainBalance }: { account: string; wa
           <span className="dash-wallet-mini__icon"><Wallet size={18} aria-hidden="true" /></span>
           <span className="dash-wallet-mini__name">{account} Wallet <ChevronRight size={14} aria-hidden="true" /></span>
           <strong>{formatInr(mainBalance)}</strong>
-          <small>Your balance</small>
+          <small>Available to spend</small>
           <i />
         </Link>
         <Link to="/app/wallets" state={{ startCreateWallet: true }} className="dash-wallet-create">
@@ -602,7 +604,16 @@ export function DashboardPage() {
   const senderCount = workspace.orders?.length ?? 0;
   const wallets = workspace.wallets ?? [];
   const orgWallet = workspace.org?.wallet;
-  const mainBalance = workspace.org.active && orgWallet?.amount != null ? orgWallet.amount : wallets[0]?.balance ?? 0;
+  // Match Wallets page: entity managers see remaining dept budget (allocated − spent);
+  // company admins see unallocated wallet cash.
+  const mainBalance =
+    workspace.userPatch.role === "entity_manager"
+      ? entityManagerBudgetRemaining(workspace)
+      : workspace.org.active && orgWallet?.unallocated != null
+        ? orgWallet.unallocated
+        : wallets[0]
+          ? walletUnallocated(wallets[0])
+          : 0;
   const pinnedShop = workspace.shops.find((s) => s.live) ?? workspace.shops[0] ?? null;
   const activeShopCount = workspace.shops.filter((s) => s.live).length || workspace.shops.length;
   const showOnboarding = wallets.length === 0;

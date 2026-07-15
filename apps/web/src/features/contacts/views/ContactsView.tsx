@@ -3,19 +3,13 @@ import {
   Ban,
   ChevronDown,
   HelpCircle,
-  MoreHorizontal,
   Search,
   SquareArrowOutUpRight,
+  Trash2,
   Upload,
   UserPlus,
 } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ContactFormDialog } from "../ContactFormDialog";
 import { ROLES } from "../types";
 import type { UiContact } from "../model";
@@ -111,21 +105,26 @@ export function ContactsView(vm: ContactsVm) {
                 <HelpCircle size={15} />
               </button>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button type="button" className="contacts-more-btn" aria-label="More actions">
-                  <MoreHorizontal size={18} />
+            {vm.canManageContacts ? (
+              <div className="contacts-top-btns">
+                <button
+                  type="button"
+                  className="btn btn-ghost contacts-add-btn"
+                  onClick={() => vm.onAddOpen("manual")}
+                >
+                  <UserPlus size={15} aria-hidden="true" />
+                  Add contacts
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="contacts-more-menu">
-                <DropdownMenuItem onSelect={() => vm.onAddOpen("manual")}>
-                  <UserPlus size={15} /> Add contacts
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => vm.onAddOpen("csv")}>
-                  <Upload size={15} /> Import
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <button
+                  type="button"
+                  className="btn btn-brand contacts-add-btn"
+                  onClick={() => vm.onAddOpen("csv")}
+                >
+                  <Upload size={15} aria-hidden="true" />
+                  Import
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -239,7 +238,7 @@ export function ContactsView(vm: ContactsVm) {
                           onToggleSort={vm.onToggleSort}
                         />
                         <th>Role</th>
-                        {vm.tab === "permissions" && <th>Permissions</th>}
+                        <th>Dept</th>
                         {vm.tab === "permissions" && (
                           <SortHead
                             label="Integrated with"
@@ -284,11 +283,13 @@ export function ContactsView(vm: ContactsVm) {
                               </select>
                             )}
                           </td>
-                          {vm.tab === "permissions" && (
-                            <td className="contacts-td-muted">{permissionLabel(c.role)}</td>
-                          )}
-                          {vm.tab === "permissions" && (
-                            <td className="contacts-td-muted">{integratedLabel(c)}</td>
+                          {vm.tab === "permissions" ? (
+                            <>
+                              <td className="contacts-td-muted">{emptyCell(c.department)}</td>
+                              <td className="contacts-td-muted">{integratedLabel(c)}</td>
+                            </>
+                          ) : (
+                            <td className="contacts-td-muted">{emptyCell(c.department)}</td>
                           )}
                           <td className="contacts-td-muted">{emptyCell(c.loc)}</td>
                           <td className="contacts-td-actions">
@@ -310,6 +311,15 @@ export function ContactsView(vm: ContactsVm) {
                                   onClick={() => vm.onEdit(c)}
                                 >
                                   <SquareArrowOutUpRight size={15} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="contacts-row-action contacts-row-action--danger"
+                                  aria-label={`Delete ${c.name || c.email}`}
+                                  disabled={c.role === "Owner" || vm.isDeletePending}
+                                  onClick={() => vm.onDelete(c)}
+                                >
+                                  <Trash2 size={15} />
                                 </button>
                               </>
                             ) : null}

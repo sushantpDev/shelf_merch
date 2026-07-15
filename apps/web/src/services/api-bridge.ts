@@ -34,6 +34,7 @@ import { mapCatalogProduct } from "./mappers";
 import {
   createContactsApi,
   createShopApi,
+  deleteContactApi,
   fetchContactsImportStatusApi,
   fetchWorkspaceSnapshot,
   listContactsApi,
@@ -323,6 +324,10 @@ export async function updateContactFlow(
   },
 ): Promise<UiContact> {
   return updateContactApi(contactId, payload);
+}
+
+export async function deleteContactFlow(contactId: string): Promise<void> {
+  await deleteContactApi(contactId);
 }
 
 export type { ContactImportStatus };

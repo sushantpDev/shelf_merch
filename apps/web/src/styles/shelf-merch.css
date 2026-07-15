@@ -386,7 +386,8 @@ select.inp{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http
   margin-left:2px;
 }
 .contacts-stats-help:hover{background:var(--info-50)}
-.contacts-add-btn{text-transform:uppercase;letter-spacing:.04em;font-size:12px;height:42px;padding:0 18px}
+.contacts-add-btn{text-transform:uppercase;letter-spacing:.04em;font-size:12px;height:42px;padding:0 18px;display:inline-flex;align-items:center;gap:8px}
+.contacts-top-btns{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .contacts-more-btn{
   width:42px;
   height:42px;
@@ -600,6 +601,7 @@ select.inp{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http
   margin-left:2px;
 }
 .contacts-row-action:hover:not(:disabled){background:var(--surface-2);color:var(--ink)}
+.contacts-row-action--danger:hover:not(:disabled){background:#fef2f2;color:var(--danger)}
 .contacts-row-action:disabled{opacity:.35;cursor:not-allowed}
 .contacts-empty{padding:48px 24px;text-align:center}
 .contacts-empty h3{font-size:18px;margin-bottom:6px}

@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addContactFlow,
+  deleteContactFlow,
   importContactsFlow,
   refreshContactsFlow,
   updateContactFlow,
   type ContactImportStatus,
 } from "@/services/api-bridge";
+import { WORKSPACE_QUERY_KEY } from "@/hooks/useWorkspace";
 import type { UiContact } from "@/services/mappers";
 import { toContactPayload, type ContactFormValues } from "./types";
 
@@ -24,11 +26,16 @@ export function useContacts(initialData?: UiContact[]) {
   });
 }
 
+function invalidateContacts(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: CONTACTS_QUERY_KEY });
+  queryClient.invalidateQueries({ queryKey: WORKSPACE_QUERY_KEY });
+}
+
 export function useAddContact() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (values: ContactFormValues) => addContactFlow(toContactPayload(values)),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: CONTACTS_QUERY_KEY }),
+    onSuccess: () => invalidateContacts(queryClient),
   });
 }
 
@@ -37,7 +44,15 @@ export function useUpdateContact() {
   return useMutation({
     mutationFn: ({ id, values }: { id: string; values: ContactFormValues }) =>
       updateContactFlow(id, toContactPayload(values)),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: CONTACTS_QUERY_KEY }),
+    onSuccess: () => invalidateContacts(queryClient),
+  });
+}
+
+export function useDeleteContact() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteContactFlow(id),
+    onSuccess: () => invalidateContacts(queryClient),
   });
 }
 
@@ -46,6 +61,6 @@ export function useImportContacts() {
   return useMutation({
     mutationFn: ({ file, onStatus }: { file: File; onStatus?: (s: ContactImportStatus) => void }) =>
       importContactsFlow(file, onStatus),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: CONTACTS_QUERY_KEY }),
+    onSuccess: () => invalidateContacts(queryClient),
   });
 }

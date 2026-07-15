@@ -75,6 +75,30 @@ router.patch(
   }),
 );
 
+router.delete(
+  '/:id',
+  canWrite,
+  validate({ params: z.object({ id: objectId }) }),
+  asyncHandler(async (req, res) => {
+    const contact = await Contact.findOne({ _id: req.params.id, tenantId: req.tenantId });
+    if (!contact) throw new NotFoundError('Contact not found');
+    if (contact.role === 'Owner') {
+      throw new ApiError(403, 'The workspace owner contact cannot be deleted', 'OWNER_PROTECTED');
+    }
+    const before = contact.toObject();
+    await contact.softDelete();
+    writeAudit({
+      req,
+      action: 'contact.delete',
+      entityType: 'Contact',
+      entityId: contact._id,
+      before,
+      after: { deletedAt: contact.deletedAt },
+    });
+    res.status(204).send();
+  }),
+);
+
 const ACCEPTED_IMPORT_EXT = /\.(csv|xlsx|xls)$/i;
 const ACCEPTED_IMPORT_MIME = new Set([
   'text/csv',
