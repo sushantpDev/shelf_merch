@@ -86,6 +86,7 @@ export type UiKitProductRef = {
 export type UiKit = {
   id: string;
   name: string;
+  description?: string;
   items: number;
   status: string;
   sent: boolean;
@@ -383,6 +384,7 @@ export function mapKit(k: ApiProduct): UiKit {
   return {
     id: String(k._id),
     name: k.name,
+    description: typeof k.description === "string" ? k.description : "",
     items: productRefs.length,
     status: k.status === "live" ? "live" : k.status === "archived" ? "archived" : "draft",
     sent: Boolean(k.lastSentAt),

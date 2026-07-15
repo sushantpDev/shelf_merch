@@ -277,6 +277,27 @@ export async function createKitApi(payload: {
   return mapKit(kit);
 }
 
+/**
+ * Ensure a workspace clone of a curated platform kit exists for the send flow.
+ * Allowed for campaignOps write (entity_manager) — does not require kits write.
+ * Optional productRefs (from tenant catalog) avoid empty curated kits with no item IDs.
+ */
+export async function ensureCuratedKitApi(
+  platformKitId: string,
+  productRefs?: Array<{
+    catalogProductId: string;
+    brand?: string;
+    name: string;
+    group?: string;
+  }>,
+) {
+  const kit = await apiFetch<Record<string, unknown>>(`/kits/from-platform/${platformKitId}`, {
+    method: "POST",
+    body: JSON.stringify(productRefs?.length ? { productRefs } : {}),
+  });
+  return mapKit(kit);
+}
+
 export async function updateKitApi(payload: {
   id: string;
   name?: string;

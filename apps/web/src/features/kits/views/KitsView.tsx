@@ -1,4 +1,4 @@
-import { type ComponentType, useState, useMemo } from "react";
+import { type ComponentType, type CSSProperties, useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router";
 import {
   ArrowRight,
@@ -21,10 +21,14 @@ import {
 import { toast } from "sonner";
 import { LoadingState } from "@/components/LoadingState";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import { useUpdateKit, useCreateKit, usePlatformKits, type PlatformKitTemplate, type UiKit } from "../model";
+import { useUpdateKit, useCreateKit, useEnsureCuratedKit, usePlatformKits, type PlatformKitTemplate, type UiKit } from "../model";
 import { kitPickedIndices } from "../wizard/kitDraft";
-import { KitDetailDialog } from "../KitDetailDialog";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  KitPreviewDialog,
+  buildKitPreviewFromPlatform,
+  buildKitPreviewFromWorkspace,
+  type KitPreviewData,
+} from "../KitPreviewDialog";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import type { KitsVm } from "../controllers/useKitsController";
 import { KitsEmptyState } from "./KitsEmptyState";
@@ -33,6 +37,32 @@ import wellnessKitImg from "../../../../assets/wellness-kit.png";
 import workFromHomeKitImg from "../../../../assets/work-from-home-kit.png";
 import kitPreviewImg from "../../../../assets/kit-preview.png";
 import "../kits-page.css";
+
+const previewBtnStyle: CSSProperties = {
+  flex: 1,
+  border: "1px solid var(--line)",
+  height: 32,
+  fontSize: 13,
+  fontWeight: 700,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 6,
+  color: "var(--ink)",
+  background: "transparent",
+  cursor: "pointer",
+};
+
+const sendBtnStyle: CSSProperties = {
+  flex: 1,
+  height: 32,
+  fontSize: 13,
+  fontWeight: 700,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 6,
+};
 
 type StatCardProps = {
   label: string;
@@ -329,11 +359,12 @@ export function KitsView(vm: KitsVm) {
   const { data: workspace } = useWorkspace();
   const updateKit = useUpdateKit();
   const createKit = useCreateKit();
+  const ensureCuratedKit = useEnsureCuratedKit();
   const { data: platformKits } = usePlatformKits();
+  const catalog = workspace?.catalogProducts ?? [];
 
   const [activeSection, setActiveSection] = useState<"recent" | "customized" | "curated">("recent");
-  const [previewKit, setPreviewKit] = useState<UiKit | null>(null);
-  const [curatedPreviewKit, setCuratedPreviewKit] = useState<PlatformKitTemplate | null>(null);
+  const [kitPreview, setKitPreview] = useState<KitPreviewData | null>(null);
 
   // Recent Activity section states
   const [recentTab, setRecentTab] = useState<"all" | "live" | "draft" | "archived">("all");
@@ -362,9 +393,9 @@ export function KitsView(vm: KitsVm) {
       .map((kit): KitRow => ({
         id: kit.id,
         name: kit.name,
-        description: "Custom kit created in your workspace.",
+        description: kit.description?.trim() || "Custom kit created in your workspace.",
         audience: "Workspace",
-        image: kitPreviewImg,
+        image: kit.artworkUrl ? resolveMediaUrl(kit.artworkUrl) : kitPreviewImg,
         items: kit.items,
         status: kit.status === "live" ? "live" : kit.status === "archived" ? "archived" : "draft",
         lastSent: kit.sent ? "Recently" : "-",
@@ -383,13 +414,28 @@ export function KitsView(vm: KitsVm) {
         return meta?.originalId === kit._id;
       });
 
+      // Platform kits (esp. Shopify imports) often have empty `items`; fall back to
+      // workspace clone count, then gallery product images (cover is index 0).
+      const imageItemCount =
+        (kit.imageUrls?.length ?? 0) > 1
+          ? (kit.imageUrls!.length - 1)
+          : (kit.imageUrls?.length ?? 0) === 1
+            ? 1
+            : 0;
+      const itemCount =
+        (kit.items?.length && kit.items.length > 0
+          ? kit.items.length
+          : matchedWk?.items && matchedWk.items > 0
+            ? matchedWk.items
+            : imageItemCount) || 0;
+
       return {
         id: matchedWk ? matchedWk.id : kit._id,
         name: matchedWk ? matchedWk.name : kit.name,
         description: kit.description || "",
         audience: "Platform",
         image: coverImg,
-        items: kit.items?.length ?? 0,
+        items: itemCount,
         status: matchedWk
           ? (matchedWk.status === "live" ? "live" : matchedWk.status === "archived" ? "archived" : "draft")
           : "live",
@@ -416,16 +462,22 @@ export function KitsView(vm: KitsVm) {
 
   // Construct complete Recent Activity history rows
   const recentActivityRows = useMemo<KitRow[]>(() => {
+    const findKitByName = (name: string) =>
+      vm.kits.find((k) => k.name.trim().toLowerCase() === name.trim().toLowerCase());
+
     const campaignRows: KitRow[] = (workspace?.campaigns ?? [])
       .filter((c) => c.type !== "send_points")
       .map((c) => {
-        const matchedKit = vm.kits.find((k) => k.name === c.name);
+        const matchedKit = findKitByName(c.name);
         return {
-          id: c.id,
+          id: matchedKit?.id ?? c.id,
           name: c.name,
-          description: "Custom kit created in your workspace.",
+          description:
+            matchedKit?.description?.trim() || "Custom kit created in your workspace.",
           audience: "Workspace",
-          image: matchedKit?.artworkUrl ? resolveMediaUrl(matchedKit.artworkUrl) : kitPreviewImg,
+          image: matchedKit?.artworkUrl
+            ? resolveMediaUrl(matchedKit.artworkUrl)
+            : kitPreviewImg,
           items: matchedKit?.items ?? 3,
           status: c.status === "draft" ? "draft" : "live",
           lastSent: c.createdAt ? "Recently" : "Recently",
@@ -434,7 +486,21 @@ export function KitsView(vm: KitsVm) {
         };
       });
 
-    return [...campaignRows, ...mockHistoryRows];
+    const historyRows = mockHistoryRows.map((row): KitRow => {
+      const matchedKit = findKitByName(row.name);
+      return {
+        ...row,
+        id: matchedKit?.id ?? row.id,
+        description: matchedKit?.description?.trim() || row.description,
+        image: matchedKit?.artworkUrl
+          ? resolveMediaUrl(matchedKit.artworkUrl)
+          : row.image,
+        items: matchedKit?.items ?? row.items,
+        kit: matchedKit,
+      };
+    });
+
+    return [...campaignRows, ...historyRows];
   }, [workspace?.campaigns, vm.kits]);
 
   // Filtered & Sorted Recent Activity
@@ -521,55 +587,96 @@ export function KitsView(vm: KitsVm) {
 
   // ── Handlers for Curated Action & Send ──
 
-  const handleSendCuratedKit = async (kit: PlatformKitTemplate) => {
-    const catalog = workspace?.catalogProducts ?? [];
-    const pickedIndices: number[] = [];
-    if (kit.items) {
-      for (const item of kit.items) {
-        const pid = String(item.catalogProductId ?? "");
-        if (!pid) continue;
-        const idx = catalog.findIndex((p) => p.id === pid);
-        if (idx >= 0 && !pickedIndices.includes(idx)) pickedIndices.push(idx);
+  const openRowPreview = (row: KitRow) => {
+    if (row.kit) {
+      setKitPreview(buildKitPreviewFromWorkspace(row.kit, catalog, row.image));
+      return;
+    }
+    if (row.platformKit) {
+      setKitPreview(buildKitPreviewFromPlatform(row.platformKit, catalog, row.image));
+      return;
+    }
+    setKitPreview({
+      name: row.name,
+      description: row.description || "No description available.",
+      coverImage: row.image,
+      products: [],
+    });
+  };
+
+  const handleSendWorkspaceKit = (kit: UiKit | undefined) => {
+    if (!kit?.id) {
+      toast.error("This kit is no longer available to send.");
+      return;
+    }
+    navigate(`/app/kits/${kit.id}/send`);
+  };
+
+  const handleSendCuratedKit = async (kit: PlatformKitTemplate, existing?: UiKit) => {
+    if (existing?.id) {
+      navigate(`/app/kits/${existing.id}/send`);
+      return;
+    }
+
+    const catalogProducts = workspace?.catalogProducts ?? [];
+    const productRefs: Array<{
+      catalogProductId: string;
+      brand?: string;
+      name: string;
+      group?: string;
+    }> = [];
+
+    for (const item of kit.items || []) {
+      const pid = String(item.catalogProductId ?? "");
+      if (!pid) continue;
+      const product = catalogProducts.find((p) => p.id === pid);
+      if (!product?.id) continue;
+      if (productRefs.some((r) => r.catalogProductId === product.id)) continue;
+      productRefs.push({
+        catalogProductId: product.id,
+        brand: product.brand || "",
+        name: product.nm || "Product",
+        group: product.g || product.category || "",
+      });
+    }
+
+    // Match prior curated-send behaviour when platform kits have empty/mismatched items.
+    if (productRefs.length === 0 && catalogProducts.length > 0) {
+      const fallbackCount = Math.max(1, (kit.imageUrls?.length || 1) - 1 || 1);
+      for (const product of catalogProducts.slice(0, fallbackCount)) {
+        if (!product.id) continue;
+        productRefs.push({
+          catalogProductId: product.id,
+          brand: product.brand || "",
+          name: product.nm || "Product",
+          group: product.g || product.category || "",
+        });
       }
     }
-    if (pickedIndices.length === 0 && catalog.length > 0) {
-      pickedIndices.push(0);
-    }
-    const packaging = kit.packaging === "none" ? "none" : "box";
-    const designNotes = JSON.stringify({
-      curated: true,
-      originalId: kit._id,
-      description: kit.description || "",
-      imageUrls: kit.imageUrls || [],
-    });
 
     try {
-      const created = await createKit.mutateAsync({
-        name: kit.name,
-        pickedIndices,
-        catalog,
-        packaging,
-        designNotes,
+      const ensured = await ensureCuratedKit.mutateAsync({
+        platformKitId: kit._id,
+        productRefs: productRefs.length ? productRefs : undefined,
       });
-      toast.success(`Temporary kit "${created.name}" created`);
-      navigate(`/app/kits/${created.id}/send`);
+      navigate(`/app/kits/${ensured.id}/send`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create temporary kit");
+      toast.error(err instanceof Error ? err.message : "Failed to prepare curated kit for send");
     }
   };
 
   const handleCuratedAction = async (kit: PlatformKitTemplate, status: "archived" | "draft" | "live") => {
-    const catalog = workspace?.catalogProducts ?? [];
+    const catalogProducts = workspace?.catalogProducts ?? [];
     const pickedIndices: number[] = [];
     if (kit.items) {
       for (const item of kit.items) {
         const pid = String(item.catalogProductId ?? "");
         if (!pid) continue;
-        const idx = catalog.findIndex((p) => p.id === pid);
+        const idx = catalogProducts.findIndex((p) => p.id === pid);
         if (idx >= 0 && !pickedIndices.includes(idx)) pickedIndices.push(idx);
       }
     }
-    if (pickedIndices.length === 0 && catalog.length > 0) {
+    if (pickedIndices.length === 0 && catalogProducts.length > 0) {
       pickedIndices.push(0);
     }
     const packaging = kit.packaging === "none" ? "none" : "box";
@@ -584,14 +691,14 @@ export function KitsView(vm: KitsVm) {
       const created = await createKit.mutateAsync({
         name: kit.name,
         pickedIndices,
-        catalog,
+        catalog: catalogProducts,
         packaging,
         designNotes,
       });
       await updateKit.mutateAsync({
         id: created.id,
         pickedIndices,
-        catalog,
+        catalog: catalogProducts,
         status,
       });
       toast.success(`Kit updated to ${status}`);
@@ -614,11 +721,15 @@ export function KitsView(vm: KitsVm) {
     return <KitsEmptyState contactCount={vm.contactCount} canCreateKits={vm.canCreateKits} />;
   }
 
-  // Nested actions component for row options
+  // Nested actions component for row options (manage actions require kits write)
   function ThreeDotMenu({ kitRow }: { kitRow: KitRow }) {
     const [open, setOpen] = useState(false);
 
     const handleAction = async (status: "archived" | "draft" | "live") => {
+      if (!canCreateKits) {
+        toast.info("Kit management requires a company admin.");
+        return;
+      }
       setOpen(false);
 
       if (kitRow.platformKit && !kitRow.kit) {
@@ -632,12 +743,12 @@ export function KitsView(vm: KitsVm) {
         return;
       }
       try {
-        const catalog = workspace?.catalogProducts ?? [];
-        const pickedIndices = kitPickedIndices(activeKit, catalog);
+        const catalogProducts = workspace?.catalogProducts ?? [];
+        const pickedIndices = kitPickedIndices(activeKit, catalogProducts);
         await updateKit.mutateAsync({
           id: activeKit.id,
           pickedIndices,
-          catalog,
+          catalog: catalogProducts,
           status,
         });
         toast.success(`Kit updated to ${status}`);
@@ -650,7 +761,13 @@ export function KitsView(vm: KitsVm) {
       <div style={{ position: "relative" }}>
         <button
           type="button"
-          onClick={() => setOpen(!open)}
+          onClick={() => {
+            if (!canCreateKits) {
+              toast.info("Kit management requires a company admin.");
+              return;
+            }
+            setOpen(!open);
+          }}
           style={{
             background: "transparent",
             border: "1px solid var(--line)",
@@ -662,6 +779,7 @@ export function KitsView(vm: KitsVm) {
             borderRadius: 6,
             cursor: "pointer",
           }}
+          aria-label="Kit options"
         >
           <MoreVertical size={16} />
         </button>
@@ -688,6 +806,26 @@ export function KitsView(vm: KitsVm) {
                 padding: 4,
               }}
             >
+              {kitRow.kit && !kitRow.platformKit && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate(`/app/kits/${kitRow.kit!.id}/edit`);
+                  }}
+                  style={{
+                    padding: "8px 12px",
+                    textAlign: "left",
+                    background: "none",
+                    border: "none",
+                    fontSize: 13,
+                    cursor: "pointer",
+                    borderRadius: 4,
+                  }}
+                >
+                  Edit kit
+                </button>
+              )}
               {kitRow.status !== "archived" && (
                 <button
                   type="button"
@@ -978,28 +1116,23 @@ export function KitsView(vm: KitsVm) {
                     </div>
 
                     <div className="kits-row-actions">
-                      {canCreateKits && (
-                        row.kit ? (
-                          <Link to={`/app/kits/${row.id}/edit`} className="kits-row-btn">
-                            Edit
-                          </Link>
-                        ) : (
-                          <Link to="/app/kits/new" className="kits-row-btn">
-                            Edit
-                          </Link>
-                        )
-                      )}
+                      <button
+                        type="button"
+                        className="kits-row-btn"
+                        onClick={() => openRowPreview(row)}
+                      >
+                        Preview
+                      </button>
 
                       {canSendKits && (
-                        row.kit ? (
-                          <Link to={`/app/kits/${row.id}/send`} className="kits-send-btn">
-                            Send
-                          </Link>
-                        ) : (
-                          <Link to="/app/kits/new" className="kits-send-btn">
-                            Send
-                          </Link>
-                        )
+                        <button
+                          type="button"
+                          className="kits-send-btn"
+                          onClick={() => handleSendWorkspaceKit(row.kit)}
+                          style={{ height: 36, padding: "0 16px", fontSize: 13 }}
+                        >
+                          Send
+                        </button>
                       )}
                     </div>
                   </div>
@@ -1248,89 +1381,26 @@ export function KitsView(vm: KitsVm) {
                                 {row.status === "live" ? "Live" : row.status === "archived" ? "Archived" : "Draft"}
                               </span>
                             </span>
-                            <span>
-                              <b>LAST SENT:</b> {row.lastSent}
-                            </span>
                           </div>
                         </div>
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                          {canCreateKits && (
-                            row.kit ? (
-                              <Link
-                                to={`/app/kits/${row.id}/edit`}
-                                className="btn btn-ghost btn-sm"
-                                style={{
-                                  flex: 1,
-                                  border: "1px solid var(--line)",
-                                  height: 32,
-                                  fontSize: 13,
-                                  fontWeight: 700,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  borderRadius: 6,
-                                  color: "var(--ink)",
-                                }}
-                              >
-                                Edit
-                              </Link>
-                            ) : (
-                              <Link
-                                to="/app/kits/new"
-                                className="btn btn-ghost btn-sm"
-                                style={{
-                                  flex: 1,
-                                  border: "1px solid var(--line)",
-                                  height: 32,
-                                  fontSize: 13,
-                                  fontWeight: 700,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  borderRadius: 6,
-                                  color: "var(--ink)",
-                                }}
-                              >
-                                Edit
-                              </Link>
-                            )
-                          )}
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => openRowPreview(row)}
+                            style={previewBtnStyle}
+                          >
+                            Preview
+                          </button>
                           {canSendKits && (
-                            row.kit ? (
-                              <Link
-                                to={`/app/kits/${row.id}/send`}
-                                className="btn btn-brand btn-sm"
-                                style={{
-                                  flex: 1,
-                                  height: 32,
-                                  fontSize: 13,
-                                  fontWeight: 700,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  borderRadius: 6,
-                                }}
-                              >
-                                Send
-                              </Link>
-                            ) : (
-                              <Link
-                                to="/app/kits/new"
-                                className="btn btn-brand btn-sm"
-                                style={{
-                                  flex: 1,
-                                  height: 32,
-                                  fontSize: 13,
-                                  fontWeight: 700,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  borderRadius: 6,
-                                }}
-                              >
-                                Send
-                              </Link>
-                            )
+                            <button
+                              type="button"
+                              className="btn btn-brand btn-sm"
+                              onClick={() => handleSendWorkspaceKit(row.kit)}
+                              style={sendBtnStyle}
+                            >
+                              Send
+                            </button>
                           )}
                           <ThreeDotMenu kitRow={row} />
                         </div>
@@ -1564,32 +1634,14 @@ export function KitsView(vm: KitsVm) {
                                 {row.status === "live" ? "Live" : row.status === "archived" ? "Archived" : "Draft"}
                               </span>
                             </span>
-                            <span>
-                              <b>LAST SENT:</b> {row.lastSent}
-                            </span>
                           </div>
                         </div>
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           <button
                             type="button"
                             className="btn btn-ghost btn-sm"
-                            onClick={() => {
-                              if (row.platformKit) {
-                                setCuratedPreviewKit(row.platformKit);
-                              }
-                            }}
-                            style={{
-                              flex: 1,
-                              border: "1px solid var(--line)",
-                              height: 32,
-                              fontSize: 13,
-                              fontWeight: 700,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              borderRadius: 6,
-                              color: "var(--ink)",
-                            }}
+                            onClick={() => openRowPreview(row)}
+                            style={previewBtnStyle}
                           >
                             Preview
                           </button>
@@ -1599,19 +1651,11 @@ export function KitsView(vm: KitsVm) {
                               className="btn btn-brand btn-sm"
                               onClick={() => {
                                 if (row.platformKit) {
-                                  handleSendCuratedKit(row.platformKit);
+                                  handleSendCuratedKit(row.platformKit, row.kit);
                                 }
                               }}
-                              style={{
-                                flex: 1,
-                                height: 32,
-                                fontSize: 13,
-                                fontWeight: 700,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                borderRadius: 6,
-                              }}
+                              style={sendBtnStyle}
+                              disabled={ensureCuratedKit.isPending}
                             >
                               Send
                             </button>
@@ -1688,82 +1732,13 @@ export function KitsView(vm: KitsVm) {
         )}
       </div>
 
-      {/* Kit Preview Modal */}
-      {previewKit && (
-        <KitDetailDialog
-          kit={previewKit}
-          catalog={workspace?.catalogProducts ?? []}
-          onOpenChange={(open) => setPreviewKit(open ? previewKit : null)}
-        />
-      )}
-
-      {/* Curated Kit Centered Modal */}
-      {curatedPreviewKit && (
-        <Dialog open={curatedPreviewKit !== null} onOpenChange={(open) => setCuratedPreviewKit(open ? curatedPreviewKit : null)}>
-          <DialogContent
-            className="sm-modal"
-            style={{
-              maxWidth: (curatedPreviewKit.imageUrls && curatedPreviewKit.imageUrls.length > 4) ? 850 : 640,
-              maxHeight: "90vh",
-              overflowY: "auto",
-            }}
-          >
-            <div className="modal-pad" style={{ padding: "24px 32px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <DialogTitle style={{ fontSize: 20, fontWeight: 800, color: "var(--ink)", margin: 0 }}>
-                  {curatedPreviewKit.name}
-                </DialogTitle>
-              </div>
-
-              <p style={{ color: "var(--gray-500)", fontSize: 14, lineHeight: 1.5, margin: "0 0 20px" }}>
-                {curatedPreviewKit.description || "No description available."}
-              </p>
-
-              <div style={{ borderBottom: "1px solid var(--line)", marginBottom: 16 }} />
-
-              <div style={{ marginBottom: 20 }}>
-                <h4 style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "var(--gray-500)", marginBottom: 12 }}>
-                  Included Products ({Math.max(0, (curatedPreviewKit.imageUrls?.length ?? 0) - 1)})
-                </h4>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 16 }}>
-                  {curatedPreviewKit.imageUrls && curatedPreviewKit.imageUrls.slice(1).map((imgUrl, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        border: "1px solid var(--line)",
-                        borderRadius: 8,
-                        padding: 12,
-                        background: "var(--gray-50)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        aspectRatio: "1"
-                      }}
-                    >
-                      <img
-                        src={resolveMediaUrl(imgUrl)}
-                        alt=""
-                        style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 24 }}>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setCuratedPreviewKit(null)}
-                  style={{ border: "1px solid var(--line)", padding: "8px 24px", borderRadius: 6, fontWeight: 700 }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      <KitPreviewDialog
+        data={kitPreview}
+        open={kitPreview !== null}
+        onOpenChange={(open) => {
+          if (!open) setKitPreview(null);
+        }}
+      />
     </section>
   );
 }
