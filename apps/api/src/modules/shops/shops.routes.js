@@ -16,6 +16,7 @@ const canRead = tenantArea('shops', 'read');
 router.get('/', canRead, asyncHandler(controller.list));
 router.post('/', canWrite, validate({ body: createShopSchema }), asyncHandler(controller.create));
 router.get('/:id', canRead, validate({ params: shopIdParams }), asyncHandler(controller.getOne));
+router.get('/:id/report', canRead, validate({ params: shopIdParams }), asyncHandler(controller.report));
 router.patch('/:id', canWrite, validate({ params: shopIdParams, body: updateShopSchema }), asyncHandler(controller.update));
 router.post('/:id/publish', canWrite, validate({ params: shopIdParams }), asyncHandler(controller.publish));
 router.delete('/:id', canWrite, validate({ params: shopIdParams }), asyncHandler(controller.archive));

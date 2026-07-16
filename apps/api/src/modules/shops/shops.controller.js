@@ -9,6 +9,10 @@ export async function getOne(req, res) {
   res.json(await shopsService.getShop({ tenantId: req.tenantId, shopId: req.params.id }));
 }
 
+export async function report(req, res) {
+  res.json(await shopsService.shopReport({ tenantId: req.tenantId, shopId: req.params.id }));
+}
+
 export async function create(req, res) {
   const shop = await shopsService.createShop({ tenantId: req.tenantId, data: req.body });
   writeAudit({ req, action: 'shop.create', entityType: 'Shop', entityId: shop._id, after: shop.toObject() });
