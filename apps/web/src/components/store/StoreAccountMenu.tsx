@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LogOut, Package, Wallet } from "lucide-react";
+import { LifeBuoy, LogOut, Package, Wallet } from "lucide-react";
 
 function TopbarChevron({ open }: { open: boolean }) {
   return (
@@ -64,6 +64,7 @@ type StoreAccountMenuProps = {
   balanceLabel: string;
   balanceValue: string;
   onOpenOrders: () => void;
+  onOpenSupport?: () => void;
   onLogout: () => void;
 };
 
@@ -76,6 +77,7 @@ export function StoreAccountMenu({
   balanceLabel,
   balanceValue,
   onOpenOrders,
+  onOpenSupport,
   onLogout,
 }: StoreAccountMenuProps) {
   const [open, setOpen] = useState(false);
@@ -147,6 +149,20 @@ export function StoreAccountMenu({
                 <Package size={16} strokeWidth={2} aria-hidden="true" />
                 <span>My orders</span>
               </button>
+              {onOpenSupport ? (
+                <button
+                  type="button"
+                  className="user-menu-link sf-account-menu-link"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    onOpenSupport();
+                  }}
+                >
+                  <LifeBuoy size={16} strokeWidth={2} aria-hidden="true" />
+                  <span>Support</span>
+                </button>
+              ) : null}
             </div>
 
             <div className="user-menu-foot">

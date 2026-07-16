@@ -760,3 +760,57 @@ export async function listRedemptionOrders(token: string, sessionToken: string) 
     { headers: { Authorization: `Bearer ${sessionToken}` } },
   );
 }
+
+// ── Employee support tickets (raised from the redemption store) ──
+
+export type StoreSupportMessage = {
+  _id?: string;
+  authorName?: string;
+  fromPlatform?: boolean;
+  body: string;
+  at: string;
+};
+
+export type StoreSupportTicket = {
+  _id: string;
+  subject: string;
+  description?: string;
+  type: string;
+  status: string;
+  messages: StoreSupportMessage[];
+  createdAt: string;
+};
+
+export async function listRedemptionTickets(token: string, sessionToken: string) {
+  return publicFetch<{ items: StoreSupportTicket[] }>(`/redemptions/${token}/support-tickets`, {
+    headers: { Authorization: `Bearer ${sessionToken}` },
+  });
+}
+
+export async function raiseRedemptionTicket(
+  token: string,
+  sessionToken: string,
+  body: { subject: string; description?: string; type?: string },
+) {
+  return publicFetch<StoreSupportTicket>(`/redemptions/${token}/support-tickets`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${sessionToken}` },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function replyRedemptionTicket(
+  token: string,
+  sessionToken: string,
+  ticketId: string,
+  body: string,
+) {
+  return publicFetch<StoreSupportTicket>(
+    `/redemptions/${token}/support-tickets/${ticketId}/messages`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${sessionToken}` },
+      body: JSON.stringify({ body }),
+    },
+  );
+}
