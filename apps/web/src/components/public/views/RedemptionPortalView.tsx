@@ -1,11 +1,42 @@
+import { useEffect } from "react";
+import confetti from "canvas-confetti";
+import { Check, ShoppingBag, Calendar, Clock, Mail, Bell } from "lucide-react";
 import KitAcceptPortal from "@/components/KitAcceptPortal";
 import { LoadingState } from "@/components/LoadingState";
 import { StoreBanner } from "@/components/StoreBanner";
 import StoreShell from "@/components/store/StoreShell";
+import { ShelfMerchLogo } from "@/components/brand/ShelfMerchLogo";
 import type { RedemptionVm } from "../controllers/useRedemptionController";
 
 /** Redemption portal view: branded OTP gate, then store / kit-accept / track. */
 export function RedemptionPortalView(vm: RedemptionVm) {
+  useEffect(() => {
+    if (vm.step !== "track" || !vm.order) return;
+
+    // Initial festive burst
+    confetti({
+      particleCount: 80,
+      spread: 70,
+      origin: { y: 0.6 }
+    });
+
+    // Continuous dynamic falling confetti
+    const interval = setInterval(() => {
+      confetti({
+        particleCount: 1,
+        startVelocity: 0,
+        ticks: 200,
+        origin: {
+          x: Math.random(),
+          y: Math.random() - 0.2
+        },
+        colors: ["#7C3AED", "#10B981", "#F59E0B", "#EF4444", "#3B82F6"]
+      });
+    }, 150);
+
+    return () => clearInterval(interval);
+  }, [vm.step, vm.order]);
+
   if (vm.step === "loading") {
     return <LoadingState message="Loading your gift…" />;
   }
@@ -24,17 +55,115 @@ export function RedemptionPortalView(vm: RedemptionVm) {
   }
 
   if (vm.step === "track" && vm.order) {
+    const orderDate = vm.order.createdAt ? new Date(vm.order.createdAt) : new Date();
+    const deliveryDate = new Date(orderDate);
+    deliveryDate.setDate(orderDate.getDate() + 7);
+
+    const formatDate = (date: Date) => {
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+    };
+
     return (
-      <div className="auth">
-        <div className="auth-form">
-          <div className="inner">
-            <div className="eyebrow">Order placed</div>
-            <h1>Thank you, {vm.portal?.recipient.name || "there"}!</h1>
-            <p className="muted">
-              Order <b>{vm.order.orderNumber}</b> is {vm.order.status || "being processed"}.
-            </p>
+      <div className="redemption-success-body">
+        {/* Navigation / Header */}
+        <header className="redemption-success-nav">
+          <ShelfMerchLogo height={32} />
+        </header>
+
+        {/* Content Area */}
+        <main className="redemption-success-content">
+          <img
+            src="/images/order-placed-3d-illustration.png"
+            alt="Order Placed"
+            className="redemption-success-illustration"
+          />
+
+          <div className="redemption-success-status">
+            <span className="redemption-success-checkmark">
+              <Check size={20} strokeWidth={3} />
+            </span>
+            <h1>Order Placed</h1>
           </div>
-        </div>
+
+          <p className="redemption-success-thankyou">
+            Thank you, <strong>{vm.portal?.recipient.name || "there"}</strong>!
+          </p>
+          <p className="redemption-success-info-msg">
+            Order <strong>{vm.order.orderNumber}</strong> is created.
+          </p>
+
+          {/* Info Card */}
+          <div className="redemption-success-card">
+            <div className="redemption-success-grid">
+              {/* Order ID */}
+              <div className="redemption-success-item">
+                <div className="redemption-success-icon-wrap purple">
+                  <ShoppingBag size={20} />
+                </div>
+                <div className="redemption-success-item-details">
+                  <span className="redemption-success-item-lbl">Order ID</span>
+                  <span className="redemption-success-item-val">{vm.order.orderNumber}</span>
+                </div>
+              </div>
+
+              {/* Order Date */}
+              <div className="redemption-success-item">
+                <div className="redemption-success-icon-wrap green">
+                  <Calendar size={20} />
+                </div>
+                <div className="redemption-success-item-details">
+                  <span className="redemption-success-item-lbl">Order Date</span>
+                  <span className="redemption-success-item-val">{formatDate(orderDate)}</span>
+                </div>
+              </div>
+
+              {/* Estimated Delivery */}
+              <div className="redemption-success-item">
+                <div className="redemption-success-icon-wrap orange">
+                  <Clock size={20} />
+                </div>
+                <div className="redemption-success-item-details">
+                  <span className="redemption-success-item-lbl">Estimated Delivery</span>
+                  <span className="redemption-success-item-val">{formatDate(deliveryDate)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Email notice section */}
+          <div className="redemption-success-email-sec">
+            <div className="redemption-success-divider-container">
+              <div className="redemption-success-divider-line" />
+              <div className="redemption-success-divider-icon-wrap">
+                <Mail size={18} />
+              </div>
+              <div className="redemption-success-divider-line" />
+            </div>
+
+            <div className="redemption-success-email-content-wrap">
+              <div className="redemption-success-email-text">
+                <h3>Keep an eye on your emails</h3>
+                <p>
+                  We'll send you email notifications at every important stage—from order confirmation to shipment and delivery.
+                </p>
+              </div>
+
+              <div className="redemption-success-mail-illustration">
+                <svg width="100" height="80" viewBox="0 0 100 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="20" y="10" width="60" height="40" rx="4" fill="#FFFFFF" stroke="#E5E7EB" strokeWidth="2" />
+                  <line x1="30" y1="22" x2="70" y2="22" stroke="#D1D5DB" strokeWidth="2" strokeLinecap="round" />
+                  <line x1="30" y1="30" x2="60" y2="30" stroke="#D1D5DB" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M10 30h80v42a6 6 0 0 1-6 6H16a6 6 0 0 1-6-6V30z" fill="#FCD34D" />
+                  <path d="M10 30l40 30 40-30" stroke="#F59E0B" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <div className="redemption-success-mail-badge">
+                  <Bell size={14} fill="#FFFFFF" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }

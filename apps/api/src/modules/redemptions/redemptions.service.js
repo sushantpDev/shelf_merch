@@ -240,11 +240,11 @@ export async function getRedemptionPortal(token) {
     });
   }
 
-  // TEMPORARY: bypass OTP verification for shop-scoped point redemptions so recipients
-  // can enter the storefront directly. Remove this block when email/SMS verification is required again.
-  const isShopPointsRedemption =
-    campaign.type === 'points' && (campaign.pointsScope ?? 'shop') === 'shop';
-  if (isShopPointsRedemption && recipient.redemptionStatus !== 'verified') {
+  // Bypass OTP verification: the unique redemption link in the email is itself the
+  // identity proof. Auto-verify recipients on first click for all campaign types so
+  // they land directly on the redemption page without an intermediate OTP screen.
+  const needsVerification = recipient.redemptionStatus !== 'verified';
+  if (needsVerification) {
     if (recipient.redemptionStatus === 'invited') {
       transitionRedemption(recipient, 'opened');
     }

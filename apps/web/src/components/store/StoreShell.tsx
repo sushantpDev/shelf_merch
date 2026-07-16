@@ -15,6 +15,7 @@ import emptyBagImg from "../../../assets/empty-bag.svg";
 import { StoreAccountMenu, type StoreOrderItem, type StoreOrderSummary } from "./StoreAccountMenu";
 import { StoreEmptyState } from "./StoreEmptyState";
 import { StorePageShell } from "./StorePageShell";
+import { SizeGuideTable } from "@/components/SizeGuideTable";
 
 type PrintArea = {
   key?: string;
@@ -2038,7 +2039,6 @@ function SizeGuideModal({
   sizeGuide: string;
   onClose: () => void;
 }) {
-  const sizeRows = parseDetailRows(sizeGuide).filter(([label]) => !/^feature$/i.test(label));
 
   useEffect(() => {
     if (!open) return;
@@ -2070,18 +2070,9 @@ function SizeGuideModal({
             </button>
           </div>
 
-          {sizeRows.length > 0 ? (
-            <div className="sf-size-guide-table">
-              {sizeRows.map(([label, value]) => (
-                <div key={`${label}-${value}`} className="sf-size-guide-row">
-                  <div>{label}</div>
-                  <div>{value ? detailText(value) : null}</div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="sf-size-guide-body">{detailText(sizeGuide)}</div>
-          )}
+          {sizeGuide ? (
+            <SizeGuideTable sizeGuide={sizeGuide} className="sf-size-guide-table" />
+          ) : null}
         </div>
       </div>
     </>
@@ -2103,8 +2094,7 @@ function ProductInfoAccordion({
   const keyFeatures = product.keyFeatures?.trim() || "";
   const sizeGuide = product.sizeGuide?.trim() || "";
   const featureRows = parseDetailRows(keyFeatures);
-  const sizeRows = parseDetailRows(sizeGuide).filter(([label]) => !/^feature$/i.test(label));
-  const hasContent = description || featureRows.length || sizeRows.length;
+  const hasContent = description || featureRows.length || !!sizeGuide;
 
   if (!hasContent) return null;
 
@@ -2144,7 +2134,7 @@ function ProductInfoAccordion({
             </div>
           ) : null}
 
-          {sizeRows.length > 0 ? (
+          {sizeGuide ? (
             <div className="sf-pdp-accordion-section">
               <div className="sf-pdp-accordion-subhead-row">
                 <div className="sf-pdp-accordion-subhead">Size guide</div>
@@ -2154,14 +2144,7 @@ function ProductInfoAccordion({
                   </button>
                 ) : null}
               </div>
-              <div className="sf-pdp-size-table">
-                {sizeRows.map(([label, value]) => (
-                  <div key={`${label}-${value}`} className="sf-pdp-size-row">
-                    <div>{label}</div>
-                    <div>{value ? detailText(value) : null}</div>
-                  </div>
-                ))}
-              </div>
+              <SizeGuideTable sizeGuide={sizeGuide} />
             </div>
           ) : null}
         </div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { UiProduct } from "@/services/mappers";
 import { detailRows } from "../types";
+import { SizeGuideTable } from "@/components/SizeGuideTable";
 
 type Tab = "description" | "features" | "size";
 
@@ -52,7 +53,6 @@ export function ProductInfoTabs({
 
   const shortDesc = desc.length > 280 && !descExpanded ? `${desc.slice(0, 280).trim()}…` : desc;
   const featureRows = detailRows(keyFeatures);
-  const sizeRows = detailRows(sizeGuide).filter(([label]) => !/^feature$/i.test(label));
   const useTabs = tabs.length > 1;
   const currentTab = useTabs ? activeTab : tabs[0].id;
 
@@ -119,19 +119,8 @@ export function ProductInfoTabs({
         role="tabpanel"
         hidden={currentTab !== "size"}
       >
-        {sizeRows.length > 0 ? (
-          <div className="pd-size-table">
-            <div className="pd-size-head">
-              <div>Feature</div>
-              <div>Details</div>
-            </div>
-            {sizeRows.map(([label, value], i) => (
-              <div key={`${label}-${i}`} className="pd-size-row">
-                <div>{label}</div>
-                <div>{value ? detailText(value) : null}</div>
-              </div>
-            ))}
-          </div>
+        {sizeGuide ? (
+          <SizeGuideTable sizeGuide={sizeGuide} />
         ) : (
           <p className="muted">No size guide available.</p>
         )}
