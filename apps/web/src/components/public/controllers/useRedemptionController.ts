@@ -40,7 +40,7 @@ export type RedemptionVm = {
   sessionToken: string;
   products: StoreProduct[];
   kitData: KitRedemptionData | null;
-  order: { orderNumber?: string; status?: string } | null;
+  order: { orderNumber?: string; status?: string; createdAt?: string } | null;
   token: string;
   isKitFlow: boolean;
   isSendingOtp: boolean;
@@ -73,7 +73,7 @@ export function useRedemptionController(token: string): RedemptionVm {
   const [sessionToken, setSessionToken] = useState("");
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [kitData, setKitData] = useState<KitRedemptionData | null>(null);
-  const [order, setOrder] = useState<{ orderNumber?: string; status?: string } | null>(null);
+  const [order, setOrder] = useState<{ orderNumber?: string; status?: string; createdAt?: string } | null>(null);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 

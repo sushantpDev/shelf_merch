@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import type { UiProduct } from "@/services/mappers";
 import { detailRows, productSwatches, productUniqueId } from "../types";
+import { SizeGuideTable } from "@/components/SizeGuideTable";
 
 type Tab = "description" | "features" | "size";
 
@@ -29,7 +30,6 @@ export function ProductDetail({ product, index }: { product: UiProduct; index: n
   const desc = String(product.description || "");
   const short = desc.length > 180 && !expanded ? `${desc.slice(0, 180).trim()}…` : desc;
   const featureRows = detailRows(product.keyFeatures);
-  const sizeRows = detailRows(product.sizeGuide).filter(([label]) => !/^feature$/i.test(label));
   const swatches = productSwatches(product);
 
   return (
@@ -135,19 +135,8 @@ export function ProductDetail({ product, index }: { product: UiProduct; index: n
 
           {tab === "size" && (
             <div className="pd-tab-panel on" role="tabpanel">
-              {sizeRows.length > 0 ? (
-                <div className="pd-size-table">
-                  <div className="pd-size-head">
-                    <div>Feature</div>
-                    <div>Details</div>
-                  </div>
-                  {sizeRows.map(([label, value], i) => (
-                    <div key={`${label}-${i}`} className="pd-size-row">
-                      <div>{label}</div>
-                      <div style={{ whiteSpace: "pre-line" }}>{value}</div>
-                    </div>
-                  ))}
-                </div>
+              {product.sizeGuide?.trim() ? (
+                <SizeGuideTable sizeGuide={product.sizeGuide} />
               ) : (
                 <p className="muted">No size guide available.</p>
               )}
