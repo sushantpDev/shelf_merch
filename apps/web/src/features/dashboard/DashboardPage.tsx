@@ -48,6 +48,7 @@ import diaryImg from "../../../assets/diary.png";
 import capImg from "../../../assets/cap.png";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import type { UiProduct } from "@/services/mappers";
+import { EntityManagerKitsSection } from "./EntityManagerKitsSection";
 import "./dashboard.css";
 
 function formatInr(amount: number) {
@@ -541,6 +542,7 @@ function ExistingDashboard({
   wallets,
   pinnedShop,
   canCreateShop,
+  isEntityManager,
 }: {
   account: string;
   memberCount: number;
@@ -550,6 +552,7 @@ function ExistingDashboard({
   wallets: Array<{ id: string; name: string; balance: number }>;
   pinnedShop: DashboardShop | null;
   canCreateShop: boolean;
+  isEntityManager: boolean;
 }) {
   return (
     <>
@@ -562,6 +565,8 @@ function ExistingDashboard({
         </div>
         <WorkspaceSettingsCard preview />
       </section>
+
+      {isEntityManager ? <EntityManagerKitsSection /> : null}
 
       <section className="dash-existing-main">
         <div className="dash-existing-main__wallets"><WalletsSection account={account} wallets={wallets} mainBalance={mainBalance} /></div>
@@ -617,6 +622,7 @@ export function DashboardPage() {
   const pinnedShop = workspace.shops.find((s) => s.live) ?? workspace.shops[0] ?? null;
   const activeShopCount = workspace.shops.filter((s) => s.live).length || workspace.shops.length;
   const showOnboarding = wallets.length === 0;
+  const isEntityManager = workspace.userPatch.role === "entity_manager";
 
   return (
     <div className="dash-page fade-in">
@@ -646,6 +652,7 @@ export function DashboardPage() {
           wallets={wallets}
           pinnedShop={pinnedShop}
           canCreateShop={canCreateShop}
+          isEntityManager={isEntityManager}
         />
       )}
     </div>

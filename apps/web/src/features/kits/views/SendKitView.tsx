@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { LoadingState } from "@/components/LoadingState";
 import { inr } from "@/components/platform/platform-ui";
@@ -168,6 +168,9 @@ function SizeSelect({
 export function SendKitView(vm: SendKitVm) {
   const { draft, dispatch } = vm;
   const [search, setSearch] = useState("");
+  const [showEmailInput, setShowEmailInput] = useState(false);
+  const [emailDraft, setEmailDraft] = useState("");
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   if (vm.isLoading) return <LoadingState message="Loading kit…" fullScreen={false} />;
   if (vm.notFound || !vm.kit) {
@@ -203,10 +206,29 @@ export function SendKitView(vm: SendKitVm) {
         (opts.requiresColor && opts.colors.length > 0),
     );
 
-  const filteredContacts = vm.contacts.filter(c =>
-    !search || c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.email?.toLowerCase().includes(search.toLowerCase())
+  const filteredContacts = vm.pickerContacts.filter(
+    (c) =>
+      !search ||
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.email?.toLowerCase().includes(search.toLowerCase()),
   );
+
+  function handleAddEmails() {
+    const raw = emailDraft.trim();
+    if (!raw) {
+      toast.error("Enter at least one email address");
+      return;
+    }
+    vm.onAddRecipientEmails(raw);
+    setEmailDraft("");
+    setShowEmailInput(false);
+  }
+
+  function handleCsvChange(file: File | undefined) {
+    if (!file) return;
+    vm.onImportRecipientCsv(file);
+    if (csvInputRef.current) csvInputRef.current.value = "";
+  }
 
   const footer = (
     <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
@@ -455,6 +477,13 @@ export function SendKitView(vm: SendKitVm) {
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
+                onClick={vm.onSelectAllRecips}
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
                 onClick={() => dispatch({ type: "deselectRecips" })}
               >
                 Deselect all
@@ -462,17 +491,24 @@ export function SendKitView(vm: SendKitVm) {
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
-                onClick={() => toast.info("Manual email input modal placeholder triggered")}
+                onClick={() => setShowEmailInput((open) => !open)}
               >
                 Input emails
               </button>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
-                onClick={() => toast.info("CSV import wizard placeholder triggered")}
+                onClick={() => csvInputRef.current?.click()}
               >
                 Add by CSV
               </button>
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: "none" }}
+                onChange={(e) => handleCsvChange(e.target.files?.[0])}
+              />
               <input
                 className="inp sk-recip-search"
                 placeholder="Search by name or email…"
@@ -480,6 +516,48 @@ export function SendKitView(vm: SendKitVm) {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+
+            {showEmailInput ? (
+              <div
+                className="card"
+                style={{ padding: 14, marginBottom: 12, background: "var(--surface-2)" }}
+              >
+                <label className="lbl">Paste email addresses</label>
+                <textarea
+                  className="inp"
+                  rows={3}
+                  placeholder="Separate emails with commas, spaces, or new lines"
+                  value={emailDraft}
+                  onChange={(e) => setEmailDraft(e.target.value)}
+                />
+                <div className="row" style={{ gap: 8, marginTop: 10 }}>
+                  <button type="button" className="btn btn-brand btn-sm" onClick={handleAddEmails}>
+                    Add recipients
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setShowEmailInput(false);
+                      setEmailDraft("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {filteredContacts.length === 0 ? (
+              <div
+                className="muted"
+                style={{ padding: "28px 16px", textAlign: "center", fontSize: 13 }}
+              >
+                {vm.pickerContacts.length === 0
+                  ? "No recipients yet. Use Input emails or Add by CSV to get started."
+                  : "No recipients match your search."}
+              </div>
+            ) : null}
 
             <div className="sk-recip-table-wrap">
               <table className="sk-recip-table">

@@ -32,21 +32,51 @@ export function parseEmailInput(raw: string): string[] {
     .filter(Boolean);
 }
 
-/** Parse CSV text — first column or bare email per row. */
+/** Parse CSV text — email column by header when present, else first column / bare email. */
 export function parseCsvEmails(text: string): string[] {
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   if (!lines.length) return [];
 
   const emails: string[] = [];
-  const header = lines[0].toLowerCase();
-  const start = header.includes("email") ? 1 : 0;
+  const headerCells = splitCsvLine(lines[0]).map((c) => c.toLowerCase().trim());
+  const emailCol = headerCells.findIndex(
+    (cell) => cell === "email" || cell.includes("email"),
+  );
+  const start = emailCol >= 0 ? 1 : 0;
+  const col = emailCol >= 0 ? emailCol : 0;
 
   for (let i = start; i < lines.length; i += 1) {
-    const line = lines[i];
-    const cell = line.includes(",") ? line.split(",")[0]?.trim() ?? line : line;
+    const cells = splitCsvLine(lines[i]);
+    const cell = (cells[col] ?? cells[0] ?? "").trim();
     if (cell) emails.push(cell);
   }
   return emails;
+}
+
+function splitCsvLine(line: string): string[] {
+  const cells: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (ch === "," && !inQuotes) {
+      cells.push(current);
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+  cells.push(current);
+  return cells;
 }
 
 export function contactForManualEmail(email: string): UiContact {

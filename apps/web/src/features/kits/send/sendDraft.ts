@@ -27,6 +27,7 @@ export type SendKitAction =
   | { type: "togglePick"; index: number }
   | { type: "toggleRecip"; id: string }
   | { type: "deselectRecips" }
+  | { type: "setSelRecips"; selRecips: string[] }
   | { type: "setMode"; mode: SendMode }
   | { type: "setSingleLoc"; key: keyof SingleLocation; value: string }
   | { type: "setNote"; note: string }
@@ -60,6 +61,8 @@ export function sendKitReducer(state: SendKitDraft, action: SendKitAction): Send
     }
     case "deselectRecips":
       return { ...state, selRecips: [] };
+    case "setSelRecips":
+      return { ...state, selRecips: action.selRecips };
     case "setMode":
       return { ...state, mode: action.mode };
     case "setSingleLoc":

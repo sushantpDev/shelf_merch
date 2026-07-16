@@ -1,5 +1,5 @@
-import { type ComponentType, type CSSProperties, useState, useMemo } from "react";
-import { Link, useNavigate } from "react-router";
+import { type ComponentType, type CSSProperties, useEffect, useState, useMemo } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   ArrowRight,
   ArrowUpDown,
@@ -36,7 +36,64 @@ import scaleYourGiftingImg from "../../../../assets/scale_your_gifting.png";
 import wellnessKitImg from "../../../../assets/wellness-kit.png";
 import workFromHomeKitImg from "../../../../assets/work-from-home-kit.png";
 import kitPreviewImg from "../../../../assets/kit-preview.png";
+import noKitsYetImg from "../../../../assets/no-kits-yet.png";
 import "../kits-page.css";
+
+type KitsSection = "recent" | "customized" | "curated";
+
+function parseKitsTab(value: string | null): KitsSection | null {
+  if (value === "recent" || value === "customized" || value === "curated") return value;
+  return null;
+}
+
+function KitsSectionEmptyState({
+  title,
+  description,
+  secondary,
+  illustration = true,
+}: {
+  title: string;
+  description: string;
+  secondary?: string;
+  illustration?: boolean;
+}) {
+  return (
+    <div
+      className="card"
+      style={{
+        padding: "48px 32px",
+        textAlign: "center",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--bg-card)",
+        border: "1px solid var(--line)",
+        borderRadius: 12,
+        minHeight: 280,
+      }}
+    >
+      {illustration ? (
+        <img
+          src={noKitsYetImg}
+          alt=""
+          style={{ maxHeight: 140, marginBottom: 20, objectFit: "contain" }}
+        />
+      ) : null}
+      <h3 style={{ fontSize: 18, fontWeight: 800, color: "var(--ink)", margin: "0 0 8px" }}>
+        {title}
+      </h3>
+      <p className="muted" style={{ fontSize: 14, lineHeight: 1.55, margin: 0, maxWidth: 420 }}>
+        {description}
+      </p>
+      {secondary ? (
+        <p className="muted" style={{ fontSize: 13, lineHeight: 1.5, margin: "10px 0 0", maxWidth: 420 }}>
+          {secondary}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 const previewBtnStyle: CSSProperties = {
   flex: 1,
@@ -356,6 +413,7 @@ function StatCard({ label, value, delta, icon: Icon }: StatCardProps) {
 
 export function KitsView(vm: KitsVm) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: workspace } = useWorkspace();
   const updateKit = useUpdateKit();
   const createKit = useCreateKit();
@@ -363,8 +421,23 @@ export function KitsView(vm: KitsVm) {
   const { data: platformKits } = usePlatformKits();
   const catalog = workspace?.catalogProducts ?? [];
 
-  const [activeSection, setActiveSection] = useState<"recent" | "customized" | "curated">("recent");
+  const [activeSection, setActiveSection] = useState<KitsSection>(
+    () => parseKitsTab(searchParams.get("tab")) ?? "recent",
+  );
   const [kitPreview, setKitPreview] = useState<KitPreviewData | null>(null);
+
+  useEffect(() => {
+    const tab = parseKitsTab(searchParams.get("tab"));
+    if (tab) setActiveSection(tab);
+  }, [searchParams]);
+
+  const selectSection = (section: KitsSection) => {
+    setActiveSection(section);
+    const next = new URLSearchParams(searchParams);
+    if (section === "recent") next.delete("tab");
+    else next.set("tab", section);
+    setSearchParams(next, { replace: true });
+  };
 
   // Recent Activity section states
   const [recentTab, setRecentTab] = useState<"all" | "live" | "draft" | "archived">("all");
@@ -460,7 +533,7 @@ export function KitsView(vm: KitsVm) {
     return { total: live + drafts + archived, live, drafts, archived };
   }, [allKits]);
 
-  // Construct complete Recent Activity history rows
+  // Construct complete Recent Activity history rows (real sends only when none exist)
   const recentActivityRows = useMemo<KitRow[]>(() => {
     const findKitByName = (name: string) =>
       vm.kits.find((k) => k.name.trim().toLowerCase() === name.trim().toLowerCase());
@@ -485,6 +558,9 @@ export function KitsView(vm: KitsVm) {
           kit: matchedKit,
         };
       });
+
+    // No real kit sends yet — show a proper empty state instead of demo rows.
+    if (campaignRows.length === 0) return [];
 
     const historyRows = mockHistoryRows.map((row): KitRow => {
       const matchedKit = findKitByName(row.name);
@@ -717,7 +793,7 @@ export function KitsView(vm: KitsVm) {
     );
   }
 
-  if (vm.isEmpty) {
+  if (vm.isEmpty && canCreateKits) {
     return <KitsEmptyState contactCount={vm.contactCount} canCreateKits={vm.canCreateKits} />;
   }
 
@@ -892,7 +968,9 @@ export function KitsView(vm: KitsVm) {
           <div>
             <h1 style={{ fontSize: 32, fontWeight: 800, color: "var(--ink)" }}>Kits &amp; Items</h1>
             <p style={{ margin: "8px 0 0", color: "var(--gray-500)" }}>
-              Create reusable gift kits with your products and send them at scale.
+              {canCreateKits
+                ? "Create reusable gift kits with your products and send them at scale."
+                : "Browse custom and curated kits, then send them to your team."}
             </p>
           </div>
           {canCreateKits && (
@@ -937,7 +1015,7 @@ export function KitsView(vm: KitsVm) {
               cursor: "pointer",
               transition: "all 0.15s",
             }}
-            onClick={() => setActiveSection("recent")}
+            onClick={() => selectSection("recent")}
           >
             Recent Activity
           </button>
@@ -954,7 +1032,7 @@ export function KitsView(vm: KitsVm) {
               cursor: "pointer",
               transition: "all 0.15s",
             }}
-            onClick={() => setActiveSection("customized")}
+            onClick={() => selectSection("customized")}
           >
             Customised Kits
           </button>
@@ -971,7 +1049,7 @@ export function KitsView(vm: KitsVm) {
               cursor: "pointer",
               transition: "all 0.15s",
             }}
-            onClick={() => setActiveSection("curated")}
+            onClick={() => selectSection("curated")}
           >
             Curated Kits
           </button>
@@ -988,6 +1066,12 @@ export function KitsView(vm: KitsVm) {
 
         {/* ── SECTION 1: RECENT ACTIVITY ── */}
         {activeSection === "recent" && (
+          recentActivityRows.length === 0 ? (
+            <KitsSectionEmptyState
+              title="No kits have been sent yet"
+              description="Once you send your first kit, delivery history and recipient activity will appear here."
+            />
+          ) : (
           <div className="kits-list-card">
             {/* Toolbar */}
             <div className="kits-list-toolbar">
@@ -1199,10 +1283,26 @@ export function KitsView(vm: KitsVm) {
               )}
             </div>
           </div>
+          )
         )}
 
         {/* ── SECTION 2: CUSTOMIZED KITS ── */}
         {activeSection === "customized" && (
+          workspaceRows.length === 0 ? (
+            <KitsSectionEmptyState
+              title="No custom kits have been created yet"
+              description={
+                canCreateKits
+                  ? "Create a custom kit to bundle products for your organization."
+                  : "Your Company Admin hasn't created any custom kits for your organization yet."
+              }
+              secondary={
+                canCreateKits
+                  ? undefined
+                  : "You can still send professionally curated gift kits from the Curated Kits tab."
+              }
+            />
+          ) : (
           <div>
             {/* Toolbar */}
             <div
@@ -1402,7 +1502,7 @@ export function KitsView(vm: KitsVm) {
                               Send
                             </button>
                           )}
-                          <ThreeDotMenu kitRow={row} />
+                          {canCreateKits ? <ThreeDotMenu kitRow={row} /> : null}
                         </div>
                       </div>
                     </div>
@@ -1410,7 +1510,7 @@ export function KitsView(vm: KitsVm) {
                 </div>
               ) : (
                 <div style={{ padding: 40, textAlign: "center", color: "var(--gray-500)" }}>
-                  No customized kits found. Create a kit to get started!
+                  No customized kits match your filters.
                 </div>
               )}
 
@@ -1471,6 +1571,7 @@ export function KitsView(vm: KitsVm) {
               )}
             </div>
           </div>
+          )
         )}
 
         {/* ── SECTION 3: CURATED KITS ── */}
@@ -1660,7 +1761,7 @@ export function KitsView(vm: KitsVm) {
                               Send
                             </button>
                           )}
-                          <ThreeDotMenu kitRow={row} />
+                          {canCreateKits ? <ThreeDotMenu kitRow={row} /> : null}
                         </div>
                       </div>
                     </div>

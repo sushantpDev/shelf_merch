@@ -9,6 +9,13 @@ import { ensureSpendEntityForWalletApi } from "@/services/mutations-api";
 import { entityIdForWallet, spendableForWallet, walletsForCheckout } from "@/services/workspace-api";
 import { kitSendTotals, type KitSendTotals } from "@/features/send/money";
 import { toSchedulePayload } from "@/features/send/types";
+import {
+  addRecipientsUpToLimit,
+  mergePickerContacts,
+  parseCsvEmails,
+  parseEmailInput,
+  selectAllRecipientIds,
+} from "@/features/send/recipientSelection";
 import { kitPickedIndices } from "../wizard/kitDraft";
 import { useLaunchKitCampaign, useUpdateKit } from "../model";
 import type { UiKit } from "../model";
@@ -18,6 +25,9 @@ import {
   type SendKitAction,
   type SendKitDraft,
 } from "../send/sendDraft";
+
+/** No hard cap on kit recipients — use a large ceiling for shared helpers. */
+const KIT_RECIPIENT_CEILING = 50_000;
 
 const NO_SIZE_GROUPS = new Set([
   'bottle',
@@ -159,6 +169,8 @@ export type SendKitVm = {
   draft: SendKitDraft;
   dispatch: Dispatch<SendKitAction>;
   contacts: UiContact[];
+  /** Workspace contacts plus any manually added email recipients. */
+  pickerContacts: UiContact[];
   catalog: UiProduct[];
   totals: KitSendTotals;
   surpriseMissing: UiContact[];
@@ -167,6 +179,9 @@ export type SendKitVm = {
   selectedWalletId: string | undefined;
   onWalletSelect: (walletId: string) => void;
   walletAvailable: (wallet: UiWallet) => number;
+  onSelectAllRecips: () => void;
+  onAddRecipientEmails: (raw: string) => void;
+  onImportRecipientCsv: (file: File) => void;
   onExit: () => void;
   onNext: () => void;
   onBack: () => void;
@@ -214,6 +229,11 @@ export function useSendKitController(): SendKitVm {
 
   const [draft, dispatch] = useReducer(sendKitReducer, initial);
 
+  const pickerContacts = useMemo(
+    () => mergePickerContacts(contacts, draft.selRecips),
+    [contacts, draft.selRecips],
+  );
+
   const checkoutWallets = useMemo(
     () => (workspace ? walletsForCheckout(workspace) : []),
     [workspace],
@@ -222,7 +242,76 @@ export function useSendKitController(): SendKitVm {
     checkoutWallets.find((w) => w.id === selectedWalletId) ?? checkoutWallets[0];
   const totals = kitSendTotals(draft.selRecips.length, draft.pkg);
   const surpriseMissing =
-    draft.mode === "surprise" ? missingAddress(contacts, draft.selRecips) : [];
+    draft.mode === "surprise" ? missingAddress(pickerContacts, draft.selRecips) : [];
+
+  function reportRecipientAddResult(result: {
+    added: string[];
+    invalid: string[];
+    duplicates: string[];
+    truncated: number;
+  }) {
+    if (result.invalid.length) {
+      toast.error(
+        `Skipped ${result.invalid.length} invalid email${result.invalid.length === 1 ? "" : "s"}`,
+      );
+    }
+    if (result.duplicates.length) {
+      toast.message(
+        `Skipped ${result.duplicates.length} duplicate${result.duplicates.length === 1 ? "" : "s"}`,
+      );
+    }
+    if (result.truncated > 0) {
+      toast.error("Could not add all recipients");
+    }
+    if (result.added.length) {
+      toast.success(
+        `Added ${result.added.length} recipient${result.added.length === 1 ? "" : "s"}`,
+      );
+    } else if (!result.invalid.length && !result.duplicates.length && !result.truncated) {
+      toast.error("No new recipients to add");
+    }
+  }
+
+  function onSelectAllRecips() {
+    if (!contacts.length) {
+      toast.message("No contacts in your workspace yet — use Input emails or Add by CSV");
+      return;
+    }
+    const ids = selectAllRecipientIds(contacts, draft.selRecips, KIT_RECIPIENT_CEILING);
+    if (ids.length === draft.selRecips.length) {
+      toast.message("All available contacts are already selected");
+      return;
+    }
+    dispatch({ type: "setSelRecips", selRecips: ids });
+  }
+
+  function onAddRecipientEmails(raw: string) {
+    const { ids, result } = addRecipientsUpToLimit(
+      parseEmailInput(raw),
+      draft.selRecips,
+      contacts,
+      KIT_RECIPIENT_CEILING,
+    );
+    dispatch({ type: "setSelRecips", selRecips: ids });
+    reportRecipientAddResult(result);
+  }
+
+  function onImportRecipientCsv(file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === "string" ? reader.result : "";
+      const { ids, result } = addRecipientsUpToLimit(
+        parseCsvEmails(text),
+        draft.selRecips,
+        contacts,
+        KIT_RECIPIENT_CEILING,
+      );
+      dispatch({ type: "setSelRecips", selRecips: ids });
+      reportRecipientAddResult(result);
+    };
+    reader.onerror = () => toast.error("Could not read CSV file");
+    reader.readAsText(file);
+  }
 
   function onNext() {
     if (step === 0) {
@@ -260,7 +349,7 @@ export function useSendKitController(): SendKitVm {
         const missingList: string[] = [];
         const pickedProds = draft.picked.map((idx) => catalog[idx]).filter(Boolean);
         for (const rid of draft.selRecips) {
-          const contact = contacts.find((c) => c.id === rid);
+          const contact = pickerContacts.find((c) => c.id === rid);
           const name = contact?.name || "Recipient";
           const variants = draft.recipVariants[rid] || {};
           for (const prod of pickedProds) {
@@ -340,7 +429,7 @@ export function useSendKitController(): SendKitVm {
         message: { from: draft.from, body: draft.msg },
         schedule: toSchedulePayload(draft.when, draft.schedule),
         contactIds: draft.selRecips,
-        contacts: contacts.map((c) => ({
+        contacts: pickerContacts.map((c) => ({
           id: c.id,
           name: c.name,
           email: c.email,
@@ -368,6 +457,7 @@ export function useSendKitController(): SendKitVm {
     draft,
     dispatch,
     contacts,
+    pickerContacts,
     catalog,
     totals,
     surpriseMissing,
@@ -376,6 +466,9 @@ export function useSendKitController(): SendKitVm {
     selectedWalletId: selectedWalletId || checkoutWallets[0]?.id,
     onWalletSelect: setSelectedWalletId,
     walletAvailable: (w) => (workspace ? spendableForWallet(workspace, w.id) : 0),
+    onSelectAllRecips,
+    onAddRecipientEmails,
+    onImportRecipientCsv,
     onExit: () => navigate("/app/kits"),
     onNext,
     onBack: () => setStep((s) => Math.max(s - 1, 0) as SendKitStep),

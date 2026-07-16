@@ -530,15 +530,27 @@ export async function launchKitCampaignFlow(payload: {
   recipVariants?: Record<string, Record<string, { size?: string; color?: string }>>;
 }) {
   const recipients = payload.contactIds
-    .map((id) => payload.contacts.find((c) => c.id === id))
+    .map((id) => {
+      if (id.startsWith("email:")) {
+        const email = id.slice("email:".length);
+        return {
+          name: email.split("@")[0] || email,
+          email,
+          variants: payload.recipVariants?.[id],
+        };
+      }
+      const contact = payload.contacts.find((c) => c.id === id);
+      if (!contact) return null;
+      return {
+        contactId: contact.id,
+        name: contact.name,
+        email: contact.email,
+        phone: contact.phone,
+        variants: payload.recipVariants?.[contact.id],
+      };
+    })
     .filter(Boolean)
-    .map((c) => ({
-      contactId: c!.id,
-      name: c!.name,
-      email: c!.email,
-      phone: c!.phone,
-      variants: payload.recipVariants?.[c!.id],
-    }));
+    .map((r) => r!);
   if (!recipients.length) throw new Error("Select at least one recipient");
   return launchKitCampaignApi({
     entityId: payload.entityId,
