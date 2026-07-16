@@ -5,12 +5,16 @@ import {
   getRedemptionKit,
   getRedemptionPortal,
   listRedemptionOrders,
+  listRedemptionTickets,
+  raiseRedemptionTicket,
+  replyRedemptionTicket,
   sendRedemptionOtp,
   submitRedemption,
   trackRedemption,
   verifyRedemptionOtp,
   type KitRedemptionData,
   type RedemptionOrderSummary,
+  type StoreSupportTicket,
 } from "@/services/api-bridge";
 import type { StoreShop } from "@/components/StoreBanner";
 import type { CheckoutItem, CheckoutPayment, ShippingAddress, StoreProduct } from "@/components/store/StoreShell";
@@ -57,6 +61,13 @@ export type RedemptionVm = {
   onKitAccepted: (orderNumber: string) => void;
   onLogout: () => void;
   onFetchOrders: () => Promise<{ orders: RedemptionOrderSummary[]; creditAmount: number }>;
+  onFetchTickets: () => Promise<{ items: StoreSupportTicket[] }>;
+  onRaiseTicket: (body: {
+    subject: string;
+    description?: string;
+    type?: string;
+  }) => Promise<StoreSupportTicket>;
+  onReplyTicket: (ticketId: string, body: string) => Promise<StoreSupportTicket>;
 };
 
 export function isKitCampaign(portal: PortalData | null) {
@@ -188,6 +199,22 @@ export function useRedemptionController(token: string): RedemptionVm {
     return data;
   }, [token, sessionToken, portal]);
 
+  const onFetchTickets = useCallback(async () => {
+    if (!sessionToken) return { items: [] };
+    return listRedemptionTickets(token, sessionToken);
+  }, [token, sessionToken]);
+
+  const onRaiseTicket = useCallback(
+    (body: { subject: string; description?: string; type?: string }) =>
+      raiseRedemptionTicket(token, sessionToken, body),
+    [token, sessionToken],
+  );
+
+  const onReplyTicket = useCallback(
+    (ticketId: string, body: string) => replyRedemptionTicket(token, sessionToken, ticketId, body),
+    [token, sessionToken],
+  );
+
   function onLogout() {
     setSessionToken("");
     setProducts([]);
@@ -220,5 +247,8 @@ export function useRedemptionController(token: string): RedemptionVm {
     },
     onLogout,
     onFetchOrders,
+    onFetchTickets,
+    onRaiseTicket,
+    onReplyTicket,
   };
 }

@@ -55,7 +55,27 @@ async function notifySupportStaff({ ticket, title, body }) {
 
 /** In-app (and optionally email) update to the user who raised the ticket. */
 async function notifyRaiser(ticket, { title, body, withEmail = false }) {
-  if (!ticket.raisedByUserId) return;
+  if (!ticket.raisedByUserId) {
+    // Employee (recipient) tickets: no User account, no in-app inbox — email only.
+    if (ticket.source !== 'recipient' || !ticket.relatedRecipientId) return;
+    const recipient = await Recipient.findOne({
+      _id: ticket.relatedRecipientId,
+      tenantId: ticket.tenantId,
+    })
+      .setOptions({ skipTenantGuard: true })
+      .select('email')
+      .lean();
+    if (!recipient?.email) return;
+    notifyAsync({
+      type: 'support_ticket_update',
+      tenantId: ticket.tenantId,
+      email: recipient.email,
+      title,
+      body: body || 'Open your gift link and go to Support to view the update.',
+      link: '',
+    });
+    return;
+  }
   let email = null;
   if (withEmail) {
     const user = await User.findOne({ _id: ticket.raisedByUserId }).select('email').lean();
@@ -124,17 +144,24 @@ export async function listSupportTicketsWithTenants({ query }) {
 /** Full ticket for the platform manage modal: tenant + raiser names resolved. */
 export async function getSupportTicketDetail(ticketId) {
   const ticket = await getSupportTicket(ticketId);
-  const [tenant, raiser] = await Promise.all([
+  const [tenant, raiser, recipient] = await Promise.all([
     ticket.tenantId ? Tenant.findById(ticket.tenantId).select('name').lean() : null,
     ticket.raisedByUserId
       ? User.findOne({ _id: ticket.raisedByUserId }).select('name email').lean()
+      : null,
+    // Employee-raised tickets have no raiser User — show the recipient instead.
+    !ticket.raisedByUserId && ticket.relatedRecipientId
+      ? Recipient.findOne({ _id: ticket.relatedRecipientId, tenantId: ticket.tenantId })
+          .setOptions({ skipTenantGuard: true })
+          .select('name email')
+          .lean()
       : null,
   ]);
   return {
     ...ticket.toObject(),
     tenantName: tenant?.name ?? '',
-    raisedByName: raiser?.name ?? '',
-    raisedByEmail: raiser?.email ?? '',
+    raisedByName: raiser?.name ?? recipient?.name ?? '',
+    raisedByEmail: raiser?.email ?? recipient?.email ?? '',
   };
 }
 
@@ -174,6 +201,12 @@ export async function addTenantMessage({ ticketId, tenantId, userId, body }) {
   }
   await ticket.save();
 
+  await notifyAgentsOfReply(ticket, body);
+  return toTenantView(ticket);
+}
+
+/** Ping the assigned agent — or the whole desk when unassigned — about a customer reply. */
+async function notifyAgentsOfReply(ticket, body) {
   const ping = {
     title: `Customer replied: ${ticket.subject}`,
     body: body.slice(0, 200),
@@ -189,6 +222,64 @@ export async function addTenantMessage({ ticketId, tenantId, userId, body }) {
   } else {
     await notifySupportStaff({ ticket, ...ping });
   }
+}
+
+/** Employee help center: the recipient's own tickets (internal notes stripped). */
+export async function listRecipientTickets({ tenantId, recipientId }) {
+  const tickets = await SupportTicket.find({
+    tenantId,
+    relatedRecipientId: recipientId,
+    source: 'recipient',
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+  return { items: tickets.map(toTenantView) };
+}
+
+/** Employee help center: raise a ticket from the redemption store. */
+export async function createRecipientTicket({ recipient, subject, description, type }) {
+  const ticket = await createSupportTicket({
+    tenantId: recipient.tenantId,
+    userId: null,
+    subject,
+    description,
+    type,
+    source: 'recipient',
+    relatedRecipientId: recipient._id,
+  });
+  return toTenantView(ticket);
+}
+
+/**
+ * Employee reply: never internal, reopens a waiting/resolved ticket, pings the
+ * assigned agent (or the whole desk when unassigned).
+ */
+export async function addRecipientMessage({ ticketId, tenantId, recipientId, authorName, body }) {
+  const ticket = await SupportTicket.findOne({
+    _id: ticketId,
+    tenantId,
+    relatedRecipientId: recipientId,
+    source: 'recipient',
+  });
+  if (!ticket) throw new NotFoundError('Support ticket not found');
+  if (ticket.status === 'closed') {
+    throw new ApiError(422, 'This ticket is closed — please open a new one', 'TICKET_CLOSED');
+  }
+
+  ticket.messages.push({
+    authorUserId: null,
+    authorName: authorName || '',
+    fromPlatform: false,
+    body,
+    internal: false,
+    at: new Date(),
+  });
+  if (['waiting_on_customer', 'resolved'].includes(ticket.status)) {
+    transitionState('supportTicket', ticket, 'in_progress', { userId: null }, 'Customer replied');
+  }
+  await ticket.save();
+
+  await notifyAgentsOfReply(ticket, body);
   return toTenantView(ticket);
 }
 

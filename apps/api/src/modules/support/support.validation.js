@@ -45,6 +45,13 @@ export const tenantAddMessageSchema = z.object({
   body: z.string().min(1),
 });
 
+/** Employee (recipient) tickets: no related-record ids accepted from the client. */
+export const recipientCreateTicketSchema = z.object({
+  subject: z.string().min(1).max(200),
+  description: z.string().max(5000).optional().default(''),
+  type: z.enum(SUPPORT_TICKET_TYPES).optional().default('other'),
+});
+
 export const updateSupportTicketStatusSchema = z.object({
   status: z.enum(SUPPORT_TICKET_STATUSES),
 });

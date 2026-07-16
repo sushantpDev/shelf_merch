@@ -9,7 +9,7 @@ import { DesignedProductThumb,
 } from "@/features/swag/DesignedProductThumb";
 import { ShelfMerchLogo } from "@/components/brand/ShelfMerchLogo";
 import { POINT_VALUE } from "@/features/send/money";
-import { createRedemptionRazorpayOrder } from "@/services/api-bridge";
+import { createRedemptionRazorpayOrder, type StoreSupportTicket } from "@/services/api-bridge";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 import walletIconImg from "../../../assets/wallet-icon.svg";
 import emptyBagImg from "../../../assets/empty-bag.svg";
@@ -153,7 +153,16 @@ type AddedToBagInfo = {
 };
 
 type Mode = "preview" | "redeem";
-type Page = "home" | "products" | "product" | "cart" | "checkout" | "done" | "orders" | "order-detail";
+type Page = "home" | "products" | "product" | "cart" | "checkout" | "done" | "orders" | "order-detail" | "support";
+
+const SUPPORT_TYPE_LABELS: Record<string, string> = {
+  delivery_issue: "Delivery issue",
+  address_change: "Address change",
+  replacement: "Replacement",
+  redemption_issue: "Redemption issue",
+  billing: "Billing",
+  other: "Other",
+};
 
 type CartLine = {
   key: string;
@@ -552,6 +561,9 @@ export default function StoreShell({
   onCheckout,
   onLogout,
   onFetchOrders,
+  onFetchTickets,
+  onRaiseTicket,
+  onReplyTicket,
 }: {
   shop: StoreShop;
   products: StoreProduct[];
@@ -575,6 +587,13 @@ export default function StoreShell({
   }>;
   onLogout?: () => void;
   onFetchOrders?: () => Promise<{ orders: StoreOrderSummary[]; creditAmount: number }>;
+  onFetchTickets?: () => Promise<{ items: StoreSupportTicket[] }>;
+  onRaiseTicket?: (body: {
+    subject: string;
+    description?: string;
+    type?: string;
+  }) => Promise<StoreSupportTicket>;
+  onReplyTicket?: (ticketId: string, body: string) => Promise<StoreSupportTicket>;
 }) {
   const storageKey = cartStorageKey(cartPersistId);
   const [page, setPage] = useState<Page>("home");
@@ -588,6 +607,16 @@ export default function StoreShell({
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState("");
   const [selectedOrderNumber, setSelectedOrderNumber] = useState<string | null>(null);
+  const [tickets, setTickets] = useState<StoreSupportTicket[]>([]);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [ticketsError, setTicketsError] = useState("");
+  const [openTicketId, setOpenTicketId] = useState<string | null>(null);
+  const [ticketReply, setTicketReply] = useState("");
+  const [ticketBusy, setTicketBusy] = useState(false);
+  const [showTicketForm, setShowTicketForm] = useState(false);
+  const [ticketSubject, setTicketSubject] = useState("");
+  const [ticketType, setTicketType] = useState("other");
+  const [ticketDetails, setTicketDetails] = useState("");
   const [address, setAddress] = useState<ShippingAddress>({
     name: recipientName || "",
     phone: "",
@@ -888,6 +917,62 @@ export default function StoreShell({
     }
   }
 
+  async function refreshTickets() {
+    if (!onFetchTickets) return;
+    setTicketsLoading(true);
+    setTicketsError("");
+    try {
+      const data = await onFetchTickets();
+      setTickets(data.items);
+    } catch (err) {
+      setTicketsError(err instanceof Error ? err.message : "Could not load tickets");
+    } finally {
+      setTicketsLoading(false);
+    }
+  }
+
+  function openSupport() {
+    setPage("support");
+    void refreshTickets();
+  }
+
+  async function raiseTicket() {
+    if (!onRaiseTicket || !ticketSubject.trim()) return;
+    setTicketBusy(true);
+    setTicketsError("");
+    try {
+      await onRaiseTicket({
+        subject: ticketSubject.trim(),
+        description: ticketDetails.trim(),
+        type: ticketType,
+      });
+      setTicketSubject("");
+      setTicketDetails("");
+      setTicketType("other");
+      setShowTicketForm(false);
+      await refreshTickets();
+    } catch (err) {
+      setTicketsError(err instanceof Error ? err.message : "Could not raise the ticket");
+    } finally {
+      setTicketBusy(false);
+    }
+  }
+
+  async function sendTicketReply() {
+    if (!onReplyTicket || !openTicketId || !ticketReply.trim()) return;
+    setTicketBusy(true);
+    setTicketsError("");
+    try {
+      const updated = await onReplyTicket(openTicketId, ticketReply.trim());
+      setTicketReply("");
+      setTickets((prev) => prev.map((t) => (t._id === updated._id ? updated : t)));
+    } catch (err) {
+      setTicketsError(err instanceof Error ? err.message : "Could not send the reply");
+    } finally {
+      setTicketBusy(false);
+    }
+  }
+
   function openCart() {
     setPage("cart");
   }
@@ -1067,6 +1152,7 @@ export default function StoreShell({
                     setPage("orders");
                     void refreshOrders();
                   }}
+                  onOpenSupport={onFetchTickets ? openSupport : undefined}
                   onLogout={onLogout}
                 />
               ) : (
@@ -1866,8 +1952,231 @@ export default function StoreShell({
         )
       ) : null}
 
+      {/* ────── SUPPORT ────── */}
+      {page === "support" && (
+        <StorePageShell
+          className="sf-orders-page"
+          backLabel="← Back to store"
+          onBack={() => setPage("home")}
+          title="Support"
+        >
+          {ticketsError ? (
+            <div className="card" style={{ padding: 12, color: "var(--danger)", marginBottom: 14 }}>
+              {ticketsError}
+            </div>
+          ) : null}
+
+          {showTicketForm ? (
+            <div className="sf-order-card" style={{ padding: 18, marginBottom: 18 }}>
+              <h2 style={{ fontSize: 16, marginBottom: 12 }}>Raise a ticket</h2>
+              <div className="sf-checkout-form">
+                <label className="sf-checkout-field">
+                  <span className="sf-checkout-label">Subject</span>
+                  <input
+                    className="sf-checkout-inp"
+                    placeholder="e.g. My order hasn't arrived"
+                    value={ticketSubject}
+                    onChange={(e) => setTicketSubject(e.target.value)}
+                  />
+                </label>
+                <label className="sf-checkout-field">
+                  <span className="sf-checkout-label">Category</span>
+                  <select
+                    className="sf-checkout-inp sf-checkout-select"
+                    value={ticketType}
+                    onChange={(e) => setTicketType(e.target.value)}
+                  >
+                    {Object.entries(SUPPORT_TYPE_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="sf-checkout-field">
+                  <span className="sf-checkout-label">Details</span>
+                  <textarea
+                    className="sf-checkout-inp"
+                    rows={4}
+                    placeholder="Order number, what went wrong, anything that helps us fix it."
+                    value={ticketDetails}
+                    onChange={(e) => setTicketDetails(e.target.value)}
+                  />
+                </label>
+                <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+                  <button
+                    type="button"
+                    className="sf-btn-secondary"
+                    onClick={() => setShowTicketForm(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="sf-bag-checkout-btn"
+                    style={{ width: "auto", padding: "0 22px" }}
+                    disabled={ticketBusy || !ticketSubject.trim()}
+                    onClick={() => void raiseTicket()}
+                  >
+                    {ticketBusy ? "Raising…" : "Raise ticket"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="row" style={{ justifyContent: "flex-end", marginBottom: 14 }}>
+              <button
+                type="button"
+                className="sf-btn-secondary"
+                onClick={() => setShowTicketForm(true)}
+              >
+                Raise a ticket
+              </button>
+            </div>
+          )}
+
+          {ticketsLoading ? (
+            <div className="sf-orders-skeleton">
+              {[1, 2].map((n) => (
+                <div key={n} className="sf-order-card sf-order-card--skeleton" />
+              ))}
+            </div>
+          ) : tickets.length === 0 && !showTicketForm ? (
+            <StoreEmptyState
+              variant="orders"
+              title="No support tickets"
+              description="Something wrong with a gift or delivery? Raise a ticket and our team will help."
+              action={
+                <button
+                  type="button"
+                  className="sf-btn-secondary"
+                  onClick={() => setShowTicketForm(true)}
+                >
+                  Raise a ticket
+                </button>
+              }
+            />
+          ) : (
+            <div className="sf-orders-list">
+              {tickets.map((t) => {
+                const isOpen = openTicketId === t._id;
+                const visibleMessages = t.messages ?? [];
+                return (
+                  <div key={t._id} className="sf-order-card" style={{ padding: 16 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenTicketId(isOpen ? null : t._id);
+                        setTicketReply("");
+                      }}
+                      style={{
+                        display: "flex",
+                        width: "100%",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 12,
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        padding: 0,
+                      }}
+                    >
+                      <span>
+                        <span style={{ display: "block", fontWeight: 600 }}>{t.subject}</span>
+                        <span className="mut3" style={{ fontSize: 12 }}>
+                          {SUPPORT_TYPE_LABELS[t.type] ?? t.type} ·{" "}
+                          {formatOrderDate(t.createdAt)} · {visibleMessages.length}{" "}
+                          {visibleMessages.length === 1 ? "reply" : "replies"}
+                        </span>
+                      </span>
+                      <span
+                        className="sf-order-status-pill"
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          whiteSpace: "nowrap",
+                          padding: "4px 10px",
+                          borderRadius: 999,
+                          border: "1px solid var(--line, #e5e5e5)",
+                        }}
+                      >
+                        {formatOrderStatus(t.status)}
+                      </span>
+                    </button>
+
+                    {isOpen ? (
+                      <div style={{ marginTop: 12, borderTop: "1px solid var(--line, #eee)", paddingTop: 12 }}>
+                        {t.description ? (
+                          <p className="mut3" style={{ fontSize: 13, whiteSpace: "pre-wrap", marginBottom: 10 }}>
+                            {t.description}
+                          </p>
+                        ) : null}
+                        {visibleMessages.length === 0 ? (
+                          <p className="mut3" style={{ fontSize: 13 }}>
+                            No replies yet — our team has been notified.
+                          </p>
+                        ) : (
+                          visibleMessages.map((m, i) => (
+                            <div
+                              key={m._id ?? i}
+                              style={{
+                                border: "1px solid var(--line, #eee)",
+                                borderRadius: 8,
+                                padding: "8px 10px",
+                                marginBottom: 6,
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                                <strong>
+                                  {m.fromPlatform === false
+                                    ? m.authorName || "You"
+                                    : m.authorName || "Support team"}
+                                </strong>
+                                <span className="mut3">{formatOrderDate(m.at)}</span>
+                              </div>
+                              <div style={{ fontSize: 13, whiteSpace: "pre-wrap", marginTop: 3 }}>{m.body}</div>
+                            </div>
+                          ))
+                        )}
+
+                        {t.status !== "closed" && onReplyTicket ? (
+                          <div style={{ marginTop: 10 }}>
+                            <textarea
+                              className="sf-checkout-inp"
+                              rows={3}
+                              placeholder="Write a reply…"
+                              value={ticketReply}
+                              onChange={(e) => setTicketReply(e.target.value)}
+                            />
+                            <div className="row" style={{ justifyContent: "flex-end", marginTop: 8 }}>
+                              <button
+                                type="button"
+                                className="sf-btn-secondary"
+                                disabled={ticketBusy || !ticketReply.trim()}
+                                onClick={() => void sendTicketReply()}
+                              >
+                                {ticketBusy ? "Sending…" : "Send reply"}
+                              </button>
+                            </div>
+                          </div>
+                        ) : t.status === "closed" ? (
+                          <p className="mut3" style={{ fontSize: 12, marginTop: 8 }}>
+                            This ticket is closed — raise a new one if you need more help.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </StorePageShell>
+      )}
+
       {/* ═══ FOOTER ═══ */}
-      {page !== "orders" && page !== "order-detail" ? (
+      {page !== "orders" && page !== "order-detail" && page !== "support" ? (
       <div className="sf-footer">
         <div className="sf-footer-inner">
           <span className="sf-footer-powered">Powered by</span>

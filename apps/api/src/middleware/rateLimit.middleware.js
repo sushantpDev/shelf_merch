@@ -72,6 +72,13 @@ export const verifyOtpRateLimit = rateLimit([
   { prefix: 'otp:verify:ip', limit: 30, windowSec: 15 * 60, key: clientIp, critical: true },
 ]);
 
+// Employee support tickets are raised from a public (session-guarded) redemption
+// link — cap creates so a leaked link can't spam the help desk.
+export const recipientTicketRateLimit = rateLimit([
+  { prefix: 'support:recipient:token', limit: 5, windowSec: 60 * 60, key: (req) => req.params?.token ?? '', critical: true },
+  { prefix: 'support:recipient:ip', limit: 20, windowSec: 60 * 60, key: clientIp, critical: true },
+]);
+
 // Coarse per-IP ceiling for the whole API surface (defence against scraping and
 // volumetric abuse). Non-critical: fails open when Redis is unavailable so a
 // Redis outage never takes the whole API down.

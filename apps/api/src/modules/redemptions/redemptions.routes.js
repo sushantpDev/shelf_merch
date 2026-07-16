@@ -3,12 +3,19 @@ import { z } from 'zod';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { idempotency } from '../../middleware/idempotency.middleware.js';
-import { sendOtpRateLimit, verifyOtpRateLimit } from '../../middleware/rateLimit.middleware.js';
+import {
+  recipientTicketRateLimit,
+  sendOtpRateLimit,
+  verifyOtpRateLimit,
+} from '../../middleware/rateLimit.middleware.js';
 import { objectId } from '../users/users.validation.js';
 import { ApiError } from '../../utils/errors.js';
 import { Recipient } from '../campaigns/recipient.model.js';
 import { requireRedemptionSession } from '../../middleware/redemptionSession.middleware.js';
+import { writeAudit } from '../../services/audit.service.js';
 import * as redemptionsService from './redemptions.service.js';
+import * as supportService from '../support/support.service.js';
+import { recipientCreateTicketSchema } from '../support/support.validation.js';
 
 async function attachRedemptionScope(req, _res, next) {
   const recipient = await Recipient.findOne({ redemptionToken: req.params.token }).setOptions({
@@ -160,6 +167,68 @@ router.get(
   validate({ params: tokenParams }),
   asyncHandler(async (req, res) => {
     res.json(await redemptionsService.trackRedemption(req.params.token));
+  }),
+);
+
+// ── Employee support: recipients raise and track tickets from the store ──
+
+router.get(
+  '/:token/support-tickets',
+  validate({ params: tokenParams }),
+  requireRedemptionSession,
+  asyncHandler(async (req, res) => {
+    const recipient = req.redemptionRecipient;
+    res.json(
+      await supportService.listRecipientTickets({
+        tenantId: recipient.tenantId,
+        recipientId: recipient._id,
+      }),
+    );
+  }),
+);
+
+router.post(
+  '/:token/support-tickets',
+  validate({ params: tokenParams, body: recipientCreateTicketSchema }),
+  requireRedemptionSession,
+  recipientTicketRateLimit,
+  asyncHandler(async (req, res) => {
+    const recipient = req.redemptionRecipient;
+    const ticket = await supportService.createRecipientTicket({
+      recipient,
+      subject: req.body.subject,
+      description: req.body.description,
+      type: req.body.type,
+    });
+    writeAudit({
+      req,
+      action: 'support_ticket.create',
+      entityType: 'SupportTicket',
+      entityId: ticket._id,
+      after: { subject: ticket.subject, status: ticket.status, source: 'recipient' },
+    });
+    res.status(201).json(ticket);
+  }),
+);
+
+router.post(
+  '/:token/support-tickets/:ticketId/messages',
+  validate({
+    params: z.object({ token: z.string().min(16), ticketId: objectId }),
+    body: z.object({ body: z.string().min(1) }),
+  }),
+  requireRedemptionSession,
+  asyncHandler(async (req, res) => {
+    const recipient = req.redemptionRecipient;
+    res.json(
+      await supportService.addRecipientMessage({
+        ticketId: req.params.ticketId,
+        tenantId: recipient.tenantId,
+        recipientId: recipient._id,
+        authorName: recipient.name || '',
+        body: req.body.body,
+      }),
+    );
   }),
 );
 
