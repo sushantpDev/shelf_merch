@@ -1,4 +1,5 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/services/api";
 import { createShopFlow, updateShopFlow } from "@/services/api-bridge";
 import { archiveShopApi, duplicateShopApi } from "@/services/workspace-api";
 import type { UiShop } from "@/services/mappers";
@@ -24,6 +25,35 @@ export type UpdateShopInput = {
   selectedCatalogProductIds?: string[];
   featuredCatalogProductIds?: string[];
 };
+
+export type ShopReport = {
+  shopId: string;
+  shopName: string;
+  generatedAt: string;
+  totals: {
+    campaignsLaunched: number;
+    recipients: number;
+    pointsIssuedInr: number;
+    pointsRedeemedInr: number;
+    redemptionRate: number;
+    ordersCount: number;
+    orderValueInr: number;
+    avgOrderValueInr: number;
+  };
+  funnel: Array<{ stage: string; label: string; count: number; pct: number }>;
+  weekly: Array<{ weekStart: string; orders: number; valueInr: number }>;
+  topProducts: Array<{ name: string; qty: number; valueInr: number }>;
+};
+
+/** Aggregated shop performance for the Reports tab. */
+export function useShopReport(shopId: string | undefined) {
+  return useQuery({
+    queryKey: ["shop-report", shopId],
+    queryFn: () => apiFetch<ShopReport>(`/shops/${shopId}/report`),
+    enabled: Boolean(shopId),
+    staleTime: 60_000,
+  });
+}
 
 export function useCreateShop() {
   const invalidate = useInvalidateWorkspace();

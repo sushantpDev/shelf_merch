@@ -142,7 +142,7 @@ export function ShopDetailView(vm: ShopDetailVm) {
         />
       )}
       {vm.tab === "Layout" && vm.canEditShop && <ShopLayoutTab shop={shop} />}
-      {vm.tab === "Reports" && <ReportsTab />}
+      {vm.tab === "Reports" && <ReportsTab shop={shop} />}
       {vm.tab === "Settings" && vm.canEditShop && <GeneralSettingsTab shop={shop} />}
     </>
   );
