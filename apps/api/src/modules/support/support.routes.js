@@ -3,6 +3,7 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { resolveTenant, requireTenantContext } from '../../middleware/tenant.middleware.js';
 import { platformArea } from '../../middleware/platformAccess.middleware.js';
+import { uploader, DOCUMENT_TYPES } from '../../middleware/upload.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import * as controller from './support.controller.js';
 import {
@@ -32,8 +33,13 @@ tenantSupportRouter.get(
   validate({ params: supportTicketIdParam }),
   asyncHandler(controller.getMine),
 );
+// Optional evidence attachment (screenshot/PDF, ≤10MB). Multer runs first so
+// multipart form fields land in req.body before zod validation; plain JSON
+// posts pass through multer untouched.
+const attachmentUpload = uploader({ allow: DOCUMENT_TYPES, maxSizeMb: 10 });
 tenantSupportRouter.post(
   '/',
+  attachmentUpload.single('attachment'),
   validate({ body: createSupportTicketSchema }),
   asyncHandler(controller.create),
 );

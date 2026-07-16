@@ -30,6 +30,14 @@ export type SupportMessage = {
   at: string;
 };
 
+export type SupportAttachment = {
+  _id?: string;
+  url: string;
+  name?: string;
+  contentType?: string;
+  size?: number;
+};
+
 export type SupportTicket = {
   _id: string;
   subject: string;
@@ -37,6 +45,7 @@ export type SupportTicket = {
   type: string;
   status: string;
   messages: SupportMessage[];
+  attachments?: SupportAttachment[];
   createdAt: string;
   updatedAt: string;
 };
@@ -65,11 +74,29 @@ export function useTicket(id: string | null) {
 export function useCreateTicket() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { subject: string; description: string; type: SupportTicketType }) =>
-      apiFetch<SupportTicket>("/support-tickets", {
+    mutationFn: (payload: {
+      subject: string;
+      description: string;
+      type: SupportTicketType;
+      file?: File | null;
+    }) => {
+      if (payload.file) {
+        const form = new FormData();
+        form.append("subject", payload.subject);
+        form.append("description", payload.description);
+        form.append("type", payload.type);
+        form.append("attachment", payload.file);
+        return apiFetch<SupportTicket>("/support-tickets", { method: "POST", body: form });
+      }
+      return apiFetch<SupportTicket>("/support-tickets", {
         method: "POST",
-        body: JSON.stringify(payload),
-      }),
+        body: JSON.stringify({
+          subject: payload.subject,
+          description: payload.description,
+          type: payload.type,
+        }),
+      });
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: SUPPORT_QUERY_KEY }),
   });
 }

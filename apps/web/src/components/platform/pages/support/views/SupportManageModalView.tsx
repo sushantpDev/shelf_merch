@@ -29,6 +29,11 @@ export function SupportManageModalView({
   const tenantName = String(ticket?.tenantName ?? "");
   const raisedByName = String(ticket?.raisedByName ?? "");
   const description = String(ticket?.description ?? row.description ?? "");
+  const attachments = (ticket?.attachments ?? []) as Array<{
+    _id?: string;
+    url: string;
+    name?: string;
+  }>;
   return (
     <PlatformModal
       title={String(row.subject ?? "Ticket")}
@@ -51,6 +56,23 @@ export function SupportManageModalView({
         <p className="muted" style={{ fontSize: 13, whiteSpace: "pre-wrap", marginBottom: 12 }}>
           {description}
         </p>
+      )}
+
+      {attachments.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+          {attachments.map((a, i) => (
+            <a
+              key={String(a._id ?? i)}
+              href={String(a.url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="lnk"
+              style={{ fontSize: 13 }}
+            >
+              📎 {String(a.name || "Attachment")}
+            </a>
+          ))}
+        </div>
       )}
 
       <div className="field">

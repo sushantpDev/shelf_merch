@@ -1,4 +1,5 @@
-import { LifeBuoy } from "lucide-react";
+import { useRef } from "react";
+import { LifeBuoy, Paperclip, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +10,44 @@ import {
 import { LoadingState } from "@/components/LoadingState";
 import { PageHeader } from "@/components/tenant/PageHeader";
 import { StatusTag } from "@/components/platform/platform-ui";
-import { SUPPORT_TICKET_TYPES, TYPE_LABELS, type SupportMessage } from "../model";
+import {
+  SUPPORT_TICKET_TYPES,
+  TYPE_LABELS,
+  type SupportAttachment,
+  type SupportMessage,
+} from "../model";
+
+function fmtBytes(size = 0) {
+  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  if (size >= 1024) return `${Math.round(size / 1024)} KB`;
+  return `${size} B`;
+}
+
+function AttachmentLinks({ attachments }: { attachments?: SupportAttachment[] }) {
+  if (!attachments?.length) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+      {attachments.map((a, i) => (
+        <a
+          key={a._id ?? i}
+          href={a.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="lnk"
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13 }}
+        >
+          <Paperclip size={14} aria-hidden="true" />
+          {a.name || "Attachment"}
+          {a.size ? (
+            <span className="muted" style={{ fontSize: 12 }}>
+              ({fmtBytes(a.size)})
+            </span>
+          ) : null}
+        </a>
+      ))}
+    </div>
+  );
+}
 import type { SupportTicketsVm } from "../controllers/useSupportTicketsController";
 
 const SUBTITLE = "Raise an issue with the ShelfMerch team and track replies here.";
@@ -44,6 +82,7 @@ function MessageBubble({ message }: { message: SupportMessage }) {
 
 /** Tenant help center: my tickets + raise-ticket dialog + conversation thread. */
 export function SupportTicketsView(vm: SupportTicketsVm) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   if (vm.isLoading) {
     return <LoadingState message="Loading support tickets…" fullScreen={false} />;
   }
@@ -178,6 +217,52 @@ export function SupportTicketsView(vm: SupportTicketsVm) {
                   onChange={(e) => vm.onDescription(e.target.value)}
                 />
               </div>
+              <div className="field">
+                <label className="lbl" htmlFor="support-attachment">
+                  Attachment <span className="muted">(optional — image or PDF, 10 MB max)</span>
+                </label>
+                <input
+                  ref={fileInputRef}
+                  id="support-attachment"
+                  type="file"
+                  accept=".png,.jpg,.jpeg,.webp,.gif,.pdf"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    vm.onFile(e.target.files?.[0] ?? null);
+                    e.target.value = "";
+                  }}
+                />
+                {vm.file ? (
+                  <div
+                    className="row"
+                    style={{ alignItems: "center", gap: 8, fontSize: 13, marginTop: 2 }}
+                  >
+                    <Paperclip size={14} aria-hidden="true" />
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {vm.file.name}
+                    </span>
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      ({fmtBytes(vm.file.size)})
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      aria-label="Remove attachment"
+                      onClick={() => vm.onFile(null)}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-soft btn-sm"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Paperclip size={14} /> Add a file
+                  </button>
+                )}
+              </div>
               <div className="row" style={{ justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
                 <button
                   type="button"
@@ -228,6 +313,8 @@ export function SupportTicketsView(vm: SupportTicketsVm) {
                   {vm.selected.description}
                 </div>
               ) : null}
+
+              <AttachmentLinks attachments={vm.selected.attachments} />
 
               <div className="lbl" style={{ marginBottom: 8 }}>
                 Conversation

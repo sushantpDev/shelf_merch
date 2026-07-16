@@ -31,6 +31,16 @@ const supportTicketSchema = new mongoose.Schema(
     relatedOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
     relatedRecipientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Recipient', default: null },
     status: { type: String, enum: SUPPORT_TICKET_STATUSES, default: 'open' },
+    // Uploaded evidence (screenshot/PDF). `url` points at hardened storage —
+    // the storage key is random hex, never the user-supplied filename.
+    attachments: [
+      {
+        url: { type: String, required: true },
+        name: { type: String, default: '' },
+        contentType: { type: String, default: '' },
+        size: { type: Number, default: 0 },
+      },
+    ],
     statusHistory: [{ status: String, at: Date, actorUserId: mongoose.Schema.Types.ObjectId, note: String }],
     assignedToUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     messages: [

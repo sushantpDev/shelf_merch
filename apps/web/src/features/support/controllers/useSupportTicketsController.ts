@@ -9,6 +9,26 @@ import {
   type SupportTicketType,
 } from "../model";
 
+// Mirrors the API allowlist (upload.middleware DOCUMENT_TYPES): images + PDF,
+// no SVG/HTML. The server re-validates — this is just a friendly early check.
+const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+const ATTACHMENT_MIMES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+  "image/gif",
+  "application/pdf",
+]);
+const ATTACHMENT_EXT_RE = /\.(png|jpe?g|webp|gif|pdf)$/i;
+
+function attachmentProblem(file: File): string | null {
+  const typeOk = ATTACHMENT_MIMES.has(file.type.toLowerCase()) || ATTACHMENT_EXT_RE.test(file.name);
+  if (!typeOk) return "Only images (PNG, JPG, WEBP, GIF) or PDF files are allowed";
+  if (file.size > ATTACHMENT_MAX_BYTES) return "File is too large — 10 MB max";
+  return null;
+}
+
 export type SupportTicketsVm = {
   isLoading: boolean;
   errorMessage: string | null;
@@ -18,12 +38,14 @@ export type SupportTicketsVm = {
   subject: string;
   type: SupportTicketType;
   description: string;
+  file: File | null;
   submitting: boolean;
   onOpenCreate: () => void;
   onCreateOpenChange: (open: boolean) => void;
   onSubject: (v: string) => void;
   onType: (v: SupportTicketType) => void;
   onDescription: (v: string) => void;
+  onFile: (file: File | null) => void;
   onSubmit: () => void;
   // Detail dialog
   selected: SupportTicket | null;
@@ -47,6 +69,7 @@ export function useSupportTicketsController(): SupportTicketsVm {
   const [subject, setSubject] = useState("");
   const [type, setType] = useState<SupportTicketType>("other");
   const [description, setDescription] = useState("");
+  const [file, setFile] = useState<File | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const detail = useTicket(selectedId);
@@ -54,6 +77,17 @@ export function useSupportTicketsController(): SupportTicketsVm {
     detail.data ?? list.data?.items.find((t) => t._id === selectedId) ?? null;
 
   const [reply, setReply] = useState("");
+
+  function onFile(next: File | null) {
+    if (next) {
+      const problem = attachmentProblem(next);
+      if (problem) {
+        toast.error(problem);
+        return;
+      }
+    }
+    setFile(next);
+  }
 
   async function onSubmit() {
     if (!subject.trim()) {
@@ -65,11 +99,13 @@ export function useSupportTicketsController(): SupportTicketsVm {
         subject: subject.trim(),
         description: description.trim(),
         type,
+        file,
       });
       setCreating(false);
       setSubject("");
       setDescription("");
       setType("other");
+      setFile(null);
       toast.success("Ticket raised — our team will get back to you");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not raise the ticket");
@@ -98,12 +134,17 @@ export function useSupportTicketsController(): SupportTicketsVm {
     subject,
     type,
     description,
+    file,
     submitting: createTicket.isPending,
     onOpenCreate: () => setCreating(true),
-    onCreateOpenChange: setCreating,
+    onCreateOpenChange: (open: boolean) => {
+      setCreating(open);
+      if (!open) setFile(null);
+    },
     onSubject: setSubject,
     onType: setType,
     onDescription: setDescription,
+    onFile,
     onSubmit,
     selected: selectedId ? selected : null,
     detailLoading: detail.isLoading,
