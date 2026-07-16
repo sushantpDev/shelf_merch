@@ -19,6 +19,9 @@ const ALLOWED_TYPES = {
   product: ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'],
   mockup: ['image/png', 'image/jpeg', 'image/webp'],
   production: ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'],
+  // Support-ticket attachments: images + PDF only. Deliberately no SVG — the
+  // multer layer blocks it too, this is defense in depth against stored XSS.
+  attachment: ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif', 'application/pdf'],
 };
 
 const r2Configured = () => Boolean(env.R2_ENDPOINT && env.R2_ACCESS_KEY && env.R2_SECRET_KEY);

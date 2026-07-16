@@ -301,6 +301,7 @@ export async function createSupportTicket({
   source = 'tenant',
   relatedOrderId = null,
   relatedRecipientId = null,
+  attachments = [],
 }) {
   const ticket = await SupportTicket.create({
     tenantId,
@@ -311,6 +312,7 @@ export async function createSupportTicket({
     source,
     relatedOrderId,
     relatedRecipientId,
+    attachments,
   });
   if (source !== 'platform') {
     await notifySupportStaff({

@@ -1,5 +1,21 @@
 import * as supportService from './support.service.js';
 import { writeAudit } from '../../services/audit.service.js';
+import { uploadFile } from '../../services/storage.service.js';
+
+/** Store an optional multer file in hardened storage; returns attachment metadata. */
+async function storeAttachment(req) {
+  if (!req.file) return [];
+  const { url } = await uploadFile({ tenantId: req.tenantId, kind: 'attachment', file: req.file });
+  return [
+    {
+      url,
+      // Display-only; the storage key is random hex, never this name.
+      name: (req.file.originalname || '').slice(0, 120),
+      contentType: req.file.mimetype || '',
+      size: req.file.size || 0,
+    },
+  ];
+}
 
 export async function listPlatform(req, res) {
   res.json(await supportService.listSupportTicketsWithTenants({ query: req.query }));
@@ -35,18 +51,20 @@ export async function addMyMessage(req, res) {
 }
 
 export async function create(req, res) {
+  const attachments = await storeAttachment(req);
   const ticket = await supportService.createSupportTicket({
     tenantId: req.tenantId,
     userId: req.user.userId,
     source: 'tenant',
     ...req.body,
+    attachments,
   });
   writeAudit({
     req,
     action: 'support_ticket.create',
     entityType: 'SupportTicket',
     entityId: ticket._id,
-    after: { subject: ticket.subject, status: ticket.status },
+    after: { subject: ticket.subject, status: ticket.status, attachments: attachments.length },
   });
   res.status(201).json(ticket);
 }

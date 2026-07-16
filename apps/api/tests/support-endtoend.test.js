@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import { connectTestDb, clearTestDb, disconnectTestDb } from './setup.js';
 import { createApp } from '../src/app.js';
@@ -7,6 +9,7 @@ import { User } from '../src/modules/users/user.model.js';
 import { RoleAssignment } from '../src/modules/roles/roleAssignment.model.js';
 import { Notification } from '../src/modules/notifications/notification.model.js';
 import { signAccessToken } from '../src/modules/auth/auth.service.js';
+import { LOCAL_UPLOAD_DIR } from '../src/services/storage.service.js';
 
 let app;
 let tenantA;
@@ -53,6 +56,13 @@ beforeEach(async () => {
   adminA = await makeUser({ tenantId: tenantA._id, name: 'AdminA', role: 'company_admin', scopeType: 'tenant' });
   adminB = await makeUser({ tenantId: tenantB._id, name: 'AdminB', role: 'company_admin', scopeType: 'tenant' });
   agent = await makeUser({ tenantId: null, name: 'Agent', role: 'platform_support_agent', scopeType: 'platform' });
+});
+afterEach(async () => {
+  // Remove only THIS test tenant's attachment dir (a fresh ObjectId each run) —
+  // never the shared uploads root, which holds committed demo assets.
+  if (tenantA?._id) {
+    await fs.rm(path.join(LOCAL_UPLOAD_DIR, String(tenantA._id)), { recursive: true, force: true });
+  }
 });
 
 async function raiseTicket(subject = 'Order stuck in transit') {
@@ -201,6 +211,69 @@ describe('support feature end to end', () => {
       .send({ body: 'one more thing' });
     expect(reply.status).toBe(422);
     expect(reply.body.code ?? reply.body.error?.code).toBeDefined();
+  });
+
+  it('accepts an optional image attachment and shows it to tenant and platform', async () => {
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(64),
+    ]);
+    const res = await request(app)
+      .post('/api/v1/support-tickets')
+      .set(auth(adminA.token))
+      .field('subject', 'Broken mug — photo attached')
+      .field('description', 'See the attached evidence')
+      .field('type', 'replacement')
+      .attach('attachment', png, { filename: 'evidence.png', contentType: 'image/png' });
+    expect(res.status).toBe(201);
+    expect(res.body.attachments).toHaveLength(1);
+    const att = res.body.attachments[0];
+    expect(att.name).toBe('evidence.png');
+    expect(att.contentType).toBe('image/png');
+    expect(att.size).toBe(png.length);
+    // Stored under a random hex key, never the user-supplied filename.
+    expect(att.url).toMatch(/\/attachment\/[a-f0-9]{24}\.png$/);
+    expect(att.url).not.toContain('evidence');
+
+    const mine = await request(app)
+      .get(`/api/v1/support-tickets/${res.body._id}`)
+      .set(auth(adminA.token));
+    expect(mine.body.attachments).toHaveLength(1);
+
+    const full = await request(app)
+      .get(`/api/v1/platform/support-tickets/${res.body._id}`)
+      .set(auth(agent.token));
+    expect(full.body.attachments).toHaveLength(1);
+    expect(full.body.attachments[0].url).toBe(att.url);
+  });
+
+  it('rejects script-capable uploads (svg / html) with 415', async () => {
+    for (const [filename, contentType] of [
+      ['payload.svg', 'image/svg+xml'],
+      ['payload.html', 'text/html'],
+    ]) {
+      const res = await request(app)
+        .post('/api/v1/support-tickets')
+        .set(auth(adminA.token))
+        .field('subject', 'sneaky upload')
+        .attach('attachment', Buffer.from('<svg onload=alert(1)>'), { filename, contentType });
+      expect(res.status).toBe(415);
+    }
+    // Nothing persisted from the rejected requests.
+    const list = await request(app).get('/api/v1/support-tickets').set(auth(adminA.token));
+    expect(list.body.items).toHaveLength(0);
+  });
+
+  it('rejects extension/MIME spoofing (html renamed to .png)', async () => {
+    const res = await request(app)
+      .post('/api/v1/support-tickets')
+      .set(auth(adminA.token))
+      .field('subject', 'spoofed file')
+      .attach('attachment', Buffer.from('<script>alert(1)</script>'), {
+        filename: 'evil.png',
+        contentType: 'text/html',
+      });
+    expect(res.status).toBe(415);
   });
 
   it('tenant list filter by status works and platform filters by tenant', async () => {
