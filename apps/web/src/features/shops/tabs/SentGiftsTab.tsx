@@ -2,7 +2,6 @@ import { Fragment, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import { inr } from "@/components/platform/platform-ui";
 import { POINT_VALUE } from "@/features/send/money";
 import { useCampaignRecipients, useDeleteCampaign } from "@/features/campaigns/model";
 import type { CampaignRecipientRow } from "@/services/mutations-api";
@@ -105,10 +104,8 @@ function statusPill(campaign: UiCampaign) {
   );
 }
 
-function pointsPerRecipient(campaign: UiCampaign, shop: UiShop) {
+function pointsPerRecipient(campaign: UiCampaign) {
   if ((campaign.creditsPerRecipient ?? 0) <= 0) return "—";
-  if (shop.currencyMode === "inr") return inr(campaign.creditsPerRecipient);
-  if (shop.currencyMode === "priceless") return "Priceless";
   return `${(campaign.creditsPerRecipient / POINT_VALUE).toFixed(2)} Pts`;
 }
 
@@ -132,11 +129,9 @@ function campaignSubtext(campaign: UiCampaign) {
   return campaign.type === "points" ? "Points send" : "Campaign";
 }
 
-function recipientAmount(creditAmount: number | undefined, shop: UiShop) {
+function recipientAmount(creditAmount: number | undefined) {
   const amount = creditAmount ?? 0;
   if (amount <= 0) return "—";
-  if (shop.currencyMode === "inr") return inr(amount);
-  if (shop.currencyMode === "priceless") return "Priceless";
   return `${(amount / POINT_VALUE).toFixed(2)} Pts`;
 }
 
@@ -218,7 +213,7 @@ function CampaignRecipientsPanel({
               <tr key={String(r._id ?? r.email)}>
                 <td style={{ fontWeight: 500 }}>{r.name || "—"}</td>
                 <td className="muted">{r.email || "—"}</td>
-                <td className="num">{recipientAmount(r.creditAmount, shop)}</td>
+                <td className="num">{recipientAmount(r.creditAmount)}</td>
                 <td className="muted" style={{ fontSize: 13 }}>
                   {recipientStatusLabel(r.redemptionStatus)}
                 </td>
@@ -344,7 +339,7 @@ export function SentGiftsTab({
                       <div className="data-list-primary">{campaign.senderName || "—"}</div>
                     </td>
                     <td className="num data-list-cell">
-                      <div className="data-list-primary">{pointsPerRecipient(campaign, shop)}</div>
+                      <div className="data-list-primary">{pointsPerRecipient(campaign)}</div>
                     </td>
                     <td className="data-list-cell" style={centerCellStyle}>
                       <div style={{ display: "flex", justifyContent: "center" }}>

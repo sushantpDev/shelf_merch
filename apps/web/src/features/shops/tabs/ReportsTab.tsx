@@ -114,7 +114,8 @@ export function ReportsTab({ shop }: { shop: UiShop }) {
   }
 
   const { totals, funnel, weekly, topProducts } = data as ShopReport;
-  const usesPoints = shop.currencyMode === "points";
+  // Store prices are always displayed in points.
+  const usesPoints = true;
   const points = (inr: number) => Math.round(inr / POINT_VALUE);
   const valueLabel = (inr: number) =>
     usesPoints ? `${points(inr).toLocaleString("en-IN")} pts` : inrLabel(inr);

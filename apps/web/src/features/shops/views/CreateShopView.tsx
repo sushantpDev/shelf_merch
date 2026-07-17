@@ -2,7 +2,6 @@ import { useRef } from "react";
 import { ArrowLeft, Upload } from "lucide-react";
 import { FullscreenOverlay } from "@/components/tenant/FullscreenOverlay";
 import { ShopBuilderStep } from "../ShopBuilderStep";
-import { SHOP_CURRENCIES } from "../types";
 import type { CreateShopVm } from "../controllers/useCreateShopController";
 
 /** Create-shop wizard shell: details/logo steps, then the builder step. */
@@ -65,29 +64,12 @@ export function CreateShopView(vm: CreateShopVm) {
                     onChange={(e) => dispatch({ type: "set", patch: { name: e.target.value } })}
                   />
                 </div>
-                <div className="lbl">Choose currency</div>
-                {SHOP_CURRENCIES.map((c) => (
-                  <button
-                    key={c.key}
-                    type="button"
-                    className={`optcard ${draft.currency === c.key ? "on" : ""}`}
-                    style={{ marginBottom: 10, width: "100%", textAlign: "left" }}
-                    aria-pressed={draft.currency === c.key}
-                    onClick={() => dispatch({ type: "set", patch: { currency: c.key } })}
-                  >
-                    <div className="rd" />
-                    <div>
-                      <h4>{c.title}</h4>
-                      <p>{c.desc}</p>
-                    </div>
-                  </button>
-                ))}
                 <p
                   className="mut3"
                   style={{ fontSize: 11.5, margin: "6px 0 16px", lineHeight: 1.5 }}
                 >
-                  Currency &amp; shop name can be edited from your dashboard. Currency can&apos;t
-                  change once an order starts.
+                  Product prices in your shop are shown in points. The shop name can be edited
+                  later from your dashboard.
                 </p>
                 <button type="button" className="btn btn-dark btn-block btn-lg" onClick={vm.onNext}>
                   Next

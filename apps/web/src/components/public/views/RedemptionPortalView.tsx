@@ -189,7 +189,7 @@ export function RedemptionPortalView(vm: RedemptionVm) {
         shop={vm.portal.campaign.shop || { name: vm.portal.campaign.name }}
         products={vm.products}
         mode="redeem"
-        currency={vm.portal.campaign.shop?.currencyMode || "points"}
+        currency="points"
         creditInr={vm.portal.recipient.creditAmount}
         recipientName={vm.portal.recipient.name}
         recipientEmail={vm.portal.recipient.email}

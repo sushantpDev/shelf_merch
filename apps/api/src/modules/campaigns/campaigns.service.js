@@ -501,7 +501,8 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
             shopLogoUrl: shop?.logoUrl ?? '',
             shopBannerTheme: shop?.bannerConfig?.theme ?? '',
             shopBannerPreset: shop?.bannerConfig?.preset ?? '',
-            shopCurrencyMode: shop?.currencyMode ?? 'points',
+            // Store prices are always displayed in points.
+            shopCurrencyMode: 'points',
           },
         });
       }

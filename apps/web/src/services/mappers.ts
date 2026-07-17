@@ -301,17 +301,14 @@ export function mapProductRef(ref: ApiProduct, catalogById?: Map<string, UiProdu
 }
 
 export function mapShop(s: ApiProduct): UiShop {
-  const currencyMap: Record<string, string> = {
-    points: "Points",
-    inr: "INR",
-    priceless: "Priceless",
-  };
   return {
     id: String(s._id),
     name: s.name,
     slug: String((s as { slug?: string }).slug || ""),
-    currency: currencyMap[s.currencyMode] || "Points",
-    currencyMode: s.currencyMode === "inr" || s.currencyMode === "priceless" ? s.currencyMode : "points",
+    // Store prices are always displayed in points — legacy inr/priceless
+    // shops normalize here so every consumer renders one way.
+    currency: "Points",
+    currencyMode: "points",
     pointsConversionEnabled: Boolean(s.pointsConversionEnabled),
     live: s.status === "live",
     categories: s.categories || [],

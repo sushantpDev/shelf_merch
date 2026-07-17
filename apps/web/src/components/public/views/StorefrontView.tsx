@@ -26,7 +26,7 @@ export function StorefrontView(vm: StorefrontVm & { shopId: string }) {
       shop={vm.data.shop}
       products={vm.data.products}
       mode="preview"
-      currency={(vm.data.shop.currencyMode as "points" | "inr" | "priceless") || "points"}
+      currency="points"
       cartPersistId={vm.shopId}
     />
   );
