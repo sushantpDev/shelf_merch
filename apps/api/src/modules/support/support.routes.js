@@ -48,6 +48,11 @@ tenantSupportRouter.post(
   validate({ params: supportTicketIdParam, body: tenantAddMessageSchema }),
   asyncHandler(controller.addMyMessage),
 );
+tenantSupportRouter.post(
+  '/:id/confirm',
+  validate({ params: supportTicketIdParam }),
+  asyncHandler(controller.confirmMine),
+);
 
 // §3.9 — the help desk is cross-tenant.
 export const platformSupportRouter = Router();

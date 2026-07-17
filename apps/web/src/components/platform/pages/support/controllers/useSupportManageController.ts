@@ -62,7 +62,11 @@ export function useSupportManageController(
 
   const reloadTicket = useCallback(() => {
     fetchPlatformTicket(ticketId)
-      .then(setTicket)
+      .then((t) => {
+        setTicket(t);
+        // Pre-select the current assignee so "Assign" reads as reassignment.
+        setAssignee((prev) => prev || String(t.assignedToUserId ?? ""));
+      })
       .catch(() => setTicket(null));
   }, [ticketId]);
 

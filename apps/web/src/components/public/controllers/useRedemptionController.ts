@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ApiError,
+  confirmRedemptionTicket,
   getRedemptionCatalog,
   getRedemptionKit,
   getRedemptionPortal,
@@ -68,6 +69,7 @@ export type RedemptionVm = {
     type?: string;
   }) => Promise<StoreSupportTicket>;
   onReplyTicket: (ticketId: string, body: string) => Promise<StoreSupportTicket>;
+  onConfirmTicket: (ticketId: string) => Promise<StoreSupportTicket>;
 };
 
 export function isKitCampaign(portal: PortalData | null) {
@@ -215,6 +217,11 @@ export function useRedemptionController(token: string): RedemptionVm {
     [token, sessionToken],
   );
 
+  const onConfirmTicket = useCallback(
+    (ticketId: string) => confirmRedemptionTicket(token, sessionToken, ticketId),
+    [token, sessionToken],
+  );
+
   function onLogout() {
     setSessionToken("");
     setProducts([]);
@@ -250,5 +257,6 @@ export function useRedemptionController(token: string): RedemptionVm {
     onFetchTickets,
     onRaiseTicket,
     onReplyTicket,
+    onConfirmTicket,
   };
 }

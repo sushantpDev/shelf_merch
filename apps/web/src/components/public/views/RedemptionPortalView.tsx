@@ -200,6 +200,7 @@ export function RedemptionPortalView(vm: RedemptionVm) {
         onFetchTickets={vm.onFetchTickets}
         onRaiseTicket={vm.onRaiseTicket}
         onReplyTicket={vm.onReplyTicket}
+        onConfirmTicket={vm.onConfirmTicket}
         redemptionToken={vm.token}
         sessionToken={vm.sessionToken}
         cartPersistId={vm.token}

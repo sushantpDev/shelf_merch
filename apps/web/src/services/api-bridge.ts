@@ -826,3 +826,10 @@ export async function replyRedemptionTicket(
     },
   );
 }
+
+export async function confirmRedemptionTicket(token: string, sessionToken: string, ticketId: string) {
+  return publicFetch<StoreSupportTicket>(
+    `/redemptions/${token}/support-tickets/${ticketId}/confirm`,
+    { method: "POST", headers: { Authorization: `Bearer ${sessionToken}` } },
+  );
+}

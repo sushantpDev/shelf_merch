@@ -565,6 +565,7 @@ export default function StoreShell({
   onFetchTickets,
   onRaiseTicket,
   onReplyTicket,
+  onConfirmTicket,
 }: {
   shop: StoreShop;
   products: StoreProduct[];
@@ -595,6 +596,7 @@ export default function StoreShell({
     type?: string;
   }) => Promise<StoreSupportTicket>;
   onReplyTicket?: (ticketId: string, body: string) => Promise<StoreSupportTicket>;
+  onConfirmTicket?: (ticketId: string) => Promise<StoreSupportTicket>;
 }) {
   const storageKey = cartStorageKey(cartPersistId);
   const [page, setPage] = useState<Page>("home");
@@ -969,6 +971,20 @@ export default function StoreShell({
       setTickets((prev) => prev.map((t) => (t._id === updated._id ? updated : t)));
     } catch (err) {
       setTicketsError(err instanceof Error ? err.message : "Could not send the reply");
+    } finally {
+      setTicketBusy(false);
+    }
+  }
+
+  async function confirmTicketResolved(ticketId: string) {
+    if (!onConfirmTicket) return;
+    setTicketBusy(true);
+    setTicketsError("");
+    try {
+      const updated = await onConfirmTicket(ticketId);
+      setTickets((prev) => prev.map((t) => (t._id === updated._id ? updated : t)));
+    } catch (err) {
+      setTicketsError(err instanceof Error ? err.message : "Could not confirm the ticket");
     } finally {
       setTicketBusy(false);
     }
@@ -2140,6 +2156,32 @@ export default function StoreShell({
                             </div>
                           ))
                         )}
+
+                        {t.status === "resolved" && onConfirmTicket ? (
+                          <div
+                            style={{
+                              border: "1px solid var(--line, #eee)",
+                              borderRadius: 8,
+                              padding: "10px 12px",
+                              marginTop: 10,
+                            }}
+                          >
+                            <div style={{ fontWeight: 600, fontSize: 13 }}>
+                              Did we solve your issue?
+                            </div>
+                            <p className="mut3" style={{ fontSize: 12, margin: "4px 0 8px" }}>
+                              Confirming closes this ticket — replying below reopens it instead.
+                            </p>
+                            <button
+                              type="button"
+                              className="sf-btn-secondary"
+                              disabled={ticketBusy}
+                              onClick={() => void confirmTicketResolved(t._id)}
+                            >
+                              {ticketBusy ? "Closing…" : "Yes, it's resolved"}
+                            </button>
+                          </div>
+                        ) : null}
 
                         {t.status !== "closed" && onReplyTicket ? (
                           <div style={{ marginTop: 10 }}>

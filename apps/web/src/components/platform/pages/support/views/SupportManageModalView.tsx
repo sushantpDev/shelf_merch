@@ -139,6 +139,11 @@ export function SupportManageModalView({
       <div className="divider" style={{ margin: "18px 0" }} />
       <div className="field">
         <label className="lbl">Assign to</label>
+        <p className="muted" style={{ fontSize: 12, margin: "0 0 8px" }}>
+          {ticket?.assigneeName
+            ? `Currently assigned to ${String(ticket.assigneeName)} — assigning notifies the new owner.`
+            : "Unassigned — assigning notifies the team member."}
+        </p>
         <select className="inp" value={assignee} onChange={(e) => onAssignee(e.target.value)}>
           <option value="">Select a team member…</option>
           {team.map((m) => (
@@ -151,10 +156,10 @@ export function SupportManageModalView({
       <button
         type="button"
         className="btn btn-soft btn-sm"
-        disabled={busy || !assignee}
+        disabled={busy || !assignee || assignee === String(ticket?.assignedToUserId ?? "")}
         onClick={onAssign}
       >
-        Assign
+        {ticket?.assignedToUserId ? "Reassign" : "Assign"}
       </button>
 
       <div className="divider" style={{ margin: "18px 0" }} />
@@ -172,7 +177,7 @@ export function SupportManageModalView({
             checked={internal}
             onChange={(e) => onInternal(e.target.checked)}
           />{" "}
-          Internal note (not sent to customer)
+          Internal note — support team only; pings the assignee
         </label>
       </div>
       <button

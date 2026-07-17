@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import {
+  useConfirmTicket,
   useCreateTicket,
   useMyTickets,
   useReplyTicket,
@@ -53,10 +54,12 @@ export type SupportTicketsVm = {
   reply: string;
   replying: boolean;
   canReply: boolean;
+  confirming: boolean;
   onSelect: (ticket: SupportTicket) => void;
   onDetailOpenChange: (open: boolean) => void;
   onReply: (v: string) => void;
   onSendReply: () => void;
+  onConfirmResolved: () => void;
 };
 
 /** Controller for the tenant help center: my tickets, raise, thread + reply. */
@@ -64,6 +67,7 @@ export function useSupportTicketsController(): SupportTicketsVm {
   const list = useMyTickets();
   const createTicket = useCreateTicket();
   const replyTicket = useReplyTicket();
+  const confirmTicket = useConfirmTicket();
 
   const [creating, setCreating] = useState(false);
   const [subject, setSubject] = useState("");
@@ -122,6 +126,16 @@ export function useSupportTicketsController(): SupportTicketsVm {
     }
   }
 
+  async function onConfirmResolved() {
+    if (!selectedId) return;
+    try {
+      await confirmTicket.mutateAsync(selectedId);
+      toast.success("Thanks for confirming — the ticket is now closed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not confirm the ticket");
+    }
+  }
+
   return {
     isLoading: list.isLoading && !list.data,
     errorMessage: list.isError
@@ -158,7 +172,9 @@ export function useSupportTicketsController(): SupportTicketsVm {
         setReply("");
       }
     },
+    confirming: confirmTicket.isPending,
     onReply: setReply,
     onSendReply,
+    onConfirmResolved,
   };
 }

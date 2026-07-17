@@ -7,7 +7,7 @@ import { Tenant } from '../tenants/tenant.model.js';
 import { User } from '../users/user.model.js';
 import { RoleAssignment } from '../roles/roleAssignment.model.js';
 import { notify } from '../notifications/notifications.service.js';
-import { transitionState } from '../../services/stateMachine.service.js';
+import { transitionState, canTransition } from '../../services/stateMachine.service.js';
 import { sendNotificationEmail, appUrl } from '../../services/email.service.js';
 import { logger } from '../../config/logger.js';
 import { ApiError, NotFoundError } from '../../utils/errors.js';
@@ -104,6 +104,7 @@ function buildFilter(query) {
   if (query.tenantId) filter.tenantId = query.tenantId;
   if (query.type) filter.type = query.type;
   if (query.assignedToUserId) filter.assignedToUserId = query.assignedToUserId;
+  else if (query.unassigned) filter.assignedToUserId = null;
   return filter;
 }
 
@@ -126,25 +127,31 @@ export async function listSupportTickets({ query, tenantId = null }) {
   return paginatedResponse(items, total, { page, limit });
 }
 
-/** Platform queue with tenant names resolved for the agent console. */
+/** Platform queue with tenant + assignee names resolved for the agent console. */
 export async function listSupportTicketsWithTenants({ query }) {
   const result = await listSupportTickets({ query });
   const tenantIds = [...new Set(result.items.map((t) => String(t.tenantId)).filter(Boolean))];
-  if (tenantIds.length) {
-    const tenants = await Tenant.find({ _id: { $in: tenantIds } }).select('name').lean();
-    const nameById = new Map(tenants.map((t) => [String(t._id), t.name]));
-    result.items = result.items.map((t) => ({
-      ...t,
-      tenantName: nameById.get(String(t.tenantId)) ?? '',
-    }));
-  }
+  const assigneeIds = [
+    ...new Set(result.items.map((t) => t.assignedToUserId && String(t.assignedToUserId)).filter(Boolean)),
+  ];
+  const [tenants, assignees] = await Promise.all([
+    tenantIds.length ? Tenant.find({ _id: { $in: tenantIds } }).select('name').lean() : [],
+    assigneeIds.length ? User.find({ _id: { $in: assigneeIds } }).select('name').lean() : [],
+  ]);
+  const tenantById = new Map(tenants.map((t) => [String(t._id), t.name]));
+  const assigneeById = new Map(assignees.map((u) => [String(u._id), u.name]));
+  result.items = result.items.map((t) => ({
+    ...t,
+    tenantName: tenantById.get(String(t.tenantId)) ?? '',
+    assigneeName: t.assignedToUserId ? (assigneeById.get(String(t.assignedToUserId)) ?? '') : '',
+  }));
   return result;
 }
 
 /** Full ticket for the platform manage modal: tenant + raiser names resolved. */
 export async function getSupportTicketDetail(ticketId) {
   const ticket = await getSupportTicket(ticketId);
-  const [tenant, raiser, recipient] = await Promise.all([
+  const [tenant, raiser, recipient, assignee] = await Promise.all([
     ticket.tenantId ? Tenant.findById(ticket.tenantId).select('name').lean() : null,
     ticket.raisedByUserId
       ? User.findOne({ _id: ticket.raisedByUserId }).select('name email').lean()
@@ -156,12 +163,16 @@ export async function getSupportTicketDetail(ticketId) {
           .select('name email')
           .lean()
       : null,
+    ticket.assignedToUserId
+      ? User.findOne({ _id: ticket.assignedToUserId }).select('name').lean()
+      : null,
   ]);
   return {
     ...ticket.toObject(),
     tenantName: tenant?.name ?? '',
     raisedByName: raiser?.name ?? recipient?.name ?? '',
     raisedByEmail: raiser?.email ?? recipient?.email ?? '',
+    assigneeName: assignee?.name ?? '',
   };
 }
 
@@ -326,16 +337,53 @@ export async function createSupportTicket({
 
 export async function addMessage({ ticketId, authorUserId, body, internal = false, tenantId = null }) {
   const ticket = await getSupportTicket(ticketId, { tenantId });
+  const authorName = await userName(authorUserId);
   ticket.messages.push({
     authorUserId,
-    authorName: await userName(authorUserId),
+    authorName,
     fromPlatform: true,
     body,
     internal,
     at: new Date(),
   });
-  await ticket.save();
   if (!internal) {
+    // A public agent reply puts the ball with the customer — keep the cycle
+    // consistent without requiring a manual status change.
+    if (ticket.status === 'open' && canTransition('supportTicket', 'open', 'in_progress')) {
+      transitionState('supportTicket', ticket, 'in_progress', { userId: authorUserId }, 'Agent replied');
+    }
+    if (canTransition('supportTicket', ticket.status, 'waiting_on_customer')) {
+      transitionState(
+        'supportTicket',
+        ticket,
+        'waiting_on_customer',
+        { userId: authorUserId },
+        'Agent replied',
+      );
+    }
+  }
+  await ticket.save();
+
+  if (internal) {
+    // Internal notes are team collaboration — ping the assignee (unless they
+    // wrote it); on unassigned tickets, ping the desk.
+    const assigneeId = ticket.assignedToUserId ? String(ticket.assignedToUserId) : null;
+    const ping = {
+      title: `Internal note on: ${ticket.subject}`,
+      body: `${authorName || 'A teammate'}: ${body.slice(0, 200)}`,
+    };
+    if (assigneeId && assigneeId !== String(authorUserId)) {
+      notifyAsync({
+        type: 'support_ticket_update',
+        tenantId: ticket.tenantId,
+        userId: ticket.assignedToUserId,
+        ...ping,
+        link: '/platform/support',
+      });
+    } else if (!assigneeId) {
+      await notifySupportStaff({ ticket, ...ping });
+    }
+  } else {
     await notifyRaiser(ticket, {
       title: `Support replied: ${ticket.subject}`,
       body: body.slice(0, 200),
@@ -359,12 +407,104 @@ export async function updateSupportTicketStatus({ ticketId, status, actor, tenan
 
 export async function assignTicket({ ticketId, userId, actor }) {
   const ticket = await getSupportTicket(ticketId);
+  const unchanged = String(ticket.assignedToUserId ?? '') === String(userId);
+
+  const [assigneeName, actorName] = await Promise.all([
+    userName(userId),
+    userName(actor?.userId),
+  ]);
   ticket.assignedToUserId = userId;
+  if (!unchanged) {
+    // Leave an internal trail in the thread so reassignments are auditable.
+    ticket.messages.push({
+      authorUserId: actor?.userId ?? null,
+      authorName: actorName,
+      fromPlatform: true,
+      body: `Assigned to ${assigneeName || 'a team member'}${actorName ? ` by ${actorName}` : ''}.`,
+      internal: true,
+      at: new Date(),
+    });
+  }
   if (ticket.status === 'open') {
     transitionState('supportTicket', ticket, 'in_progress', actor, 'Assigned');
   }
   await ticket.save();
+
+  // The whole point of assigning: the assignee must find out.
+  if (!unchanged && String(userId) !== String(actor?.userId ?? '')) {
+    const assignee = await User.findOne({ _id: userId }).select('email').lean();
+    notifyAsync({
+      type: 'support_ticket_assigned',
+      tenantId: ticket.tenantId,
+      userId,
+      email: assignee?.email ?? null,
+      title: `Ticket assigned to you: ${ticket.subject}`,
+      body: (ticket.description || '').slice(0, 200),
+      link: '/platform/support',
+    });
+  }
   return ticket;
+}
+
+/**
+ * Customer confirms a resolved ticket actually solved their issue — closes the
+ * loop. Callers scope the lookup (tenant or recipient) before delegating here.
+ */
+async function confirmResolution(ticket, { confirmedBy }) {
+  if (ticket.status !== 'resolved') {
+    throw new ApiError(
+      422,
+      'Only resolved tickets can be confirmed — reply instead if you still need help',
+      'TICKET_NOT_RESOLVED',
+    );
+  }
+  ticket.messages.push({
+    authorUserId: null,
+    authorName: confirmedBy || '',
+    fromPlatform: false,
+    body: 'Confirmed: my issue is resolved. Thank you!',
+    internal: false,
+    at: new Date(),
+  });
+  transitionState('supportTicket', ticket, 'closed', { userId: null }, 'Customer confirmed resolution');
+  await ticket.save();
+
+  const ping = {
+    title: `Resolution confirmed: ${ticket.subject}`,
+    body: `${confirmedBy || 'The customer'} confirmed the issue is resolved.`,
+  };
+  if (ticket.assignedToUserId) {
+    notifyAsync({
+      type: 'support_ticket_update',
+      tenantId: ticket.tenantId,
+      userId: ticket.assignedToUserId,
+      ...ping,
+      link: '/platform/support',
+    });
+  } else {
+    await notifySupportStaff({ ticket, ...ping });
+  }
+  return ticket;
+}
+
+/** Tenant user confirms their resolved ticket. */
+export async function confirmTenantTicket({ ticketId, tenantId, userId }) {
+  const ticket = await getSupportTicket(ticketId, { tenantId });
+  await confirmResolution(ticket, { confirmedBy: await userName(userId) });
+  return toTenantView(ticket);
+}
+
+/** Employee (recipient) confirms their resolved ticket. */
+export async function confirmRecipientTicket({ ticketId, tenantId, recipientId, authorName }) {
+  const ticket = await SupportTicket.findOne({
+    _id: ticketId,
+    tenantId,
+    relatedRecipientId: recipientId,
+    source: 'recipient',
+  });
+  if (!ticket) throw new NotFoundError('Support ticket not found');
+  await confirmResolution(ticket, { confirmedBy: authorName });
+  return toTenantView(ticket);
 }
 
 export async function linkTicketToOrder({ ticketId, orderId }) {

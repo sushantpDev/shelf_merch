@@ -12,6 +12,7 @@ export const listSupportTicketsQuery = z.object({
   type: z.enum(SUPPORT_TICKET_TYPES).optional(),
   tenantId: objectId.optional(),
   assignedToUserId: objectId.optional(),
+  unassigned: z.coerce.boolean().optional(),
 });
 
 export const supportTicketIdParam = z.object({ id: objectId });

@@ -190,6 +190,34 @@ describe('employee (recipient) support end to end', () => {
     expect(reply.status).toBe(422);
   });
 
+  it('employee confirms a resolved ticket → closed', async () => {
+    const ticket = await raiseTicket();
+    await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticket._id}/status`)
+      .set(bearer(agent.token))
+      .send({ status: 'in_progress' })
+      .expect(200);
+    await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticket._id}/status`)
+      .set(bearer(agent.token))
+      .send({ status: 'resolved' })
+      .expect(200);
+
+    const res = await request(app)
+      .post(`${base()}/${ticket._id}/confirm`)
+      .set(bearer(session));
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('closed');
+    expect(res.body.messages.at(-1).authorName).toBe('Priya');
+
+    // Another recipient cannot confirm someone else's ticket.
+    const second = await raiseTicket('Another issue');
+    const sneaky = await request(app)
+      .post(`/api/v1/redemptions/${otherRecipient.redemptionToken}/support-tickets/${second._id}/confirm`)
+      .set(bearer(otherSession));
+    expect(sneaky.status).toBe(404);
+  });
+
   it('platform detail resolves the employee as the raiser', async () => {
     const ticket = await raiseTicket();
     const detail = await getSupportTicketDetail(ticket._id);

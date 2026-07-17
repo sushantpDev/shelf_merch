@@ -276,6 +276,137 @@ describe('support feature end to end', () => {
     expect(res.status).toBe(415);
   });
 
+  it('assignment notifies the assignee, leaves an internal trail, and shows in the queue', async () => {
+    const ticket = await raiseTicket();
+    const teammate = await makeUser({
+      tenantId: null,
+      name: 'Teammate',
+      role: 'platform_support_agent',
+      scopeType: 'platform',
+    });
+
+    const res = await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticket._id}/assign`)
+      .set(auth(agent.token))
+      .send({ userId: String(teammate.user._id) });
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('in_progress');
+
+    // Internal trail message records who assigned whom.
+    const trail = res.body.messages.at(-1);
+    expect(trail.internal).toBe(true);
+    expect(trail.body).toContain('Assigned to Teammate');
+    expect(trail.body).toContain('by Agent');
+
+    await eventually(async () => {
+      const pings = await Notification.find({
+        userId: teammate.user._id,
+        type: 'support_ticket_assigned',
+      });
+      expect(pings.length).toBe(1);
+      expect(pings[0].title).toContain('assigned to you');
+    });
+
+    const queue = await request(app)
+      .get('/api/v1/platform/support-tickets')
+      .set(auth(agent.token));
+    expect(queue.body.items[0].assigneeName).toBe('Teammate');
+
+    const mine = await request(app)
+      .get(`/api/v1/platform/support-tickets?assignedToUserId=${teammate.user._id}`)
+      .set(auth(agent.token));
+    expect(mine.body.items).toHaveLength(1);
+    const unassigned = await request(app)
+      .get('/api/v1/platform/support-tickets?unassigned=true')
+      .set(auth(agent.token));
+    expect(unassigned.body.items).toHaveLength(0);
+  });
+
+  it('internal notes ping the assignee but never the customer', async () => {
+    const ticket = await raiseTicket();
+    const teammate = await makeUser({
+      tenantId: null,
+      name: 'Teammate',
+      role: 'platform_support_agent',
+      scopeType: 'platform',
+    });
+    await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticket._id}/assign`)
+      .set(auth(agent.token))
+      .send({ userId: String(teammate.user._id) })
+      .expect(200);
+
+    // Agent (not the assignee) writes an internal note.
+    await request(app)
+      .post(`/api/v1/platform/support-tickets/${ticket._id}/messages`)
+      .set(auth(agent.token))
+      .send({ body: 'please pick this up today', internal: true })
+      .expect(200);
+
+    await eventually(async () => {
+      const pings = await Notification.find({
+        userId: teammate.user._id,
+        type: 'support_ticket_update',
+      });
+      expect(pings.length).toBe(1);
+      expect(pings[0].title).toContain('Internal note');
+      expect(pings[0].body).toContain('please pick this up today');
+    });
+    // The raiser gets nothing for internal notes.
+    const raiserPings = await Notification.find({
+      userId: adminA.user._id,
+      type: 'support_ticket_update',
+    });
+    expect(raiserPings).toHaveLength(0);
+  });
+
+  it('a public agent reply moves the ticket to waiting_on_customer', async () => {
+    const ticket = await raiseTicket();
+    const res = await request(app)
+      .post(`/api/v1/platform/support-tickets/${ticket._id}/messages`)
+      .set(auth(agent.token))
+      .send({ body: 'We are looking into it.' });
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('waiting_on_customer');
+  });
+
+  it('customer confirms a resolved ticket → closed, agent notified; unresolved → 422', async () => {
+    const ticket = await raiseTicket();
+
+    const early = await request(app)
+      .post(`/api/v1/support-tickets/${ticket._id}/confirm`)
+      .set(auth(adminA.token));
+    expect(early.status).toBe(422);
+
+    await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticket._id}/assign`)
+      .set(auth(agent.token))
+      .send({ userId: String(agent.user._id) })
+      .expect(200);
+    await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticket._id}/status`)
+      .set(auth(agent.token))
+      .send({ status: 'resolved' })
+      .expect(200);
+
+    const res = await request(app)
+      .post(`/api/v1/support-tickets/${ticket._id}/confirm`)
+      .set(auth(adminA.token));
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('closed');
+    expect(res.body.messages.at(-1).body).toContain('issue is resolved');
+    expect(res.body.messages.at(-1).fromPlatform).toBe(false);
+
+    await eventually(async () => {
+      const pings = await Notification.find({
+        userId: agent.user._id,
+        type: 'support_ticket_update',
+        title: { $regex: 'Resolution confirmed' },
+      });
+      expect(pings.length).toBe(1);
+    });
+  });
+
   it('tenant list filter by status works and platform filters by tenant', async () => {
     await raiseTicket('First');
     await raiseTicket('Second');

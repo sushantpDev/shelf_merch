@@ -232,4 +232,21 @@ router.post(
   }),
 );
 
+router.post(
+  '/:token/support-tickets/:ticketId/confirm',
+  validate({ params: z.object({ token: z.string().min(16), ticketId: objectId }) }),
+  requireRedemptionSession,
+  asyncHandler(async (req, res) => {
+    const recipient = req.redemptionRecipient;
+    res.json(
+      await supportService.confirmRecipientTicket({
+        ticketId: req.params.ticketId,
+        tenantId: recipient.tenantId,
+        recipientId: recipient._id,
+        authorName: recipient.name || '',
+      }),
+    );
+  }),
+);
+
 export default router;

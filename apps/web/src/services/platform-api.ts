@@ -202,8 +202,14 @@ export async function fetchPlatformShipments(limit = 50) {
   return apiFetch<Paginated<Record<string, unknown>>>(`/platform/shipments?limit=${limit}`);
 }
 
-export async function fetchPlatformSupport(limit = 50) {
-  return apiFetch<Paginated<Record<string, unknown>>>(`/platform/support-tickets?limit=${limit}`);
+export async function fetchPlatformSupport(
+  limit = 50,
+  filter?: { assignedToUserId?: string; unassigned?: boolean },
+) {
+  const q = new URLSearchParams({ limit: String(limit) });
+  if (filter?.assignedToUserId) q.set("assignedToUserId", filter.assignedToUserId);
+  if (filter?.unassigned) q.set("unassigned", "true");
+  return apiFetch<Paginated<Record<string, unknown>>>(`/platform/support-tickets?${q}`);
 }
 
 export async function fetchProductionBoard() {

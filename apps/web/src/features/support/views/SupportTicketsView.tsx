@@ -331,6 +331,29 @@ export function SupportTicketsView(vm: SupportTicketsVm) {
                 )}
               </div>
 
+              {vm.selected.status === "resolved" ? (
+                <div
+                  className="card"
+                  style={{ padding: 14, marginTop: 12, background: "var(--surface-2)" }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
+                    Did we solve your issue?
+                  </div>
+                  <p className="muted" style={{ fontSize: 12.5, marginBottom: 10 }}>
+                    Confirming closes this ticket. If you still need help, just reply below and
+                    it reopens.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-brand btn-sm"
+                    disabled={vm.confirming}
+                    onClick={vm.onConfirmResolved}
+                  >
+                    {vm.confirming ? "Closing…" : "Yes, close my ticket"}
+                  </button>
+                </div>
+              ) : null}
+
               {vm.canReply ? (
                 <div style={{ marginTop: 12 }}>
                   <textarea

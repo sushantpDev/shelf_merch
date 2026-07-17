@@ -112,3 +112,13 @@ export function useReplyTicket() {
     onSuccess: () => qc.invalidateQueries({ queryKey: SUPPORT_QUERY_KEY }),
   });
 }
+
+/** Customer confirms a resolved ticket solved their issue — closes it. */
+export function useConfirmTicket() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ticketId: string) =>
+      apiFetch<SupportTicket>(`/support-tickets/${ticketId}/confirm`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: SUPPORT_QUERY_KEY }),
+  });
+}

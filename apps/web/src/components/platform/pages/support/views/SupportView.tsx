@@ -10,11 +10,19 @@ import type { SupportVm } from "../controllers/useSupportController";
 import { SupportManageModal } from "./SupportManageModal";
 
 /** Cross-tenant help desk queue. */
+const FILTERS: Array<{ key: "all" | "mine" | "unassigned"; label: string }> = [
+  { key: "all", label: "All tickets" },
+  { key: "mine", label: "Assigned to me" },
+  { key: "unassigned", label: "Unassigned" },
+];
+
 export function SupportView({
   data,
   error,
   loading,
   canWrite,
+  filter,
+  onFilter,
   managing,
   onManage,
   onCloseManage,
@@ -29,6 +37,11 @@ export function SupportView({
     { key: "tenantName", label: "Tenant", render: (r) => String(r.tenantName ?? "") || "—" },
     { key: "type", label: "Type" },
     { key: "status", label: "Status", render: (r) => <StatusTag status={String(r.status)} /> },
+    {
+      key: "assigneeName",
+      label: "Assignee",
+      render: (r) => String(r.assigneeName ?? "") || "—",
+    },
     {
       key: "createdAt",
       label: "Opened",
@@ -51,6 +64,20 @@ export function SupportView({
   return (
     <>
       <PlatformPageHeader title="Support" subtitle="Cross-tenant help desk queue." />
+      <div className="tabs" style={{ maxWidth: 420, marginBottom: 14 }} role="tablist">
+        {FILTERS.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            role="tab"
+            aria-selected={filter === f.key}
+            className={filter === f.key ? "on" : ""}
+            onClick={() => onFilter(f.key)}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
       {loading && <PlatformLoading />}
       {error && <PlatformError message={error} />}
       {data && <DataTable empty="No tickets." rows={data.items} columns={columns} />}

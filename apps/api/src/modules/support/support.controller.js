@@ -33,6 +33,22 @@ export async function getMine(req, res) {
   res.json(await supportService.getTenantTicket({ ticketId: req.params.id, tenantId: req.tenantId }));
 }
 
+export async function confirmMine(req, res) {
+  const ticket = await supportService.confirmTenantTicket({
+    ticketId: req.params.id,
+    tenantId: req.tenantId,
+    userId: req.user.userId,
+  });
+  writeAudit({
+    req,
+    action: 'support_ticket.confirm_resolution',
+    entityType: 'SupportTicket',
+    entityId: ticket._id,
+    after: { status: ticket.status },
+  });
+  res.json(ticket);
+}
+
 export async function addMyMessage(req, res) {
   const ticket = await supportService.addTenantMessage({
     ticketId: req.params.id,
