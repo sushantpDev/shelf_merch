@@ -566,7 +566,7 @@ function ExistingDashboard({
         <WorkspaceSettingsCard preview />
       </section>
 
-      {isEntityManager ? <EntityManagerKitsSection /> : null}
+  
 
       <section className="dash-existing-main">
         <div className="dash-existing-main__wallets"><WalletsSection account={account} wallets={wallets} mainBalance={mainBalance} /></div>

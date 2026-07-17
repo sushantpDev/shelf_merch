@@ -90,6 +90,33 @@ export const SEND_POINTS_PLACEHOLDERS = {
   msg: "Appreciate your turnaround completing the key project, which is critical to company revenue.",
 } as const;
 
+/** Minimum budget per recipient (INR) for Send Points. */
+export const MIN_POINTS_BUDGET_INR = 250;
+
+/**
+ * Inline validation for budget-per-recipient.
+ * `raw` is the field string so decimals like "250." / "250.5" are caught.
+ */
+export function budgetPerRecipientError(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return "Minimum of ₹250 must be allocated.";
+  if (trimmed.includes(".") || trimmed.includes("e") || trimmed.includes("E")) {
+    return "Only whole numbers are allowed.";
+  }
+  if (!/^\d+$/.test(trimmed)) {
+    return "Only whole numbers are allowed.";
+  }
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || n < MIN_POINTS_BUDGET_INR) {
+    return "Minimum of ₹250 must be allocated.";
+  }
+  return null;
+}
+
+export function isValidBudgetPerRecipient(raw: string): boolean {
+  return budgetPerRecipientError(raw) === null;
+}
+
 export function suggestOrderName() {
   return "Order R" + (200000000 + Math.floor(Math.random() * 99_999_999));
 }

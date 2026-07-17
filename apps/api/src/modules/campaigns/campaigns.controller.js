@@ -38,6 +38,7 @@ export async function importRecipients(req, res) {
     user: req.user,
     recipients: req.body.recipients,
     totalBudget: req.body.totalBudget,
+    packaging: req.body.packaging,
   });
   writeAudit({
     req,

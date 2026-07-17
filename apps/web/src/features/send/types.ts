@@ -40,7 +40,13 @@ export function toSchedulePayload(
     const date = sched.date || new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
     const time = sched.time || "10:00";
     const tz = (sched.tz || "Asia/Kolkata (IST)").split(" ")[0];
-    return { mode: "scheduled", sendAt: `${date}T${time}:00`, timezone: tz };
+    // Asia/Kolkata is IST (+05:30). Attach offset so sendAt is absolute, not ambiguous local.
+    const offset = tz === "Asia/Kolkata" || tz.includes("Kolkata") ? "+05:30" : "";
+    return {
+      mode: "scheduled",
+      sendAt: `${date}T${time}:00${offset}`,
+      timezone: tz,
+    };
   }
   return { mode: "now" };
 }

@@ -193,6 +193,7 @@ export function RedemptionPortalView(vm: RedemptionVm) {
         creditInr={vm.portal.recipient.creditAmount}
         recipientName={vm.portal.recipient.name}
         recipientEmail={vm.portal.recipient.email}
+        initialShippingAddress={vm.portal.recipient.shippingAddress}
         welcome={vm.portal.campaign.message?.body}
         onCheckout={vm.onCheckout}
         onLogout={vm.onLogout}

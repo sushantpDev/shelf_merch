@@ -37,6 +37,8 @@ export type SendKitAction =
   | { type: "setSchedule"; key: keyof ScheduleDraft; value: string }
   | { type: "setPreview"; preview: "landing" | "email" }
   | { type: "setPay"; pay: PaymentMethod }
+  | { type: "setPkg"; pkg: "none" | "box" }
+  | { type: "hydrate"; draft: SendKitDraft }
   | { type: "setRecipVariant"; contactId: string; productId: string; key: "size" | "color"; value: string };
 
 export function sendKitReducer(state: SendKitDraft, action: SendKitAction): SendKitDraft {
@@ -81,6 +83,10 @@ export function sendKitReducer(state: SendKitDraft, action: SendKitAction): Send
       return { ...state, preview: action.preview };
     case "setPay":
       return { ...state, pay: action.pay };
+    case "setPkg":
+      return { ...state, pkg: action.pkg };
+    case "hydrate":
+      return action.draft;
     case "setRecipVariant": {
       const contactVariants = state.recipVariants[action.contactId] || {};
       const productVariant = contactVariants[action.productId] || {};

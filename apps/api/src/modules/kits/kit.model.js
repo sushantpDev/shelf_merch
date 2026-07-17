@@ -11,6 +11,8 @@ const kitSchema = new mongoose.Schema(
     artworkUrl: { type: String, default: '' },
     designNotes: { type: String, default: '' },
     packaging: { type: String, enum: ['none', 'box'], default: 'none' },
+    /** Persisted sum of product basePriceInr at publish time. */
+    kitPrice: { type: Number, default: 0 },
     status: { type: String, enum: ['draft', 'live', 'archived'], default: 'draft' },
     lastSentAt: { type: Date, default: null },
   },

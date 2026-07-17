@@ -5,9 +5,10 @@ import { CatalogStep } from "@/features/swag/wizard/CatalogStep";
 import type { KitWizardVm } from "../controllers/useKitWizardController";
 import { KitNameStep } from "./KitNameStep";
 import { KitBrandingStep } from "./KitBrandingStep";
-import { KitPackagingStep } from "./KitPackagingStep";
+import { KitReviewPricingStep } from "./KitReviewPricingStep";
+import { KitPublishedSuccess } from "./KitPublishedSuccess";
 
-const STEPS = ["Name", "Products", "Branding", "Packaging"];
+const STEPS = ["Name", "Products", "Branding", "Review"];
 
 /** Create-kit wizard shell; all state and actions come from the controller. */
 export function KitWizardView(vm: KitWizardVm) {
@@ -18,6 +19,15 @@ export function KitWizardView(vm: KitWizardVm) {
   }
   if (vm.isPublishing) {
     return <LoadingState message="Publishing kit…" fullScreen={false} />;
+  }
+  if (vm.publishedKit) {
+    return (
+      <KitPublishedSuccess
+        kitName={vm.publishedKit.name}
+        onSendKit={vm.onSendPublishedKit}
+        onGoToKits={vm.onGoToKits}
+      />
+    );
   }
 
   const backLink = (label: string, to: 0 | 1 | 2) => (
@@ -168,14 +178,12 @@ export function KitWizardView(vm: KitWizardVm) {
         <button type="button" className="btn btn-brand" onClick={vm.onPublish}>
           Publish kit &amp; send
         </button>,
-        draft.packaging === "none" ? "Standard mailer" : "Premium box",
       )}
     >
-      <KitPackagingStep
+      <KitReviewPricingStep
         kitName={draft.name}
-        itemCount={draft.picked.length}
-        packaging={draft.packaging}
-        onPackaging={(packaging) => dispatch({ type: "setPackaging", packaging })}
+        products={vm.pickedProducts}
+        artworkUrl={draft.art?.preview}
       />
     </WizardChrome>
   );

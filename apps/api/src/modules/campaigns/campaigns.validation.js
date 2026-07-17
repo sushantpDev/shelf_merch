@@ -63,10 +63,16 @@ export const importRecipientsSchema = z.object({
     .min(1),
   /** Checkout total in INR — required for kit/items wallet debit on launch. */
   totalBudget: z.number().positive().optional(),
+  /** Packaging choice for kit sends — used to recompute server-side totals. */
+  packaging: z.enum(['none', 'box']).optional(),
 });
 
 export const allocateCreditsSchema = z.object({
-  creditsPerRecipient: z.number().positive(),
+  /** Budget per recipient in INR — whole rupees only, minimum ₹250. */
+  creditsPerRecipient: z
+    .number()
+    .int('Budget per recipient must be a whole number')
+    .min(250, 'Minimum of ₹250 must be allocated'),
   /** Full checkout total in INR (incl. fees/tax). Falls back to credits × recipients. */
   totalBudget: z.number().positive().optional(),
 });

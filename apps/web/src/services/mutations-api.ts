@@ -254,10 +254,12 @@ function cleanPreferredColors(colors?: string[]) {
 
 export async function createKitApi(payload: {
   name: string;
+  description?: string;
   pickedIndices: number[];
   catalog: UiProduct[];
   packaging: "none" | "box";
   designNotes?: string;
+  kitPrice?: number;
 }) {
   const productRefs = payload.pickedIndices.map((i) => {
     const p = payload.catalog[i];
@@ -268,9 +270,11 @@ export async function createKitApi(payload: {
     method: "POST",
     body: JSON.stringify({
       name: payload.name,
+      description: payload.description || "",
       productRefs,
       packaging: payload.packaging === "box" ? "box" : "none",
       designNotes: payload.designNotes || "",
+      kitPrice: Math.round(Number(payload.kitPrice) || 0),
       status: "live",
     }),
   });
@@ -329,6 +333,28 @@ export async function uploadKitArtworkApi(kitId: string, file: File) {
   const form = new FormData();
   form.append("artwork", file);
   const kit = await apiFetch<Record<string, unknown>>(`/kits/${kitId}/artwork`, {
+    method: "POST",
+    body: form,
+  });
+  return mapKit(kit);
+}
+
+type KitMockupUploadItem = { catalogProductId: string; dataUrl: string };
+
+export async function uploadKitMockupsApi(kitId: string, items: KitMockupUploadItem[]) {
+  const meta: Array<{ catalogProductId: string }> = [];
+  const form = new FormData();
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (!item.dataUrl?.startsWith("data:")) continue;
+    const res = await fetch(item.dataUrl);
+    const blob = await res.blob();
+    form.append("mockups", new File([blob], `kit-mockup-${i}.png`, { type: blob.type || "image/png" }));
+    meta.push({ catalogProductId: item.catalogProductId });
+  }
+  if (!meta.length) return null;
+  form.append("meta", JSON.stringify(meta));
+  const kit = await apiFetch<Record<string, unknown>>(`/kits/${kitId}/mockups`, {
     method: "POST",
     body: form,
   });
@@ -615,10 +641,12 @@ export async function launchPointsCampaignApi(payload: {
   creditsPerRecipient: number;
   totalBudget?: number;
   message: { from: string; body: string };
+  schedule?: { mode: "now" | "scheduled" | "self"; sendAt?: string | null; timezone?: string };
   recipients: Array<{ name: string; email: string; phone?: string; contactId?: string }>;
 }) {
   let campaignId = payload.campaignId;
   let existingStatus: string | undefined;
+  const schedule = payload.schedule ?? { mode: "now" as const };
 
   if (campaignId) {
     const existing = await apiFetch<Record<string, unknown>>(`/campaigns/${campaignId}`);
@@ -630,7 +658,7 @@ export async function launchPointsCampaignApi(payload: {
         name: payload.name,
         pointsScope: payload.pointsScope ?? "shop",
         message: payload.message,
-        schedule: { mode: "now" },
+        schedule,
       }),
     });
   } else {
@@ -643,7 +671,7 @@ export async function launchPointsCampaignApi(payload: {
         shopId: payload.shopId,
         pointsScope: payload.pointsScope ?? "shop",
         message: payload.message,
-        schedule: { mode: "now" },
+        schedule,
       }),
     });
     campaignId = String(campaign._id);
@@ -688,6 +716,7 @@ export async function launchKitCampaignApi(payload: {
   kitId: string;
   name: string;
   totalBudget?: number;
+  packaging?: "none" | "box";
   fulfillmentMode?: "redeem" | "surprise" | "single";
   singleLocation?: {
     name: string;
@@ -736,6 +765,9 @@ export async function launchKitCampaignApi(payload: {
         variants: r.variants,
       })),
       ...(payload.totalBudget != null ? { totalBudget: payload.totalBudget } : {}),
+      ...(payload.packaging === "none" || payload.packaging === "box"
+        ? { packaging: payload.packaging }
+        : {}),
     }),
   });
 

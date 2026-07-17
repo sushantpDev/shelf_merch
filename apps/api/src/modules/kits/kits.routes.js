@@ -8,11 +8,13 @@ import { tenantArea } from '../../middleware/tenantAccess.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { objectId } from '../users/users.validation.js';
 import { Kit } from './kit.model.js';
+import { CustomisedKit } from './customisedKit.model.js';
 import { PlatformKit } from './platformKit.model.js';
 import { CatalogProduct } from '../catalog/catalogProduct.model.js';
 import { uploadFile } from '../../services/storage.service.js';
 import { writeAudit } from '../../services/audit.service.js';
 import { ApiError, NotFoundError } from '../../utils/errors.js';
+import { sumKitProductPrices } from './kitPricing.js';
 
 const upload = uploader({ allow: DOCUMENT_TYPES, maxSizeMb: 25 });
 const router = Router();
@@ -28,6 +30,7 @@ const productRef = z.object({
   brand: z.string().optional().default(''),
   name: z.string().min(1),
   group: z.string().optional().default(''),
+  mockupUrl: z.string().optional().default(''),
 });
 
 const createSchema = z.object({
@@ -36,10 +39,42 @@ const createSchema = z.object({
   productRefs: z.array(productRef).min(1),
   designNotes: z.string().optional().default(''),
   packaging: z.enum(['none', 'box']).optional().default('none'),
+  kitPrice: z.number().nonnegative().optional(),
   status: z.enum(['draft', 'live', 'archived']).optional().default('draft'),
 });
 
 const updateSchema = createSchema.partial();
+
+async function resolveKitPrice(productRefs, clientKitPrice) {
+  const ids = (productRefs || []).map((r) => r.catalogProductId).filter(Boolean);
+  if (!ids.length) return Math.round(Number(clientKitPrice) || 0);
+  const products = await CatalogProduct.find({ _id: { $in: ids } })
+    .select('basePriceInr')
+    .lean();
+  const fromCatalog = sumKitProductPrices(products);
+  if (fromCatalog > 0) return fromCatalog;
+  return Math.round(Number(clientKitPrice) || 0);
+}
+
+async function upsertCustomisedKit(kit) {
+  const payload = {
+    tenantId: kit.tenantId,
+    kitId: kit._id,
+    name: kit.name,
+    description: kit.description || '',
+    productRefs: kit.productRefs || [],
+    artworkUrl: kit.artworkUrl || '',
+    designNotes: kit.designNotes || '',
+    packaging: kit.packaging === 'none' ? 'none' : 'box',
+    kitPrice: Math.round(Number(kit.kitPrice) || 0),
+    status: kit.status || 'live',
+  };
+  await CustomisedKit.findOneAndUpdate(
+    { tenantId: kit.tenantId, kitId: kit._id },
+    { $set: payload },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
+}
 
 function parseCuratedMeta(designNotes) {
   try {
@@ -157,7 +192,10 @@ router.post(
       designNotes,
       status: 'live',
       artworkUrl: platformKit.imageUrls?.[0] || '',
+      kitPrice: await resolveKitPrice(productRefs, 0),
     });
+
+    await upsertCustomisedKit(kit);
 
     writeAudit({
       req,
@@ -175,7 +213,13 @@ router.post(
   canWrite,
   validate({ body: createSchema }),
   asyncHandler(async (req, res) => {
-    const kit = await Kit.create({ tenantId: req.tenantId, ...req.body });
+    const kitPrice = await resolveKitPrice(req.body.productRefs, req.body.kitPrice);
+    const kit = await Kit.create({
+      tenantId: req.tenantId,
+      ...req.body,
+      kitPrice,
+    });
+    await upsertCustomisedKit(kit);
     writeAudit({ req, action: 'kit.create', entityType: 'Kit', entityId: kit._id, after: kit.toObject() });
     res.status(201).json(kit);
   }),
@@ -190,7 +234,11 @@ router.patch(
     if (!kit) throw new NotFoundError('Kit not found');
     const before = kit.toObject();
     Object.assign(kit, req.body);
+    if (req.body.productRefs || req.body.kitPrice != null) {
+      kit.kitPrice = await resolveKitPrice(kit.productRefs, req.body.kitPrice ?? kit.kitPrice);
+    }
     await kit.save();
+    await upsertCustomisedKit(kit);
     writeAudit({ req, action: 'kit.update', entityType: 'Kit', entityId: kit._id, before, after: kit.toObject() });
     res.json(kit);
   }),
@@ -207,7 +255,52 @@ router.post(
     const { url } = await uploadFile({ tenantId: req.tenantId, kind: 'artwork', file: req.file });
     kit.artworkUrl = url;
     await kit.save();
+    await upsertCustomisedKit(kit);
     writeAudit({ req, action: 'kit.artwork', entityType: 'Kit', entityId: kit._id, after: { artworkUrl: url } });
+    res.json(kit);
+  }),
+);
+
+const mockupMetaItem = z.object({
+  catalogProductId: objectId,
+});
+
+router.post(
+  '/:id/mockups',
+  canWrite,
+  validate({ params: z.object({ id: objectId }) }),
+  upload.array('mockups', 50),
+  asyncHandler(async (req, res) => {
+    const kit = await Kit.findOne({ _id: req.params.id, tenantId: req.tenantId });
+    if (!kit) throw new NotFoundError('Kit not found');
+    const files = req.files || [];
+    let meta;
+    try {
+      meta = mockupMetaItem.array().parse(JSON.parse(req.body.meta || '[]'));
+    } catch {
+      throw new ApiError(400, 'Invalid mockup metadata', 'MOCKUP_META_INVALID');
+    }
+    if (meta.length !== files.length) {
+      throw new ApiError(400, 'Mockup file count does not match metadata', 'MOCKUP_COUNT_MISMATCH');
+    }
+    for (let i = 0; i < files.length; i++) {
+      const { catalogProductId } = meta[i];
+      const { url } = await uploadFile({ tenantId: req.tenantId, kind: 'mockup', file: files[i] });
+      const ref = kit.productRefs.find(
+        (r) => String(r.catalogProductId) === String(catalogProductId),
+      );
+      if (ref) ref.mockupUrl = url;
+    }
+    kit.markModified('productRefs');
+    await kit.save();
+    await upsertCustomisedKit(kit);
+    writeAudit({
+      req,
+      action: 'kit.mockups',
+      entityType: 'Kit',
+      entityId: kit._id,
+      after: { mockupCount: files.length },
+    });
     res.json(kit);
   }),
 );

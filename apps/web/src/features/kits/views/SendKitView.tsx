@@ -11,8 +11,9 @@ import { DesignedProductThumb } from "@/features/swag/DesignedProductThumb";
 import { resolveKitItemOptions, getCuratedKitMeta } from "../controllers/useSendKitController";
 import type { UiProduct } from "@/services/mappers";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { KitPackagingStep } from "./KitPackagingStep";
 
-const STEPS = ["Items", "Recipients", "Experience", "Checkout"];
+const STEPS = ["Items", "Recipients", "Experience", "Packaging", "Checkout"];
 
 const COLOR_MAP: Record<string, string> = {
   black: "#1a1a1a", white: "#f8f8f8", navy: "#001f5b", red: "#c0392b",
@@ -192,8 +193,12 @@ export function SendKitView(vm: SendKitVm) {
     .map((idx) => vm.catalog[idx])
     .filter(Boolean)
     .map((p) => {
-      const ref = kit.productRefs?.find((r) => r.catalogProductId === p.id) ?? {};
-      return { product: p, opts: resolveKitItemOptions(p, ref) };
+      const ref = kit.productRefs?.find((r) => r.catalogProductId === p.id);
+      const branded: UiProduct = {
+        ...p,
+        mockupUrl: ref?.mockupUrl || p.mockupUrl,
+      };
+      return { product: branded, opts: resolveKitItemOptions(p, ref ?? {}) };
     });
 
   /** Only show when sender must configure real size/color options. */
@@ -235,7 +240,7 @@ export function SendKitView(vm: SendKitVm) {
       {vm.step > 0
         ? <button type="button" className="lnk" style={{ background: "none", border: "none", cursor: "pointer" }} onClick={vm.onBack}>Back</button>
         : <span />}
-      {vm.step < 3
+      {vm.step < 4
         ? <button type="button" className="btn btn-dark" onClick={vm.onNext}>Next</button>
         : <span />}
     </div>
@@ -303,7 +308,10 @@ export function SendKitView(vm: SendKitVm) {
                 return (
                   <div key={p.id} className="card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10, borderRadius: 12 }}>
                     <div style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: "var(--gray-100)", position: "relative" }}>
-                      <DesignedProductThumb product={p} artworkUrl={kit.artworkUrl} />
+                      <DesignedProductThumb
+                        product={p}
+                        artworkUrl={p.mockupUrl ? undefined : kit.artworkUrl}
+                      />
                     </div>
                     {p.brand && <div className="mut3" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".04em" }}>{p.brand}</div>}
                     <div style={{ fontWeight: 600, fontSize: 14 }}>{p.nm}</div>
@@ -774,8 +782,19 @@ export function SendKitView(vm: SendKitVm) {
         />
       )}
 
-      {/* ── Step 3: Checkout ── */}
+      {/* ── Step 3: Packaging ── */}
       {vm.step === 3 && (
+        <KitPackagingStep
+          kitName={kit.name}
+          itemCount={draft.picked.length}
+          packaging={draft.pkg}
+          onPackaging={(pkg) => dispatch({ type: "setPkg", pkg })}
+          stepBadge="Step 4 of 5"
+        />
+      )}
+
+      {/* ── Step 4: Checkout ── */}
+      {vm.step === 4 && (
         <>
           <h1 style={{ fontSize: 24, marginBottom: 16 }}>Checkout</h1>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
@@ -791,16 +810,36 @@ export function SendKitView(vm: SendKitVm) {
             <div className="card" style={{ padding: 22, height: "fit-content" }}>
               <h3 style={{ fontSize: 18, marginBottom: 12 }}>Order summary</h3>
               <SumRow k="Kit" v={kit.name} />
-              <SumRow k="Items per recipient" v={String(draft.picked.length)} />
+
+              <div style={{ margin: "10px 0 4px" }}>
+                <div className="muted" style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
+                  Kit Price
+                </div>
+                {vm.pricedItems.map((item) => (
+                  <SumRow key={item.id} k={item.name} v={inr(item.priceInr)} />
+                ))}
+                <SumRow k="Kit Cost" v={inr(vm.kitUnitPrice)} />
+              </div>
+
               <SumRow k="Recipients" v={String(totals.qty)} />
-              <SumRow k="Items subtotal" v={inr(totals.sub)} />
-              <SumRow k="Packaging" v={totals.pkgCost ? inr(totals.pkgCost) : "Free"} />
+              <SumRow
+                k="Total Kit Cost"
+                v={`${totals.qty} × ${inr(vm.kitUnitPrice)} = ${inr(totals.sub)}`}
+              />
+              <SumRow
+                k="Packaging"
+                v={
+                  totals.pkgCost
+                    ? `${totals.qty} × ₹49 = ${inr(totals.pkgCost)}`
+                    : "₹0"
+                }
+              />
               <SumRow k="Service fee (12%)" v={inr(totals.fee)} />
               <SumRow k="Shipping" v={inr(totals.ship)} />
               <SumRow k="Estimated GST (18%)" v={inr(totals.tax)} />
               <div className="divider" />
               <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                <b style={{ fontSize: 18 }}>You pay</b>
+                <b style={{ fontSize: 18 }}>Grand Total</b>
                 <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)" }}>{inr(totals.total)}</b>
               </div>
               <button type="button" className="btn btn-brand btn-block btn-lg" style={{ marginTop: 14 }} onClick={vm.onPayAndSend}>

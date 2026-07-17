@@ -1,12 +1,14 @@
-/** Per-recipient unit price for a kit send, in INR. */
-export const KIT_UNIT_PRICE = 4200;
-const PREMIUM_BOX_PER_RECIP = 49;
+/** Premium packaging charge per recipient (INR). */
+export const PREMIUM_BOX_PER_RECIP = 49;
 const SERVICE_FEE_RATE = 0.12;
 const SHIP_PER_RECIP = 120;
 const GST_RATE = 0.18;
 
 export type KitSendTotals = {
   qty: number;
+  /** Kit unit price (sum of product basePriceInr). */
+  unitPrice: number;
+  /** Total kit cost = unitPrice × recipients. */
   sub: number;
   pkgCost: number;
   fee: number;
@@ -15,20 +17,32 @@ export type KitSendTotals = {
   total: number;
 };
 
+/** Sum of catalog basePriceInr for selected kit products (qty 1 each). */
+export function sumKitProductPrices(
+  products: Array<{ basePriceInr?: number | null }>,
+): number {
+  return products.reduce((sum, p) => sum + Math.round(Number(p.basePriceInr) || 0), 0);
+}
+
 /**
- * Money math for a kit send. Mirrors the legacy `sendItems` checkout:
- * unit ₹4200 × recipients, premium box ₹49/recipient, 12% service fee,
- * ₹120/recipient shipping, then 18% GST on the running total.
+ * Money math for a kit send:
+ * kit unit (from products) × recipients, premium box ₹49/recipient, 12% service fee,
+ * ₹120/recipient shipping, then 18% GST on the running total (including packaging).
  */
-export function kitSendTotals(recipientCount: number, packaging: "none" | "box"): KitSendTotals {
-  const qty = recipientCount;
-  const sub = KIT_UNIT_PRICE * qty;
+export function kitSendTotals(
+  recipientCount: number,
+  packaging: "none" | "box",
+  kitUnitPriceInr: number,
+): KitSendTotals {
+  const qty = Math.max(0, recipientCount);
+  const unitPrice = Math.max(0, Math.round(kitUnitPriceInr));
+  const sub = unitPrice * qty;
   const pkgCost = (packaging === "box" ? PREMIUM_BOX_PER_RECIP : 0) * qty;
   const fee = sub * SERVICE_FEE_RATE;
   const ship = SHIP_PER_RECIP * qty;
   const tax = (sub + fee + pkgCost + ship) * GST_RATE;
   const total = sub + fee + pkgCost + ship + tax;
-  return { qty, sub, pkgCost, fee, ship, tax, total };
+  return { qty, unitPrice, sub, pkgCost, fee, ship, tax, total };
 }
 
 /** 1 point = ₹2. */

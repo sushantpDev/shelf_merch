@@ -30,7 +30,22 @@ export type PortalData = {
     message?: { body?: string };
     shop?: Shop | null;
   };
-  recipient: { name: string; email?: string; creditAmount: number };
+  recipient: {
+    name: string;
+    email?: string;
+    creditAmount: number;
+    /** Admin-saved contact address for checkout prefill (optional). */
+    shippingAddress?: {
+      name?: string;
+      phone?: string;
+      line1?: string;
+      line2?: string;
+      city?: string;
+      state?: string;
+      pincode?: string;
+      country?: string;
+    };
+  };
   alreadyVerified?: boolean;
   sessionToken?: string;
 };

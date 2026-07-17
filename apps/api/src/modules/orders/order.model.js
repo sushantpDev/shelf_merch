@@ -71,6 +71,8 @@ const orderSchema = new mongoose.Schema(
     },
     amountBreakdown: {
       subtotal: Number,
+      packaging: { type: Number, default: 0 },
+      shipping: { type: Number, default: 0 },
       serviceFee: Number,
       gst: Number,
       total: Number,

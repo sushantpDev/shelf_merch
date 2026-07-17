@@ -135,11 +135,13 @@ describe('campaign lifecycle (§11.1)', () => {
     expect(entityAfter.spentAmount - entityBefore.spentAmount).toBe(4000);
   });
 
-  it('kit send → recipients → launch without wallet debit', async () => {
+  it('kit send → recipients → launch debits wallet for kit grand total', async () => {
     const kit = await Kit.create({
       tenantId: tenant._id,
       name: 'Welcome Kit',
       productRefs: [{ catalogProductId: product._id, name: 'Test Tee', brand: '', group: 'tee' }],
+      kitPrice: 500,
+      packaging: 'none',
       status: 'live',
     });
 
@@ -162,11 +164,16 @@ describe('campaign lifecycle (§11.1)', () => {
       .set('Authorization', `Bearer ${managerToken}`)
       .send({
         recipients: [{ name: 'Alice', email: 'alice@test.io' }],
+        packaging: 'none',
       });
     expect(imported.status).toBe(200);
     expect(imported.body.campaign.status).toBe('approved');
+    expect(imported.body.campaign.totalBudget).toBeGreaterThan(0);
 
     const entityBefore = await Entity.findOne({ _id: entity._id, tenantId: tenant._id });
+    const walletBefore = await Wallet.findOne({ _id: entity.walletId, tenantId: tenant._id });
+    const expectedSpend = Math.round(imported.body.campaign.totalBudget);
+
     const launch = await request(app)
       .post(`/api/v1/campaigns/${id}/launch`)
       .set('Authorization', `Bearer ${managerToken}`)
@@ -175,10 +182,76 @@ describe('campaign lifecycle (§11.1)', () => {
     expect(launch.body.status).toBe('redemption_open');
 
     const entityAfter = await Entity.findOne({ _id: entity._id, tenantId: tenant._id });
-    expect(entityAfter.spentAmount).toBe(entityBefore.spentAmount);
+    const walletAfter = await Wallet.findOne({ _id: entity.walletId, tenantId: tenant._id });
+    expect(entityAfter.spentAmount - entityBefore.spentAmount).toBe(expectedSpend);
+    expect(walletBefore.balance - walletAfter.balance).toBe(expectedSpend);
 
     const updatedKit = await Kit.findOne({ _id: kit._id, tenantId: tenant._id });
     expect(updatedKit.lastSentAt).toBeTruthy();
+  });
+
+  it('scheduled points send debits wallet immediately but defers email and credits', async () => {
+    const sendAt = new Date(Date.now() + 60_000);
+    const created = await request(app)
+      .post('/api/v1/campaigns')
+      .set('Authorization', `Bearer ${managerToken}`)
+      .send({
+        entityId: String(entity._id),
+        name: 'Scheduled Diwali',
+        type: 'points',
+        shopId: String(shop._id),
+        schedule: { mode: 'scheduled', sendAt, timezone: 'Asia/Kolkata' },
+      });
+    expect(created.status).toBe(201);
+    const id = created.body._id;
+
+    await request(app)
+      .post(`/api/v1/campaigns/${id}/recipients/import`)
+      .set('Authorization', `Bearer ${managerToken}`)
+      .send({ recipients: [{ name: 'Alice', email: 'alice-sched@test.io' }] });
+
+    await request(app)
+      .post(`/api/v1/campaigns/${id}/allocate-credits`)
+      .set('Authorization', `Bearer ${managerToken}`)
+      .send({ creditsPerRecipient: 500 });
+
+    const recipientBefore = await Recipient.findOne({
+      tenantId: tenant._id,
+      campaignId: id,
+    });
+    expect(recipientBefore.creditAmount).toBe(0);
+
+    const walletBefore = await Wallet.findOne({ _id: entity.walletId, tenantId: tenant._id });
+    const launch = await request(app)
+      .post(`/api/v1/campaigns/${id}/launch`)
+      .set('Authorization', `Bearer ${managerToken}`)
+      .set('Idempotency-Key', `launch-sched-${id}`);
+    expect(launch.status).toBe(200);
+    expect(launch.body.status).toBe('launched');
+
+    const walletAfter = await Wallet.findOne({ _id: entity.walletId, tenantId: tenant._id });
+    expect(walletBefore.balance - walletAfter.balance).toBe(500);
+    expect(
+      (await Recipient.findOne({ _id: recipientBefore._id, tenantId: tenant._id })).creditAmount,
+    ).toBe(0);
+
+    // Make due and recover overdue schedule.
+    await Campaign.updateOne(
+      { _id: id, tenantId: tenant._id },
+      { $set: { 'schedule.sendAt': new Date(Date.now() - 1000) } },
+    );
+    const { processDueScheduledCampaigns } = await import(
+      '../src/modules/campaigns/campaigns.service.js'
+    );
+    const results = await processDueScheduledCampaigns({ limit: 10 });
+    expect(results.some((r) => r.id === String(id) && r.ok)).toBe(true);
+
+    const delivered = await Campaign.findOne({ _id: id, tenantId: tenant._id });
+    expect(delivered.status).toBe('redemption_open');
+    expect(delivered.schedule.invitesSentAt).toBeTruthy();
+    expect(
+      (await Recipient.findOne({ _id: recipientBefore._id, tenantId: tenant._id })).creditAmount,
+    ).toBe(500);
   });
 
   it('surprise kit send creates an order from the saved contact address without redemption', async () => {

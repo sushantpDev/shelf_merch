@@ -9,11 +9,13 @@ export function KitPackagingStep({
   kitName,
   packaging,
   onPackaging,
+  stepBadge = "Step 4 of 5",
 }: {
   kitName: string;
   itemCount?: number;
   packaging: Pkg;
   onPackaging: (pkg: Pkg) => void;
+  stepBadge?: string;
 }) {
   return (
     <div className="kt-pkg-solo">
@@ -21,7 +23,7 @@ export function KitPackagingStep({
         <header className="sw-name-header">
           <div className="sw-name-title-row">
             <h1>Choose packaging</h1>
-            <span className="tag tag-ready">Step 4 of 4</span>
+            <span className="tag tag-ready">{stepBadge}</span>
           </div>
           <p className="muted sw-name-lead">
             How should &ldquo;{kitName}&rdquo; arrive? Premium packaging is charged per kit —
@@ -51,11 +53,11 @@ export function KitPackagingStep({
 
           <div className="sw-name-tips">
             <div className="row sw-name-tips-head">
-              <Box size={15} /> Reusable kit
+              <Box size={15} /> Packaging at send time
             </div>
             <p className="kt-pkg-tip-copy">
-              Once published, this kit is reusable — send it to new recipients any time without
-              rebuilding.
+              Packaging is charged per recipient at checkout. Premium packaging is selected by
+              default — you can switch to free mailers anytime before paying.
             </p>
           </div>
         </div>

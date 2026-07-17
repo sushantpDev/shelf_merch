@@ -2,6 +2,8 @@ import { useMemo, useReducer, useState, type Dispatch } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { sumKitProductPrices } from "@/features/send/money";
+import { bakeMockup, placementKey } from "@/features/swag/mockup-bake";
 import { usePlatformKits, useCreateKit } from "../model";
 import type { UiProduct } from "../model";
 import { kitReducer, type KitAction, type KitDraft } from "../wizard/kitDraft";
@@ -22,6 +24,7 @@ const INITIAL: KitDraft = {
 export type KitWizardVm = {
   isLoading: boolean;
   isPublishing: boolean;
+  publishedKit: { id: string; name: string } | null;
   step: KitWizardStep;
   draft: KitDraft;
   dispatch: Dispatch<KitAction>;
@@ -31,6 +34,8 @@ export type KitWizardVm = {
   onNext: () => void;
   onStep: (step: KitWizardStep) => void;
   onPublish: () => void;
+  onSendPublishedKit: () => void;
+  onGoToKits: () => void;
 };
 
 /** Map a platform template's product list onto catalog indices. */
@@ -55,6 +60,7 @@ export function useKitWizardController(): KitWizardVm {
   const createKit = useCreateKit();
   const [step, setStep] = useState<KitWizardStep>(0);
   const [publishing, setPublishing] = useState(false);
+  const [publishedKit, setPublishedKit] = useState<{ id: string; name: string } | null>(null);
 
   const catalog: UiProduct[] = useMemo(() => workspace?.catalogProducts ?? [], [workspace]);
 
@@ -99,19 +105,44 @@ export function useKitWizardController(): KitWizardVm {
   async function onPublish() {
     setPublishing(true);
     try {
+      const kitPrice = sumKitProductPrices(pickedProducts);
+      let mockups: Array<{ catalogProductId: string; dataUrl: string }> | undefined;
+
+      if (draft.art?.preview) {
+        const artUrl = draft.art.preview;
+        const baked = await Promise.all(
+          draft.picked.map((i, idx) => {
+            const cp = catalog[i];
+            if (!cp) return Promise.resolve("");
+            const key = placementKey(cp, idx);
+            return bakeMockup(cp, artUrl, draft.placements[key] ?? null);
+          }),
+        );
+        mockups = draft.picked
+          .map((i, idx) => {
+            const cp = catalog[i];
+            if (!cp?.id || !baked[idx]) return null;
+            return { catalogProductId: cp.id, dataUrl: baked[idx] };
+          })
+          .filter((m): m is { catalogProductId: string; dataUrl: string } => m !== null);
+      }
+
       const created = await createKit.mutateAsync({
         name: draft.name || "New Kit",
+        description: draft.desc || "",
         pickedIndices: draft.picked,
         catalog,
-        packaging: draft.packaging,
+        packaging: "box",
         designNotes: draft.notes,
+        kitPrice,
         artwork: draft.art?.file
           ? { file: draft.art.file, preview: draft.art.preview, name: draft.art.name }
           : undefined,
+        mockups,
       });
       toast.success(`Kit "${created.name}" saved to your workspace`);
-      // Publish & send: continue straight into the send-kit checkout.
-      navigate(`/app/kits/${created.id}/send`);
+      setPublishedKit({ id: created.id, name: created.name });
+      setPublishing(false);
     } catch (err) {
       setPublishing(false);
       toast.error(err instanceof Error ? err.message : "Failed to save kit");
@@ -121,6 +152,7 @@ export function useKitWizardController(): KitWizardVm {
   return {
     isLoading: isLoading && !workspace,
     isPublishing: publishing || createKit.isPending,
+    publishedKit,
     step,
     draft,
     dispatch,
@@ -130,5 +162,9 @@ export function useKitWizardController(): KitWizardVm {
     onNext,
     onStep: setStep,
     onPublish,
+    onSendPublishedKit: () => {
+      if (publishedKit) navigate(`/app/kits/${publishedKit.id}/send`);
+    },
+    onGoToKits: () => navigate("/app/kits"),
   };
 }

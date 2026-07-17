@@ -1,4 +1,5 @@
 import { ArrowLeftRight } from "lucide-react";
+import { useEffect, useState } from "react";
 import { LoadingState } from "@/components/LoadingState";
 import { inr } from "@/components/platform/platform-ui";
 import { WizardChrome } from "@/features/swag/wizard/WizardChrome";
@@ -6,7 +7,11 @@ import { RecipientPicker } from "@/features/send/RecipientPicker";
 import { RecipientExperience } from "@/features/send/RecipientExperience";
 import { PaymentPanel } from "@/features/send/PaymentPanel";
 import { POINT_VALUE } from "@/features/send/money";
-import { SEND_POINTS_PLACEHOLDERS } from "../pointsDraft";
+import {
+  budgetPerRecipientError,
+  isValidBudgetPerRecipient,
+  SEND_POINTS_PLACEHOLDERS,
+} from "../pointsDraft";
 import type { SendPointsVm } from "../controllers/useSendPointsController";
 
 const STEPS = ["Budget", "Recipients", "Message", "Checkout"];
@@ -39,6 +44,15 @@ export function SendPointsView({
   onAddRecipientEmails,
   onImportRecipientCsv,
 }: SendPointsVm) {
+  const [pprRaw, setPprRaw] = useState(draft.ppr > 0 ? String(draft.ppr) : "");
+
+  useEffect(() => {
+    setPprRaw(draft.ppr > 0 ? String(Math.trunc(draft.ppr)) : "");
+  }, [draft.ppr]);
+
+  const pprError = budgetPerRecipientError(pprRaw);
+  const budgetStepValid = Boolean(draft.recips) && isValidBudgetPerRecipient(pprRaw);
+
   if (isLoading) {
     return <LoadingState message="Loading…" fullScreen={false} />;
   }
@@ -58,7 +72,12 @@ export function SendPointsView({
         {step === 0 ? "Cancel" : "Back"}
       </button>
       {step < 3 ? (
-        <button type="button" className="btn btn-brand" onClick={onNext}>
+        <button
+          type="button"
+          className="btn btn-brand"
+          disabled={step === 0 && !budgetStepValid}
+          onClick={onNext}
+        >
           Next
         </button>
       ) : (
@@ -133,9 +152,28 @@ export function SendPointsView({
             <div className="inp-wrap" style={{ flex: 1 }}>
               <input
                 className="inp num"
-                value={draft.ppr || ""}
+                inputMode="numeric"
+                value={pprRaw}
                 placeholder={SEND_POINTS_PLACEHOLDERS.ppr}
-                onChange={(e) => dispatch({ type: "setPpr", ppr: Number(e.target.value) || 0 })}
+                aria-invalid={Boolean(pprRaw && pprError)}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setPprRaw(raw);
+                  if (raw.trim() === "") {
+                    dispatch({ type: "setPpr", ppr: 0 });
+                    return;
+                  }
+                  if (/^\d+$/.test(raw.trim())) {
+                    dispatch({ type: "setPpr", ppr: Number(raw.trim()) });
+                    return;
+                  }
+                  // Keep draft invalid so Continue stays disabled for decimals / junk.
+                  const asNum = Number(raw);
+                  dispatch({
+                    type: "setPpr",
+                    ppr: Number.isFinite(asNum) ? asNum : 0,
+                  });
+                }}
               />
               <span className="inp-suffix">INR</span>
             </div>
@@ -145,7 +183,11 @@ export function SendPointsView({
             <div className="inp-wrap" style={{ flex: 1 }}>
               <input
                 className="inp num"
-                value={draft.ppr ? (draft.ppr / POINT_VALUE).toFixed(2) : ""}
+                value={
+                  isValidBudgetPerRecipient(pprRaw)
+                    ? (Number(pprRaw) / POINT_VALUE).toFixed(2)
+                    : ""
+                }
                 placeholder={SEND_POINTS_PLACEHOLDERS.points}
                 readOnly
                 style={{ background: "var(--surface-2)" }}
@@ -153,9 +195,15 @@ export function SendPointsView({
               <span className="inp-suffix">POINTS</span>
             </div>
           </div>
-          <p className="mut3" style={{ fontSize: 12, marginTop: 8 }}>
-            No minimum budget. Shipping included.
-          </p>
+          {pprRaw && pprError ? (
+            <p style={{ fontSize: 12, marginTop: 8, color: "var(--danger)", fontWeight: 600 }}>
+              {pprError}
+            </p>
+          ) : (
+            <p className="mut3" style={{ fontSize: 12, marginTop: 8 }}>
+              Minimum ₹250 per recipient. Whole numbers only. Shipping included.
+            </p>
+          )}
           <div className="divider" style={{ marginTop: 18 }} />
           <div
             className="card"

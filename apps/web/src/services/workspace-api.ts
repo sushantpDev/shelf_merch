@@ -131,15 +131,15 @@ function mapWalletOrgFields(
   myEntity?: { allocatedAmount?: number; spentAmount?: number },
 ): WorkspaceSnapshot["org"]["wallet"] {
   const id = String(w._id ?? w.id ?? "");
-  const balance = w.balance ?? w.totalAmount ?? 0;
-  const allocated = w.allocatedAmount ?? 0;
+  const balance = Math.round(Number(w.balance) || 0);
+  const allocated = Math.round(Number(w.allocatedAmount) || 0);
   return {
     id: id || undefined,
     name: w.name || "Merchandise Budget",
     status: w.status || "",
     amount: isEntityManager
       ? (myEntity?.allocatedAmount ?? 0)
-      : (w.totalAmount ?? w.balance ?? 0),
+      : balance,
     unallocated: isEntityManager
       ? Math.max(0, (myEntity?.allocatedAmount ?? 0) - (myEntity?.spentAmount ?? 0))
       : Math.max(0, balance - allocated),

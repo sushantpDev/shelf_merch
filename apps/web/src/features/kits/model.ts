@@ -29,11 +29,14 @@ export type KitArtworkInput = { file?: File; preview?: string; name?: string };
 
 export type CreateKitInput = {
   name: string;
+  description?: string;
   pickedIndices: number[];
   catalog: UiProduct[];
   packaging: string;
   designNotes?: string;
+  kitPrice?: number;
   artwork?: KitArtworkInput;
+  mockups?: Array<{ catalogProductId: string; dataUrl: string }>;
 };
 
 export function useCreateKit() {

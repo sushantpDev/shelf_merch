@@ -1,4 +1,4 @@
-import { useMemo, useReducer, useState, useEffect, type Dispatch } from "react";
+import { useMemo, useReducer, useState, useEffect, useRef, type Dispatch } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import { useWorkspace, useInvalidateWorkspace } from "@/hooks/useWorkspace";
@@ -7,7 +7,7 @@ import type { UiContact, UiProduct } from "@/services/mappers";
 import type { UiWallet } from "@/services/mappers";
 import { ensureSpendEntityForWalletApi } from "@/services/mutations-api";
 import { entityIdForWallet, spendableForWallet, walletsForCheckout } from "@/services/workspace-api";
-import { kitSendTotals, type KitSendTotals } from "@/features/send/money";
+import { kitSendTotals, sumKitProductPrices, type KitSendTotals } from "@/features/send/money";
 import { toSchedulePayload } from "@/features/send/types";
 import {
   addRecipientsUpToLimit,
@@ -156,7 +156,7 @@ export function getCuratedKitMeta(kit: UiKit | undefined) {
   return null;
 }
 
-export type SendKitStep = 0 | 1 | 2 | 3;
+export type SendKitStep = 0 | 1 | 2 | 3 | 4;
 
 export type SendKitVm = {
   isLoading: boolean;
@@ -172,6 +172,9 @@ export type SendKitVm = {
   /** Workspace contacts plus any manually added email recipients. */
   pickerContacts: UiContact[];
   catalog: UiProduct[];
+  /** Line items for checkout kit price breakdown. */
+  pricedItems: Array<{ id: string; name: string; priceInr: number; mockupUrl?: string }>;
+  kitUnitPrice: number;
   totals: KitSendTotals;
   surpriseMissing: UiContact[];
   wallet: UiWallet | undefined;
@@ -222,17 +225,61 @@ export function useSendKitController(): SendKitVm {
 
   const initial = useMemo(() => {
     const picked = kit ? kitPickedIndices(kit, catalog) : [];
-    const packaging = kit?.packaging === "none" ? "none" : "box";
+    // Premium packaging is the default at send time.
+    const packaging: "none" | "box" = "box";
     const firstRecips = contacts.slice(0, 2).map((c) => c.id);
     return initialSendKitDraft(picked, packaging, firstRecips, workspace?.account ?? "Shelf Merch");
   }, [kit, catalog, contacts, workspace?.account]);
 
   const [draft, dispatch] = useReducer(sendKitReducer, initial);
+  const seededKitId = useRef<string | null>(null);
+
+  // Seed draft once kit data is available (workspace may load after first render).
+  useEffect(() => {
+    if (!kit?.id) return;
+    if (seededKitId.current === kit.id) return;
+    seededKitId.current = kit.id;
+    const picked = kitPickedIndices(kit, catalog);
+    const firstRecips = contacts.slice(0, 2).map((c) => c.id);
+    dispatch({
+      type: "hydrate",
+      draft: initialSendKitDraft(
+        picked,
+        "box",
+        firstRecips,
+        workspace?.account ?? "Shelf Merch",
+      ),
+    });
+  }, [kit, catalog, contacts, workspace?.account]);
 
   const pickerContacts = useMemo(
     () => mergePickerContacts(contacts, draft.selRecips),
     [contacts, draft.selRecips],
   );
+
+  const pricedItems = useMemo(() => {
+    if (!kit) return [];
+    return draft.picked
+      .map((idx) => {
+        const product = catalog[idx];
+        if (!product) return null;
+        const ref = kit.productRefs?.find((r) => r.catalogProductId === product.id);
+        return {
+          id: product.id || product.nm,
+          name: product.nm,
+          priceInr: Math.round(Number(product.basePriceInr) || 0),
+          mockupUrl: ref?.mockupUrl || product.mockupUrl || "",
+        };
+      })
+      .filter(Boolean) as Array<{ id: string; name: string; priceInr: number; mockupUrl?: string }>;
+  }, [kit, draft.picked, catalog]);
+
+  const kitUnitPrice = useMemo(() => {
+    if (kit?.kitPrice && kit.kitPrice > 0) return Math.round(kit.kitPrice);
+    return sumKitProductPrices(
+      draft.picked.map((idx) => catalog[idx]).filter(Boolean) as UiProduct[],
+    );
+  }, [kit?.kitPrice, draft.picked, catalog]);
 
   const checkoutWallets = useMemo(
     () => (workspace ? walletsForCheckout(workspace) : []),
@@ -240,7 +287,7 @@ export function useSendKitController(): SendKitVm {
   );
   const wallet =
     checkoutWallets.find((w) => w.id === selectedWalletId) ?? checkoutWallets[0];
-  const totals = kitSendTotals(draft.selRecips.length, draft.pkg);
+  const totals = kitSendTotals(draft.selRecips.length, draft.pkg, kitUnitPrice);
   const surpriseMissing =
     draft.mode === "surprise" ? missingAddress(pickerContacts, draft.selRecips) : [];
 
@@ -366,7 +413,7 @@ export function useSendKitController(): SendKitVm {
         }
       }
     }
-    setStep((s) => Math.min(s + 1, 3) as SendKitStep);
+    setStep((s) => Math.min(s + 1, 4) as SendKitStep);
   }
 
   async function resolveEntityId(walletId: string | undefined): Promise<string | undefined> {
@@ -403,7 +450,7 @@ export function useSendKitController(): SendKitVm {
       const payWallet = walletId ? workspace?.wallets.find((w) => w.id === walletId) : undefined;
       if (available < paymentTotal) {
         toast.error(
-          `Insufficient wallet balance — ${formatWalletAmount(available, payWallet?.cur)} available`,
+          `Insufficient wallet balance — add more funds to continue. ${formatWalletAmount(available, payWallet?.cur)} available, ${formatWalletAmount(paymentTotal, payWallet?.cur)} required.`,
         );
         return;
       }
@@ -423,6 +470,7 @@ export function useSendKitController(): SendKitVm {
         kitId: String(kit!.id),
         name: kit!.name,
         totalBudget: paymentTotal,
+        packaging: draft.pkg,
         fulfillmentMode:
           draft.mode === "surprise" ? "surprise" : draft.mode === "single" ? "single" : "redeem",
         singleLocation: draft.mode === "single" ? draft.singleLocation : undefined,
@@ -438,7 +486,11 @@ export function useSendKitController(): SendKitVm {
         recipVariants: draft.recipVariants,
       });
       await refreshWorkspace();
-      toast.success(`Order placed for ${draft.selRecips.length} recipients! 📦`);
+      toast.success(
+        draft.when === "sched"
+          ? `Kit scheduled — wallet debited. Recipients will be notified at the scheduled time.`
+          : `Order placed for ${draft.selRecips.length} recipients! 📦`,
+      );
       navigate("/app/orders");
     } catch (err) {
       setSending(false);
@@ -459,6 +511,8 @@ export function useSendKitController(): SendKitVm {
     contacts,
     pickerContacts,
     catalog,
+    pricedItems,
+    kitUnitPrice,
     totals,
     surpriseMissing,
     wallet,

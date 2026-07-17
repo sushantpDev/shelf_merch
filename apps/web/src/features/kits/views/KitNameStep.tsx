@@ -30,8 +30,8 @@ const NEXT_STEPS: { icon: typeof Shirt; title: string; desc: string }[] = [
   },
   {
     icon: Package,
-    title: "Choose packaging",
-    desc: "Pick standard mailers or premium branded boxes for delivery.",
+    title: "Review & pricing",
+    desc: "Confirm your products and the calculated kit cost before publishing.",
   },
 ];
 

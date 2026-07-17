@@ -20,6 +20,7 @@ import {
   uploadCollectionArtworkApi,
   uploadCollectionMockupsApi,
   uploadKitArtworkApi,
+  uploadKitMockupsApi,
   launchKitCampaignApi,
   launchPointsCampaignApi,
   linkCollectionToShopApi,
@@ -353,18 +354,25 @@ export async function refreshContactsFlow(): Promise<UiContact[]> {
 
 export async function createKitFlow(payload: {
   name: string;
+  description?: string;
   pickedIndices: number[];
   catalog: UiProduct[];
   packaging: string;
   designNotes?: string;
+  kitPrice?: number;
   artwork?: { file?: File; preview?: string; name?: string };
+  mockups?: Array<{ catalogProductId: string; dataUrl: string }>;
 }) {
-  const kit = await createKitApi({
+  let kit = await createKitApi({
     ...payload,
     packaging: payload.packaging === "box" ? "box" : "none",
   });
   if (payload.artwork?.file) {
-    return uploadKitArtworkApi(kit.id, payload.artwork.file);
+    kit = await uploadKitArtworkApi(kit.id, payload.artwork.file);
+  }
+  if (payload.mockups?.length) {
+    const withMockups = await uploadKitMockupsApi(kit.id, payload.mockups);
+    if (withMockups) kit = withMockups;
   }
   return kit;
 }
@@ -469,6 +477,7 @@ export async function launchPointsCampaignFlow(payload: {
   creditsPerRecipient: number;
   totalBudget?: number;
   message: { from: string; body: string };
+  schedule?: { mode: "now" | "scheduled" | "self"; sendAt?: string | null; timezone?: string };
   contactIds: string[];
   contacts: Array<{ id: string; name: string; email: string; phone?: string }>;
 }) {
@@ -502,6 +511,7 @@ export async function launchPointsCampaignFlow(payload: {
     creditsPerRecipient: payload.creditsPerRecipient,
     totalBudget: payload.totalBudget,
     message: payload.message,
+    schedule: payload.schedule,
     recipients,
   });
 }
@@ -511,6 +521,7 @@ export async function launchKitCampaignFlow(payload: {
   kitId: string;
   name: string;
   totalBudget?: number;
+  packaging?: "none" | "box";
   fulfillmentMode?: "redeem" | "surprise" | "single";
   singleLocation?: {
     name: string;
@@ -557,6 +568,7 @@ export async function launchKitCampaignFlow(payload: {
     kitId: payload.kitId,
     name: payload.name,
     totalBudget: payload.totalBudget,
+    packaging: payload.packaging,
     fulfillmentMode: payload.fulfillmentMode,
     singleLocation: payload.singleLocation,
     message: payload.message,

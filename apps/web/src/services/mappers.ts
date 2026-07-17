@@ -23,6 +23,8 @@ export type UiProduct = {
   keyFeatures?: string;
   sizeGuide?: string;
   price: string;
+  /** Numeric catalog selling price (INR) — source of truth for kit pricing. */
+  basePriceInr?: number;
   sw: number;
   colors?: string[];
   /** Variant colour name → hex (from catalog variants). */
@@ -81,6 +83,8 @@ export type UiKitProductRef = {
   brand?: string;
   name: string;
   group?: string;
+  /** Pre-baked branded mockup from kit creation. */
+  mockupUrl?: string;
 };
 
 export type UiKit = {
@@ -94,6 +98,8 @@ export type UiKit = {
   packaging?: string;
   designNotes?: string;
   artworkUrl?: string;
+  /** Persisted sum of product basePriceInr at publish time. */
+  kitPrice?: number;
 };
 
 export type UiCollection = {
@@ -234,6 +240,7 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
     keyFeatures: p.keyFeatures || "",
     sizeGuide: p.sizeGuide || "",
     price: formatInr(p.basePriceInr ?? 0),
+    basePriceInr: Math.round(Number(p.basePriceInr) || 0),
     sw: Array.isArray(p.variants) ? Math.max(p.variants.length, 2) : 4,
     colors: variantColors,
     colorHexByName: Object.keys(colorHexByName).length ? colorHexByName : undefined,
@@ -358,6 +365,7 @@ export function mapKit(k: ApiProduct): UiKit {
         brand: ref.brand || "",
         name: ref.name || "",
         group: ref.group || "",
+        mockupUrl: typeof ref.mockupUrl === "string" ? ref.mockupUrl : "",
       }))
     : [];
   return {
@@ -371,6 +379,10 @@ export function mapKit(k: ApiProduct): UiKit {
     packaging: k.packaging || "none",
     designNotes: k.designNotes || "",
     artworkUrl: k.artworkUrl || "",
+    kitPrice:
+      typeof k.kitPrice === "number" && Number.isFinite(k.kitPrice)
+        ? Math.round(k.kitPrice)
+        : undefined,
   };
 }
 
@@ -492,14 +504,16 @@ export function mapCampaign(c: ApiProduct): UiCampaign {
 }
 
 export function mapWallet(w: ApiProduct, owner?: ApiUser): UiWallet {
-  const balance = w.totalAmount ?? w.balance ?? 0;
-  const alloc = w.allocatedAmount ?? 0;
+  // Live cash balance (decreases on campaign_spend). Do not use totalAmount —
+  // that is lifetime funded amount and never shrinks after sends.
+  const balance = Math.round(Number(w.balance) || 0);
+  const alloc = Math.round(Number(w.allocatedAmount) || 0);
   return {
     id: normalizeMongoId(w._id ?? w.id),
     name: w.name,
     cur: (w.currency || "INR").toUpperCase(),
     balance,
-    unalloc: balance - alloc,
+    unalloc: Math.max(0, balance - alloc),
     alloc,
     owner: owner?.name || "—",
     email: owner?.email || "",

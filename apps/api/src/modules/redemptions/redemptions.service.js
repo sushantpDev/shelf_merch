@@ -23,8 +23,9 @@ import { CatalogProduct } from '../catalog/catalogProduct.model.js';
 import { Order, sanitizeOrderItems } from '../orders/order.model.js';
 import { Contact } from '../contacts/contact.model.js';
 import { transitionRedemption, finalizeRecipientRedemption } from '../campaigns/campaigns.service.js';
-import { computeAmountBreakdown } from '../../services/pricing.service.js';
+import { computeAmountBreakdown, amountBreakdownForKitCampaign } from '../../services/pricing.service.js';
 import { recordUsage } from '../../services/usage.service.js';
+import { sumKitProductPrices } from '../kits/kitPricing.js';
 import { env } from '../../config/env.js';
 import { redemptionSignOptions, redemptionVerifyOptions } from '../../config/jwt.js';
 import { sendOtpSms } from '../../services/msg91.service.js';
@@ -112,6 +113,32 @@ async function loadCampaignContext(recipient) {
     shop = await Shop.findOne({ _id: campaign.shopId, tenantId: recipient.tenantId });
   }
   return { campaign, shop };
+}
+
+/**
+ * Prefill shipping from the Contacts collection (admin-entered address).
+ * Read-only for redemption — checkout edits never write back to Contact.
+ */
+async function resolveContactShippingAddress(recipient) {
+  const contact = recipient.contactId
+    ? await Contact.findOne({ _id: recipient.contactId, tenantId: recipient.tenantId }).lean()
+    : await Contact.findOne({
+        email: recipient.email,
+        tenantId: recipient.tenantId,
+      }).lean();
+  if (!contact) return null;
+
+  const addr = contact.address || {};
+  return {
+    name: contact.name || recipient.name || '',
+    phone: contact.phone || recipient.phone || '',
+    line1: addr.line1 || '',
+    line2: addr.line2 || '',
+    city: addr.city || '',
+    state: addr.state || '',
+    pincode: addr.pincode || '',
+    country: addr.country || 'IN',
+  };
 }
 
 /** Points sends to the same employee accumulate — sum open credits per shop (or tenant-wide for stadium). */
@@ -271,18 +298,26 @@ export async function getRedemptionPortal(token) {
     shop: shopPayload,
   };
 
+  const shippingAddress = await resolveContactShippingAddress(recipient);
+  const recipientPayload = {
+    name: recipient.name,
+    email: recipient.email,
+    creditAmount: availableCredit,
+    ...(shippingAddress ? { shippingAddress } : {}),
+  };
+
   if (recipient.redemptionStatus === 'verified') {
     return {
       alreadyVerified: true,
       sessionToken: signRedemptionSession(recipient),
       campaign: campaignPayload,
-      recipient: { name: recipient.name, email: recipient.email, creditAmount: availableCredit },
+      recipient: recipientPayload,
     };
   }
 
   return {
     campaign: campaignPayload,
-    recipient: { name: recipient.name, email: recipient.email, creditAmount: availableCredit },
+    recipient: recipientPayload,
   };
 }
 
@@ -568,7 +603,11 @@ export async function createSurpriseOrdersForCampaign({ tenantId, campaign }) {
         pincode: address.pincode,
         country: address.country || 'IN',
       },
-      amountBreakdown: computeAmountBreakdown(lineItems),
+      amountBreakdown: amountBreakdownForKitCampaign(campaign, {
+        kitUnitPriceInr: sumKitProductPrices(kitEntries.map((e) => e.product)),
+        packaging: campaign.packaging,
+        orderKitCount: 1,
+      }),
       status: 'created',
       statusHistory: [
         { status: 'created', at: new Date(), actorUserId: null, note: 'Surprise gift auto-fulfillment' },
@@ -673,7 +712,11 @@ export async function createSingleLocationOrderForCampaign({ tenantId, campaign 
       pincode: location.pincode,
       country: location.country || 'IN',
     },
-    amountBreakdown: computeAmountBreakdown(lineItems),
+    amountBreakdown: amountBreakdownForKitCampaign(campaign, {
+      kitUnitPriceInr: sumKitProductPrices(kitEntries.map((e) => e.product)),
+      packaging: campaign.packaging,
+      orderKitCount: recipients.length,
+    }),
     status: 'created',
     statusHistory: [
       { status: 'created', at: new Date(), actorUserId: null, note: 'Single-location auto-fulfillment' },
@@ -796,7 +839,13 @@ export async function submitRedemption(
     });
   }
 
-  const breakdown = computeAmountBreakdown(lineItems);
+  const breakdown = kitFulfillment
+    ? amountBreakdownForKitCampaign(campaign, {
+        kitUnitPriceInr: sumKitProductPrices(kitEntries.map((e) => e.product)),
+        packaging: campaign.packaging,
+        orderKitCount: 1,
+      })
+    : computeAmountBreakdown(lineItems);
   if (!kitFulfillment) {
     if (campaign.type === 'points') {
       if (paymentMode === 'upi') {

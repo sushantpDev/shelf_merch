@@ -2,6 +2,7 @@ import { Order, sanitizeOrderItems } from './order.model.js';
 import { Campaign } from '../campaigns/campaign.model.js';
 import { Recipient } from '../campaigns/recipient.model.js';
 import { transitionState, validNextStatuses } from '../../services/stateMachine.service.js';
+import { amountBreakdownForKitCampaign } from '../../services/pricing.service.js';
 import { ApiError, NotFoundError, ForbiddenError } from '../../utils/errors.js';
 import { getPagination, paginatedResponse } from '../../utils/pagination.js';
 
@@ -30,14 +31,50 @@ async function assertOrderAccess({ tenantId, user, order }) {
   }
 }
 
+/**
+ * Ensure kit order totals match the campaign checkout / wallet debit.
+ * Repairs legacy orders that stored item+fee+GST only (missing packaging/shipping).
+ */
+function alignKitOrderBreakdown(order, campaign) {
+  if (!campaign || campaign.type !== 'kit') return order.amountBreakdown;
+  const paid = Math.round(Number(campaign.totalBudget) || 0);
+  if (paid <= 0) return order.amountBreakdown;
+
+  const recipients = Math.max(1, Number(campaign.recipientCount) || 1);
+  const orderKitCount = campaign.fulfillmentMode === 'single' ? recipients : 1;
+  const itemsSubtotal = (order.items || []).reduce(
+    (sum, i) => sum + Number(i.unitPriceInr || 0) * Number(i.qty || 0),
+    0,
+  );
+  const kitUnitPriceInr = orderKitCount > 0 ? itemsSubtotal / orderKitCount : itemsSubtotal;
+
+  const breakdown = amountBreakdownForKitCampaign(campaign, {
+    kitUnitPriceInr,
+    packaging: campaign.packaging,
+    orderKitCount,
+  });
+
+  const current = Math.round(Number(order.amountBreakdown?.total) || 0);
+  if (current !== breakdown.total) {
+    // Persist repair so DB matches Checkout / Wallet going forward.
+    Order.updateOne(
+      { _id: order._id, tenantId: order.tenantId },
+      { $set: { amountBreakdown: breakdown } },
+    ).catch(() => {});
+  }
+  return breakdown;
+}
+
 function withMeta(order, extras = {}) {
   const obj = order.toObject ? order.toObject() : order;
   const { internalNotes, ...safe } = obj; // internal notes are platform-only
+  const amountBreakdown = extras.amountBreakdown ?? obj.amountBreakdown;
   return {
     ...safe,
     items: sanitizeOrderItems(obj.items ?? []),
     validNextStatuses: validNextStatuses('order', obj.status),
     ...extras,
+    amountBreakdown,
   };
 }
 
@@ -60,14 +97,19 @@ export async function listOrders({ tenantId, user, query }) {
   ]);
 
   const campaignIds = [...new Set(items.map((o) => String(o.campaignId)))];
-  const campaigns = await Campaign.find({ _id: { $in: campaignIds }, tenantId }).select('name entityId');
+  const campaigns = await Campaign.find({ _id: { $in: campaignIds }, tenantId }).select(
+    'name entityId type totalBudget recipientCount fulfillmentMode packaging',
+  );
   const campaignById = Object.fromEntries(campaigns.map((c) => [String(c._id), c]));
 
-  const enriched = items.map((o) =>
-    withMeta(o, {
-      campaignName: campaignById[String(o.campaignId)]?.name ?? '',
-    }),
-  );
+  const enriched = items.map((o) => {
+    const campaign = campaignById[String(o.campaignId)];
+    const amountBreakdown = alignKitOrderBreakdown(o, campaign);
+    return withMeta(o, {
+      campaignName: campaign?.name ?? '',
+      amountBreakdown,
+    });
+  });
 
   return paginatedResponse(enriched, total, { page, limit });
 }
@@ -78,13 +120,19 @@ export async function getOrder({ tenantId, user, orderId }) {
   await assertOrderAccess({ tenantId, user, order });
 
   const [campaign, recipient] = await Promise.all([
-    Campaign.findOne({ _id: order.campaignId, tenantId }).select('name entityId'),
+    Campaign.findOne({ _id: order.campaignId, tenantId }).select(
+      'name entityId type totalBudget recipientCount fulfillmentMode packaging',
+    ),
     Recipient.findOne({ _id: order.recipientId, tenantId }).select('name email'),
   ]);
+
+  const lean = order.toObject();
+  const amountBreakdown = alignKitOrderBreakdown(lean, campaign);
 
   return withMeta(order, {
     campaignName: campaign?.name ?? '',
     recipient: recipient ? { name: recipient.name, email: recipient.email } : null,
+    amountBreakdown,
   });
 }
 

@@ -22,6 +22,8 @@ import { useLaunchPointsCampaign, useSavePointsCampaignDraft } from "../model";
 import type { UiContact, UiWallet } from "../model";
 import {
   initialSendPointsDraft,
+  isValidBudgetPerRecipient,
+  MIN_POINTS_BUDGET_INR,
   resolveFrom,
   resolveMessage,
   resolveOrderName,
@@ -351,8 +353,16 @@ export function useSendPointsController(): SendPointsVm {
 
   function next() {
     if (step === 0) {
-      if (!draft.recips || !draft.ppr) {
-        toast.error("Enter number of recipients and budget per recipient");
+      if (!draft.recips) {
+        toast.error("Enter number of recipients");
+        return;
+      }
+      if (!isValidBudgetPerRecipient(String(draft.ppr || ""))) {
+        toast.error(
+          draft.ppr > 0 && !Number.isInteger(draft.ppr)
+            ? "Only whole numbers are allowed."
+            : `Minimum of ₹${MIN_POINTS_BUDGET_INR} must be allocated.`,
+        );
         return;
       }
       autoSelectRecipients();
@@ -395,13 +405,17 @@ export function useSendPointsController(): SendPointsVm {
       toast.error(`You can only select ${recipientLimit} recipients`);
       return;
     }
+    if (!isValidBudgetPerRecipient(String(draft.ppr || ""))) {
+      toast.error(`Minimum of ₹${MIN_POINTS_BUDGET_INR} must be allocated.`);
+      return;
+    }
     const paymentTotal = Math.round(totals.total);
     if (draft.pay === "wallet") {
       const available = walletId && workspace ? spendableForWallet(workspace, walletId) : 0;
       const payWallet = walletId ? workspace?.wallets.find((w) => w.id === walletId) : undefined;
       if (available < paymentTotal) {
         toast.error(
-          `Insufficient wallet balance — ${formatWalletAmount(available, payWallet?.cur)} available`,
+          `Insufficient wallet balance — add more funds to continue. ${formatWalletAmount(available, payWallet?.cur)} available, ${formatWalletAmount(paymentTotal, payWallet?.cur)} required.`,
         );
         return;
       }
@@ -420,6 +434,7 @@ export function useSendPointsController(): SendPointsVm {
           from: resolveFrom(draft.from),
           body: resolveMessage(draft.msg),
         },
+        schedule: toSchedulePayload(draft.when, draft.schedule),
         contactIds: draft.selRecips,
         contacts: contacts.map((c) => ({
           id: c.id,
@@ -429,7 +444,12 @@ export function useSendPointsController(): SendPointsVm {
         })),
       });
       await refreshWorkspace();
-      toast.success(`Points sent to ${draft.selRecips.length} recipients! 🎉`);
+      const scheduled = draft.when === "sched";
+      toast.success(
+        scheduled
+          ? `Campaign scheduled — wallet debited. Emails and points will go out at the scheduled time.`
+          : `Points sent to ${draft.selRecips.length} recipients! 🎉`,
+      );
       navigate(`/app/shops/${String(shopId)}?tab=sent-gifts`);
     } catch (err) {
       setSending(false);

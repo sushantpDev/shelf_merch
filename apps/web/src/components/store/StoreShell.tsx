@@ -386,6 +386,103 @@ function PackageIcon() {
   );
 }
 
+function UserFieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21a8 8 0 00-16 0" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+function BriefcaseFieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2M2 13h20" />
+    </svg>
+  );
+}
+
+function GlobeFieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
+    </svg>
+  );
+}
+
+function PhoneFieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 16.92v3a2 2 0 01-2.18 2 19.8 19.8 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.8 19.8 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0122 16.92z" />
+    </svg>
+  );
+}
+
+function MapPinFieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function BuildingFieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 9h.01M15 9h.01M9 13h.01M15 13h.01" />
+    </svg>
+  );
+}
+
+function MapFieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3z" />
+      <path d="M9 3v15M15 6v15" />
+    </svg>
+  );
+}
+
+function ZipFieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M7 10h4M7 14h2M15 10h2M15 14h2" />
+    </svg>
+  );
+}
+
+function SummaryDocIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <path d="M14 2v6h6M8 13h8M8 17h5" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 018 0v3" />
+    </svg>
+  );
+}
+
+function ShieldCheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  );
+}
+
 function formatOrderStatus(status: string) {
   return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -559,6 +656,7 @@ export default function StoreShell({
   redemptionToken,
   sessionToken,
   cartPersistId,
+  initialShippingAddress,
   onCheckout,
   onLogout,
   onFetchOrders,
@@ -573,6 +671,8 @@ export default function StoreShell({
   creditInr?: number;
   recipientName?: string;
   recipientEmail?: string;
+  /** Prefill from Contacts (admin-entered). Edits stay on this order only. */
+  initialShippingAddress?: Partial<ShippingAddress> | null;
   welcome?: string;
   redemptionToken?: string;
   sessionToken?: string;
@@ -618,24 +718,32 @@ export default function StoreShell({
   const [ticketSubject, setTicketSubject] = useState("");
   const [ticketType, setTicketType] = useState("other");
   const [ticketDetails, setTicketDetails] = useState("");
-  const [address, setAddress] = useState<ShippingAddress>({
-    name: recipientName || "",
-    phone: "",
-    line1: "",
-    city: "",
-    state: "",
-    pincode: "",
-    country: "IN",
-  });
+  const [address, setAddress] = useState<ShippingAddress>(() => ({
+    name: initialShippingAddress?.name || recipientName || "",
+    phone: initialShippingAddress?.phone || "",
+    line1: initialShippingAddress?.line1 || "",
+    line2: initialShippingAddress?.line2 || "",
+    city: initialShippingAddress?.city || "",
+    state: initialShippingAddress?.state || "",
+    pincode: initialShippingAddress?.pincode || "",
+    country: initialShippingAddress?.country || "IN",
+  }));
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All Products");
   const [scrolled, setScrolled] = useState(false);
-  const [checkoutFirst, setCheckoutFirst] = useState("");
-  const [checkoutLast, setCheckoutLast] = useState("");
+  const [checkoutFirst, setCheckoutFirst] = useState(() => {
+    const full = (initialShippingAddress?.name || recipientName || "").trim();
+    return full.split(/\s+/)[0] || "";
+  });
+  const [checkoutLast, setCheckoutLast] = useState(() => {
+    const full = (initialShippingAddress?.name || recipientName || "").trim();
+    return full.split(/\s+/).slice(1).join(" ") || "";
+  });
   const [checkoutBusiness, setCheckoutBusiness] = useState("");
+  /** @deprecated Manual continue step — Pay Now now tracks form validity directly. */
   const [shippingConfirmed, setShippingConfirmed] = useState(false);
-  const [itemsExpanded, setItemsExpanded] = useState(false);
   const checkoutSummaryRef = useRef<HTMLElement>(null);
+  const shippingPrefillDone = useRef(false);
   const [useRewardPoints, setUseRewardPoints] = useState(true);
   const [addedToBag, setAddedToBag] = useState<AddedToBagInfo | null>(null);
   const catalogRef = useRef<HTMLDivElement>(null);
@@ -649,6 +757,33 @@ export default function StoreShell({
   useEffect(() => {
     setBalanceInr(creditInr);
   }, [creditInr]);
+
+  // Prefill checkout from Contacts once (admin-saved address). Recipient edits are local only.
+  useEffect(() => {
+    if (shippingPrefillDone.current || !initialShippingAddress) return;
+    const hasAddress = Boolean(
+      initialShippingAddress.line1?.trim() ||
+        initialShippingAddress.city?.trim() ||
+        initialShippingAddress.pincode?.trim() ||
+        initialShippingAddress.phone?.trim(),
+    );
+    if (!hasAddress && !initialShippingAddress.name?.trim()) return;
+    shippingPrefillDone.current = true;
+    const fullName = (initialShippingAddress.name || recipientName || "").trim();
+    const parts = fullName.split(/\s+/).filter(Boolean);
+    setCheckoutFirst(parts[0] || "");
+    setCheckoutLast(parts.slice(1).join(" ") || "");
+    setAddress({
+      name: fullName,
+      phone: initialShippingAddress.phone || "",
+      line1: initialShippingAddress.line1 || "",
+      line2: initialShippingAddress.line2 || "",
+      city: initialShippingAddress.city || "",
+      state: initialShippingAddress.state || "",
+      pincode: initialShippingAddress.pincode || "",
+      country: initialShippingAddress.country || "IN",
+    });
+  }, [initialShippingAddress, recipientName]);
 
   useEffect(() => {
     if (!storageKey || products.length === 0) return;
@@ -679,16 +814,16 @@ export default function StoreShell({
 
   useEffect(() => {
     if (page !== "checkout") {
-      setShippingConfirmed(false);
-      setItemsExpanded(false);
       return;
     }
+    // Only seed name fields from recipient when they are still empty (avoid clobbering prefill/edits).
+    if (checkoutFirst.trim() || checkoutLast.trim()) return;
     const full = (address.name || recipientName || "").trim();
     if (!full) return;
     const parts = full.split(/\s+/);
     setCheckoutFirst(parts[0] || "");
     setCheckoutLast(parts.slice(1).join(" ") || "");
-  }, [page, recipientName, address.name]);
+  }, [page, recipientName, address.name, checkoutFirst, checkoutLast]);
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 10);
@@ -706,6 +841,26 @@ export default function StoreShell({
   const hasEnoughPoints = balanceInr != null && cartTotalInr <= balanceInr;
   const paysWithUpi = mode === "redeem" && upiDueInr > 0;
   const canCheckout = mode !== "redeem" || cart.length > 0;
+
+  const shippingValid = useMemo(() => {
+    const name = [checkoutFirst, checkoutLast].filter(Boolean).join(" ").trim();
+    return Boolean(
+      name &&
+        address.phone.trim() &&
+        address.line1.trim() &&
+        address.city.trim() &&
+        address.state.trim() &&
+        address.pincode.trim(),
+    );
+  }, [
+    checkoutFirst,
+    checkoutLast,
+    address.phone,
+    address.line1,
+    address.city,
+    address.state,
+    address.pincode,
+  ]);
 
   const storeCategories = useMemo(() => {
     const unique = Array.from(new Set(products.map((p) => (p.category || "").trim()).filter(Boolean)));
@@ -786,6 +941,8 @@ export default function StoreShell({
   }
 
   function resetCheckoutProgress() {
+    // Kept for potential restore of the manual "Continue to order summary" step.
+    // Pay Now now reacts to shippingValid automatically.
     setShippingConfirmed(false);
   }
 
@@ -1549,15 +1706,18 @@ export default function StoreShell({
       {page === "checkout" && (
         <div className="sf-content sf-checkout-page">
           <button type="button" className="sf-bag-back" onClick={() => setPage("cart")}>
-            ← BACK
+            ← Back to shop
           </button>
 
           <div className="sf-checkout-titlebar">
-            <h1 className="sf-checkout-title">Checkout</h1>
-            <div className="sf-checkout-currency" aria-label="Currency">
+            <div>
+              <h1 className="sf-checkout-title">Checkout</h1>
+              <p className="sf-checkout-lead">Review your details and complete your order.</p>
+            </div>
+            {/* <div className="sf-checkout-currency" aria-label="Currency">
               {usesPointsDisplay ? "Pts" : "INR"}
               <ChevronDown className="sf-checkout-currency-chevron" />
-            </div>
+            </div> */}
           </div>
 
           {error ? <div className="sf-checkout-error">{error}</div> : null}
@@ -1566,68 +1726,95 @@ export default function StoreShell({
             <div className="sf-checkout-main">
               <div className="sf-checkout-shipping-card">
                 <div className="sf-checkout-section-head">
-                  <TruckIcon />
-                  <span>Shipping</span>
+                  <span className="sf-checkout-head-icon">
+                    <TruckIcon />
+                  </span>
+                  <div>
+                    <h2>Shipping address</h2>
+                    <p>We&apos;ll deliver your order to this address</p>
+                  </div>
                 </div>
-                <h2 className="sf-checkout-subhead">— Add new address</h2>
 
                 <div className="sf-checkout-form">
                   <div className="sf-checkout-form-row sf-checkout-form-row--2">
                     <label className="sf-checkout-field">
-                      <span className="sf-checkout-label">First name</span>
-                      <input
-                        className="sf-checkout-inp"
-                        value={checkoutFirst}
-                        onChange={(e) => {
-                          setCheckoutFirst(e.target.value);
-                          resetCheckoutProgress();
-                        }}
-                      />
+                      <span className="sf-checkout-label">First name <i>*</i></span>
+                      <div className="sf-checkout-inp-wrap">
+                        <span className="sf-checkout-inp-icon" aria-hidden="true">
+                          <UserFieldIcon />
+                        </span>
+                        <input
+                          className="sf-checkout-inp sf-checkout-inp--icon"
+                          value={checkoutFirst}
+                          onChange={(e) => {
+                            setCheckoutFirst(e.target.value);
+                            resetCheckoutProgress();
+                          }}
+                        />
+                      </div>
                     </label>
                     <label className="sf-checkout-field">
-                      <span className="sf-checkout-label">Last name</span>
-                      <input
-                        className="sf-checkout-inp"
-                        value={checkoutLast}
-                        onChange={(e) => {
-                          setCheckoutLast(e.target.value);
-                          resetCheckoutProgress();
-                        }}
-                      />
+                      <span className="sf-checkout-label">Last name <i>*</i></span>
+                      <div className="sf-checkout-inp-wrap">
+                        <span className="sf-checkout-inp-icon" aria-hidden="true">
+                          <UserFieldIcon />
+                        </span>
+                        <input
+                          className="sf-checkout-inp sf-checkout-inp--icon"
+                          value={checkoutLast}
+                          onChange={(e) => {
+                            setCheckoutLast(e.target.value);
+                            resetCheckoutProgress();
+                          }}
+                        />
+                      </div>
                     </label>
                   </div>
 
                   <label className="sf-checkout-field">
                     <span className="sf-checkout-label">Business name (optional)</span>
-                    <input
-                      className="sf-checkout-inp"
-                      placeholder="Company name"
-                      value={checkoutBusiness}
-                      onChange={(e) => {
-                        setCheckoutBusiness(e.target.value);
-                        resetCheckoutProgress();
-                      }}
-                    />
+                    <div className="sf-checkout-inp-wrap">
+                      <span className="sf-checkout-inp-icon" aria-hidden="true">
+                        <BriefcaseFieldIcon />
+                      </span>
+                      <input
+                        className="sf-checkout-inp sf-checkout-inp--icon"
+                        placeholder="Company name"
+                        value={checkoutBusiness}
+                        onChange={(e) => {
+                          setCheckoutBusiness(e.target.value);
+                          resetCheckoutProgress();
+                        }}
+                      />
+                    </div>
                   </label>
 
                   <div className="sf-checkout-form-row sf-checkout-form-row--2">
                     <label className="sf-checkout-field">
-                      <span className="sf-checkout-label">Country</span>
-                      <select
-                        className="sf-checkout-inp sf-checkout-select"
-                        value={address.country || "IN"}
-                        onChange={(e) => {
-                          setAddress({ ...address, country: e.target.value });
-                          resetCheckoutProgress();
-                        }}
-                      >
-                        <option value="IN">India</option>
-                        <option value="US">United States</option>
-                      </select>
+                      <span className="sf-checkout-label">Country <i>*</i></span>
+                      <div className="sf-checkout-inp-wrap">
+                        <span className="sf-checkout-inp-icon" aria-hidden="true">
+                          <GlobeFieldIcon />
+                        </span>
+                        <select
+                          className="sf-checkout-inp sf-checkout-select sf-checkout-inp--icon"
+                          value={address.country || "IN"}
+                          onChange={(e) => {
+                            setAddress({ ...address, country: e.target.value });
+                            resetCheckoutProgress();
+                          }}
+                        >
+                          <option value="IN">India</option>
+                          <option value="US">United States</option>
+                        </select>
+                      </div>
                     </label>
                     <label className="sf-checkout-field">
-                      <span className="sf-checkout-label">Phone number</span>
+                      <span className="sf-checkout-label">Phone number <i>*</i></span>
                       <div className="sf-checkout-phone">
+                        <span className="sf-checkout-inp-icon sf-checkout-inp-icon--phone" aria-hidden="true">
+                          <PhoneFieldIcon />
+                        </span>
                         <span className="sf-checkout-phone-prefix">
                           {address.country === "US" ? "+1" : "+91"}
                         </span>
@@ -1645,72 +1832,107 @@ export default function StoreShell({
                   </div>
 
                   <label className="sf-checkout-field">
-                    <span className="sf-checkout-label">Address</span>
-                    <input
-                      className="sf-checkout-inp"
-                      placeholder="Street address"
-                      value={address.line1}
-                      onChange={(e) => {
-                        setAddress({ ...address, line1: e.target.value });
-                        resetCheckoutProgress();
-                      }}
-                    />
+                    <span className="sf-checkout-label">Address <i>*</i></span>
+                    <div className="sf-checkout-inp-wrap">
+                      <span className="sf-checkout-inp-icon" aria-hidden="true">
+                        <MapPinFieldIcon />
+                      </span>
+                      <input
+                        className="sf-checkout-inp sf-checkout-inp--icon"
+                        placeholder="Street address"
+                        value={address.line1}
+                        onChange={(e) => {
+                          setAddress({ ...address, line1: e.target.value });
+                          resetCheckoutProgress();
+                        }}
+                      />
+                    </div>
                   </label>
 
                   <div className="sf-checkout-form-row sf-checkout-form-row--2">
                     <label className="sf-checkout-field">
-                      <span className="sf-checkout-label">Suite / Apt / Other (optional)</span>
-                      <input
-                        className="sf-checkout-inp"
-                        placeholder="Apt 000"
-                        value={address.line2 || ""}
-                        onChange={(e) => {
-                          setAddress({ ...address, line2: e.target.value });
-                          resetCheckoutProgress();
-                        }}
-                      />
+                      <span className="sf-checkout-label">Apartment, suite, etc. (optional)</span>
+                      <div className="sf-checkout-inp-wrap">
+                        <span className="sf-checkout-inp-icon" aria-hidden="true">
+                          <BuildingFieldIcon />
+                        </span>
+                        <input
+                          className="sf-checkout-inp sf-checkout-inp--icon"
+                          placeholder="Apt 000"
+                          value={address.line2 || ""}
+                          onChange={(e) => {
+                            setAddress({ ...address, line2: e.target.value });
+                            resetCheckoutProgress();
+                          }}
+                        />
+                      </div>
                     </label>
                     <label className="sf-checkout-field">
-                      <span className="sf-checkout-label">City</span>
-                      <input
-                        className="sf-checkout-inp"
-                        value={address.city}
-                        onChange={(e) => {
-                          setAddress({ ...address, city: e.target.value });
-                          resetCheckoutProgress();
-                        }}
-                      />
+                      <span className="sf-checkout-label">City <i>*</i></span>
+                      <div className="sf-checkout-inp-wrap">
+                        <span className="sf-checkout-inp-icon" aria-hidden="true">
+                          <BuildingFieldIcon />
+                        </span>
+                        <input
+                          className="sf-checkout-inp sf-checkout-inp--icon"
+                          value={address.city}
+                          onChange={(e) => {
+                            setAddress({ ...address, city: e.target.value });
+                            resetCheckoutProgress();
+                          }}
+                        />
+                      </div>
                     </label>
                   </div>
 
                   <div className="sf-checkout-form-row sf-checkout-form-row--2">
                     <label className="sf-checkout-field">
-                      <span className="sf-checkout-label">State / County / Province</span>
-                      <input
-                        className="sf-checkout-inp"
-                        placeholder="Search"
-                        value={address.state}
-                        onChange={(e) => {
-                          setAddress({ ...address, state: e.target.value });
-                          resetCheckoutProgress();
-                        }}
-                      />
+                      <span className="sf-checkout-label">State / County / Province <i>*</i></span>
+                      <div className="sf-checkout-inp-wrap">
+                        <span className="sf-checkout-inp-icon" aria-hidden="true">
+                          <MapFieldIcon />
+                        </span>
+                        <input
+                          className="sf-checkout-inp sf-checkout-inp--icon"
+                          placeholder="Search"
+                          value={address.state}
+                          onChange={(e) => {
+                            setAddress({ ...address, state: e.target.value });
+                            resetCheckoutProgress();
+                          }}
+                        />
+                      </div>
                     </label>
                     <label className="sf-checkout-field">
-                      <span className="sf-checkout-label">Zip code / Pin</span>
-                      <input
-                        className="sf-checkout-inp"
-                        placeholder="00000"
-                        value={address.pincode}
-                        onChange={(e) => {
-                          setAddress({ ...address, pincode: e.target.value });
-                          resetCheckoutProgress();
-                        }}
-                      />
+                      <span className="sf-checkout-label">Zip code / Pin <i>*</i></span>
+                      <div className="sf-checkout-inp-wrap">
+                        <span className="sf-checkout-inp-icon" aria-hidden="true">
+                          <ZipFieldIcon />
+                        </span>
+                        <input
+                          className="sf-checkout-inp sf-checkout-inp--icon"
+                          placeholder="00000"
+                          value={address.pincode}
+                          onChange={(e) => {
+                            setAddress({ ...address, pincode: e.target.value });
+                            resetCheckoutProgress();
+                          }}
+                        />
+                      </div>
                     </label>
                   </div>
                 </div>
 
+                <div className={`sf-checkout-delivery-note${shippingValid ? " is-valid" : ""}`}>
+                  <CheckCircleIcon />
+                  <span>
+                    {shippingValid
+                      ? "Your order will be securely delivered to the address above."
+                      : "Complete the required fields to confirm your delivery address."}
+                  </span>
+                </div>
+
+                {/* Manual continue step disabled — Pay Now enables when shipping is valid.
                 <button
                   type="button"
                   className="sf-checkout-continue sf-checkout-continue--inline"
@@ -1721,12 +1943,18 @@ export default function StoreShell({
                 <p className="sf-checkout-continue-hint">
                   Review your totals and pay in the order summary below.
                 </p>
+                */}
               </div>
             </div>
 
             <aside ref={checkoutSummaryRef} className="sf-checkout-sidebar">
               <div className="sf-checkout-summary">
-                <h2 className="sf-checkout-summary-title">Order Summary</h2>
+                <div className="sf-checkout-summary-head">
+                  <span className="sf-checkout-summary-icon">
+                    <SummaryDocIcon />
+                  </span>
+                  <h2 className="sf-checkout-summary-title">Order Summary</h2>
+                </div>
                 {mode === "redeem" && balanceInr != null ? (
                   <div className={`sf-bag-funds sf-bag-funds--checkout${useRewardPoints ? "" : " sf-bag-funds--off"}`}>
                     <div className="sf-bag-funds-label">My Reward Points</div>
@@ -1736,6 +1964,9 @@ export default function StoreShell({
                         checked={useRewardPoints}
                         onChange={(e) => setUseRewardPoints(e.target.checked)}
                       />
+                      <span className="sf-bag-funds-wallet-gift" aria-hidden="true">
+                        <GiftIcon />
+                      </span>
                       <span>
                         {recipientName ? `${recipientName}'s ` : ""}
                         {shop.name} Wallet
@@ -1760,9 +1991,9 @@ export default function StoreShell({
                   <b>{fmtCardPrice(cartTotalInr)}</b>
                 </div>
                 {mode === "redeem" && useRewardPoints && pointsApplied > 0 ? (
-                  <div className="sf-checkout-summary-row sf-checkout-summary-row--muted">
+                  <div className="sf-checkout-summary-row sf-checkout-summary-row--credit">
                     <span>Points applied</span>
-                    <b>{fmtCardPrice(pointsApplied)}</b>
+                    <b>-{fmtCardPrice(pointsApplied)}</b>
                   </div>
                 ) : null}
                 {mode === "redeem" && paysWithUpi ? (
@@ -1778,57 +2009,67 @@ export default function StoreShell({
                 <button
                   type="button"
                   className="sf-checkout-pay"
-                  disabled={placing || !shippingConfirmed || !canCheckout || cart.length === 0}
+                  disabled={placing || !shippingValid || !canCheckout || cart.length === 0}
                   onClick={() => void placeOrder()}
                 >
-                  {placing
-                    ? "Processing…"
-                    : paysWithUpi
-                      ? `Pay ${fmtUpiAmount(upiDueInr)} via UPI`
-                      : "Pay now"}
+                  {placing ? (
+                    "Processing…"
+                  ) : paysWithUpi ? (
+                    `Pay ${fmtUpiAmount(upiDueInr)} via UPI`
+                  ) : (
+                    <>
+                      <LockIcon />
+                      Pay now
+                    </>
+                  )}
                 </button>
-                {!shippingConfirmed ? (
-                  <p className="sf-checkout-pay-hint">Complete shipping above, then continue to pay here.</p>
-                ) : null}
+                {shippingValid ? (
+                  <p className="sf-checkout-pay-hint sf-checkout-pay-hint--valid">
+                    <CheckCircleIcon /> All required shipping fields are filled
+                  </p>
+                ) : (
+                  <p className="sf-checkout-pay-hint">Complete all required shipping fields to pay.</p>
+                )}
               </div>
 
               <div className="sf-checkout-items">
-                <button
-                  type="button"
-                  className="sf-checkout-items-toggle"
-                  aria-expanded={itemsExpanded}
-                  onClick={() => setItemsExpanded((v) => !v)}
-                >
-                  <span>Your item{cartCount === 1 ? "" : "s"}</span>
-                  <ChevronDown className={`sf-checkout-items-chevron${itemsExpanded ? " sf-checkout-items-chevron--open" : ""}`} />
-                </button>
-                {itemsExpanded ? (
-                  <div className="sf-checkout-items-body">
-                    {cart.map((l) => {
-                      const variantLabel = [l.variant?.size, l.variant?.color].filter(Boolean).join(" · ");
-                      return (
-                        <div key={l.key} className="sf-checkout-item">
-                          <div className="sf-checkout-item-img">
-                            {l.image ? <img src={l.image} alt={l.name} /> : null}
-                          </div>
-                          <div className="sf-checkout-item-info">
-                            <div className="sf-checkout-item-name">{l.name}</div>
-                            {variantLabel ? (
-                              <div className="sf-checkout-item-variant">{variantLabel}</div>
-                            ) : null}
-                            <div className="sf-checkout-item-meta">
-                              <span>Qty {l.qty}</span>
-                              <b>{fmtCardPrice(l.priceInr * l.qty)}</b>
-                            </div>
+                <div className="sf-checkout-items-toggle" aria-hidden="false">
+                  <span className="sf-checkout-items-title">
+                    <PackageIcon />
+                    Your item{cartCount === 1 ? "" : "s"} ({cartCount})
+                  </span>
+                  
+                </div>
+                <div className="sf-checkout-items-body">
+                  {cart.map((l) => {
+                    const variantLabel = [l.variant?.size, l.variant?.color].filter(Boolean).join(" · ");
+                    return (
+                      <div key={l.key} className="sf-checkout-item">
+                        <div className="sf-checkout-item-img">
+                          {l.image ? <img src={l.image} alt={l.name} /> : null}
+                        </div>
+                        <div className="sf-checkout-item-info">
+                          <div className="sf-checkout-item-name">{l.name}</div>
+                          {variantLabel ? (
+                            <div className="sf-checkout-item-variant">{variantLabel}</div>
+                          ) : null}
+                          <div className="sf-checkout-item-meta">
+                            <span>Qty: {l.qty}</span>
+                            <b className="sf-checkout-item-price">{fmtCardPrice(l.priceInr * l.qty)}</b>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </aside>
           </div>
+
+          <p className="sf-checkout-secure-footer">
+            <ShieldCheckIcon />
+            Your data is secure and will only be used to process your order.
+          </p>
         </div>
       )}
 

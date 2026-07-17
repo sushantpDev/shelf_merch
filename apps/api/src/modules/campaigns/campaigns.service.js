@@ -6,6 +6,8 @@ import { Entity } from '../entities/entity.model.js';
 import { Contact } from '../contacts/contact.model.js';
 import { Shop } from '../shops/shop.model.js';
 import { Kit } from '../kits/kit.model.js';
+import { CatalogProduct } from '../catalog/catalogProduct.model.js';
+import { kitSendTotals, sumKitProductPrices } from '../kits/kitPricing.js';
 import { Wallet } from '../wallets/wallet.model.js';
 import { Tenant } from '../tenants/tenant.model.js';
 import * as ledger from '../../services/ledger.service.js';
@@ -297,7 +299,14 @@ async function upsertRecipientsFromList({ tenantId, campaign, rows }) {
 }
 
 /** §7.8 — CSV or manual recipient list. */
-export async function importRecipients({ tenantId, campaignId, user, recipients, totalBudget }) {
+export async function importRecipients({
+  tenantId,
+  campaignId,
+  user,
+  recipients,
+  totalBudget,
+  packaging,
+}) {
   const campaign = await Campaign.findOne({ _id: campaignId, tenantId });
   if (!campaign) throw new NotFoundError('Campaign not found');
   if (user?.scopeType === 'entity') {
@@ -316,7 +325,33 @@ export async function importRecipients({ tenantId, campaignId, user, recipients,
   // Kit / items sends skip credit allocation — approve once recipients are uploaded.
   if (['kit', 'items'].includes(campaign.type) && campaign.status === 'recipients_uploaded') {
     campaign.creditsPerRecipient = 0;
-    const budget = Math.round(totalBudget ?? 0);
+    let budget = Math.round(totalBudget ?? 0);
+
+    // Recompute kit checkout from catalog kitPrice so wallet debit matches product pricing.
+    if (campaign.type === 'kit' && campaign.kitId) {
+      const kit = await Kit.findOne({ _id: campaign.kitId, tenantId });
+      if (kit) {
+        let unitPrice = Math.round(Number(kit.kitPrice) || 0);
+        if (unitPrice <= 0 && kit.productRefs?.length) {
+          const products = await CatalogProduct.find({
+            _id: { $in: kit.productRefs.map((r) => r.catalogProductId).filter(Boolean) },
+          })
+            .select('basePriceInr')
+            .lean();
+          unitPrice = sumKitProductPrices(products);
+        }
+        const pkg =
+          packaging === 'none' ? 'none' : packaging === 'box' ? 'box' : kit.packaging === 'none' ? 'none' : 'box';
+        campaign.packaging = pkg;
+        const computed = kitSendTotals(campaign.recipientCount, pkg, unitPrice);
+        // Checkout Grand Total is the source of truth when the client sends it;
+        // otherwise recompute with the shared kitSendTotals formula.
+        budget = Math.round(totalBudget ?? 0) > 0 ? Math.round(totalBudget) : Math.round(computed.total);
+      }
+    } else if (packaging === 'none' || packaging === 'box') {
+      campaign.packaging = packaging;
+    }
+
     if (budget > 0) {
       await assertWalletCanSpend({
         tenantId,
@@ -352,7 +387,15 @@ export async function allocateCredits({
   const count = await Recipient.countDocuments({ tenantId, campaignId: campaign._id });
   if (count === 0) throw new ApiError(422, 'Upload recipients before allocating credits', 'NO_RECIPIENTS');
 
-  const totalBudget = Math.round(totalBudgetOverride ?? creditsPerRecipient * count);
+  const perRecipient = Math.round(Number(creditsPerRecipient) || 0);
+  if (!Number.isInteger(Number(creditsPerRecipient)) || perRecipient !== Number(creditsPerRecipient)) {
+    throw new ApiError(422, 'Budget per recipient must be a whole number', 'INVALID_BUDGET');
+  }
+  if (perRecipient < 250) {
+    throw new ApiError(422, 'Minimum of ₹250 must be allocated', 'BUDGET_TOO_LOW');
+  }
+
+  const totalBudget = Math.round(totalBudgetOverride ?? perRecipient * count);
   await assertWalletCanSpend({
     tenantId,
     entityId: campaign.entityId,
@@ -371,10 +414,15 @@ export async function allocateCredits({
     }
   }
 
-  campaign.creditsPerRecipient = creditsPerRecipient;
+  campaign.creditsPerRecipient = perRecipient;
   campaign.recipientCount = count;
   campaign.totalBudget = totalBudget;
-  await Recipient.updateMany({ tenantId, campaignId: campaign._id }, { creditAmount: creditsPerRecipient });
+  // Scheduled sends: hold point credit until sendAt (wallet is still debited at launch).
+  const deferCredits = campaign.schedule?.mode === 'scheduled';
+  await Recipient.updateMany(
+    { tenantId, campaignId: campaign._id },
+    { creditAmount: deferCredits ? 0 : perRecipient },
+  );
 
   if (campaign.status === 'recipients_uploaded') {
     transitionState('campaign', campaign, 'credits_allocated', { userId: user.userId });
@@ -382,6 +430,199 @@ export async function allocateCredits({
   }
   await campaign.save();
   return withCampaignMeta(campaign);
+}
+
+async function buildInviteContext(campaign, tenantId) {
+  const [tenant, kit, shop] = await Promise.all([
+    Tenant.findById(tenantId).select('name').lean(),
+    campaign.kitId ? Kit.findOne({ _id: campaign.kitId, tenantId }).select('name').lean() : null,
+    campaign.shopId
+      ? Shop.findOne({ _id: campaign.shopId, tenantId })
+          .select('name logoUrl bannerConfig currencyMode')
+          .lean()
+      : null,
+  ]);
+  const isFulfillment = campaign.type === 'kit' || campaign.type === 'items';
+  const isSurprise = campaign.fulfillmentMode === 'surprise';
+  const isSingle = campaign.fulfillmentMode === 'single';
+  const fromLabel = campaign.message?.from?.trim() || campaign.name;
+  const inviteBody =
+    campaign.message?.body?.trim() ||
+    (isSurprise
+      ? `${fromLabel} is sending you a surprise gift. No action is required from you.`
+      : isFulfillment
+        ? 'Choose your gift using the link below.'
+        : 'Redeem your gift using the link we sent.');
+  const inviteTitle = isSurprise
+    ? `You've received a gift from ${fromLabel}!`
+    : isFulfillment
+      ? `${fromLabel} sent you a gift`
+      : `You're invited: ${campaign.name}`;
+  const companyName = tenant?.name || 'your company';
+  const giftName =
+    campaign.type === 'points' ? `${shop?.name || campaign.name} points` : kit?.name || campaign.name;
+  return {
+    isFulfillment,
+    isSurprise,
+    isSingle,
+    fromLabel,
+    inviteBody,
+    inviteTitle,
+    companyName,
+    giftName,
+    shop,
+  };
+}
+
+/** Deliver invite emails (and mark recipients invited). Safe to call once per campaign. */
+async function sendCampaignInvites(campaign, tenantId) {
+  const ctx = await buildInviteContext(campaign, tenantId);
+  if (ctx.isSingle) {
+    await notify({
+      type: 'single_location_gift',
+      tenantId,
+      email: campaign.singleLocation.email,
+      title: `${ctx.companyName} is sending gifts to ${campaign.singleLocation.name}`,
+      body: `${campaign.recipientCount} gift${campaign.recipientCount === 1 ? '' : 's'} will be shipped to the provided address.`,
+    });
+    return ctx;
+  }
+
+  const recipients = await Recipient.find({ tenantId, campaignId: campaign._id });
+  for (const r of recipients) {
+    await notify({
+      type: ctx.isSurprise ? 'surprise_gift' : 'redemption_invite',
+      tenantId,
+      email: r.email,
+      phone: r.phone || null,
+      title: ctx.inviteTitle,
+      body: ctx.inviteBody,
+      link: ctx.isSurprise ? '' : `/redeem/${r.redemptionToken}`,
+      meta: {
+        recipientName: r.name,
+        senderName: ctx.fromLabel,
+        message: ctx.inviteBody,
+        giftName: ctx.giftName,
+        companyName: ctx.companyName,
+        campaignType: campaign.type,
+        fulfillmentMode: campaign.fulfillmentMode,
+        pointsScope: campaign.pointsScope ?? 'shop',
+        shopName: ctx.shop?.name ?? '',
+        shopLogoUrl: ctx.shop?.logoUrl ?? '',
+        shopBannerTheme: ctx.shop?.bannerConfig?.theme ?? '',
+        shopBannerPreset: ctx.shop?.bannerConfig?.preset ?? '',
+        shopCurrencyMode: ctx.shop?.currencyMode ?? 'points',
+      },
+    });
+    if (!r.invitedAt) {
+      r.invitedAt = new Date();
+      await r.save();
+    }
+  }
+  return ctx;
+}
+
+async function createFulfillmentOrdersIfNeeded(campaign, tenantId) {
+  const isFulfillment = campaign.type === 'kit' || campaign.type === 'items';
+  if (!isFulfillment) return;
+
+  if (campaign.fulfillmentMode === 'surprise') {
+    const { createSurpriseOrdersForCampaign } = await import('../redemptions/redemptions.service.js');
+    await createSurpriseOrdersForCampaign({ tenantId, campaign });
+  }
+  if (campaign.fulfillmentMode === 'single') {
+    const { createSingleLocationOrderForCampaign } = await import(
+      '../redemptions/redemptions.service.js'
+    );
+    await createSingleLocationOrderForCampaign({ tenantId, campaign });
+  }
+}
+
+/**
+ * Credit deferred points + send invites for a scheduled campaign that is due.
+ * Safe to call for overdue campaigns (recovery). Idempotent via invitesSentAt.
+ */
+export async function deliverScheduledCampaign({ tenantId, campaignId, userId = null }) {
+  const campaign = await Campaign.findOne({ _id: campaignId, tenantId });
+  if (!campaign) throw new NotFoundError('Campaign not found');
+  if (campaign.schedule?.mode !== 'scheduled') {
+    throw new ApiError(422, 'Campaign is not scheduled', 'NOT_SCHEDULED');
+  }
+  if (campaign.schedule?.invitesSentAt) {
+    return withCampaignMeta(campaign);
+  }
+  if (campaign.status !== 'launched' && campaign.status !== 'redemption_open') {
+    throw new ApiError(422, 'Campaign is not ready for scheduled delivery', 'NOT_LAUNCHED');
+  }
+
+  // Credit points now (held at 0 from allocate when scheduled).
+  if (campaign.type === 'points' && campaign.creditsPerRecipient > 0) {
+    await Recipient.updateMany(
+      { tenantId, campaignId: campaign._id },
+      { creditAmount: campaign.creditsPerRecipient },
+    );
+  }
+
+  await createFulfillmentOrdersIfNeeded(campaign, tenantId);
+  const ctx = await sendCampaignInvites(campaign, tenantId);
+
+  if (campaign.status === 'launched') {
+    transitionState('campaign', campaign, 'redemption_open', { userId });
+  }
+  campaign.schedule = campaign.schedule || {};
+  campaign.schedule.invitesSentAt = new Date();
+  campaign.markModified('schedule');
+  await campaign.save();
+
+  if (campaign.kitId) {
+    await Kit.updateOne({ _id: campaign.kitId, tenantId }, { lastSentAt: new Date() });
+  }
+
+  const entity = await Entity.findOne({ _id: campaign.entityId, tenantId }).select('managerUserId');
+  if (entity?.managerUserId) {
+    await notify({
+      type: 'campaign_launched',
+      tenantId,
+      userId: entity.managerUserId,
+      title: `Scheduled send delivered: ${campaign.name}`,
+      body: ctx.isSurprise
+        ? `${campaign.recipientCount} surprise gift orders created.`
+        : ctx.isSingle
+          ? `One delivery order created for ${campaign.recipientCount} recipients.`
+          : `${campaign.recipientCount} recipients invited.`,
+      link: `/campaigns/${campaign._id}`,
+    });
+  }
+
+  return withCampaignMeta(campaign);
+}
+
+/** Poll due scheduled campaigns and deliver invites + credits (including overdue). */
+export async function processDueScheduledCampaigns({ limit = 50 } = {}) {
+  const now = new Date();
+  const due = await Campaign.find({
+    status: 'launched',
+    'schedule.mode': 'scheduled',
+    'schedule.sendAt': { $lte: now },
+    $or: [{ 'schedule.invitesSentAt': null }, { 'schedule.invitesSentAt': { $exists: false } }],
+  })
+    .setOptions({ skipTenantGuard: true })
+    .sort({ 'schedule.sendAt': 1 })
+    .limit(limit);
+
+  const results = [];
+  for (const campaign of due) {
+    try {
+      const delivered = await deliverScheduledCampaign({
+        tenantId: campaign.tenantId,
+        campaignId: campaign._id,
+      });
+      results.push({ id: String(campaign._id), ok: true, status: delivered.status });
+    } catch (err) {
+      results.push({ id: String(campaign._id), ok: false, error: err.message });
+    }
+  }
+  return results;
 }
 
 /** §7.8 /launch — idempotent wallet debit + invite notifications. */
@@ -399,19 +640,42 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
     throw new ApiError(422, 'Campaign must be approved before launch', 'CAMPAIGN_NOT_APPROVED');
   }
 
+  const scheduleMode = campaign.schedule?.mode ?? 'now';
+  const isScheduled = scheduleMode === 'scheduled';
+  const sendInvitesNow = scheduleMode === 'now';
+  const openRedemptionNow = scheduleMode !== 'scheduled';
+
+  if (isScheduled) {
+    if (!campaign.schedule?.sendAt) {
+      throw new ApiError(422, 'Scheduled campaigns require a sendAt timestamp', 'SCHEDULE_MISSING');
+    }
+  }
+
   const entity = await Entity.findOne({ _id: campaign.entityId, tenantId });
+  if (!entity) throw new NotFoundError('Entity not found');
+
   const { wallet } = await ledger.resolveSpendWalletForEntity({
     tenantId,
     entityId: campaign.entityId,
   });
-  const isFulfillment = campaign.type === 'kit' || campaign.type === 'items';
+
+  // Re-validate funds immediately before debit so Send never proceeds on a stale balance.
+  if (campaign.totalBudget > 0) {
+    await assertWalletCanSpend({
+      tenantId,
+      entityId: campaign.entityId,
+      amount: campaign.totalBudget,
+      user,
+    });
+  }
+
   const spendFromEntity = user?.scopeType === 'entity';
   if (campaign.totalBudget > 0) {
     await ledger.createTransaction({
       tenantId,
       walletId: wallet._id,
       type: 'campaign_spend',
-      amount: -campaign.totalBudget,
+      amount: -Math.round(campaign.totalBudget),
       relatedEntityId: spendFromEntity ? entity._id : null,
       description: `Campaign launch: ${campaign.name}`,
       performedBy: user.userId,
@@ -419,111 +683,44 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
   }
 
   transitionState('campaign', campaign, 'launched', { userId: user.userId });
-  transitionState('campaign', campaign, 'redemption_open', { userId: user.userId });
 
-  if (campaign.fulfillmentMode === 'surprise') {
-    if (!isFulfillment) {
-      throw new ApiError(422, 'Surprise fulfillment is only available for item and kit sends', 'SURPRISE_NOT_SUPPORTED');
-    }
-    const { createSurpriseOrdersForCampaign } = await import('../redemptions/redemptions.service.js');
-    await createSurpriseOrdersForCampaign({ tenantId, campaign });
+  if (openRedemptionNow) {
+    // Immediate / self: create fulfillment orders and open redemption now.
+    // Self mode skips emails (recipient opens link themselves).
+    await createFulfillmentOrdersIfNeeded(campaign, tenantId);
+    transitionState('campaign', campaign, 'redemption_open', { userId: user.userId });
   }
-  if (campaign.fulfillmentMode === 'single') {
-    if (!isFulfillment) {
-      throw new ApiError(422, 'Single-location fulfillment is only available for item and kit sends', 'SINGLE_NOT_SUPPORTED');
-    }
-    const { createSingleLocationOrderForCampaign } = await import('../redemptions/redemptions.service.js');
-    await createSingleLocationOrderForCampaign({ tenantId, campaign });
-  }
+  // Scheduled: stay at `launched` until sendAt — no emails, no point credit yet.
 
   await campaign.save();
-  recordUsage(tenantId, 'campaigns.launched'); // §Gap E metering
+  recordUsage(tenantId, 'campaigns.launched');
 
-  const scheduleMode = campaign.schedule?.mode ?? 'now';
-  const sendInvites = scheduleMode === 'now';
-  const fromLabel = campaign.message?.from?.trim() || campaign.name;
-  const isSurprise = campaign.fulfillmentMode === 'surprise';
-  const isSingle = campaign.fulfillmentMode === 'single';
-  const inviteBody =
-    campaign.message?.body?.trim() ||
-    (isSurprise
-      ? `${fromLabel} is sending you a surprise gift. No action is required from you.`
-      : isFulfillment
-        ? 'Choose your gift using the link below.'
-        : 'Redeem your gift using the link we sent.');
-  const inviteTitle = isSurprise
-    ? `You've received a gift from ${fromLabel}!`
-    : isFulfillment
-      ? `${fromLabel} sent you a gift`
-      : `You're invited: ${campaign.name}`;
+  if (sendInvitesNow) {
+    const ctx = await sendCampaignInvites(campaign, tenantId);
+    campaign.schedule = campaign.schedule || {};
+    campaign.schedule.invitesSentAt = new Date();
+    campaign.markModified('schedule');
+    await campaign.save();
 
-  if (sendInvites) {
-    const [tenant, kit, shop] = await Promise.all([
-      Tenant.findById(tenantId).select('name').lean(),
-      campaign.kitId ? Kit.findOne({ _id: campaign.kitId, tenantId }).select('name').lean() : null,
-      campaign.shopId
-        ? Shop.findOne({ _id: campaign.shopId, tenantId })
-          .select('name logoUrl bannerConfig currencyMode')
-          .lean()
-        : null,
-    ]);
-    const companyName = tenant?.name || 'your company';
-    const giftName = campaign.type === 'points' ? `${shop?.name || campaign.name} points` : (kit?.name || campaign.name);
-    if (isSingle) {
-      await notify({
-        type: 'single_location_gift',
-        tenantId,
-        email: campaign.singleLocation.email,
-        title: `${companyName} is sending gifts to ${campaign.singleLocation.name}`,
-        body: `${campaign.recipientCount} gift${campaign.recipientCount === 1 ? '' : 's'} will be shipped to the provided address.`,
-      });
-    } else {
-      const recipients = await Recipient.find({ tenantId, campaignId: campaign._id });
-      for (const r of recipients) {
-        await notify({
-          type: isSurprise ? 'surprise_gift' : 'redemption_invite',
-          tenantId,
-          email: r.email,
-          phone: r.phone || null,
-          title: inviteTitle,
-          body: inviteBody,
-          link: isSurprise ? '' : `/redeem/${r.redemptionToken}`,
-          meta: {
-            recipientName: r.name,
-            senderName: fromLabel,
-            message: inviteBody,
-            giftName,
-            companyName,
-            campaignType: campaign.type,
-            fulfillmentMode: campaign.fulfillmentMode,
-            pointsScope: campaign.pointsScope ?? 'shop',
-            shopName: shop?.name ?? '',
-            shopLogoUrl: shop?.logoUrl ?? '',
-            shopBannerTheme: shop?.bannerConfig?.theme ?? '',
-            shopBannerPreset: shop?.bannerConfig?.preset ?? '',
-            shopCurrencyMode: shop?.currencyMode ?? 'points',
-          },
-        });
-      }
+    if (campaign.kitId) {
+      await Kit.updateOne({ _id: campaign.kitId, tenantId }, { lastSentAt: new Date() });
     }
-  }
-
-  if (campaign.kitId) {
+    if (entity.managerUserId) {
+      await notify({
+        type: 'campaign_launched',
+        tenantId,
+        userId: entity.managerUserId,
+        title: `Campaign launched: ${campaign.name}`,
+        body: ctx.isSurprise
+          ? `${campaign.recipientCount} surprise gift orders created.`
+          : ctx.isSingle
+            ? `One delivery order created for ${campaign.recipientCount} recipients.`
+            : `${campaign.recipientCount} recipients invited.`,
+        link: `/campaigns/${campaign._id}`,
+      });
+    }
+  } else if (openRedemptionNow && campaign.kitId) {
     await Kit.updateOne({ _id: campaign.kitId, tenantId }, { lastSentAt: new Date() });
-  }
-  if (entity.managerUserId) {
-    await notify({
-      type: 'campaign_launched',
-      tenantId,
-      userId: entity.managerUserId,
-      title: `Campaign launched: ${campaign.name}`,
-      body: isSurprise
-        ? `${campaign.recipientCount} surprise gift orders created.`
-        : isSingle
-          ? `One delivery order created for ${campaign.recipientCount} recipients.`
-        : `${campaign.recipientCount} recipients invited.`,
-      link: `/campaigns/${campaign._id}`,
-    });
   }
 
   return withCampaignMeta(campaign);

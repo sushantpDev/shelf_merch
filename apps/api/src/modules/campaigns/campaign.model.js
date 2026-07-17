@@ -37,7 +37,9 @@ const campaignSchema = new mongoose.Schema(
     pointsScope: { type: String, enum: ['stadium', 'shop'], default: 'shop' },
     creditsPerRecipient: { type: Number, default: 0 }, // INR
     recipientCount: { type: Number, default: 0 }, // cached
-    totalBudget: { type: Number, default: 0 }, // creditsPerRecipient * recipientCount
+    totalBudget: { type: Number, default: 0 }, // checkout grand total charged at launch
+    /** Kit packaging chosen at send checkout — drives order amount breakdown. */
+    packaging: { type: String, enum: ['none', 'box'], default: 'none' },
     message: {
       from: { type: String, default: '' },
       body: { type: String, default: '' },
@@ -46,6 +48,8 @@ const campaignSchema = new mongoose.Schema(
       mode: { type: String, enum: ['now', 'scheduled', 'self'], default: 'now' },
       sendAt: { type: Date, default: null },
       timezone: { type: String, default: 'Asia/Kolkata' },
+      /** Set when deferred invites + point credits have been delivered. */
+      invitesSentAt: { type: Date, default: null },
     },
     status: { type: String, enum: CAMPAIGN_STATUSES, default: 'draft' },
     draftState: {
