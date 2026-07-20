@@ -1,5 +1,7 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router";
+import { CircleDollarSign, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { UiWallet } from "@/services/mappers";
 import { formatWalletAmount, walletUnallocated } from "@/lib/walletFormat";
 import walletIconImg from "../../../assets/wallet-icon.svg";
@@ -25,20 +27,21 @@ function TopbarChevron({ open }: { open: boolean }) {
 type Props = {
   wallets: UiWallet[];
   totalLabel: string;
-  currentWalletId?: string;
+  hasBudget?: boolean;
   balanceCaption?: string;
-  itemBalance?: (wallet: UiWallet) => string;
+  canRequestTopup?: boolean;
 };
 
 export function WalletBalanceMenu({
   wallets,
   totalLabel,
-  currentWalletId,
+  hasBudget = wallets.length > 0,
   balanceCaption = "Available balance",
-  itemBalance,
+  canRequestTopup = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const primaryWallet = wallets[0];
 
   useEffect(() => {
     if (!open) return;
@@ -53,16 +56,17 @@ export function WalletBalanceMenu({
     setOpen(false);
   }
 
-  function openWallet(walletId: string) {
+  function openBudget() {
     close();
-    void navigate(`/app/wallets?wallet=${encodeURIComponent(walletId)}`);
+    void navigate("/app/wallets");
   }
 
-  function openAddFunds(e: MouseEvent, walletId: string) {
+  function openTopup(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     close();
-    void navigate(`/app/wallets?wallet=${encodeURIComponent(walletId)}&addFunds=1`);
+    const walletId = primaryWallet?.id;
+    void navigate(walletId ? `/app/wallets?wallet=${encodeURIComponent(walletId)}&addFunds=1` : "/app/wallets");
   }
 
   return (
@@ -70,7 +74,7 @@ export function WalletBalanceMenu({
       <button
         type="button"
         className="topbar-wallet"
-        aria-label="Wallet balance"
+        aria-label="Organization budget"
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((v) => !v)}
@@ -79,7 +83,7 @@ export function WalletBalanceMenu({
           <img src={walletIconImg} alt="" className="topbar-wallet-img" aria-hidden="true" />
         </span>
         <span className="topbar-wallet-copy">
-          <span className="k">Wallet balance</span>
+          <span className="k">Organization budget</span>
           <span className="v">
             {totalLabel}
             <TopbarChevron open={open} />
@@ -92,45 +96,37 @@ export function WalletBalanceMenu({
           <button type="button" className="user-menu-scrim" aria-label="Close menu" onClick={close} />
           <div className="wallet-menu-panel" role="menu" onClick={(e) => e.stopPropagation()}>
             <div className="wallet-menu-body">
-              {wallets.length === 0 ? (
-                <div className="wallet-menu-empty">No wallets yet</div>
+              {!hasBudget ? (
+                <div className="wallet-menu-empty">
+                  <p className="mb-3 text-sm text-muted-foreground">No organization budget yet.</p>
+                  <Button size="sm" asChild onClick={close}>
+                    <Link to="/app/wallets" state={{ startCreateWallet: true }}>
+                      Setup budget
+                    </Link>
+                  </Button>
+                </div>
               ) : (
-                wallets.map((w) => {
-                  const selected = currentWalletId === w.id;
-                  return (
-                    <div
-                      key={w.id}
-                      className={`wallet-menu-item${selected ? " on" : ""}`}
-                      role="menuitem"
-                    >
-                      <button
-                        type="button"
-                        className="wallet-menu-item-open"
-                        onClick={() => openWallet(w.id)}
-                      >
-                        <span className="wallet-menu-item-name">{w.name}</span>
-                        <span className="wallet-menu-item-bal">
-                          {balanceCaption}:{" "}
-                          {itemBalance
-                            ? itemBalance(w)
-                            : formatWalletAmount(walletUnallocated(w), w.cur)}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className="wallet-menu-item-funds"
-                        onClick={(e) => openAddFunds(e, w.id)}
-                      >
-                        Add funds
-                      </button>
-                    </div>
-                  );
-                })
+                <div className="wallet-menu-item on" role="menuitem">
+                  <button type="button" className="wallet-menu-item-open" onClick={openBudget}>
+                    <span className="wallet-menu-item-name">Organization budget</span>
+                    <span className="wallet-menu-item-bal">
+                      {balanceCaption}:{" "}
+                      {primaryWallet
+                        ? formatWalletAmount(walletUnallocated(primaryWallet), primaryWallet.cur)
+                        : totalLabel}
+                    </span>
+                  </button>
+                  {canRequestTopup ? (
+                    <button type="button" className="wallet-menu-item-funds" onClick={openTopup}>
+                      Request top-up
+                    </button>
+                  ) : null}
+                </div>
               )}
             </div>
             <div className="wallet-menu-foot">
               <Link to="/app/wallets" className="wallet-menu-create" onClick={close}>
-                + Create wallet
+                {hasBudget ? "View budget dashboard" : "Setup budget"}
               </Link>
             </div>
           </div>

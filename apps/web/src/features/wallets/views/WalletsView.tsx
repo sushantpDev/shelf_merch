@@ -9,7 +9,7 @@ import type { WalletsScreen } from "../controllers/useWalletsController";
 export function WalletsView(screen: WalletsScreen) {
   switch (screen.kind) {
     case "loading":
-      return <LoadingState message="Loading wallets…" fullScreen={false} />;
+      return <LoadingState message="Loading budget…" fullScreen={false} />;
     case "error":
       return (
         <div className="card" style={{ padding: 16, color: "var(--danger)" }}>
@@ -41,10 +41,10 @@ export function WalletsView(screen: WalletsScreen) {
         <OrgDashboard
           account={screen.account}
           org={screen.org}
-          hasWallets={screen.hasWallets}
-          onStart={screen.onStart}
+          hasBudget={screen.hasBudget}
+          onSetup={screen.onSetup}
           onAllocate={screen.onAllocate}
-          openAddFundsOnMount={screen.openAddFundsOnMount}
+          openTopupOnMount={screen.openTopupOnMount}
         />
       );
   }

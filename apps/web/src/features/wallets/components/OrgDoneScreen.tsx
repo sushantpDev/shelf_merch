@@ -83,12 +83,11 @@ export function OrgDoneScreen({
                 <span className="wallet-submit__spark wallet-submit__spark--3" />
               </div>
               <div>
-                <h1>Wallet submitted for review</h1>
+                <h1>Funding request submitted</h1>
                 <p>
-                  Platform finance will review your PO. Once approved,{" "}
-                  <strong className="wallet-submit__hl">{inr(o.amount)}</strong> will be credited
-                  to <strong className="wallet-submit__hl">{o.name}</strong> and you can allocate
-                  funds to departments.
+                  ShelfMerch finance will review your PO. Once approved,{" "}
+                  <strong className="wallet-submit__hl">{inr(o.amount)}</strong> will be added to
+                  your organization budget and you can allocate funds to departments.
                 </p>
               </div>
             </header>
@@ -114,7 +113,7 @@ export function OrgDoneScreen({
                 onClick={onGoToDashboard}
               >
                 <Wallet size={16} strokeWidth={2} aria-hidden="true" />
-                Go to wallet dashboard
+                Go to budget dashboard
               </button>
             </div>
           </div>
@@ -132,7 +131,7 @@ export function OrgDoneScreen({
         <div>
           <h1>Allocation complete</h1>
           <p>
-            Your wallet budget is split across {depts.length} department
+            Your organization budget is split across {depts.length} department
             {depts.length === 1 ? "" : "s"}. <strong>{account}</strong> is ready to launch
             campaigns.
           </p>
@@ -144,7 +143,7 @@ export function OrgDoneScreen({
           <div className="wallet-done-stats">
             <StatCard
               icon={<Wallet size={18} />}
-              label="Wallet budget"
+              label="Organization budget"
               value={inr(o.amount)}
               meta={o.name}
               tag={<StatusTag label="Active" />}

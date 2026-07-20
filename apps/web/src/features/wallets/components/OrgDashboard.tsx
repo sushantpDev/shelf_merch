@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Wallet } from "lucide-react";
+import { ArrowDownToLine, CircleDollarSign, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { inr } from "@/components/platform/platform-ui";
 import { PageHeader } from "@/components/tenant/PageHeader";
@@ -11,63 +11,66 @@ import {
   totalAllocatedAmount,
   type OrgSnapshot,
 } from "../types";
-import { AddFundsDialog } from "./AddFundsDialog";
 import { Donut } from "./Donut";
 import { WalletHistory } from "./WalletHistory";
+import { EmptyBudgetState } from "./budget/EmptyBudgetState";
+import { RequestTopupDialog } from "./budget/RequestTopupDialog";
 
-/** Company-admin landing: merchandise wallet overview + departments table. */
+function ManagerInviteBadge({ status }: { status: "unassigned" | "pending" | "active" }) {
+  if (status === "active") {
+    return (
+      <span className="tag tag-live">
+        <span className="dot" />
+        Active
+      </span>
+    );
+  }
+  if (status === "pending") {
+    return (
+      <span className="tag tag-warn">
+        <span className="dot" />
+        Invite pending
+      </span>
+    );
+  }
+  return <span className="tag tag-draft">Not assigned</span>;
+}
+
+/** Company-admin landing: organization budget overview + departments table. */
 export function OrgDashboard({
   account,
   org,
-  hasWallets,
-  onStart,
+  hasBudget,
+  onSetup,
   onAllocate,
-  openAddFundsOnMount,
+  openTopupOnMount,
 }: {
   account: string;
   org: OrgSnapshot;
-  hasWallets: boolean;
-  onStart: () => void;
+  hasBudget: boolean;
+  onSetup: () => void;
   onAllocate: (step?: number) => void;
-  openAddFundsOnMount?: boolean;
+  openTopupOnMount?: boolean;
 }) {
   const { canWrite } = useTenantAccess();
-  const canManageWallets = canWrite("wallets");
-  const [addFundsOpen, setAddFundsOpen] = useState(false);
+  const canManageBudget = canWrite("wallets");
+  const [topupOpen, setTopupOpen] = useState(false);
   const walletId = org.wallet.id;
 
   useEffect(() => {
-    if (openAddFundsOnMount && walletId) {
-      setAddFundsOpen(true);
+    if (openTopupOnMount && walletId) {
+      setTopupOpen(true);
     }
-  }, [openAddFundsOnMount, walletId]);
+  }, [openTopupOnMount, walletId]);
 
-  if (!org.active && !hasWallets) {
+  if (!org.active && !hasBudget) {
     return (
       <>
         <PageHeader
-          title="Wallets"
-          subtitle="Create your merchandise budget wallet, then allocate funds to departments."
+          title="Budget"
+          subtitle="Set up and manage your organization's merchandise budget."
         />
-        <div className="card empty" style={{ padding: 50 }}>
-          <div className="ic" aria-hidden="true">
-            <Wallet size={34} color="var(--gray-300)" />
-          </div>
-          <h3>No merchandise wallet yet</h3>
-          <p>
-            Create your organization&apos;s merchandise budget wallet and upload a PO for finance
-            approval.
-          </p>
-          <button
-            type="button"
-            className="btn btn-brand"
-            style={{ marginTop: 16 }}
-            onClick={onStart}
-            disabled={!canManageWallets}
-          >
-            <Plus size={16} /> Create wallet
-          </button>
-        </div>
+        <EmptyBudgetState onSetup={onSetup} disabled={!canManageBudget} />
       </>
     );
   }
@@ -77,22 +80,22 @@ export function OrgDashboard({
   const total = o.amount;
   const alloc = totalAllocatedAmount(org.departments);
   const rem = o.unallocated ?? remainingWalletBalance(total, org.departments);
-  const walletLive = o.status === "active";
+  const budgetLive = o.status === "active";
   const depts = org.departments;
   const managersActive = depts.filter((d) => d.mgr.inviteStatus === "active").length;
   const managersPending = depts.filter((d) => d.mgr.inviteStatus === "pending").length;
   const canAllocate = Boolean(walletId) && !fundingPending && total > 0;
-  const needsAllocation = canAllocate && !walletLive;
+  const needsAllocation = canAllocate && !budgetLive;
 
   function handleAllocateClick() {
     if (fundingPending) {
-      toast.message("PO pending finance approval", {
-        description: "Your balance will be available after platform finance approves your PO.",
+      toast.message("Funding pending approval", {
+        description: "Your balance will be available after ShelfMerch approves your request.",
       });
       return;
     }
     if (total <= 0) {
-      toast.message("No wallet balance yet", {
+      toast.message("No budget balance yet", {
         description: "Wait for finance to approve your funding request before allocating.",
       });
       return;
@@ -103,19 +106,26 @@ export function OrgDashboard({
   return (
     <>
       <PageHeader
-        title="Wallets"
+        title="Budget"
         subtitle={`${o.name} · Organization merchandise budget · ${account}`}
         actions={
-          canManageWallets ? (
+          canManageBudget ? (
             <div className="row" style={{ gap: 8 }}>
-              {walletId && !fundingPending && (
-                <button type="button" className="btn btn-brand" onClick={() => setAddFundsOpen(true)}>
-                  <Plus size={16} /> Add funds
+              {walletId && !fundingPending ? (
+                <button type="button" className="btn btn-brand" onClick={() => setTopupOpen(true)}>
+                  <Plus size={16} /> Request top-up
                 </button>
-              )}
-              <button type="button" className="btn btn-brand" onClick={onStart}>
-                <Plus size={16} /> Create wallet
-              </button>
+              ) : null}
+              {o.fundingFileUrl ? (
+                <a
+                  href={o.fundingFileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-ghost"
+                >
+                  <ArrowDownToLine size={16} /> Download agreement
+                </a>
+              ) : null}
             </div>
           ) : undefined
         }
@@ -123,30 +133,30 @@ export function OrgDashboard({
 
       {fundingPending && (
         <div className="banner" style={{ marginBottom: 18 }}>
-          <Wallet size={16} aria-hidden="true" />
+          <CircleDollarSign size={16} aria-hidden="true" />
           <div>
-            <b>PO submitted for finance review.</b>{" "}
+            <b>Funding request submitted for review.</b>{" "}
             {o.requestedAmount ? (
               <>
-                {inr(o.requestedAmount)} will be credited to your wallet once platform finance
+                {inr(o.requestedAmount)} will be added to your organization budget once ShelfMerch
                 approves your {o.docType || "document"} {o.docNumber ? `(${o.docNumber})` : ""}.
-                After approval, use <b>Allocate funds</b> to split the budget across departments.
+                After approval, use <b>Allocate budget</b> to split funds across departments.
               </>
             ) : (
-              <>Your funding request is awaiting platform finance approval.</>
+              <>Your funding request is awaiting ShelfMerch approval.</>
             )}
           </div>
         </div>
       )}
 
-      {needsAllocation && canManageWallets && (
+      {needsAllocation && canManageBudget && (
         <div className="banner" style={{ marginBottom: 18 }}>
-          <Wallet size={16} aria-hidden="true" />
+          <CircleDollarSign size={16} aria-hidden="true" />
           <div>
-            <b>Wallet funded — allocation not finished.</b> Split your balance across departments
+            <b>Budget funded — allocation not finished.</b> Split your balance across departments
             and assign managers.{" "}
             <span className="lnk" role="button" tabIndex={0} onClick={handleAllocateClick}>
-              Allocate funds
+              Allocate budget
             </span>
           </div>
         </div>
@@ -172,36 +182,36 @@ export function OrgDashboard({
                 letterSpacing: ".04em",
               }}
             >
-              Wallet balance
+              Budget balance
             </div>
             <div className="wallet-name-title">{o.name}</div>
           </div>
           <div className="row" style={{ gap: 10, alignItems: "center" }}>
-            {walletLive ? (
+            {budgetLive ? (
               <span className="tag tag-live">
                 <span className="dot" />
                 Active
               </span>
             ) : fundingPending ? (
-              <span className="tag tag-warn">Awaiting finance</span>
+              <span className="tag tag-warn">Awaiting approval</span>
             ) : (
               <span className="tag tag-draft">Setup in progress</span>
             )}
-            {canAllocate && canManageWallets && (
+            {canAllocate && canManageBudget && (
               <button type="button" className="wallet-allocate-link" onClick={handleAllocateClick}>
-                Allocate funds
+                Allocate budget
               </button>
             )}
           </div>
         </div>
         <div className="row" style={{ alignItems: "stretch" }}>
           <div className="stat" style={{ flex: 1, padding: "18px 22px" }}>
-            <div className="k">Total wallet cash</div>
+            <div className="k">Budget balance</div>
             <div className="v num" style={{ fontSize: 26 }}>
               {inr(total)}
             </div>
             <div className="mut3" style={{ fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
-              All cash in this wallet after funding and spend
+              Total organization budget after funding and spend
             </div>
           </div>
           <div style={{ width: 1, background: "var(--line)" }} />
@@ -211,7 +221,7 @@ export function OrgDashboard({
               {inr(alloc)}
             </div>
             <div className="mut3" style={{ fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
-              Earmarked for cost-center budgets
+              Earmarked for department budgets
             </div>
           </div>
           <div style={{ width: 1, background: "var(--line)" }} />
@@ -221,13 +231,13 @@ export function OrgDashboard({
               {inr(rem)}
             </div>
             <div className="mut3" style={{ fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
-              Unallocated — pay from wallet at checkout
+              Unallocated — pay from budget at checkout
             </div>
           </div>
         </div>
         <div className="muted" style={{ fontSize: 12.5, padding: "10px 22px 14px" }}>
           <span>
-            {inr(alloc)} allocated + {inr(rem)} available = {inr(total)} total cash
+            {inr(alloc)} allocated + {inr(rem)} available = {inr(total)} total balance
           </span>
           <span style={{ margin: "0 8px" }}>·</span>
           <span>
@@ -264,12 +274,12 @@ export function OrgDashboard({
               {depts.length === 0 ? (
                 <p className="muted" style={{ fontSize: 13 }}>
                   No departments yet.{" "}
-                  {canAllocate && canManageWallets ? (
+                  {canAllocate && canManageBudget ? (
                     <span className="lnk" role="button" tabIndex={0} onClick={handleAllocateClick}>
-                      Allocate funds
+                      Allocate budget
                     </span>
                   ) : null}{" "}
-                  to add cost centers.
+                  to add departments.
                 </p>
               ) : (
                 depts.map((d, i) => (
@@ -299,7 +309,7 @@ export function OrgDashboard({
         </div>
         <div className="card" style={{ padding: 22 }}>
           <div className="stat" style={{ padding: 0, marginBottom: 14 }}>
-            <div className="k">Allocated to cost centers</div>
+            <div className="k">Allocated to departments</div>
             <div className="v num">{inr(alloc)}</div>
           </div>
           <div className="stat" style={{ padding: 0 }}>
@@ -316,25 +326,25 @@ export function OrgDashboard({
               ) : null}
             </div>
           </div>
-          {canAllocate && canManageWallets && (
+          {canAllocate && canManageBudget && (
             <button
               type="button"
               className="btn btn-ghost btn-sm"
               style={{ marginTop: 16 }}
               onClick={handleAllocateClick}
             >
-              {depts.length ? "Edit allocation" : "Allocate funds"}
+              {depts.length ? "Edit allocation" : "Allocate budget"}
             </button>
           )}
         </div>
       </div>
 
       <div className="card" style={{ padding: 22 }}>
-        <h3 style={{ fontSize: 17, marginBottom: 14 }}>Budget Allocated</h3>
+        <h3 style={{ fontSize: 17, marginBottom: 14 }}>Budget allocated</h3>
         {depts.length === 0 ? (
           <p className="muted" style={{ fontSize: 13.5 }}>
             No departments configured yet.
-            {canAllocate ? " Use Allocate funds to set up cost centers and managers." : ""}
+            {canAllocate ? " Use Allocate budget to set up departments and managers." : ""}
           </p>
         ) : (
           <table className="tbl">
@@ -396,36 +406,16 @@ export function OrgDashboard({
         )}
       </div>
 
-      {walletId && <WalletHistory walletId={walletId} />}
+      {walletId ? <WalletHistory walletId={walletId} /> : null}
 
-      {walletId && (
-        <AddFundsDialog
-          open={addFundsOpen}
-          onOpenChange={setAddFundsOpen}
+      {walletId ? (
+        <RequestTopupDialog
+          open={topupOpen}
+          onOpenChange={setTopupOpen}
           walletId={walletId}
-          walletName={o.name}
+          walletName={o.name || "Organization budget"}
         />
-      )}
+      ) : null}
     </>
   );
-}
-
-function ManagerInviteBadge({ status }: { status: "unassigned" | "pending" | "active" }) {
-  if (status === "active") {
-    return (
-      <span className="tag tag-live">
-        <span className="dot" />
-        Active
-      </span>
-    );
-  }
-  if (status === "pending") {
-    return (
-      <span className="tag tag-warn">
-        <span className="dot" />
-        Invite pending
-      </span>
-    );
-  }
-  return <span className="tag tag-draft">Not assigned</span>;
 }

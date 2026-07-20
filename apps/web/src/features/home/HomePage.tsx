@@ -70,7 +70,7 @@ function GettingStartedOnboarding() {
         <div className="home-onboarding__steps" aria-label="Onboarding progress">
           <span className="home-onboarding-step home-onboarding-step--current">
             <span className="home-onboarding-step__num">1</span>
-            Create wallet
+            Create budget
           </span>
           <LockedStepChip label="Add funds" />
           <LockedStepChip label="Create shop" />
@@ -81,11 +81,11 @@ function GettingStartedOnboarding() {
             <Wallet size={22} strokeWidth={2} />
           </span>
           <div className="home-onboarding-card__copy">
-            <h3>Create your wallet</h3>
-            <p>Your wallet is required before creating a shop or sending gifts.</p>
+            <h3>Set up your organization budget</h3>
+            <p>Your budget is required before creating a shop or sending gifts.</p>
           </div>
           <Link to="/app/wallets" state={{ startCreateWallet: true }} className="btn btn-brand">
-            Create wallet
+            Setup budget
           </Link>
         </div>
       </section>
@@ -247,11 +247,11 @@ export function HomePage() {
         <div className="home-layout__span-9">
           <div className="home-card card">
             <h2 className="home-card__title">
-              Wallets{wallets.length > 0 ? ` (${wallets.length})` : ""}
+              Budget
             </h2>
             <div className="home-wallet-grid">
               <div className="home-wallet-tile">
-                <div className="home-wallet-tile__label">{account} wallet</div>
+                <div className="home-wallet-tile__label">{account} budget</div>
                 <div className="home-wallet-tile__balance">{formatInr(remainingBalance)}</div>
                 <div className="home-wallet-tile__sub">Available to spend</div>
               </div>
@@ -271,7 +271,7 @@ export function HomePage() {
             </div>
             <div className="home-card__footer">
               <Link to="/app/wallets" className="lnk">
-                View all wallets
+                View budget
               </Link>
             </div>
           </div>
@@ -344,8 +344,8 @@ export function HomePage() {
           <span className="home-mini-card__icon">
             <Wallet size={20} strokeWidth={1.75} aria-hidden="true" />
           </span>
-          <span className="home-mini-card__label">Wallets</span>
-          <span className="home-mini-card__cta">Manage funds</span>
+          <span className="home-mini-card__label">Budget</span>
+          <span className="home-mini-card__cta">Manage funding</span>
         </Link>
       </div>
     </div>

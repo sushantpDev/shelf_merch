@@ -148,8 +148,8 @@ export function WalletHistory({
   const rows = (
     entityMode ? withEntityBudgetBalance(txns, entityIdList) : withAvailableBalance(txns)
   ).sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
-  const title = entityMode ? "Budget history" : "Wallet history";
-  const balanceColumn = entityMode ? "Remaining budget" : "Unallocated balance";
+  const title = entityMode ? "Budget history" : "Funding history";
+  const balanceColumn = entityMode ? "Remaining budget" : "Available balance";
 
   return (
     <div className="card data-list-card wallet-history">
@@ -166,11 +166,11 @@ export function WalletHistory({
           <div className="data-list-empty-icon" aria-hidden="true">
             <Wallet size={28} color="var(--brand)" />
           </div>
-          <h4>{entityMode ? "No budget activity yet" : "No wallet history yet"}</h4>
+          <h4>{entityMode ? "No budget activity yet" : "No funding history yet"}</h4>
           <p className="muted" style={{ fontSize: 13, maxWidth: 360, margin: "0 auto" }}>
             {entityMode
               ? "Allocations and campaign spend for your department will appear here."
-              : "Preload now for future campaigns. Add ₹1,00,000+ via bank transfer and get 5% bonus funds."}
+              : "Funding events and budget activity will appear here after your first top-up."}
           </p>
         </div>
       )}

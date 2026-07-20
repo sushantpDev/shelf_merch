@@ -111,14 +111,14 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
       await fund.mutateAsync({
         walletId,
         amount,
-        description: description || `PO top-up to ${walletName}`,
+        description: description || "Top-up to organization budget",
         fundingMethod: "po_upload",
         docType,
         docNumber: docNumber.trim(),
         uploadFile: uploadFile?.file,
       });
       toast.success("Funding request submitted", {
-        description: "Finance will review your PO and credit the wallet once approved.",
+        description: "Finance will review your PO and credit your budget once approved.",
       });
       onOpenChange(false);
     } catch (err) {
@@ -135,7 +135,7 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
         walletName,
         onSuccess: () => {
           toast.success("Payment received", {
-            description: `${inr(amount)} will be added to your wallet shortly.`,
+            description: `${inr(amount)} will be added to your organization budget shortly.`,
           });
           invalidateWorkspace();
           onOpenChange(false);
@@ -169,7 +169,7 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
       <DialogContent className="add-funds-modal">
         <div className="add-funds-inner">
           <div className="add-funds-scroll">
-            <p className="add-funds-eyebrow">Add wallet funds ({step}/4)</p>
+            <p className="add-funds-eyebrow">Request top-up ({step}/4)</p>
 
             {step === 1 && (
               <div className="add-funds-body add-funds-step">
@@ -290,7 +290,8 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
                 <DialogHeader className="add-funds-header">
                   <DialogTitle>Upload purchase order</DialogTitle>
                   <DialogDescription>
-                    Finance will review your document and credit your wallet once approved.
+                    Finance will review your document and credit your organization budget once
+                    approved.
                   </DialogDescription>
                 </DialogHeader>
 
@@ -374,7 +375,7 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
                       <b>UPI · Cards · Net banking</b>
                     </div>
                     <div className="add-funds-detail-row">
-                      <span>Wallet</span>
+                      <span>Budget</span>
                       <b>{walletName}</b>
                     </div>
                   </div>
@@ -382,7 +383,8 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
 
                 <p className="add-funds-brand-hint">
                   <CreditCard size={14} strokeWidth={2} aria-hidden />
-                  Funds are credited to your wallet automatically once payment is confirmed.
+                  Funds are credited to your organization budget automatically once payment is
+                  confirmed.
                 </p>
               </div>
             )}
@@ -392,7 +394,7 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
                 <DialogHeader className="add-funds-header">
                   <DialogTitle>Review and confirm</DialogTitle>
                   <DialogDescription>
-                    Check the details before adding funds to your wallet.
+                    Check the details before requesting a budget top-up.
                   </DialogDescription>
                 </DialogHeader>
 
@@ -409,7 +411,7 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
                   <p className="add-funds-brand-card-title">Summary</p>
                   <div className="add-funds-detail-rows">
                     <div className="add-funds-detail-row">
-                      <span>Wallet</span>
+                      <span>Budget</span>
                       <b>{walletName}</b>
                     </div>
                     <div className="add-funds-detail-row">

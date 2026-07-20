@@ -70,6 +70,7 @@ export type WorkspaceSnapshot = {
       pay: string;
       fundingApproval?: string;
       requestedAmount?: number;
+      fundingFileUrl?: string;
     };
     departments: ReturnType<typeof mapEntityToDept>[];
   };
@@ -159,6 +160,7 @@ function mapWalletOrgFields(
     pay: "card",
     fundingApproval: w.fundingDocument?.approvalStatus || "",
     requestedAmount: Number(w.fundingDocument?.requestedAmount ?? 0),
+    fundingFileUrl: w.fundingDocument?.fileUrl || undefined,
   };
 }
 

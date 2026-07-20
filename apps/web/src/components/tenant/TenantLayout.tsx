@@ -6,11 +6,11 @@ import { WalletBalanceMenu } from "@/components/tenant/WalletBalanceMenu";
 import { ShelfMerchLogo } from "@/components/brand/ShelfMerchLogo";
 import { getStoredUser, isAuthenticated } from "@/services/api-bridge";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { formatWalletAmount, formatWalletsTotal } from "@/lib/walletFormat";
 import {
   entityManagerBudgetRemaining,
   entityManagerDepartments,
-  spendableForWallet,
   type WorkspaceSnapshot,
 } from "@/services/workspace-api";
 import { normalizeMongoId } from "@/lib/mongoId";
@@ -45,11 +45,12 @@ function formatWalletBalance(workspace: WorkspaceSnapshot | undefined) {
 export default function TenantLayout() {
   const user = getStoredUser();
   const { data: workspace } = useWorkspace();
+  const { canWrite } = useTenantAccess();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const walletParam =
     location.pathname === "/app/wallets" ? (searchParams.get("wallet") ?? undefined) : undefined;
-  const currentWalletId = walletParam || workspace?.primaryWalletId;
+  const _currentWalletId = walletParam || workspace?.primaryWalletId;
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -78,11 +79,8 @@ export default function TenantLayout() {
     isEntityManager && entityManagerWalletIds
       ? (workspace?.wallets ?? []).filter((w) => entityManagerWalletIds.has(w.id))
       : (workspace?.wallets ?? []);
-  const walletItemBalance =
-    isEntityManager && workspace
-      ? (w: WorkspaceSnapshot["wallets"][number]) =>
-          formatWalletAmount(spendableForWallet(workspace, w.id), w.cur)
-      : undefined;
+  const hasBudget = (workspace?.wallets?.length ?? 0) > 0;
+  const canRequestTopup = canWrite("wallets") && !isEntityManager && hasBudget;
 
   return (
     <div className="tenant-shell">
@@ -95,11 +93,9 @@ export default function TenantLayout() {
           <WalletBalanceMenu
             wallets={headerWallets}
             totalLabel={walletBalance}
-            currentWalletId={currentWalletId}
+            hasBudget={hasBudget}
             balanceCaption={isEntityManager ? "Available department budget" : "Available balance"}
-            itemBalance={
-              walletItemBalance
-            }
+            canRequestTopup={canRequestTopup}
           />
           <UserMenu
             userName={userName}

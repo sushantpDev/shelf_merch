@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Gift,
   Home,
+  Landmark,
   LayoutGrid,
   LifeBuoy,
   Megaphone,
@@ -22,7 +23,6 @@ import {
   ShoppingBag,
   Store,
   Users,
-  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { getStoredUser } from "@/services/api-bridge";
@@ -36,7 +36,7 @@ const STORAGE_KEY = "shelfmerch.sidebar.expanded";
 const NAV_ICONS: Record<string, LucideIcon> = {
   home: Home,
   orders: ShoppingBag,
-  wallets: Wallet,
+  wallets: Landmark,
   shops: Store,
   swag: Shirt,
   kits: Gift,

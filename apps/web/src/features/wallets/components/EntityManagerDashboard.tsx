@@ -26,7 +26,7 @@ export function EntityManagerDashboard({
           </div>
           <h3>Budget not available yet</h3>
           <p>
-            Your company admin must finish <b>wallet allocation</b> (departments, budget split, and
+            Your company admin must finish <b>budget allocation</b> (departments, budget split, and
             manager invites) before you can launch campaigns. If you were invited by email, accept
             the invite link first.
           </p>
@@ -61,7 +61,7 @@ export function EntityManagerDashboard({
           }}
         >
           <b>Budget not allocated yet.</b> Your admin assigned you as manager, but the department
-          budget has not been saved. Ask them to open <b>Wallets → Re-allocate budget</b> and finish
+          budget has not been saved. Ask them to open <b>Budget → Allocate budget</b> and finish
           setup.
         </div>
       )}
@@ -107,8 +107,8 @@ export function EntityManagerDashboard({
 
       <div className="card" style={{ padding: "18px 22px", marginBottom: 18 }}>
         <div className="mut3" style={{ fontSize: 12 }}>
-          You can create campaigns and send gifts from this budget. Company-wide wallet settings are
-          managed by your admin.
+          You can create campaigns and send gifts from this budget. Organization-wide budget
+          settings are managed by your admin.
         </div>
       </div>
 

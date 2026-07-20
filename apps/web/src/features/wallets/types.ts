@@ -117,7 +117,7 @@ export function deptPaletteColor(index: number): string {
 }
 
 export const ORG_STEPS = [
-  "Create Wallet",
+  "Setup Budget",
   "Departments",
   "Allocate Budget",
   "Assign Managers",

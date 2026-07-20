@@ -23,15 +23,15 @@ export function Step1Wallet({ state, dispatch }: StepProps) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 22 }}>
       <div className="card" style={{ padding: 24 }}>
-        <h3 style={{ fontSize: 18, marginBottom: 4 }}>Create Merchandise Budget Wallet</h3>
+        <h3 style={{ fontSize: 18, marginBottom: 4 }}>Setup Organization Budget</h3>
         <p className="muted" style={{ fontSize: 13, marginBottom: 18 }}>
-          Set up your annual merchandise budget. Funds in this wallet power every department
-          campaign and order.
+          Create your organization&apos;s merchandise budget. Submit a Purchase Order or Agreement
+          for ShelfMerch approval — this is your single budget for all campaigns and orders.
         </p>
 
         <div className="field">
           <label className="lbl" htmlFor="org-wname">
-            Wallet name
+            Budget name
           </label>
           <input
             className="inp"
@@ -231,14 +231,14 @@ export function Step1Wallet({ state, dispatch }: StepProps) {
             style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}
           >
             <span className="lbl" style={{ margin: 0 }}>
-              Wallet summary
+              Budget summary
             </span>
             <span className="tag tag-draft">
               <span className="dot" />
               Draft
             </span>
           </div>
-          <SummaryRow label="Wallet name" value={o.name || "Untitled wallet"} />
+          <SummaryRow label="Budget name" value={o.name || "Organization budget"} />
           <SummaryRow label="Budget" value={inr(o.amount)} big />
           <SummaryRow label="Validity" value={`${fmtDate(o.start)} → ${fmtDate(o.end)}`} />
           <SummaryRow

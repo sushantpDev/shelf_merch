@@ -72,7 +72,7 @@ export const TENANT_NAV: TenantNavItem[] = [
     match: (pathname) => pathname === "/app" || pathname === "/app/",
   },
   { area: "orders", key: "orders", label: "Orders", href: "/app/orders" },
-  { area: "wallets", key: "wallets", label: "Wallets", href: "/app/wallets" },
+  { area: "wallets", key: "wallets", label: "Budget", href: "/app/wallets" },
   { area: "shops", key: "shops", label: "Shops", href: "/app/shops" },
   { area: "swag", key: "swag", label: "Swag", href: "/app/swag" },
   { area: "kits", key: "kits", label: "Kits", href: "/app/kits" },

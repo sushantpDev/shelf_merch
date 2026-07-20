@@ -63,7 +63,7 @@ export function OrgWizard({
   function validateWalletStep(): boolean {
     const w = state.wallet;
     if (!w.name.trim()) {
-      toast.error("Enter a wallet name");
+      toast.error("Enter a budget name");
       return false;
     }
     if (w.amount <= 0) {
@@ -116,7 +116,7 @@ export function OrgWizard({
       if (isWalletFlow) {
         const result = await createWallet.mutateAsync(state);
         dispatch({ type: "finished", walletId: result.walletId, invites: [] });
-        toast.success("Wallet submitted — finance will review your PO");
+        toast.success("Budget submitted — finance will review your funding request");
         onFinished();
         return;
       }
@@ -140,7 +140,7 @@ export function OrgWizard({
   if (busy) {
     return (
       <LoadingState
-        message={isWalletFlow ? "Creating wallet…" : "Saving allocation setup…"}
+        message={isWalletFlow ? "Setting up budget…" : "Saving allocation setup…"}
         fullScreen={false}
       />
     );
@@ -171,13 +171,13 @@ export function OrgWizard({
             }}
             onClick={onExit}
           >
-            <ArrowLeft size={15} /> Back to wallet dashboard
+            <ArrowLeft size={15} /> Back to budget dashboard
           </button>
-          <h1>{isWalletFlow ? "Create wallet" : "Allocate funds"}</h1>
+          <h1>{isWalletFlow ? "Setup budget" : "Allocate budget"}</h1>
           <div className="sub">
             {isWalletFlow
-              ? `${account} · set up your merchandise budget and submit PO for finance review.`
-              : `${account} · split your wallet balance across departments and assign managers.`}
+              ? `${account} · submit a Purchase Order or Agreement to fund your organization budget.`
+              : `${account} · split your organization budget across departments and assign managers.`}
           </div>
         </div>
       </div>
@@ -257,13 +257,13 @@ export function OrgWizard({
           <div className="modal-pad">
             <DialogHeader>
               <DialogTitle style={{ fontSize: 20, fontFamily: "var(--disp)" }}>
-                {isWalletFlow ? "Submit wallet for review?" : "Finish allocation?"}
+                {isWalletFlow ? "Submit budget for review?" : "Finish allocation?"}
               </DialogTitle>
               <DialogDescription className="muted" style={{ fontSize: 14, margin: "8px 0 0" }}>
                 {isWalletFlow ? (
                   <>
-                    Create <b>{state.wallet.name}</b> ({inr(state.wallet.amount)}) and send your PO
-                    to finance for approval.
+                    Submit <b>{state.wallet.name}</b> ({inr(state.wallet.amount)}) funding request
+                    and send your PO to ShelfMerch for approval.
                   </>
                 ) : (
                   <>

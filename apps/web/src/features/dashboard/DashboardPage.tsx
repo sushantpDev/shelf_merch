@@ -21,7 +21,7 @@ import {
   Sparkles,
   Store,
   Users,
-  Wallet,
+  Landmark,
 } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { ShopBanner } from "@/features/shops/banner";
@@ -86,7 +86,7 @@ const WHY_CARDS = [
 ] as const;
 
 const SHORTCUTS = [
-  { label: "Wallets", body: "Manage budgets & funds", href: "/app/wallets", icon: Wallet, tone: "blue" },
+  { label: "Budget", body: "Manage organization budget & funding", href: "/app/wallets", icon: Landmark, tone: "blue" },
   { label: "Shops", body: "Create & manage your shops", href: "/app/shops", icon: Store, tone: "green" },
   { label: "Catalog", body: "Browse 5,000+ products", href: "/app/catalog", icon: Gift, tone: "orange" },
   { label: "Orders", body: "Track orders & deliveries", href: "/app/orders", icon: Box, tone: "purple" },
@@ -104,7 +104,7 @@ const FALLBACK_SEND_ITEMS = [
 const QUICK_TIPS = [
   {
     title: "Quick tip",
-    body: "You can create multiple wallets for different departments or campaigns.",
+    body: "Your organization has one budget — allocate portions to departments as needed.",
     icon: Lightbulb,
     tone: "peach",
   },
@@ -116,7 +116,7 @@ const QUICK_TIPS = [
   },
   {
     title: "Admin control",
-    body: "Only admins can manage wallets, members and approvals.",
+    body: "Only admins can manage the organization budget, members and approvals.",
     icon: Users,
     tone: "sky",
   },
@@ -367,11 +367,11 @@ function OnboardingDashboard({ catalogProducts }: { catalogProducts: UiProduct[]
         <div className="dash-setup__copy">
           <span className="dash-setup__eyebrow"><Sparkles size={14} /> Let's get started</span>
           <h1>Set up your gifting workspace</h1>
-          <p>Create your wallet to unlock your gifting journey.</p>
+          <p>Set up your organization budget to unlock your gifting journey.</p>
           <Link to="/app/wallets" state={{ startCreateWallet: true }} className="dash-setup__cta">
             <span className="dash-setup__cta-shine" aria-hidden="true" />
-            <Wallet size={20} aria-hidden="true" />
-            Create wallet
+            <Landmark size={20} aria-hidden="true" />
+            Setup budget
             <ArrowRight size={20} aria-hidden="true" />
           </Link>
           <div className="dash-setup__trust">
@@ -475,22 +475,29 @@ function StartDesigningCard() {
   );
 }
 
-function WalletsSection({ account, wallets, mainBalance }: { account: string; wallets: Array<{ id: string; name: string; balance: number }>; mainBalance: number }) {
+function BudgetSection({ account, mainBalance, hasBudget }: { account: string; mainBalance: number; hasBudget: boolean }) {
   return (
     <section className="dash-card card dash-wallets-card">
-      <SectionHead title={`Wallets (${wallets.length})`} action={<Link to="/app/wallets" className="dash-inline-action">View all wallets <ArrowRight size={14} /></Link>} />
+      <SectionHead title="Organization budget" action={<Link to="/app/wallets" className="dash-inline-action">View budget <ArrowRight size={14} /></Link>} />
       <div className="dash-wallet-preview-grid">
-        <Link to="/app/wallets" className="dash-wallet-mini" aria-label={`${account} wallet balance ${formatInr(mainBalance)}`}>
-          <span className="dash-wallet-mini__icon"><Wallet size={18} aria-hidden="true" /></span>
-          <span className="dash-wallet-mini__name">{account} Wallet <ChevronRight size={14} aria-hidden="true" /></span>
+        <Link to="/app/wallets" className="dash-wallet-mini" aria-label={`${account} available budget ${formatInr(mainBalance)}`}>
+          <span className="dash-wallet-mini__icon"><Landmark size={18} aria-hidden="true" /></span>
+          <span className="dash-wallet-mini__name">{account} budget <ChevronRight size={14} aria-hidden="true" /></span>
           <strong>{formatInr(mainBalance)}</strong>
           <small>Available to spend</small>
           <i />
         </Link>
-        <Link to="/app/wallets" state={{ startCreateWallet: true }} className="dash-wallet-create">
-          <span>+</span>
-          Create new wallet
-        </Link>
+        {!hasBudget ? (
+          <Link to="/app/wallets" state={{ startCreateWallet: true }} className="dash-wallet-create">
+            <span>+</span>
+            Setup budget
+          </Link>
+        ) : (
+          <Link to="/app/wallets?addFunds=1" className="dash-wallet-create">
+            <span>+</span>
+            Request top-up
+          </Link>
+        )}
       </div>
     </section>
   );
@@ -539,7 +546,7 @@ function ExistingDashboard({
   senderCount,
   activeShopCount,
   mainBalance,
-  wallets,
+  hasBudget,
   pinnedShop,
   canCreateShop,
   isEntityManager,
@@ -549,7 +556,7 @@ function ExistingDashboard({
   senderCount: number;
   activeShopCount: number;
   mainBalance: number;
-  wallets: Array<{ id: string; name: string; balance: number }>;
+  hasBudget: boolean;
   pinnedShop: DashboardShop | null;
   canCreateShop: boolean;
   isEntityManager: boolean;
@@ -561,7 +568,7 @@ function ExistingDashboard({
           <MetricCard label="Gifts Sent" value={senderCount} iconSrc={metricGiftsIcon} artSrc={metricArtGifts} tone="violet" href="/app/kits" cta="Go to kits" />
           <MetricCard label="People Reached" value={memberCount} iconSrc={metricPeopleIcon} artSrc={metricArtPeople} tone="blue" href="/app/orders" cta="Go to orders" />
           <MetricCard label="Active Shops" value={activeShopCount} iconSrc={metricShopsIcon} artSrc={metricArtShops} tone="green" href="/app/shops" cta="Go to shops" />
-          <MetricCard label="Budget Used" value={formatInr(mainBalance)} iconSrc={metricBudgetIcon} artSrc={metricArtBudget} tone="amber" href="/app/wallets" cta="Go to wallets" />
+          <MetricCard label="Available budget" value={formatInr(mainBalance)} iconSrc={metricBudgetIcon} artSrc={metricArtBudget} tone="amber" href="/app/wallets" cta="Go to budget" />
         </div>
         <WorkspaceSettingsCard preview />
       </section>
@@ -569,7 +576,7 @@ function ExistingDashboard({
   
 
       <section className="dash-existing-main">
-        <div className="dash-existing-main__wallets"><WalletsSection account={account} wallets={wallets} mainBalance={mainBalance} /></div>
+        <div className="dash-existing-main__wallets"><BudgetSection account={account} mainBalance={mainBalance} hasBudget={hasBudget} /></div>
         <div className="dash-existing-main__video"><VideoCard wide /></div>
       </section>
 
@@ -649,7 +656,7 @@ export function DashboardPage() {
           activeShopCount={activeShopCount}
           senderCount={senderCount}
           mainBalance={mainBalance}
-          wallets={wallets}
+          hasBudget={wallets.length > 0}
           pinnedShop={pinnedShop}
           canCreateShop={canCreateShop}
           isEntityManager={isEntityManager}

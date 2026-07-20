@@ -22,10 +22,10 @@ export type WalletsScreen =
       kind: "dashboard";
       account: string;
       org: OrgSnapshot;
-      hasWallets: boolean;
-      onStart: () => void;
+      hasBudget: boolean;
+      onSetup: () => void;
       onAllocate: (step?: number) => void;
-      openAddFundsOnMount: boolean;
+      openTopupOnMount: boolean;
     };
 
 /**
@@ -50,15 +50,17 @@ export function useWalletsController(): WalletsScreen {
   if (isError || !workspace) {
     return {
       kind: "error",
-      message: error instanceof Error ? error.message : "Could not load wallets",
+      message: error instanceof Error ? error.message : "Could not load budget",
     };
   }
 
   const { account } = workspace;
   const org = orgForWallet(workspace, walletId);
   const role = workspace.userPatch.role;
+  const hasBudget = workspace.wallets.length > 0;
 
-  function startNewWallet() {
+  function startBudgetSetup() {
+    if (hasBudget) return;
     dispatch(seedNewWizard());
     setInWizard(true);
   }
@@ -97,9 +99,9 @@ export function useWalletsController(): WalletsScreen {
     kind: "dashboard",
     account,
     org,
-    hasWallets: workspace.wallets.length > 0,
-    onStart: startNewWallet,
+    hasBudget,
+    onSetup: startBudgetSetup,
     onAllocate: startAllocateFunds,
-    openAddFundsOnMount: addFunds === "1",
+    openTopupOnMount: addFunds === "1",
   };
 }
