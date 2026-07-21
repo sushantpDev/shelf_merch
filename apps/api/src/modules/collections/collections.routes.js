@@ -201,6 +201,16 @@ router.post(
 
 const mockupMetaItem = z.object({
   catalogProductId: objectId,
+  // Konva placement baked into this mockup — stored so live colour previews
+  // can reproduce the exact artwork position.
+  placement: z
+    .object({
+      xPct: z.number().finite(),
+      yPct: z.number().finite(),
+      wPct: z.number().finite(),
+      rot: z.number().finite(),
+    })
+    .optional(),
 });
 
 // Upload pre-baked product mockups (one PNG per catalog product in the collection).
@@ -223,12 +233,15 @@ router.post(
       throw new ApiError(400, 'Mockup file count does not match metadata', 'MOCKUP_COUNT_MISMATCH');
     }
     for (let i = 0; i < files.length; i++) {
-      const { catalogProductId } = meta[i];
+      const { catalogProductId, placement } = meta[i];
       const { url } = await uploadFile({ tenantId: req.tenantId, kind: 'mockup', file: files[i] });
       const ref = collection.productRefs.find(
         (r) => String(r.catalogProductId) === String(catalogProductId),
       );
-      if (ref) ref.mockupUrl = url;
+      if (ref) {
+        ref.mockupUrl = url;
+        if (placement) ref.placement = placement;
+      }
     }
     collection.markModified('productRefs');
     await collection.save();

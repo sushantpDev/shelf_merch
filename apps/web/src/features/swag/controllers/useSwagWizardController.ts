@@ -88,7 +88,14 @@ export function useSwagWizardController(): SwagWizardVm {
         .map((i, idx) => {
           const cp = catalog[i];
           if (!cp?.id || !baked[idx]) return null;
-          return { catalogProductId: cp.id, dataUrl: baked[idx] };
+          // Persist the Konva placement so live colour-tinted previews match
+          // the baked mockup exactly.
+          const placement = draft.placements[cp.id || `idx${idx}`];
+          return {
+            catalogProductId: cp.id,
+            dataUrl: baked[idx],
+            ...(placement ? { placement } : {}),
+          };
         })
         .filter((m): m is { catalogProductId: string; dataUrl: string } => m !== null);
 

@@ -30,13 +30,18 @@ function LiveArtworkComposite({
   product,
   base,
   overlay,
+  savedPlacement,
 }: {
   product: UiProduct;
   base: string;
   overlay: string;
+  savedPlacement?: Placement | null;
 }) {
   const [artAspect, setArtAspect] = useState(1);
-  const placement = useMemo(() => defaultPlacement(product, artAspect), [product, artAspect]);
+  const placement = useMemo(
+    () => savedPlacement ?? defaultPlacement(product, artAspect),
+    [savedPlacement, product, artAspect],
+  );
 
   return (
     <div className="img img-mockup" style={{ position: "relative" }}>
@@ -66,14 +71,19 @@ function MaskArtworkComposite({
   mask,
   overlay,
   tintHex,
+  savedPlacement,
 }: {
   product: UiProduct;
   mask: string;
   overlay: string;
   tintHex: string;
+  savedPlacement?: Placement | null;
 }) {
   const [artAspect, setArtAspect] = useState(1);
-  const placement = useMemo(() => defaultPlacement(product, artAspect), [product, artAspect]);
+  const placement = useMemo(
+    () => savedPlacement ?? defaultPlacement(product, artAspect),
+    [savedPlacement, product, artAspect],
+  );
 
   return (
     <div className="img img-mockup" style={{ position: "relative" }}>
@@ -99,8 +109,11 @@ function MaskArtworkComposite({
 }
 
 /**
- * Saved-design thumbnail: prefer a stored baked mockup when available, then a
- * live product + artwork composite, then the catalog base image.
+ * Saved-design thumbnail. The baked Konva mockup (uploaded at the artwork step)
+ * is the source of truth for the default look — it is preferred whenever
+ * present. Live compositing remains for tinted colour variants (using the
+ * saved placement so the artwork sits exactly where the user put it) and for
+ * products that never got a bake.
  */
 export function DesignedProductThumb({
   product,
@@ -128,16 +141,35 @@ export function DesignedProductThumb({
     productThumbUrl(product, false) ||
     productThumbUrl(product, true);
 
+  const isDefaultTint =
+    !tintHex || tintHex.toLowerCase() === DEFAULT_MOCKUP_TINT_HEX.toLowerCase();
+  const savedPlacement = product.placement ?? null;
+
   const inner =
-    overlay && resolvedMask ? (
+    baked && isDefaultTint ? (
+      <div className="img img-mockup">
+        <img
+          src={baked}
+          alt={product.nm}
+          loading="lazy"
+          style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+        />
+      </div>
+    ) : overlay && resolvedMask ? (
       <MaskArtworkComposite
         product={product}
         mask={resolvedMask}
         overlay={overlay}
         tintHex={tintHex}
+        savedPlacement={savedPlacement}
       />
     ) : overlay && maskStage ? (
-      <LiveArtworkComposite product={product} base={maskStage} overlay={overlay} />
+      <LiveArtworkComposite
+        product={product}
+        base={maskStage}
+        overlay={overlay}
+        savedPlacement={savedPlacement}
+      />
     ) : baked ? (
       <div className="img img-mockup">
         <img
@@ -193,6 +225,7 @@ export function storeProductAsUi(p: {
   maskImageUrl?: string;
   baseImageUrl?: string;
   mockupUrl?: string;
+  placement?: UiProduct["placement"];
   printAreas?: UiProduct["printAreas"];
   primaryImageUrl?: string;
   imageUrls?: string[];
@@ -214,6 +247,7 @@ export function storeProductAsUi(p: {
     imgUrl: mask || base,
     photoUrl: photo,
     mockupUrl: p.mockupUrl,
+    placement: p.placement,
     printAreas: p.printAreas,
   };
 }

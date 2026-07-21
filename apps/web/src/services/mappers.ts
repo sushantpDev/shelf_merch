@@ -44,6 +44,8 @@ export type UiProduct = {
   maskImageUrl?: string;
   /** Pre-baked design mockup served to shop/storefront. */
   mockupUrl?: string;
+  /** Saved artwork placement from the design wizard (matches the baked mockup). */
+  placement?: { xPct: number; yPct: number; wPct: number; rot: number };
   /** Super-admin design zones — artwork is clipped to the first matching area. */
   printAreas?: UiPrintArea[];
   variants?: Array<{ size?: string; color?: string; colorHex?: string; material?: string; sku?: string }>;
@@ -308,8 +310,20 @@ export function mapProductRef(ref: ApiProduct, catalogById?: Map<string, UiProdu
     imgUrl,
     maskImageUrl: resolveMediaUrl(ref.maskImageUrl) || fromCatalog?.maskImageUrl,
     mockupUrl: resolveMediaUrl(ref.mockupUrl),
+    placement: mapPlacement((ref as { placement?: unknown }).placement),
     printAreas: fromCatalog?.printAreas,
   };
+}
+
+/** Validate a stored artwork placement — all four numbers or nothing. */
+export function mapPlacement(
+  raw: unknown,
+): { xPct: number; yPct: number; wPct: number; rot: number } | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const p = raw as Record<string, unknown>;
+  const nums = [p.xPct, p.yPct, p.wPct, p.rot].map(Number);
+  if (nums.some((n) => !Number.isFinite(n))) return undefined;
+  return { xPct: nums[0], yPct: nums[1], wPct: nums[2], rot: nums[3] };
 }
 
 export function mapShop(s: ApiProduct): UiShop {

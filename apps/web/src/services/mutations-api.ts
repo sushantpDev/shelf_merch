@@ -383,14 +383,15 @@ export async function uploadCollectionArtworkApi(collectionId: string, file: Fil
   return mapCollection(col);
 }
 
-type MockupUploadItem = { catalogProductId: string; dataUrl: string };
+type MockupPlacement = { xPct: number; yPct: number; wPct: number; rot: number };
+type MockupUploadItem = { catalogProductId: string; dataUrl: string; placement?: MockupPlacement };
 
 export async function uploadCollectionMockupsApi(
   collectionId: string,
   items: MockupUploadItem[],
   catalogById?: Map<string, UiProduct>,
 ) {
-  const meta: Array<{ catalogProductId: string }> = [];
+  const meta: Array<{ catalogProductId: string; placement?: MockupPlacement }> = [];
   const form = new FormData();
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
@@ -398,7 +399,10 @@ export async function uploadCollectionMockupsApi(
     const res = await fetch(item.dataUrl);
     const blob = await res.blob();
     form.append("mockups", new File([blob], `mockup-${i}.png`, { type: blob.type || "image/png" }));
-    meta.push({ catalogProductId: item.catalogProductId });
+    meta.push({
+      catalogProductId: item.catalogProductId,
+      ...(item.placement ? { placement: item.placement } : {}),
+    });
   }
   if (!meta.length) return null;
   form.append("meta", JSON.stringify(meta));

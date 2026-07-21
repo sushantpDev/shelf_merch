@@ -10,6 +10,13 @@ const productRefSchema = new mongoose.Schema(
     group: String,
     /** Pre-baked design mockup (mask + artwork) — served to shop/storefront as-is. */
     mockupUrl: { type: String, default: '' },
+    /** Konva artwork placement (% of the square stage) — lets live colour
+     *  previews match the baked mockup exactly. */
+    placement: {
+      type: { xPct: Number, yPct: Number, wPct: Number, rot: Number },
+      default: null,
+      _id: false,
+    },
   },
   { _id: false },
 );

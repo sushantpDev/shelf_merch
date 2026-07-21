@@ -173,4 +173,32 @@ describe('collection mockup uploads', () => {
     const storefront = await request(app).get(`/api/v1/storefront/${shop._id}`);
     expect(storefront.body.products[0].mockupUrl).toBe(res.body.productRefs[0].mockupUrl);
   });
+
+  it('persists the Konva placement with the mockup and serves it to the storefront', async () => {
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    const placement = { xPct: 42.5, yPct: 31, wPct: 28, rot: -7.5 };
+    const res = await request(app)
+      .post(`/api/v1/collections/${collection._id}/mockups`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .field('meta', JSON.stringify([{ catalogProductId: String(product._id), placement }]))
+      .attach('mockups', png, { filename: 'mockup.png', contentType: 'image/png' });
+    expect(res.status).toBe(200);
+    expect(res.body.productRefs[0].placement).toMatchObject(placement);
+
+    const shop = await Shop.create({
+      tenantId: tenant._id,
+      name: 'Placement Shop',
+      status: 'live',
+      selectedCatalogProductIds: [product._id],
+    });
+    await Collection.updateOne(
+      { _id: collection._id, tenantId: tenant._id },
+      { $set: { shopId: shop._id, shopIds: [shop._id] } },
+    );
+    const storefront = await request(app).get(`/api/v1/storefront/${shop._id}`);
+    expect(storefront.body.products[0].placement).toMatchObject(placement);
+  });
 });

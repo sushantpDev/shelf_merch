@@ -19,6 +19,7 @@ export function mapBrandedListing(col, ref, base) {
     group: ref.group ?? base.group,
     artworkUrl: col.artworkUrl || '',
     mockupUrl: ref.mockupUrl || '',
+    placement: ref.placement ?? null,
     preferredColors: col.preferredColors || [],
   };
 }
