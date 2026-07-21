@@ -1,0 +1,77 @@
+import type { ReactNode } from "react";
+import { DesignedProductThumb } from "./DesignedProductThumb";
+import type { UiCollection, UiProduct } from "@/services/mappers";
+
+function colorSwatches(p: UiProduct) {
+  const hexes: string[] = [];
+  if (p.colorHexByName) {
+    for (const h of Object.values(p.colorHexByName)) {
+      if (h && !hexes.includes(h)) hexes.push(h);
+    }
+  }
+  if (!hexes.length && p.variants) {
+    for (const v of p.variants) {
+      if (v.colorHex && !hexes.includes(v.colorHex)) hexes.push(v.colorHex);
+    }
+  }
+  if (!hexes.length && p.colors) {
+    for (const c of p.colors) if (!hexes.includes(c)) hexes.push(c);
+  }
+  return hexes.slice(0, 5);
+}
+
+/** Horizontal collection card: header + all product cards in a scrollable row. */
+export function CollectionInlineCard({
+  collection,
+  actions,
+  subtitle,
+}: {
+  collection: UiCollection;
+  actions?: ReactNode;
+  subtitle?: string;
+}) {
+  const defaultSub = `${collection.code ? `${collection.code} · ` : ""}${collection.products.length} ${
+    collection.products.length === 1 ? "item" : "items"
+  }`;
+
+  return (
+    <article className="swag-col-card card">
+      <div className="swag-col-card-head">
+        <div className="swag-col-card-info">
+          <h3 className="swag-col-card-name">{collection.name}</h3>
+          <span className="swag-col-card-sub muted">{subtitle ?? defaultSub}</span>
+        </div>
+        {actions ? <div className="swag-col-card-actions">{actions}</div> : null}
+      </div>
+
+      <div className="swag-col-card-products">
+        {collection.products.map((p, i) => {
+          const swatches = colorSwatches(p);
+          return (
+            <div key={`${p.id ?? p.nm}-${i}`} className="swag-col-pcard">
+              <div className="swag-col-pcard-img">
+                <DesignedProductThumb product={p} artworkUrl={collection.artworkUrl} />
+              </div>
+              <div className="swag-col-pcard-meta">
+                {swatches.length > 0 ? (
+                  <div className="swag-col-pcard-colors">
+                    {swatches.map((hex) => (
+                      <span
+                        key={hex}
+                        className="swag-col-pcard-swatch"
+                        style={{ background: hex }}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                {p.brand ? <div className="swag-col-pcard-brand">{p.brand}</div> : null}
+                <div className="swag-col-pcard-name">{p.nm}</div>
+                {p.price ? <div className="swag-col-pcard-price">{p.price}</div> : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </article>
+  );
+}

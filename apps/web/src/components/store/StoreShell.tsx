@@ -1247,33 +1247,13 @@ export default function StoreShell({
   }, [products, searchQuery]);
 
   const { featuredProducts, remainingProducts } = useMemo(() => {
-    const featuredIds = (shop.featuredCatalogProductIds || []).map(String).filter(Boolean);
-    if (!featuredIds.length) {
-      return {
-        featuredProducts: filteredBySearch.slice(0, 5),
-        remainingProducts: filteredBySearch.slice(5),
-      };
-    }
-    const byCatalogId = new Map(
-      filteredBySearch.map((p) => [String(p.catalogProductId || p._id), p] as const),
-    );
-    const featured: typeof filteredBySearch = [];
-    for (const id of featuredIds) {
-      const hit = byCatalogId.get(id);
-      if (hit) featured.push(hit);
-    }
-    if (!featured.length) {
-      return {
-        featuredProducts: filteredBySearch.slice(0, 5),
-        remainingProducts: filteredBySearch.slice(5),
-      };
-    }
-    const featuredKeys = new Set(featured.map((p) => p._id));
+    // Featured picks UI is temporarily disabled — always show 5 most recently added
+    // (API returns products newest-first via collection publish / created time).
     return {
-      featuredProducts: featured,
-      remainingProducts: filteredBySearch.filter((p) => !featuredKeys.has(p._id)),
+      featuredProducts: filteredBySearch.slice(0, 5),
+      remainingProducts: filteredBySearch.slice(5),
     };
-  }, [filteredBySearch, shop.featuredCatalogProductIds]);
+  }, [filteredBySearch]);
 
   const userInitials = recipientName
     ? recipientName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)

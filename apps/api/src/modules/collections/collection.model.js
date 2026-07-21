@@ -27,6 +27,16 @@ const collectionSchema = new mongoose.Schema(
     preferredColors: { type: [String], default: [] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     isShopSpecific: { type: Boolean, default: false },
+    /** Per-shop publish metadata (collection remains global). */
+    shopPublish: {
+      type: [
+        {
+          shopId: { type: mongoose.Schema.Types.ObjectId, ref: 'Shop' },
+          publishedAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true },
 );

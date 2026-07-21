@@ -24,6 +24,8 @@ export type UpdateShopInput = {
   bannerConfig?: Record<string, unknown>;
   selectedCatalogProductIds?: string[];
   featuredCatalogProductIds?: string[];
+  activeListingKeys?: string[];
+  featuredListingKeys?: string[];
 };
 
 export type ShopReport = {
@@ -84,6 +86,18 @@ export function useArchiveShop() {
   const invalidate = useInvalidateWorkspace();
   return useMutation({
     mutationFn: (shopId: string) => archiveShopApi(shopId),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUnpublishCollectionFromShop() {
+  const invalidate = useInvalidateWorkspace();
+  return useMutation({
+    mutationFn: ({ collectionId, shopId }: { collectionId: string; shopId: string }) =>
+      apiFetch<unknown>(`/collections/${collectionId}/unpublish`, {
+        method: "POST",
+        body: JSON.stringify({ shopId }),
+      }),
     onSuccess: () => invalidate(),
   });
 }

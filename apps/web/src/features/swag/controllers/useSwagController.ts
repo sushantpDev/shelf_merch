@@ -3,85 +3,60 @@ import { useNavigate } from "react-router";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { mergeCatalogProductDetails } from "@/services/mappers";
-import type { UiCollection, UiProduct } from "../model";
-import type { DesignTarget } from "../ProductDetailDialog";
-import type { AddToShopTarget } from "../AddToShopDialog";
+import type { UiCollection, UiShop } from "../model";
 
-export type SwagTab = "All Products" | "Saved Designs" | "Archived";
-export type SwagView = "product" | "collection";
-
-export type DesignEntry = { collection: UiCollection; product: UiProduct; pIdx: number };
+export type SwagTab = "Collections" | "Archived";
 
 export type SwagVm = {
   isLoading: boolean;
   errorMessage: string | null;
   canDesignSwag: boolean;
   canManageSwag: boolean;
-  canAddToShop: boolean;
+  canPublish: boolean;
   tab: SwagTab;
-  view: SwagView;
-  shown: UiCollection[];
-  designEntries: DesignEntry[];
+  collections: UiCollection[];
+  shops: UiShop[];
+  shopNameById: Map<string, string>;
   empty: boolean;
-  design: DesignTarget | null;
-  addTarget: AddToShopTarget | null;
+  viewCollection: UiCollection | null;
+  publishCollection: UiCollection | null;
   onSelectTab: (tab: SwagTab) => void;
-  onSetView: (view: SwagView) => void;
   onStartDesigning: () => void;
-  onOpenDesign: (target: DesignTarget) => void;
-  onCloseDesign: () => void;
-  onSetAddTarget: (target: AddToShopTarget | null) => void;
-  onEditDesign: () => void;
-  onViewCatalog: (productId: string) => void;
-  onDesignAddToShop: (target: DesignTarget) => void;
+  onViewCollection: (col: UiCollection | null) => void;
+  onPublishCollection: (col: UiCollection | null) => void;
 };
 
-/** Controller for the swag library: tab/view state, design + add-to-shop dialogs. */
+/** Controller for the Swag collection management module. */
 export function useSwagController(): SwagVm {
   const { data: workspace, isLoading, isError, error } = useWorkspace();
   const { canWrite } = useTenantAccess();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<SwagTab>("All Products");
-  const [view, setView] = useState<SwagView>("product");
-  const [design, setDesign] = useState<DesignTarget | null>(null);
-  const [addTarget, setAddTarget] = useState<AddToShopTarget | null>(null);
+  const [tab, setTab] = useState<SwagTab>("Collections");
+  const [viewCollection, setViewCollection] = useState<UiCollection | null>(null);
+  const [publishCollection, setPublishCollection] = useState<UiCollection | null>(null);
+
+  const catalogProducts = workspace?.catalogProducts ?? [];
+  const shops = workspace?.shops ?? [];
+
+  const shopNameById = useMemo(
+    () => new Map(shops.map((s) => [s.id, s.name])),
+    [shops],
+  );
+
+  const allCollections = useMemo(() => {
+    return (workspace?.collections ?? []).map((col) => ({
+      ...col,
+      products: col.products.map((p) => mergeCatalogProductDetails(p, catalogProducts)),
+    }));
+  }, [workspace?.collections, catalogProducts]);
 
   const collections = useMemo(
-    () => (workspace?.collections ?? []).filter((c) => !c.isShopSpecific),
-    [workspace?.collections],
+    () =>
+      tab === "Archived"
+        ? allCollections.filter((c) => c.status === "archived")
+        : allCollections.filter((c) => c.status !== "archived"),
+    [allCollections, tab],
   );
-  const active = collections.filter((c) => c.status !== "archived");
-  const archived = collections.filter((c) => c.status === "archived");
-  const catalogProducts = workspace?.catalogProducts ?? [];
-
-  const enrichCollection = (col: UiCollection): UiCollection => ({
-    ...col,
-    products: col.products.map((p) => mergeCatalogProductDetails(p, catalogProducts)),
-  });
-
-  const shown = useMemo(
-    () => (tab === "Archived" ? archived : active).map(enrichCollection),
-    [tab, archived, active, catalogProducts],
-  );
-
-  const designEntries = useMemo<DesignEntry[]>(() => {
-    const seen = new Set<string>();
-    const out: DesignEntry[] = [];
-    for (const col of shown) {
-      col.products.forEach((p, i) => {
-        const key = `${p.id || ""}|${col.artworkUrl || ""}|${p.nm}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        out.push({ collection: col, product: p, pIdx: i });
-      });
-    }
-    return out;
-  }, [shown]);
-
-  function onSelectTab(t: SwagTab) {
-    setTab(t);
-    setView(t === "All Products" ? "product" : "collection");
-  }
 
   return {
     isLoading: isLoading && !workspace,
@@ -93,25 +68,17 @@ export function useSwagController(): SwagVm {
         : null,
     canDesignSwag: canWrite("swag"),
     canManageSwag: canWrite("swag"),
-    canAddToShop: canWrite("shops"),
+    canPublish: canWrite("shops"),
     tab,
-    view,
-    shown,
-    designEntries,
-    empty: shown.length === 0,
-    design,
-    addTarget,
-    onSelectTab,
-    onSetView: setView,
+    collections,
+    shops,
+    shopNameById,
+    empty: collections.length === 0,
+    viewCollection,
+    publishCollection,
+    onSelectTab: setTab,
     onStartDesigning: () => navigate("/app/swag/new"),
-    onOpenDesign: setDesign,
-    onCloseDesign: () => setDesign(null),
-    onSetAddTarget: setAddTarget,
-    onEditDesign: () => navigate("/app/swag/new"),
-    onViewCatalog: (productId) => navigate(`/app/catalog/${productId}`),
-    onDesignAddToShop: (t) => {
-      setDesign(null);
-      setAddTarget({ collection: t.collection, product: t.product });
-    },
+    onViewCollection: setViewCollection,
+    onPublishCollection: setPublishCollection,
   };
 }

@@ -125,7 +125,7 @@ export function UserMenu({
                 </span>
               </button>
 
-              <button
+              {/* <button
                 type="button"
                 className="user-menu-ws"
                 role="menuitem"
@@ -138,9 +138,9 @@ export function UserMenu({
                   <User size={16} strokeWidth={2} />
                 </span>
                 <span className="user-menu-ws-label">Personal Workspace</span>
-              </button>
+              </button> */}
 
-              <button
+              {/* <button
                 type="button"
                 className="user-menu-create"
                 onClick={() => {
@@ -149,7 +149,7 @@ export function UserMenu({
                 }}
               >
                 + Create new workspace
-              </button>
+              </button> */}
             </div>
 
             <div className="user-menu-foot">

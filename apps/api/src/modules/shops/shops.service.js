@@ -4,6 +4,7 @@ import { Recipient } from '../campaigns/recipient.model.js';
 import { Order } from '../orders/order.model.js';
 import { ApiError, NotFoundError } from '../../utils/errors.js';
 import { ensureUniqueShopSlug, slugifyShopName } from '../../utils/shopSlug.js';
+import { syncShopCatalogVisibility, syncActiveListingKeys } from './shopCatalogSync.js';
 
 async function backfillShopSlug(shop) {
   if (shop.slug?.trim()) return shop;
@@ -50,14 +51,44 @@ export async function createShop({ tenantId, data }) {
 export async function updateShop({ tenantId, shopId, patch }) {
   const shop = await getShop({ tenantId, shopId });
   const before = shop.toObject();
-  const { status: _ignored, slug: slugPatch, currencyMode: _currencyIgnored, ...rest } = patch; // publish endpoint owns status; currency is permanent
+  const {
+    status: _ignored,
+    slug: slugPatch,
+    currencyMode: _currencyIgnored,
+    selectedCatalogProductIds,
+    featuredCatalogProductIds,
+    activeListingKeys,
+    featuredListingKeys,
+    ...rest
+  } = patch; // publish endpoint owns status; currency is permanent
   Object.assign(shop, rest);
   if (slugPatch != null && String(slugPatch).trim()) {
     shop.slug = await ensureUniqueShopSlug(Shop, slugPatch, shop._id);
   } else if (!shop.slug?.trim()) {
     shop.slug = await ensureUniqueShopSlug(Shop, shop.name, shop._id);
   }
-  await shop.save();
+  let saved = false;
+  if (activeListingKeys !== undefined) {
+    await syncActiveListingKeys(shop, tenantId, activeListingKeys);
+    saved = true;
+  } else if (selectedCatalogProductIds !== undefined) {
+    await syncShopCatalogVisibility(shop, tenantId, selectedCatalogProductIds);
+    saved = true;
+  }
+  if (featuredListingKeys !== undefined) {
+    if (!Array.isArray(shop.activeListingKeys)) shop.activeListingKeys = [];
+    const active = new Set(shop.activeListingKeys.map(String));
+    shop.featuredListingKeys = featuredListingKeys.filter((k) => active.has(String(k)));
+    await shop.save();
+    saved = true;
+  } else if (featuredCatalogProductIds !== undefined) {
+    shop.featuredCatalogProductIds = featuredCatalogProductIds;
+    await shop.save();
+    saved = true;
+  }
+  if (!saved) {
+    await shop.save();
+  }
   return { before, shop };
 }
 

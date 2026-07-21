@@ -34,6 +34,8 @@ function shopPublicPayload(shop) {
     bannerImageUrl: shop.bannerConfig?.imageUrl || '',
     currencyMode: shop.currencyMode,
     featuredCatalogProductIds: (shop.featuredCatalogProductIds || []).map(String),
+    featuredListingKeys: (shop.featuredListingKeys || []).map(String),
+    activeListingKeys: (shop.activeListingKeys || []).map(String),
   };
 }
 

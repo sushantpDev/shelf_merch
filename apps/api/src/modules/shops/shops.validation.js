@@ -31,6 +31,8 @@ export const updateShopSchema = z
     categories: z.array(z.string().min(1)),
     selectedCatalogProductIds: z.array(objectId).optional(),
     featuredCatalogProductIds: z.array(objectId).optional(),
+    activeListingKeys: z.array(z.string().min(1)).optional(),
+    featuredListingKeys: z.array(z.string().min(1)).optional(),
   })
   .partial();
 

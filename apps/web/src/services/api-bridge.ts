@@ -16,6 +16,7 @@ import {
   createCollectionApi,
   createKitApi,
   ensureCuratedKitApi,
+  updateCollectionApi,
   updateKitApi,
   uploadCollectionArtworkApi,
   uploadCollectionMockupsApi,
@@ -267,6 +268,8 @@ export async function updateShopFlow(
     bannerConfig?: Record<string, unknown>;
     selectedCatalogProductIds?: string[];
     featuredCatalogProductIds?: string[];
+    activeListingKeys?: string[];
+    featuredListingKeys?: string[];
   },
 ) {
   return updateShopApi(shopId, payload);
@@ -415,6 +418,17 @@ export async function createCollectionFlow(payload: {
   mockups?: Array<{ catalogProductId: string; dataUrl: string }>;
 }) {
   return createCollectionApi(payload);
+}
+
+export async function updateCollectionFlow(payload: {
+  collectionId: string;
+  name: string;
+  pickedIndices: number[];
+  catalog: UiProduct[];
+  artwork?: { file?: File; preview?: string; name?: string };
+  mockups?: Array<{ catalogProductId: string; dataUrl: string }>;
+}) {
+  return updateCollectionApi(payload);
 }
 
 export async function updateCollectionArtworkFlow(payload: {

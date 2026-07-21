@@ -1,45 +1,44 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import type { UiProduct, UiShop } from "@/services/mappers";
+import type { UiShop } from "@/services/mappers";
 import { ProductThumb } from "./ProductThumb";
 import { useUpdateShop } from "./model";
-import { catalogProductKey } from "./types";
+import { activeListingKeysForShop, type ShopListing } from "./shopListings";
 
 /** Pick products for the shop landing “Featured Products” row. */
 export function FeaturedPicksDialog({
   shop,
-  products,
+  listings,
   open,
   onOpenChange,
 }: {
   shop: UiShop;
-  products: UiProduct[];
+  listings: ShopListing[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const updateShop = useUpdateShop();
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
-  const enabledIds = useMemo(
-    () => new Set((shop.selectedCatalogProductIds || []).map(String)),
-    [shop.selectedCatalogProductIds],
+  const listingKeys = useMemo(() => new Set(listings.map((l) => l.key)), [listings]);
+
+  const enabledKeys = useMemo(
+    () => new Set(activeListingKeysForShop(shop, listingKeys)),
+    [shop.activeListingKeys, shop.selectedCatalogProductIds, listingKeys],
   );
 
   const eligible = useMemo(
-    () =>
-      products
-        .map((p, i) => ({ p, key: catalogProductKey(p, i) }))
-        .filter(({ key }) => enabledIds.has(key)),
-    [products, enabledIds],
+    () => listings.filter((l) => enabledKeys.has(l.key)),
+    [listings, enabledKeys],
   );
 
   useEffect(() => {
     if (open) {
-      const saved = (shop.featuredCatalogProductIds || []).filter((id) => enabledIds.has(id));
-      setPicked(new Set(saved));
+      const saved = (shop.featuredListingKeys || []).filter((k) => enabledKeys.has(k));
+      setPicked(new Set(saved.length ? saved : []));
     }
-  }, [open, shop.featuredCatalogProductIds, enabledIds]);
+  }, [open, shop.featuredListingKeys, enabledKeys]);
 
   function toggle(key: string) {
     setPicked((prev) => {
@@ -51,11 +50,11 @@ export function FeaturedPicksDialog({
   }
 
   async function save() {
-    const ids = [...picked].filter((id) => !id.startsWith("demo:"));
+    const featuredListingKeys = [...picked].filter((k) => enabledKeys.has(k));
     try {
       await updateShop.mutateAsync({
         shopId: shop.id,
-        input: { featuredCatalogProductIds: ids },
+        input: { featuredListingKeys },
       });
       toast.success("Featured picks updated");
       onOpenChange(false);
@@ -74,7 +73,7 @@ export function FeaturedPicksDialog({
               Choose products to highlight in the Featured Products section of{" "}
               <b>{shop.name}</b>.
             </p>
-            {enabledIds.size === 0 ? (
+            {enabledKeys.size === 0 ? (
               <div className="sm-catalog-modal-warn">
                 Enable products in Edit Catalog first, then pick featured items here.
               </div>
@@ -88,22 +87,24 @@ export function FeaturedPicksDialog({
                   No eligible products yet.
                 </p>
               ) : (
-                eligible.map(({ p, key }) => {
-                  const on = picked.has(key);
+                eligible.map((l) => {
+                  const on = picked.has(l.key);
                   return (
                     <button
-                      key={key}
+                      key={l.key}
                       type="button"
                       className={`pcard sm-catalog-product${on ? " on" : ""}`}
                       aria-pressed={on}
-                      onClick={() => toggle(key)}
+                      onClick={() => toggle(l.key)}
                     >
                       <div className={`sm-catalog-check${on ? " on" : ""}`}>{on ? "✓" : ""}</div>
-                      <ProductThumb product={p} />
+                      <ProductThumb product={l.product} branded />
                       <div className="meta">
-                        {p.brand ? <div className="brand">{p.brand}</div> : null}
-                        <div className="nm">{p.nm}</div>
-                        <div className="pr">{p.price || ""}</div>
+                        {l.product.brand ? <div className="brand">{l.product.brand}</div> : null}
+                        <div className="nm">{l.product.nm}</div>
+                        <div className="sm-catalog-collection-label">Collection</div>
+                        <div className="sm-catalog-collection-name">{l.collectionName}</div>
+                        <div className="pr">{l.product.price || ""}</div>
                       </div>
                     </button>
                   );
@@ -124,7 +125,7 @@ export function FeaturedPicksDialog({
               <button
                 type="button"
                 className="btn btn-brand"
-                disabled={updateShop.isPending || enabledIds.size === 0}
+                disabled={updateShop.isPending || enabledKeys.size === 0}
                 onClick={save}
               >
                 {updateShop.isPending ? "Saving…" : "Save changes"}

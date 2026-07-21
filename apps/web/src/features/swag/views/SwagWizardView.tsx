@@ -3,9 +3,11 @@ import { WizardChrome } from "../wizard/WizardChrome";
 import { NameStep } from "../wizard/NameStep";
 import { CatalogStep } from "../wizard/CatalogStep";
 import { ArtworkStep } from "../wizard/ArtworkStep";
+import { AddToShopStep } from "../wizard/AddToShopStep";
 import type { SwagWizardVm } from "../controllers/useSwagWizardController";
+import type { SwagDraft } from "../swagDraft";
 
-const STEPS = ["Collection", "Products", "Artwork"];
+const STEPS = ["Collection", "Products", "Artwork", "Add to shop"];
 
 /** Design-swag wizard shell; all state and actions come from the controller. */
 export function SwagWizardView(vm: SwagWizardVm) {
@@ -14,11 +16,11 @@ export function SwagWizardView(vm: SwagWizardVm) {
   if (vm.isLoading) {
     return <LoadingState message="Loading catalog…" fullScreen={false} />;
   }
-  if (vm.isGenerating) {
-    return <LoadingState message="Generating designs…" fullScreen={false} />;
+  if (vm.isWorking) {
+    return <LoadingState message="Generating and publishing…" fullScreen={false} />;
   }
 
-  const backLink = (label: string, step: 0 | 1) => (
+  const backLink = (label: string, step: SwagDraft["step"]) => (
     <button
       type="button"
       className="lnk"
@@ -92,7 +94,7 @@ export function SwagWizardView(vm: SwagWizardVm) {
                 disabled={!draft.picked.length}
                 onClick={() => vm.onStep(2)}
               >
-                Add artwork
+                Add Products
               </button>
             </div>
           </div>
@@ -107,11 +109,56 @@ export function SwagWizardView(vm: SwagWizardVm) {
     );
   }
 
+  if (draft.step === 2) {
+    return (
+      <WizardChrome
+        title="Design swag"
+        steps={STEPS}
+        activeIndex={2}
+        onExit={vm.onExit}
+        exitLabel="Back to my swag"
+        footer={
+          <>
+            <div className="row" style={{ gap: 12, alignItems: "center" }}>
+              <b style={{ fontSize: 15 }}>{draft.name}</b>
+              <span className="tag tag-soft" style={{ fontWeight: 700 }}>
+                {vm.pickedProducts.length} item{vm.pickedProducts.length === 1 ? "" : "s"} selected
+              </span>
+            </div>
+            <div className="row" style={{ gap: 12, alignItems: "center" }}>
+              {backLink("Back to products", 1)}
+              <button
+                type="button"
+                className="btn btn-brand"
+                disabled={!draft.art}
+                onClick={() => vm.onStep(3)}
+              >
+                Add Artwork
+              </button>
+            </div>
+          </>
+        }
+      >
+        <ArtworkStep
+          products={vm.pickedProducts}
+          previousUploads={vm.previousUploads}
+          art={draft.art}
+          placements={draft.placements}
+          placementEpoch={draft.placementEpoch}
+          onSetArt={(art) => dispatch({ type: "setArt", art })}
+          onClearArt={() => dispatch({ type: "clearArt" })}
+          onResetPlacements={() => dispatch({ type: "resetPlacements" })}
+          onPlacementChange={(key, placement) => dispatch({ type: "setPlacement", key, placement })}
+        />
+      </WizardChrome>
+    );
+  }
+
   return (
     <WizardChrome
       title="Design swag"
       steps={STEPS}
-      activeIndex={2}
+      activeIndex={3}
       onExit={vm.onExit}
       exitLabel="Back to my swag"
       footer={
@@ -119,33 +166,36 @@ export function SwagWizardView(vm: SwagWizardVm) {
           <div className="row" style={{ gap: 12, alignItems: "center" }}>
             <b style={{ fontSize: 15 }}>{draft.name}</b>
             <span className="tag tag-soft" style={{ fontWeight: 700 }}>
-              {vm.pickedProducts.length} item{vm.pickedProducts.length === 1 ? "" : "s"} selected
+              {vm.pickedProducts.length} item{vm.pickedProducts.length === 1 ? "" : "s"}
             </span>
+            {vm.pickedShops.size > 0 ? (
+              <span className="tag tag-live">
+                <span className="dot" />
+                {vm.pickedShops.size} {vm.pickedShops.size === 1 ? "shop" : "shops"}
+              </span>
+            ) : null}
           </div>
           <div className="row" style={{ gap: 12, alignItems: "center" }}>
-            {backLink("Back to products", 1)}
+            {backLink("Back to artwork", 2)}
             <button
               type="button"
               className="btn btn-brand"
-              disabled={!draft.art}
-              onClick={vm.onGenerate}
+              disabled={vm.isWorking || vm.pickedShops.size === 0 || !draft.art}
+              onClick={vm.onPublish}
             >
-              Generate designs
+              Publish
             </button>
           </div>
         </>
       }
     >
-      <ArtworkStep
+      <AddToShopStep
+        collectionName={draft.name}
         products={vm.pickedProducts}
-        previousUploads={vm.previousUploads}
-        art={draft.art}
-        placements={draft.placements}
-        placementEpoch={draft.placementEpoch}
-        onSetArt={(art) => dispatch({ type: "setArt", art })}
-        onClearArt={() => dispatch({ type: "clearArt" })}
-        onResetPlacements={() => dispatch({ type: "resetPlacements" })}
-        onPlacementChange={(key, placement) => dispatch({ type: "setPlacement", key, placement })}
+        artworkPreview={draft.art?.preview}
+        shops={vm.shops}
+        picked={vm.pickedShops}
+        onToggle={vm.onToggleShop}
       />
     </WizardChrome>
   );

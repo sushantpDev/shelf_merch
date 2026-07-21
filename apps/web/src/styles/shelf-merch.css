@@ -1049,6 +1049,34 @@ select.inp{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http
 .sw-art-reset {
   margin-top: -4px;
 }
+.sw-art-shop-scroll {
+  --sw-art-pick-row-height: 68px;
+  max-height: calc(var(--sw-art-pick-row-height) * 4 + 12px);
+}
+.sw-art-shop-row {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.sw-art-shop-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  flex: none;
+  color: var(--ink-2);
+}
+.sw-art-pick-row.on .sw-art-shop-icon {
+  background: rgba(26, 127, 55, 0.08);
+  border-color: var(--brand);
+  color: var(--brand);
+}
 .sw-art-alert {
   grid-column: 2;
   grid-row: 1;
@@ -3580,6 +3608,49 @@ a.shop-collection-cell:hover{background:var(--gray-100)}
   .shop-catalog-panel-grid{grid-template-columns:1fr}
   .shop-catalog-panel-art{order:-1}
   .shop-catalog-panel-art img{max-width:200px}
+}
+
+.shop-catalog-editor{
+  margin-top:18px;
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  background:#fff;
+  overflow:visible;
+}
+.shop-catalog-editor-inner{
+  max-height:none !important;
+  overflow:visible;
+}
+.shop-catalog-editor-title{
+  margin:0;
+  font-size:17px;
+  font-weight:700;
+  color:var(--ink);
+}
+.shop-catalog-editor-body{
+  min-height:0;
+  max-height:none;
+  overflow:visible;
+}
+.shop-catalog-editor .sm-catalog-modal-main{
+  overflow:visible;
+  min-height:0;
+}
+.shop-catalog-editor-grid{
+  max-height:none;
+  overflow:visible;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+}
+@media (max-width:1100px){
+  .shop-catalog-editor-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:720px){
+  .shop-catalog-editor-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+.shop-catalog-editor-empty{
+  padding:32px 24px;
+  font-size:14px;
+  text-align:center;
 }
 .swag-design-card .img{position:relative}
 .swag-design-card--product-view{cursor:default}
@@ -13384,3 +13455,67 @@ tr:hover .camp-avatar {
     position: static;
   }
 }
+
+.shop-collection-cover-img{width:100%;height:100%;object-fit:contain;display:block}
+.shop-collection-badges{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.shop-collection-date{font-size:11px}
+.shop-collection-card-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.sm-catalog-collection-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8a939c;margin-top:6px}
+.sm-catalog-collection-name{font-size:12px;font-weight:600;color:#3a4550;margin-bottom:4px;line-height:1.3}
+
+.swag-collections-grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px}
+.swag-collection-card{cursor:default}
+.swag-collection-card:hover{transform:none}
+.swag-shop-chips{margin-top:10px}
+.swag-shop-chips-label{display:block;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
+.swag-shop-chips-list{display:flex;flex-wrap:wrap;gap:6px}
+.swag-shop-chip{
+  display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;
+  font-size:11px;font-weight:600;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line-2);
+}
+
+.swag-col-list{display:flex;flex-direction:column;gap:18px}
+.swag-col-card{padding:0;overflow:hidden}
+.swag-col-card-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:14px;
+  padding:16px 20px 12px;flex-wrap:wrap;
+}
+.swag-col-card-info{min-width:0}
+.swag-col-card-name{margin:0;font-size:15px;font-weight:700;line-height:1.3;color:var(--ink)}
+.swag-col-card-sub{font-size:12px;margin-top:2px}
+.swag-col-card-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.swag-col-card-chips{display:flex;gap:5px;flex-wrap:wrap}
+.btn-danger-ghost{color:var(--danger)}
+.btn-danger-ghost:hover{background:rgba(220,38,38,.08)}
+.swag-col-card-products{
+  display:flex;gap:14px;padding:0 20px 16px;overflow-x:auto;
+  scrollbar-width:thin;
+}
+.swag-col-card-products::-webkit-scrollbar{height:6px}
+.swag-col-card-products::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:3px}
+.swag-col-pcard{
+  flex:0 0 190px;width:190px;
+  border:1px solid var(--line-2);border-radius:var(--r);overflow:hidden;background:#fff;
+}
+.swag-col-pcard-img{
+  aspect-ratio:1;background:var(--surface-2);overflow:hidden;
+}
+.swag-col-pcard-img .img,
+.swag-col-pcard-img .img img:not(.art-overlay-img){width:100%;height:100%;object-fit:contain;display:block}
+.swag-col-pcard-meta{padding:10px 12px 12px}
+.swag-col-pcard-colors{display:flex;gap:4px;margin-bottom:6px}
+.swag-col-pcard-swatch{
+  width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,0,0,.12);flex:none;
+}
+.swag-col-pcard-brand{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:2px}
+.swag-col-pcard-name{font-size:13px;font-weight:600;color:var(--ink);line-height:1.3}
+.swag-col-pcard-price{font-size:13px;color:var(--ink);margin-top:2px}
+.swag-publish-shop-list{display:flex;flex-direction:column;gap:8px;max-height:min(360px,50vh);overflow:auto}
+.swag-publish-shop-row{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line-2);
+  border-radius:var(--r);cursor:pointer;transition:background .12s,border-color .12s;
+}
+.swag-publish-shop-row:hover{background:var(--surface-2)}
+.swag-publish-shop-row.on{border-color:var(--brand);background:rgba(26,127,55,.06)}
+.swag-publish-shop-row input{flex:none;width:16px;height:16px;cursor:pointer}
+.swag-publish-shop-name{flex:1;font-weight:600;font-size:13.5px;color:var(--ink)}

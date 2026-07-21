@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { collectionLinkedToShop, SHOP_TABS, shopTabFromSearch, type ShopTab } from "../types";
+import { publishedShopListings } from "../shopListings";
 import {
   clearShopCelebration,
   peekShopCelebration,
@@ -17,6 +18,7 @@ export type ShopDetailVm = {
   shop: UiShop | null;
   collections: UiCollection[];
   catalogProducts: UiProduct[];
+  shopListings: ReturnType<typeof publishedShopListings>;
   tab: ShopTab;
   visibleTabs: ShopTab[];
   canEditShop: boolean;
@@ -65,6 +67,16 @@ export function useShopDetailController(): ShopDetailVm {
       shop ? (workspace?.collections ?? []).filter((c) => collectionLinkedToShop(c, shop.id)) : [],
     [workspace?.collections, shop],
   );
+  const shopListings = useMemo(
+    () =>
+      shop
+        ? publishedShopListings(
+            (workspace?.collections ?? []).filter((c) => collectionLinkedToShop(c, shop.id)),
+            workspace?.catalogProducts ?? [],
+          )
+        : [],
+    [workspace?.collections, workspace?.catalogProducts, shop],
+  );
 
   useEffect(() => {
     if (!welcomeParam) return;
@@ -111,6 +123,7 @@ export function useShopDetailController(): ShopDetailVm {
     shop,
     collections,
     catalogProducts: workspace?.catalogProducts ?? [],
+    shopListings,
     tab,
     visibleTabs,
     canEditShop,

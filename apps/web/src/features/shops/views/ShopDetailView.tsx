@@ -133,7 +133,7 @@ export function ShopDetailView(vm: ShopDetailVm) {
         />
       )}
       {vm.tab === "Shop Catalog" && (
-        <ShopCatalogTab shop={shop} products={vm.catalogProducts} canEditShop={vm.canEditShop} />
+        <ShopCatalogTab shop={shop} listings={vm.shopListings} canEditShop={vm.canEditShop} />
       )}
       {vm.tab === "Sent Gifts" && (
         <SentGiftsTab

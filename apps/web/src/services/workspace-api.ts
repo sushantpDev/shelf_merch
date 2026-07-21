@@ -603,6 +603,8 @@ export async function updateShopApi(
     categories?: string[];
     selectedCatalogProductIds?: string[];
     featuredCatalogProductIds?: string[];
+    activeListingKeys?: string[];
+    featuredListingKeys?: string[];
   },
 ) {
   const shop = await apiFetch<unknown>(`/shops/${shopId}`, {

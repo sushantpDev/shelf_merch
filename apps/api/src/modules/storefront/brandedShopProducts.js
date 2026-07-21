@@ -1,6 +1,8 @@
 import { Collection } from '../collections/collection.model.js';
 import { collectionsForShopFilter } from '../collections/collectionQueries.js';
 import { CatalogProduct } from '../catalog/catalogProduct.model.js';
+import { bootstrapActiveListingKeys } from '../shops/shopCatalogSync.js';
+import { listingKey } from '../shops/listingKeys.js';
 
 export const CATALOG_SELECT =
   'name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas';
@@ -11,9 +13,10 @@ export function mapBrandedListing(col, ref, base) {
   const collectionId = String(col._id);
   return {
     ...base,
-    _id: `${collectionId}:${catalogProductId}`,
+    _id: listingKey(collectionId, catalogProductId),
     catalogProductId,
     collectionId,
+    collectionName: col.name || '',
     name: ref.name || base.name,
     brand: ref.brand ?? base.brand,
     group: ref.group ?? base.group,
@@ -43,26 +46,40 @@ export async function loadShopCollections(shop, { skipTenantGuard = true } = {})
     status: { $ne: 'archived' },
   })
     .setOptions(skipTenantGuard ? { skipTenantGuard: true } : undefined)
-    .select('productRefs artworkUrl preferredColors')
+    .select('name productRefs artworkUrl preferredColors shopPublish createdAt')
     .lean();
 }
 
+/** Prefer shop publish time, then collection createdAt — newer first. */
+function collectionRecencyMs(col, shopId) {
+  const shopKey = String(shopId);
+  const published = (col.shopPublish || []).find((p) => String(p.shopId) === shopKey)?.publishedAt;
+  const raw = published || col.createdAt || 0;
+  const ms = new Date(raw).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 /**
- * Public shop listings: one entry per active Branded Swag design that is also
- * enabled in Shop Catalog (`selectedCatalogProductIds`). Empty selection = none.
+ * Public shop listings: published collections × products that are marked active
+ * on this shop (`activeListingKeys`).
  */
 export async function buildBrandedProductListings(shop, { skipTenantGuard = true } = {}) {
-  const allowed = new Set((shop.selectedCatalogProductIds || []).map(String).filter(Boolean));
-  if (!allowed.size) return [];
+  await bootstrapActiveListingKeys(shop, shop.tenantId);
+
+  const activeKeys = new Set((shop.activeListingKeys || []).map(String).filter(Boolean));
+  if (!activeKeys.size) return [];
 
   const collections = await loadShopCollections(shop, { skipTenantGuard });
   const catalogIds = [];
   for (const col of collections) {
     for (const ref of col.productRefs || []) {
-      if (ref.catalogProductId) catalogIds.push(String(ref.catalogProductId));
+      const catalogProductId = ref.catalogProductId ? String(ref.catalogProductId) : '';
+      if (!catalogProductId) continue;
+      const key = listingKey(col._id, catalogProductId);
+      if (activeKeys.has(key)) catalogIds.push(catalogProductId);
     }
   }
-  const uniqueIds = [...new Set(catalogIds)].filter((id) => allowed.has(id));
+  const uniqueIds = [...new Set(catalogIds)];
   if (!uniqueIds.length) return [];
 
   const catalogRows = await CatalogProduct.find({
@@ -77,17 +94,33 @@ export async function buildBrandedProductListings(shop, { skipTenantGuard = true
 
   const products = [];
   for (const col of collections) {
-    for (const ref of col.productRefs || []) {
+    const recency = collectionRecencyMs(col, shop._id);
+    const refs = col.productRefs || [];
+    // Walk refs newest-last so within a collection the last-added product ranks higher.
+    for (let i = 0; i < refs.length; i++) {
+      const ref = refs[i];
       const catalogProductId = ref.catalogProductId ? String(ref.catalogProductId) : '';
-      if (!catalogProductId || !allowed.has(catalogProductId)) continue;
+      if (!catalogProductId) continue;
+      const key = listingKey(col._id, catalogProductId);
+      if (!activeKeys.has(key)) continue;
       const base = catalogById.get(catalogProductId);
       if (!base) continue;
-      products.push(mapBrandedListing(col, ref, base));
+      products.push({
+        ...mapBrandedListing(col, ref, base),
+        _recency: recency,
+        _refIndex: i,
+      });
     }
   }
 
-  products.sort((a, b) => String(a.name).localeCompare(String(b.name)));
-  return products;
+  // Most recently published/added first (featured default takes the first 5).
+  products.sort((a, b) => {
+    if (b._recency !== a._recency) return b._recency - a._recency;
+    if (b._refIndex !== a._refIndex) return b._refIndex - a._refIndex;
+    return String(a.name).localeCompare(String(b.name));
+  });
+
+  return products.map(({ _recency, _refIndex, ...rest }) => rest);
 }
 
 export function mockupUrlFromCollections(collections, collectionId, catalogProductId) {

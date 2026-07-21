@@ -3,7 +3,7 @@ import type { Placement } from "./mockup-bake";
 export type ArtFile = { preview: string; name: string; file?: File };
 
 export type SwagDraft = {
-  step: 0 | 1 | 2;
+  step: 0 | 1 | 2 | 3;
   name: string;
   picked: number[];
   art: ArtFile | null;
@@ -21,13 +21,14 @@ export const INITIAL_SWAG_DRAFT: SwagDraft = {
 };
 
 export type SwagAction =
-  | { type: "setStep"; step: 0 | 1 | 2 }
+  | { type: "setStep"; step: 0 | 1 | 2 | 3 }
   | { type: "setName"; name: string }
   | { type: "togglePick"; index: number }
   | { type: "setArt"; art: ArtFile }
   | { type: "clearArt" }
   | { type: "setPlacement"; key: string; placement: Placement }
-  | { type: "resetPlacements" };
+  | { type: "resetPlacements" }
+  | { type: "hydrate"; draft: SwagDraft };
 
 export function swagDraftReducer(state: SwagDraft, action: SwagAction): SwagDraft {
   switch (action.type) {
@@ -61,6 +62,8 @@ export function swagDraftReducer(state: SwagDraft, action: SwagAction): SwagDraf
         placements: {},
         placementEpoch: (state.placementEpoch ?? 0) + 1,
       };
+    case "hydrate":
+      return action.draft;
     default:
       return state;
   }

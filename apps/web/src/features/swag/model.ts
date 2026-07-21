@@ -5,8 +5,10 @@ import {
   createCollectionFlow,
   deleteCollectionFlow,
   restoreCollectionFlow,
+  updateCollectionFlow,
   updateCollectionArtworkFlow,
 } from "@/services/api-bridge";
+import { apiFetch } from "@/services/api";
 import { useInvalidateWorkspace } from "@/hooks/useWorkspace";
 import type { UiCollection, UiProduct } from "@/services/mappers";
 
@@ -27,6 +29,21 @@ export function useCreateCollection() {
   const invalidate = useInvalidateWorkspace();
   return useMutation({
     mutationFn: (input: CreateCollectionInput) => createCollectionFlow(input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateCollection() {
+  const invalidate = useInvalidateWorkspace();
+  return useMutation({
+    mutationFn: (input: {
+      collectionId: string;
+      name: string;
+      pickedIndices: number[];
+      catalog: UiProduct[];
+      artwork?: { file?: File; preview?: string; name?: string };
+      mockups?: Array<{ catalogProductId: string; dataUrl: string }>;
+    }) => updateCollectionFlow(input),
     onSuccess: () => invalidate(),
   });
 }
@@ -72,6 +89,18 @@ export function useAddProductToShop() {
       product: UiProduct;
       catalog: UiProduct[];
     }) => addProductToShopFlow(payload),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useSyncCollectionPublish() {
+  const invalidate = useInvalidateWorkspace();
+  return useMutation({
+    mutationFn: ({ collectionId, shopIds }: { collectionId: string; shopIds: string[] }) =>
+      apiFetch<unknown>(`/collections/${collectionId}/publish`, {
+        method: "POST",
+        body: JSON.stringify({ shopIds }),
+      }),
     onSuccess: () => invalidate(),
   });
 }

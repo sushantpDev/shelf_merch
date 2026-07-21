@@ -417,6 +417,46 @@ export async function linkCollectionToShopApi(collectionId: string, shopId: stri
   return mapCollection(col);
 }
 
+export async function updateCollectionApi(payload: {
+  collectionId: string;
+  name: string;
+  pickedIndices: number[];
+  catalog: UiProduct[];
+  artwork?: ArtworkInput;
+  mockups?: MockupUploadItem[];
+}) {
+  const productRefs = payload.pickedIndices.map((i) => {
+    const p = payload.catalog[i];
+    if (!p) throw new Error("Invalid product selection");
+    return productRefFromUi(p);
+  });
+  const catalogById = new Map(
+    payload.catalog.filter((p) => p.id).map((p) => [p.id as string, p]),
+  );
+
+  let result = mapCollection(
+    await apiFetch<Record<string, unknown>>(`/collections/${payload.collectionId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name: payload.name, productRefs }),
+    }),
+    "",
+    catalogById,
+  );
+
+  if (payload.artwork?.file) {
+    const file = await artworkFileFromInput(payload.artwork);
+    if (file) result = await uploadCollectionArtworkApi(result.id, file);
+  }
+  if (payload.mockups?.length) {
+    const withMockups = await uploadCollectionMockupsApi(result.id, payload.mockups, catalogById);
+    if (!withMockups) {
+      throw new Error("Failed to save product mockups — try generating designs again");
+    }
+    result = withMockups;
+  }
+  return result;
+}
+
 export async function archiveCollectionApi(collectionId: string) {
   const col = await apiFetch<Record<string, unknown>>(`/collections/${collectionId}/archive`, {
     method: "POST",

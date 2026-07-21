@@ -8,6 +8,11 @@ import { RoleAssignment } from '../src/modules/roles/roleAssignment.model.js';
 import { CatalogProduct } from '../src/modules/catalog/catalogProduct.model.js';
 import { Collection } from '../src/modules/collections/collection.model.js';
 import { Shop } from '../src/modules/shops/shop.model.js';
+import { Order } from '../src/modules/orders/order.model.js';
+import { Campaign } from '../src/modules/campaigns/campaign.model.js';
+import { Recipient } from '../src/modules/campaigns/recipient.model.js';
+import { Entity } from '../src/modules/entities/entity.model.js';
+import { Wallet } from '../src/modules/wallets/wallet.model.js';
 import { signAccessToken } from '../src/modules/auth/auth.service.js';
 
 let app;
@@ -86,6 +91,81 @@ describe('collections archive / restore / delete', () => {
     expect(found).toBeNull();
     const deleted = await Collection.findOne({ _id: collection._id, tenantId: tenant._id }).setOptions({ includeDeleted: true });
     expect(deleted?.deletedAt).toBeTruthy();
+  });
+
+  it('soft-deletes a collection and removes it from linked shops', async () => {
+    const shop = await Shop.create({
+      tenantId: tenant._id,
+      name: 'Linked Shop',
+      status: 'live',
+    });
+    collection.shopId = shop._id;
+    collection.shopIds = [shop._id];
+    await collection.save();
+    await request(app)
+      .post(`/api/v1/collections/${collection._id}/publish`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ shopId: String(shop._id) });
+
+    const res = await request(app)
+      .delete(`/api/v1/collections/${collection._id}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(204);
+
+    const shopRecord = await Shop.findOne({ _id: shop._id, tenantId: tenant._id });
+    expect(shopRecord.activeListingKeys).toEqual([]);
+
+    const storefront = await request(app).get(`/api/v1/storefront/${shop._id}`);
+    expect(storefront.body.products).toHaveLength(0);
+  });
+
+  it('blocks delete when collection products have been ordered', async () => {
+    const wallet = await Wallet.create({ tenantId: tenant._id, name: 'Budget' });
+    const entity = await Entity.create({ tenantId: tenant._id, walletId: wallet._id, name: 'Marketing' });
+    const shop = await Shop.create({ tenantId: tenant._id, name: 'Order Shop', status: 'live' });
+    const campaign = await Campaign.create({
+      tenantId: tenant._id,
+      entityId: entity._id,
+      name: 'Test campaign',
+      type: 'points',
+      shopId: shop._id,
+      status: 'redemption_open',
+      creditsPerRecipient: 500,
+      totalBudget: 500,
+      recipientCount: 1,
+    });
+    const recipient = await Recipient.create({
+      tenantId: tenant._id,
+      campaignId: campaign._id,
+      name: 'Alex',
+      email: 'alex@test.io',
+      creditAmount: 500,
+      redemptionToken: 'token-ordered',
+      redemptionStatus: 'order_created',
+    });
+    await Order.create({
+      tenantId: tenant._id,
+      campaignId: campaign._id,
+      recipientId: recipient._id,
+      orderNumber: `ORD-${Date.now()}`,
+      items: [{
+        catalogProductId: product._id,
+        collectionId: collection._id,
+        name: 'Core Cotton Tee',
+        qty: 1,
+        unitPriceInr: 499,
+      }],
+      amountBreakdown: { subtotal: 499, serviceFee: 0, gst: 0, total: 499 },
+    });
+
+    const res = await request(app)
+      .delete(`/api/v1/collections/${collection._id}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('COLLECTION_HAS_ORDERS');
+
+    const stillThere = await Collection.findOne({ _id: collection._id, tenantId: tenant._id });
+    expect(stillThere).toBeTruthy();
   });
 });
 

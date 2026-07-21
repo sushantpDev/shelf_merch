@@ -61,6 +61,8 @@ export type UiShop = {
   collections: string[];
   selectedCatalogProductIds: string[];
   featuredCatalogProductIds: string[];
+  activeListingKeys: string[];
+  featuredListingKeys: string[];
   logoUrl?: string;
   bannerConfig?: Record<string, unknown>;
   createdAt?: string;
@@ -120,6 +122,8 @@ export type UiCollection = {
   preferredColors?: string[];
   products: UiProduct[];
   isShopSpecific?: boolean;
+  shopPublish?: Array<{ shopId: string; publishedAt?: string }>;
+  createdAt?: string;
 };
 
 export type UiOrder = {
@@ -332,6 +336,12 @@ export function mapShop(s: ApiProduct): UiShop {
     featuredCatalogProductIds: Array.isArray((s as { featuredCatalogProductIds?: unknown }).featuredCatalogProductIds)
       ? ((s as { featuredCatalogProductIds: unknown[] }).featuredCatalogProductIds).map(String)
       : [],
+    activeListingKeys: Array.isArray((s as { activeListingKeys?: unknown }).activeListingKeys)
+      ? ((s as { activeListingKeys: unknown[] }).activeListingKeys).map(String)
+      : [],
+    featuredListingKeys: Array.isArray((s as { featuredListingKeys?: unknown }).featuredListingKeys)
+      ? ((s as { featuredListingKeys: unknown[] }).featuredListingKeys).map(String)
+      : [],
     logoUrl: s.logoUrl || "",
     bannerConfig: s.bannerConfig || {},
     createdAt: s.createdAt ? String(s.createdAt) : undefined,
@@ -408,6 +418,13 @@ export function mapCollection(c: ApiProduct, createdByName = "", catalogById?: M
     preferredColors: Array.isArray(c.preferredColors) ? c.preferredColors : [],
     products: (c.productRefs || []).map((ref: ApiProduct) => mapProductRef(ref, catalogById)),
     isShopSpecific: Boolean((c as { isShopSpecific?: boolean }).isShopSpecific),
+    shopPublish: Array.isArray((c as { shopPublish?: Array<{ shopId: unknown; publishedAt?: string }> }).shopPublish)
+      ? (c as { shopPublish: Array<{ shopId: unknown; publishedAt?: string }> }).shopPublish.map((p) => ({
+          shopId: String(p.shopId),
+          publishedAt: p.publishedAt,
+        }))
+      : [],
+    createdAt: (c as { createdAt?: string }).createdAt,
   };
 }
 

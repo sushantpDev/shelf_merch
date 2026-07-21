@@ -14,7 +14,8 @@ import { uploadFile } from '../../services/storage.service.js';
 import { writeAudit } from '../../services/audit.service.js';
 import { NotFoundError, ApiError } from '../../utils/errors.js';
 import { collectionsForShopFilter } from './collectionQueries.js';
-import { addCatalogProductsToShop } from '../shops/shopCatalogSync.js';
+import { publishCollectionToShop, unpublishCollectionFromShop, syncCollectionPublishTargets, unlinkCollectionFromAllShops } from '../shops/shopCatalogSync.js';
+import { Order } from '../orders/order.model.js';
 
 const upload = uploader({ allow: DOCUMENT_TYPES, maxSizeMb: 25, files: 50 });
 const router = Router();
@@ -94,8 +95,7 @@ router.post(
       isShopSpecific: req.body.isShopSpecific || false,
     });
     if (shopId && req.body.productRefs?.length) {
-      const catalogIds = req.body.productRefs.map((ref) => ref.catalogProductId).filter(Boolean);
-      await addCatalogProductsToShop(shopId, req.tenantId, catalogIds);
+      await publishCollectionToShop(shopId, req.tenantId, collection);
     }
     writeAudit({ req, action: 'collection.create', entityType: 'Collection', entityId: collection._id, after: collection.toObject() });
     res.status(201).json(collection);
@@ -105,6 +105,8 @@ router.post(
 const patchSchema = z.object({
   shopId: objectId.optional(),
   status: z.enum(['draft', 'ready', 'archived']).optional(),
+  name: z.string().min(1).optional(),
+  productRefs: z.array(productRef).min(1).optional(),
 });
 
 router.patch(
@@ -129,14 +131,91 @@ router.patch(
       collection.shopIds = nextIds;
       if (!collection.shopId) collection.shopId = shop._id;
     }
+    if (req.body.name || req.body.productRefs) {
+      if (collection.status !== 'draft') {
+        throw new ApiError(400, 'Only draft collections can be edited', 'COLLECTION_NOT_DRAFT');
+      }
+      if (req.body.name) collection.name = req.body.name;
+      if (req.body.productRefs) collection.productRefs = req.body.productRefs;
+    }
     if (req.body.status) collection.status = req.body.status;
     await collection.save();
     if (linkedShopId) {
-      const catalogIds = (collection.productRefs || []).map((ref) => ref.catalogProductId).filter(Boolean);
-      await addCatalogProductsToShop(linkedShopId, req.tenantId, catalogIds);
+      await publishCollectionToShop(linkedShopId, req.tenantId, collection);
     }
     writeAudit({ req, action: 'collection.update', entityType: 'Collection', entityId: collection._id, after: collection.toObject() });
     res.json(collection);
+  }),
+);
+
+router.post(
+  '/:id/publish',
+  canWrite,
+  validate({
+    params: z.object({ id: objectId }),
+    body: z
+      .object({
+        shopId: objectId.optional(),
+        shopIds: z.array(objectId).optional(),
+      })
+      .refine((b) => b.shopId || b.shopIds !== undefined, {
+        message: 'Provide shopId or shopIds',
+      }),
+  }),
+  asyncHandler(async (req, res) => {
+    const collection = await Collection.findOne({ _id: req.params.id, tenantId: req.tenantId });
+    if (!collection) throw new NotFoundError('Collection not found');
+
+    const shopIds = req.body.shopIds !== undefined
+      ? req.body.shopIds.map(String)
+      : [String(req.body.shopId)];
+
+    for (const sid of shopIds) {
+      const shop = await Shop.findOne({ _id: sid, tenantId: req.tenantId });
+      if (!shop) throw new NotFoundError('Shop not found');
+    }
+
+    let updated;
+    if (req.body.shopIds !== undefined) {
+      updated = await syncCollectionPublishTargets(collection._id, req.tenantId, shopIds);
+    } else {
+      await publishCollectionToShop(shopIds[0], req.tenantId, collection);
+      updated = await Collection.findOne({ _id: collection._id, tenantId: req.tenantId });
+    }
+
+    writeAudit({
+      req,
+      action: 'collection.publish',
+      entityType: 'Collection',
+      entityId: collection._id,
+      after: { shopIds },
+    });
+    res.json(updated);
+  }),
+);
+
+router.post(
+  '/:id/unpublish',
+  canWrite,
+  validate({
+    params: z.object({ id: objectId }),
+    body: z.object({ shopId: objectId }),
+  }),
+  asyncHandler(async (req, res) => {
+    const collection = await Collection.findOne({ _id: req.params.id, tenantId: req.tenantId });
+    if (!collection) throw new NotFoundError('Collection not found');
+    const shop = await Shop.findOne({ _id: req.body.shopId, tenantId: req.tenantId });
+    if (!shop) throw new NotFoundError('Shop not found');
+    await unpublishCollectionFromShop(shop._id, req.tenantId, collection);
+    const updated = await Collection.findOne({ _id: collection._id, tenantId: req.tenantId });
+    writeAudit({
+      req,
+      action: 'collection.unpublish',
+      entityType: 'Collection',
+      entityId: collection._id,
+      after: { shopId: shop._id },
+    });
+    res.json(updated);
   }),
 );
 
@@ -173,8 +252,24 @@ router.delete(
   canWrite,
   validate({ params: z.object({ id: objectId }) }),
   asyncHandler(async (req, res) => {
-    const collection = await Collection.findOne({ _id: req.params.id, tenantId: req.tenantId });
+    let collection = await Collection.findOne({ _id: req.params.id, tenantId: req.tenantId });
     if (!collection) throw new NotFoundError('Collection not found');
+
+    const orderCount = await Order.countDocuments({
+      tenantId: req.tenantId,
+      'items.collectionId': collection._id,
+    });
+    if (orderCount > 0) {
+      throw new ApiError(
+        409,
+        'This collection cannot be deleted because products from it have been ordered.',
+        'COLLECTION_HAS_ORDERS',
+      );
+    }
+
+    collection = await unlinkCollectionFromAllShops(collection, req.tenantId);
+    if (!collection) throw new NotFoundError('Collection not found');
+
     await collection.softDelete();
     writeAudit({ req, action: 'collection.delete', entityType: 'Collection', entityId: collection._id });
     res.status(204).send();
