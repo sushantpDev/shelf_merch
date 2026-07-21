@@ -489,36 +489,36 @@ async function sendCampaignInvites(campaign, tenantId) {
   }
 
   const recipients = await Recipient.find({ tenantId, campaignId: campaign._id });
-  for (const r of recipients) {
-    await notify({
-      type: ctx.isSurprise ? 'surprise_gift' : 'redemption_invite',
-      tenantId,
-      email: r.email,
-      phone: r.phone || null,
-      title: ctx.inviteTitle,
-      body: ctx.inviteBody,
-      link: ctx.isSurprise ? '' : `/redeem/${r.redemptionToken}`,
-      meta: {
-        recipientName: r.name,
-        senderName: ctx.fromLabel,
-        message: ctx.inviteBody,
-        giftName: ctx.giftName,
-        companyName: ctx.companyName,
-        campaignType: campaign.type,
-        fulfillmentMode: campaign.fulfillmentMode,
-        pointsScope: campaign.pointsScope ?? 'shop',
-        shopName: ctx.shop?.name ?? '',
-        shopLogoUrl: ctx.shop?.logoUrl ?? '',
-        shopBannerTheme: ctx.shop?.bannerConfig?.theme ?? '',
-        shopBannerPreset: ctx.shop?.bannerConfig?.preset ?? '',
-        shopCurrencyMode: ctx.shop?.currencyMode ?? 'points',
-      },
-    });
-    if (!r.invitedAt) {
-      r.invitedAt = new Date();
-      await r.save();
-    }
-  }
+  // Enqueue in parallel — notify() only waits on Redis push (or fire-and-forget), not SMTP.
+  await Promise.all(
+    recipients.map((r) =>
+      notify({
+        type: ctx.isSurprise ? 'surprise_gift' : 'redemption_invite',
+        tenantId,
+        email: r.email,
+        phone: r.phone || null,
+        title: ctx.inviteTitle,
+        body: ctx.inviteBody,
+        link: ctx.isSurprise ? '' : `/redeem/${r.redemptionToken}`,
+        meta: {
+          recipientName: r.name,
+          senderName: ctx.fromLabel,
+          message: ctx.inviteBody,
+          giftName: ctx.giftName,
+          companyName: ctx.companyName,
+          campaignType: campaign.type,
+          fulfillmentMode: campaign.fulfillmentMode,
+          pointsScope: campaign.pointsScope ?? 'shop',
+          shopName: ctx.shop?.name ?? '',
+          shopLogoUrl: ctx.shop?.logoUrl ?? '',
+          shopBannerTheme: ctx.shop?.bannerConfig?.theme ?? '',
+          shopBannerPreset: ctx.shop?.bannerConfig?.preset ?? '',
+          shopCurrencyMode: ctx.shop?.currencyMode ?? 'points',
+        },
+      }),
+    ),
+  );
+  await Recipient.updateMany({ tenantId, campaignId: campaign._id }, { invitedAt: new Date() });
   return ctx;
 }
 

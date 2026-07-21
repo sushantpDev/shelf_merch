@@ -67,21 +67,30 @@ export async function deliverNotification({
   }
 }
 
-/** Enqueue, falling back to immediate delivery when Redis is down. */
+/**
+ * Enqueue notification delivery via BullMQ when Redis is up.
+ * Never block the HTTP request on SMTP/SMS — that was making campaign launch
+ * (send points) feel hung while emails sent one-by-one in-process.
+ * Falls back to async inline delivery when Redis/worker is unavailable;
+ * tests still await delivery so assertions stay deterministic.
+ */
 export async function notify(payload) {
-  if (payload.type === 'surprise_gift' || env.NODE_ENV !== 'production') {
-    await deliverNotification(payload).catch((err) =>
+  const deliver = () =>
+    deliverNotification(payload).catch((err) =>
       logger.error({ err }, 'Direct notification delivery failed'),
     );
-    return;
-  }
 
   try {
     if (!(await ensureRedisReady())) throw new Error('Redis not ready');
-    await getNotificationQueue().add(payload.type, payload);
+    await getNotificationQueue().add(payload.type, payload, {
+      removeOnComplete: 100,
+      removeOnFail: 50,
+    });
   } catch {
-    await deliverNotification(payload).catch((err) =>
-      logger.error({ err }, 'Direct notification delivery failed'),
-    );
+    if (env.NODE_ENV === 'test') {
+      await deliver();
+      return;
+    }
+    setImmediate(deliver);
   }
 }
