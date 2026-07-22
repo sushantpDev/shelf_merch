@@ -135,21 +135,23 @@ function MaskArtworkComposite({
         alt={product.nm}
         style={{ width: "100%", height: "100%" }}
       />
-      <img
-        className="art-overlay-img"
-        src={overlay}
-        alt="Artwork"
-        style={{
-          ...placementStyle(placement, artAspect),
-          opacity: fx.opacity,
-          mixBlendMode: fx.mixBlendMode,
-        }}
-        onLoad={(e) => {
-          const img = e.currentTarget;
-          const aspect = (img.naturalHeight || 1) / (img.naturalWidth || 1);
-          if (aspect > 0) setArtAspect(aspect);
-        }}
-      />
+      {overlay ? (
+        <img
+          className="art-overlay-img"
+          src={overlay}
+          alt="Artwork"
+          style={{
+            ...placementStyle(placement, artAspect),
+            opacity: fx.opacity,
+            mixBlendMode: fx.mixBlendMode,
+          }}
+          onLoad={(e) => {
+            const img = e.currentTarget;
+            const aspect = (img.naturalHeight || 1) / (img.naturalWidth || 1);
+            if (aspect > 0) setArtAspect(aspect);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -194,6 +196,10 @@ export function DesignedProductThumb({
   const showBaked = Boolean(baked && isDefaultTint && preferBakedMockup);
   const savedPlacement = product.placement ?? null;
   const liveTintHex = tintHex || DEFAULT_MOCKUP_TINT_HEX;
+  // A non-white swatch is active — recolour the garment even if this design has
+  // no standalone artwork URL (only a baked mockup). The mask/base stage is what
+  // gets tinted; the artwork is overlaid on top only when we actually have it.
+  const wantsTint = !isDefaultTint && Boolean(maskStage);
 
   const inner =
     showBaked ? (
@@ -205,6 +211,14 @@ export function DesignedProductThumb({
           style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
         />
       </div>
+    ) : wantsTint ? (
+      <MaskArtworkComposite
+        product={product}
+        mask={resolvedMask || maskStage}
+        overlay={overlay}
+        tintHex={liveTintHex}
+        savedPlacement={savedPlacement}
+      />
     ) : overlay && resolvedMask ? (
       <MaskArtworkComposite
         product={product}

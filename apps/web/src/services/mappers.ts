@@ -282,6 +282,18 @@ export function mergeCatalogProductDetails(
     colors: product.colors?.length ? product.colors : fromCatalog.colors,
     colorHexByName: product.colorHexByName ?? fromCatalog.colorHexByName,
     variants: product.variants?.length ? product.variants : fromCatalog.variants,
+    // Garment images drive the live colour tint — fall back to the catalog
+    // when the collection ref never captured them (e.g. the catalog product
+    // wasn't loaded when the workspace was first mapped). Keep the design's
+    // own baked mockup/placement untouched.
+    maskImageUrl: product.maskImageUrl || fromCatalog.maskImageUrl,
+    baseImageUrl: product.baseImageUrl || fromCatalog.baseImageUrl,
+    photoUrl: product.photoUrl || fromCatalog.photoUrl,
+    imgUrl: product.imgUrl || fromCatalog.imgUrl,
+    printAreas: product.printAreas?.length ? product.printAreas : fromCatalog.printAreas,
+    price: product.price || fromCatalog.price,
+    basePriceInr: product.basePriceInr ?? fromCatalog.basePriceInr,
+    sw: product.sw ?? fromCatalog.sw,
   };
 }
 
