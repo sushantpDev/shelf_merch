@@ -33,6 +33,33 @@ export function designImgUrl(p: UiProduct): string {
   return p?.maskImageUrl || p?.baseImageUrl || "";
 }
 
+/** Same-origin path compare — ignores scheme/host so catalog vs collection refs match. */
+function sameMediaPath(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  return normMediaPath(a) === normMediaPath(b);
+}
+
+/**
+ * Production garment image for live colour tinting. Never returns the marketing
+ * photo (`photoUrl`) — only mask, stage, print-area mockup, or imgUrl when it
+ * differs from the catalog photo.
+ */
+export function resolveGarmentMaskUrl(p: UiProduct | undefined): string {
+  if (!p) return "";
+  const photo = resolveMediaUrl(p.photoUrl);
+  const mask = resolveMediaUrl(p.maskImageUrl);
+  if (mask) return mask;
+  const base = resolveMediaUrl(p.baseImageUrl);
+  if (base && !sameMediaPath(base, photo)) return base;
+  const printArea = resolveMediaUrl(pickPrintArea(p)?.mockupImageUrl);
+  if (printArea && !sameMediaPath(printArea, photo)) return printArea;
+  const design = resolveMediaUrl(designImgUrl(p));
+  if (design && !sameMediaPath(design, photo)) return design;
+  const img = resolveMediaUrl(p.imgUrl);
+  if (img && !sameMediaPath(img, photo)) return img;
+  return "";
+}
+
 /** Pick the print area whose mockup image matches the mask/photo, else the first usable one. */
 export function pickPrintArea(p: UiProduct) {
   const areas = p?.printAreas;

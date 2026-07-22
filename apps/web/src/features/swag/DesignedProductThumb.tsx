@@ -185,7 +185,9 @@ export function DesignedProductThumb({
   const printAreaBase = resolveMediaUrl(pickPrintArea(product)?.mockupImageUrl);
   const stageBase = resolveMediaUrl(product.baseImageUrl);
   const resolvedMask = resolveMediaUrl(product.maskImageUrl);
-  const maskStage = resolvedMask || stageBase || printAreaBase || resolveMediaUrl(designImgUrl(product));
+  /** Production garment image used for live colour tinting (never the marketing photo). */
+  const tintMask = resolvedMask || stageBase || printAreaBase;
+  const maskStage = tintMask || resolveMediaUrl(designImgUrl(product));
   const base =
     maskStage ||
     resolveMediaUrl(product.photoUrl) ||
