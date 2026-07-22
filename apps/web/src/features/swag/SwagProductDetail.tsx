@@ -1,8 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Store } from "lucide-react";
 import { ProductInfoTabs } from "@/features/catalog/views/ProductInfoTabs";
 import type { UiCollection, UiProduct } from "@/services/mappers";
-import { collectionProductColorNames, productColorHex } from "./colors";
+import {
+  collectionProductColorNames,
+  defaultWhiteColorIndex,
+  getMockupTintHex,
+  productColorHex,
+} from "./colors";
 import { DesignedProductThumb } from "./DesignedProductThumb";
 
 export type SwagDesignTarget = { collection: UiCollection; product: UiProduct; pIdx: number };
@@ -15,10 +20,25 @@ export function SwagProductDetail({
   target: SwagDesignTarget;
   onAddToShop: () => void;
 }) {
-  const [sel, setSel] = useState(0);
   const { collection, product } = target;
   const title = product.brand ? `${product.brand} ${product.nm}` : product.nm;
   const names = collectionProductColorNames(collection, product);
+  const [sel, setSel] = useState(() => defaultWhiteColorIndex(names));
+  // Only tint once the user actually picks a swatch, so the baked white Konva
+  // mockup is shown on first paint (matches the storefront product page).
+  const [hasUserPickedColor, setHasUserPickedColor] = useState(false);
+
+  // Reset the selection back to the default (White) whenever the product changes.
+  useEffect(() => {
+    setSel(defaultWhiteColorIndex(names));
+    setHasUserPickedColor(false);
+  }, [product.id, collection.id]);
+
+  const selectedName = names[sel];
+  const tintHex = getMockupTintHex(
+    selectedName ? productColorHex(product, selectedName) : undefined,
+    hasUserPickedColor,
+  );
 
   return (
     <div>
@@ -46,7 +66,11 @@ export function SwagProductDetail({
             overflow: "hidden",
           }}
         >
-          <DesignedProductThumb product={product} artworkUrl={collection.artworkUrl} />
+          <DesignedProductThumb
+            product={product}
+            artworkUrl={collection.artworkUrl}
+            tintHex={tintHex}
+          />
         </div>
 
         <div>
@@ -63,7 +87,10 @@ export function SwagProductDetail({
                     title={c}
                     aria-label={c}
                     aria-pressed={sel === i}
-                    onClick={() => setSel(i)}
+                    onClick={() => {
+                      setHasUserPickedColor(true);
+                      setSel(i);
+                    }}
                     className="sw"
                     style={{
                       width: 24,
