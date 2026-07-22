@@ -809,34 +809,31 @@ export function SendKitView(vm: SendKitVm) {
             />
             <div className="card" style={{ padding: 22, height: "fit-content" }}>
               <h3 style={{ fontSize: 18, marginBottom: 12 }}>Order summary</h3>
-              <SumRow k="Kit" v={kit.name} />
+              {/* <SumRow k="Kit" v={kit.name} /> */}
 
-              <div style={{ margin: "10px 0 4px" }}>
+              {/* <div style={{ margin: "10px 0 4px" }}>
                 <div className="muted" style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
-                  Kit Price
+                  Kit Price Breakdown
                 </div>
                 {vm.pricedItems.map((item) => (
                   <SumRow key={item.id} k={item.name} v={inr(item.priceInr)} />
                 ))}
-                <SumRow k="Kit Cost" v={inr(vm.kitUnitPrice)} />
-              </div>
-
-              <SumRow k="Recipients" v={String(totals.qty)} />
+                {totals.pkgPerKit > 0 ? (
+                  <SumRow k="Packaging" v={inr(totals.pkgPerKit)} />
+                ) : null}
+                <SumRow k="Cost Per Kit" v={inr(totals.costPerKit)} emphasis />
+              </div> */}
+{/* 
+              <SumRow k="Recipients" v={String(totals.qty)} /> */}
               <SumRow
-                k="Total Kit Cost"
-                v={`${totals.qty} × ${inr(vm.kitUnitPrice)} = ${inr(totals.sub)}`}
+                k={`${totals.qty} kits × ${inr(totals.costPerKit)}`}
+                v={inr(totals.sub)}
+                emphasis
               />
-              <SumRow
-                k="Packaging"
-                v={
-                  totals.pkgCost
-                    ? `${totals.qty} × ₹49 = ${inr(totals.pkgCost)}`
-                    : "₹0"
-                }
-              />
-              <SumRow k="Service fee (12%)" v={inr(totals.fee)} />
-              <SumRow k="Shipping" v={inr(totals.ship)} />
-              <SumRow k="Estimated GST (18%)" v={inr(totals.tax)} />
+              <SumRow k="GST at 18%" v={inr(totals.tax)} />
+              <SumRow k="Shipping" v="Free" />
+              {/* <SumRow k="Service fee (12%)" v={inr(totals.fee)} /> */}
+              
               <div className="divider" />
               <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                 <b style={{ fontSize: 18 }}>Grand Total</b>
@@ -889,11 +886,18 @@ const cellAddr = (bg: string): React.CSSProperties => ({
   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
 });
 
-function SumRow({ k, v }: { k: string; v: string }) {
+function SumRow({ k, v, emphasis }: { k: string; v: string; emphasis?: boolean }) {
+  const labelStyle = emphasis
+    ? { fontSize: 14, fontWeight: 700 as const, color: "var(--ink)" }
+    : { fontSize: 13 };
+  const valueStyle = emphasis
+    ? { fontWeight: 700 as const, fontSize: 15 }
+    : { fontWeight: 600 as const, fontSize: 13 };
+
   return (
-    <div className="row" style={{ justifyContent: "space-between", padding: "7px 0" }}>
-      <span className="muted" style={{ fontSize: 13 }}>{k}</span>
-      <span className="num" style={{ fontWeight: 600, fontSize: 13 }}>{v}</span>
+    <div className="row" style={{ justifyContent: "space-between", padding: emphasis ? "9px 0" : "7px 0" }}>
+      <span className={emphasis ? undefined : "muted"} style={labelStyle}>{k}</span>
+      <span className="num" style={valueStyle}>{v}</span>
     </div>
   );
 }

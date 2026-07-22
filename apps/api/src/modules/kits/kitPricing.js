@@ -14,11 +14,21 @@ export function sumKitProductPrices(products = []) {
 export function kitSendTotals(recipientCount, packaging, kitUnitPriceInr) {
   const qty = Math.max(0, Number(recipientCount) || 0);
   const unitPrice = Math.max(0, Math.round(Number(kitUnitPriceInr) || 0));
-  const sub = unitPrice * qty;
-  const pkgCost = (packaging === 'box' ? PREMIUM_BOX_PER_RECIP : 0) * qty;
-  const fee = sub * SERVICE_FEE_RATE;
-  const ship = SHIP_PER_RECIP * qty;
-  const tax = (sub + fee + pkgCost + ship) * GST_RATE;
-  const total = sub + fee + pkgCost + ship + tax;
-  return { qty, unitPrice, sub, pkgCost, fee, ship, tax, total };
+  const pkgPerKit = packaging === 'box' ? PREMIUM_BOX_PER_RECIP : 0;
+  const costPerKit = unitPrice + pkgPerKit;
+  const sub = costPerKit * qty;
+  const tax = sub * GST_RATE;
+  const total = sub + tax;
+  return {
+    qty,
+    unitPrice,
+    pkgPerKit,
+    costPerKit,
+    sub,
+    pkgCost: pkgPerKit * qty,
+    fee: 0,
+    ship: 0,
+    tax,
+    total,
+  };
 }

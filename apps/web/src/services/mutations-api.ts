@@ -363,19 +363,57 @@ export async function uploadKitMockupsApi(kitId: string, items: KitMockupUploadI
 
 type ArtworkInput = { file?: File; preview?: string; name?: string };
 
-async function artworkFileFromInput(art: ArtworkInput): Promise<File | null> {
-  if (art.file instanceof File) return art.file;
-  // Fetch data: and blob: previews back into a File so the standalone artwork
-  // is persisted (collection.artworkUrl). Without this, a blob: preview left
-  // artworkUrl empty even though the baked mockup captured the art — which
-  // broke live colour tinting (garment recoloured, artwork missing).
-  const src = art.preview;
-  if (src && (src.startsWith("data:") || src.startsWith("blob:"))) {
-    const res = await fetch(src);
-    const blob = await res.blob();
-    return new File([blob], art.name || "artwork.png", { type: blob.type || "image/png" });
+/** Rasterize SVG (blocked by upload allowlist) to PNG so artwork can be stored. */
+async function ensureUploadableArtworkFile(file: File): Promise<File> {
+  const isSvg = file.type === "image/svg+xml" || /\.svg$/i.test(file.name);
+  if (!isSvg) return file;
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Could not read SVG artwork"));
+      el.src = objectUrl;
+    });
+    const w = Math.max(1, img.naturalWidth || 1024);
+    const h = Math.max(1, img.naturalHeight || 1024);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not convert SVG artwork");
+    ctx.drawImage(img, 0, 0, w, h);
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error("Could not convert SVG artwork"))),
+        "image/png",
+      );
+    });
+    const base = file.name.replace(/\.svg$/i, "") || "artwork";
+    return new File([blob], `${base}.png`, { type: "image/png" });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
   }
-  return null;
+}
+
+async function artworkFileFromInput(art: ArtworkInput): Promise<File | null> {
+  let file: File | null = null;
+  if (art.file instanceof File) {
+    file = art.file;
+  } else if (art.preview?.startsWith("data:")) {
+    const res = await fetch(art.preview);
+    const blob = await res.blob();
+    const name = art.name || "artwork.png";
+    file = new File([blob], name, { type: blob.type || "image/png" });
+  }
+  if (!file) return null;
+  return ensureUploadableArtworkFile(file);
+}
+
+/** Build an upload-ready artwork File (SVG → PNG). Exported for kit/collection flows. */
+export async function prepareArtworkUploadFile(art: ArtworkInput): Promise<File | null> {
+  return artworkFileFromInput(art);
 }
 
 export async function uploadCollectionArtworkApi(collectionId: string, file: File) {

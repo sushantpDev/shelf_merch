@@ -39,6 +39,14 @@ async function parseBody(res: Response): Promise<unknown> {
 }
 
 function errorFromResponse(status: number, body: unknown): ApiError {
+  if (status === 502 || status === 503 || status === 504) {
+    return new ApiError(
+      status,
+      "Server temporarily unavailable — wait a moment and try again",
+      "GATEWAY_ERROR",
+      body,
+    );
+  }
   if (body && typeof body === "object" && "error" in body) {
     const err = (body as {
       error: {
@@ -56,7 +64,7 @@ function errorFromResponse(status: number, body: unknown): ApiError {
     }
     return new ApiError(status, message, err.code || "API_ERROR", body);
   }
-  return new ApiError(status, typeof body === "string" ? body : "Request failed");
+  return new ApiError(status, typeof body === "string" && body.trim() ? body : "Request failed");
 }
 
 async function refreshAccessToken(): Promise<boolean> {

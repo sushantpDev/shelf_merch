@@ -16,7 +16,8 @@ import { writeAudit } from '../../services/audit.service.js';
 import { ApiError, NotFoundError } from '../../utils/errors.js';
 import { sumKitProductPrices } from './kitPricing.js';
 
-const upload = uploader({ allow: DOCUMENT_TYPES, maxSizeMb: 25 });
+// Allow multiple mockup PNGs (one per kit product) — same cap as collections.
+const upload = uploader({ allow: DOCUMENT_TYPES, maxSizeMb: 25, files: 50 });
 const router = Router();
 
 router.use(authenticate, resolveTenant, requireTenantContext);
@@ -252,6 +253,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const kit = await Kit.findOne({ _id: req.params.id, tenantId: req.tenantId });
     if (!kit) throw new NotFoundError('Kit not found');
+    if (!req.file) throw new ApiError(400, 'No artwork file uploaded', 'FILE_REQUIRED');
     const { url } = await uploadFile({ tenantId: req.tenantId, kind: 'artwork', file: req.file });
     kit.artworkUrl = url;
     await kit.save();

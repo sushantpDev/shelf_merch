@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { refreshCatalogProducts } from "@/services/api-bridge";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { draftFromCollection } from "../draftFromCollection";
-import { bakeMockupsForProducts } from "../mockup-bake";
+import { bakeMockup, resolvePlacementForBake, type MockupUploadItem } from "../mockup-bake";
 import { buildPreviousUploads, type PreviousArtwork } from "../wizard/artworkHistory";
 import { useCreateCollection, useSyncCollectionPublish, useUpdateCollection } from "../model";
 import type { UiProduct, UiShop } from "../model";
@@ -126,9 +126,24 @@ export function useSwagWizardController(): SwagWizardVm {
     setWorking(true);
     try {
       const artUrl = draft.art.preview;
-      // Bake each picked product with its saved Konva placement (or the catalog
-      // default) so the uploaded mockup carries the placement it was baked with.
-      const mockups = await bakeMockupsForProducts(draft.picked, catalog, artUrl, draft.placements);
+      const baked = await Promise.all(
+        draft.picked.map((i, idx) => {
+          const cp = catalog[i];
+          const key = cp?.id || `idx${idx}`;
+          return bakeMockup(cp, artUrl, draft.placements[key] ?? null);
+        }),
+      );
+      const mockups = draft.picked
+        .map((i, idx) => {
+          const cp = catalog[i];
+          if (!cp?.id || !baked[idx]) return null;
+          return {
+            catalogProductId: cp.id,
+            dataUrl: baked[idx],
+            placement: resolvePlacementForBake(cp, draft.placements, idx),
+          } satisfies MockupUploadItem;
+        })
+        .filter((m): m is MockupUploadItem => m !== null);
 
       if (!mockups.length) {
         throw new Error("Failed to generate designs — try again");

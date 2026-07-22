@@ -6,12 +6,19 @@ const GST_RATE = 0.18;
 
 export type KitSendTotals = {
   qty: number;
-  /** Kit unit price (sum of product basePriceInr). */
+  /** Sum of product basePriceInr (one kit). */
   unitPrice: number;
-  /** Total kit cost = unitPrice × recipients. */
+  /** Packaging per kit (₹49 premium box or 0). */
+  pkgPerKit: number;
+  /** Products + packaging per kit. */
+  costPerKit: number;
+  /** Subtotal = costPerKit × recipients. */
   sub: number;
+  /** @deprecated Included in costPerKit/sub — kept for compatibility. */
   pkgCost: number;
+  /** @deprecated Not charged in checkout summary. */
   fee: number;
+  /** @deprecated Shown as free in checkout summary. */
   ship: number;
   tax: number;
   total: number;
@@ -26,8 +33,9 @@ export function sumKitProductPrices(
 
 /**
  * Money math for a kit send:
- * kit unit (from products) × recipients, premium box ₹49/recipient, 12% service fee,
- * ₹120/recipient shipping, then 18% GST on the running total (including packaging).
+ * cost per kit = product prices + packaging per kit;
+ * subtotal = cost per kit × recipients;
+ * GST = 18% of subtotal; shipping and service fee excluded for now.
  */
 export function kitSendTotals(
   recipientCount: number,
@@ -36,13 +44,23 @@ export function kitSendTotals(
 ): KitSendTotals {
   const qty = Math.max(0, recipientCount);
   const unitPrice = Math.max(0, Math.round(kitUnitPriceInr));
-  const sub = unitPrice * qty;
-  const pkgCost = (packaging === "box" ? PREMIUM_BOX_PER_RECIP : 0) * qty;
-  const fee = sub * SERVICE_FEE_RATE;
-  const ship = SHIP_PER_RECIP * qty;
-  const tax = (sub + fee + pkgCost + ship) * GST_RATE;
-  const total = sub + fee + pkgCost + ship + tax;
-  return { qty, unitPrice, sub, pkgCost, fee, ship, tax, total };
+  const pkgPerKit = packaging === "box" ? PREMIUM_BOX_PER_RECIP : 0;
+  const costPerKit = unitPrice + pkgPerKit;
+  const sub = costPerKit * qty;
+  const tax = sub * GST_RATE;
+  const total = sub + tax;
+  return {
+    qty,
+    unitPrice,
+    pkgPerKit,
+    costPerKit,
+    sub,
+    pkgCost: pkgPerKit * qty,
+    fee: 0,
+    ship: 0,
+    tax,
+    total,
+  };
 }
 
 import { POINTS_PER_RUPEE } from "@/lib/storeCurrency";

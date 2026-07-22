@@ -128,7 +128,7 @@ export function useKitWizardController(): KitWizardVm {
         packaging: "box",
         designNotes: draft.notes,
         kitPrice,
-        artwork: draft.art?.file
+        artwork: draft.art
           ? { file: draft.art.file, preview: draft.art.preview, name: draft.art.name }
           : undefined,
         mockups,

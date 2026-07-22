@@ -81,18 +81,21 @@ export function KitReviewPricingStep({
           className="row"
           style={{
             justifyContent: "space-between",
-            alignItems: "center",
+            alignItems: "baseline",
             marginTop: 16,
             paddingTop: 4,
           }}
         >
           <span style={{ fontSize: 16, fontWeight: 800, color: "var(--ink)" }}>Total Kit Cost</span>
-          <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)", fontWeight: 800 }}>
-            {formatInr(total)}
-          </b>
+          <span style={{ display: "inline-flex", alignItems: "baseline" }}>
+            <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)", fontWeight: 800 }}>
+              {formatInr(total)}
+            </b>
+            <span style={{ fontSize: 14, fontWeight: 400, color: "var(--ink-2)" }}> / kit + GST</span>
+          </span>
         </div>
         <p className="muted" style={{ margin: "8px 0 0", fontSize: 12 }}>
-          Sum of product prices only — packaging, shipping, GST, and service fees are calculated at send time.
+          Packaging, shipping, and GST are calculated at send time.
         </p>
       </div>
     </div>

@@ -22,6 +22,7 @@ import {
   uploadCollectionMockupsApi,
   uploadKitArtworkApi,
   uploadKitMockupsApi,
+  prepareArtworkUploadFile,
   launchKitCampaignApi,
   launchPointsCampaignApi,
   linkCollectionToShopApi,
@@ -361,16 +362,32 @@ export async function createKitFlow(payload: {
   artwork?: { file?: File; preview?: string; name?: string };
   mockups?: Array<{ catalogProductId: string; dataUrl: string }>;
 }) {
-  let kit = await createKitApi({
-    ...payload,
-    packaging: payload.packaging === "box" ? "box" : "none",
+  const createOnce = () =>
+    createKitApi({
+      ...payload,
+      packaging: payload.packaging === "box" ? "box" : "none",
+    });
+
+  // Retry briefly on gateway blips (API restart / proxy 502).
+  let kit = await createOnce().catch(async (err) => {
+    const status = err && typeof err === "object" && "status" in err ? Number(err.status) : 0;
+    if (status !== 502 && status !== 503) throw err;
+    await new Promise((r) => setTimeout(r, 800));
+    return createOnce();
   });
-  if (payload.artwork?.file) {
-    kit = await uploadKitArtworkApi(kit.id, payload.artwork.file);
+
+  if (payload.artwork) {
+    const file = await prepareArtworkUploadFile(payload.artwork);
+    if (file) {
+      kit = await uploadKitArtworkApi(kit.id, file);
+    }
   }
   if (payload.mockups?.length) {
     const withMockups = await uploadKitMockupsApi(kit.id, payload.mockups);
-    if (withMockups) kit = withMockups;
+    if (!withMockups) {
+      throw new Error("Failed to save product mockups — try publishing again");
+    }
+    kit = withMockups;
   }
   return kit;
 }
@@ -402,8 +419,11 @@ export async function updateKitFlow(payload: {
     ...payload,
     packaging: payload.packaging === "box" ? "box" : payload.packaging === "none" ? "none" : undefined,
   });
-  if (payload.artwork?.file) {
-    kit = await uploadKitArtworkApi(kit.id, payload.artwork.file);
+  if (payload.artwork) {
+    const file = await prepareArtworkUploadFile(payload.artwork);
+    if (file) {
+      kit = await uploadKitArtworkApi(kit.id, file);
+    }
   }
   return kit;
 }
