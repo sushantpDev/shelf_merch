@@ -10109,8 +10109,14 @@ a.shop-collection-cell:hover{background:var(--gray-100)}
 }
 .camp-ways-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 280px));
   gap: 16px;
+  justify-content: center;
+}
+@media (max-width: 900px) {
+  .camp-ways-grid {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 280px));
+  }
 }
 .camp-way-card {
   padding: 20px;

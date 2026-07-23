@@ -15,16 +15,17 @@ export function kitSendTotals(recipientCount, packaging, kitUnitPriceInr) {
   const qty = Math.max(0, Number(recipientCount) || 0);
   const unitPrice = Math.max(0, Math.round(Number(kitUnitPriceInr) || 0));
   const pkgPerKit = packaging === 'box' ? PREMIUM_BOX_PER_RECIP : 0;
-  const costPerKit = unitPrice + pkgPerKit;
-  const sub = costPerKit * qty;
-  const tax = sub * GST_RATE;
-  const total = sub + tax;
+  const costPerKitExGst = unitPrice + pkgPerKit;
+  // Price per kit is GST-inclusive; grand total = recipients × inclusive price.
+  const costPerKit = Math.round(costPerKitExGst * (1 + GST_RATE));
+  const total = costPerKit * qty;
+  const tax = total - costPerKitExGst * qty;
   return {
     qty,
     unitPrice,
     pkgPerKit,
     costPerKit,
-    sub,
+    sub: total,
     pkgCost: pkgPerKit * qty,
     fee: 0,
     ship: 0,

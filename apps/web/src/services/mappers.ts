@@ -103,6 +103,8 @@ export type UiKit = {
   items: number;
   status: string;
   sent: boolean;
+  /** ISO timestamp when this kit was last sent (kit campaign launch). */
+  lastSentAt?: string;
   productRefs?: UiKitProductRef[];
   packaging?: string;
   designNotes?: string;
@@ -414,6 +416,7 @@ export function mapKit(k: ApiProduct): UiKit {
     items: productRefs.length,
     status: k.status === "live" ? "live" : k.status === "archived" ? "archived" : "draft",
     sent: Boolean(k.lastSentAt),
+    lastSentAt: k.lastSentAt ? String(k.lastSentAt) : undefined,
     productRefs,
     packaging: k.packaging || "none",
     designNotes: k.designNotes || "",

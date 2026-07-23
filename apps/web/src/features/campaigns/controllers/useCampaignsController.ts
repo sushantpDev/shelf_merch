@@ -54,6 +54,8 @@ export type CampaignsVm = {
   onSearch: (search: string) => void;
   onPage: (page: number) => void;
   onSendGift: () => void;
+  onSendPointsCampaign: () => void;
+  onSendKitCampaign: () => void;
   gift: SendGiftVm;
 };
 
@@ -133,6 +135,18 @@ export function useCampaignsController(): CampaignsVm {
     },
     onPage: setPage,
     onSendGift: () => setGiftOpen(true),
+    onSendPointsCampaign: () => {
+      setGiftOpen(true);
+      if (availableShops.length === 1) {
+        goToSendPoints(availableShops[0].id);
+        return;
+      }
+      setGiftView("points");
+    },
+    onSendKitCampaign: () => {
+      setGiftOpen(true);
+      setGiftView("kit");
+    },
     gift: {
       open: giftOpen,
       view: giftView,

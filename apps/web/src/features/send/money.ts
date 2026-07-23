@@ -6,13 +6,13 @@ const GST_RATE = 0.18;
 
 export type KitSendTotals = {
   qty: number;
-  /** Sum of product basePriceInr (one kit). */
+  /** Sum of product basePriceInr (one kit), before GST. */
   unitPrice: number;
   /** Packaging per kit (₹49 premium box or 0). */
   pkgPerKit: number;
-  /** Products + packaging per kit. */
+  /** Products + packaging + 18% GST — the charged price per kit. */
   costPerKit: number;
-  /** Subtotal = costPerKit × recipients. */
+  /** Same as total: costPerKit × recipients (GST already in costPerKit). */
   sub: number;
   /** @deprecated Included in costPerKit/sub — kept for compatibility. */
   pkgCost: number;
@@ -20,6 +20,7 @@ export type KitSendTotals = {
   fee: number;
   /** @deprecated Shown as free in checkout summary. */
   ship: number;
+  /** GST portion embedded in the inclusive kit price (not added separately). */
   tax: number;
   total: number;
 };
@@ -33,9 +34,10 @@ export function sumKitProductPrices(
 
 /**
  * Money math for a kit send:
- * cost per kit = product prices + packaging per kit;
- * subtotal = cost per kit × recipients;
- * GST = 18% of subtotal; shipping and service fee excluded for now.
+ * ex-GST kit = products + packaging;
+ * price per kit = ex-GST × 1.18 (GST inclusive);
+ * grand total = recipients × GST-inclusive price per kit.
+ * Shipping and service fee excluded for now.
  */
 export function kitSendTotals(
   recipientCount: number,
@@ -45,16 +47,16 @@ export function kitSendTotals(
   const qty = Math.max(0, recipientCount);
   const unitPrice = Math.max(0, Math.round(kitUnitPriceInr));
   const pkgPerKit = packaging === "box" ? PREMIUM_BOX_PER_RECIP : 0;
-  const costPerKit = unitPrice + pkgPerKit;
-  const sub = costPerKit * qty;
-  const tax = sub * GST_RATE;
-  const total = sub + tax;
+  const costPerKitExGst = unitPrice + pkgPerKit;
+  const costPerKit = Math.round(costPerKitExGst * (1 + GST_RATE));
+  const total = costPerKit * qty;
+  const tax = total - costPerKitExGst * qty;
   return {
     qty,
     unitPrice,
     pkgPerKit,
     costPerKit,
-    sub,
+    sub: total,
     pkgCost: pkgPerKit * qty,
     fee: 0,
     ship: 0,

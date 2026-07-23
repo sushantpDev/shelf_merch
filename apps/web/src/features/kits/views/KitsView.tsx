@@ -1,4 +1,4 @@
-import { type ComponentType, type CSSProperties, useEffect, useState, useMemo } from "react";
+import { type ComponentType, type CSSProperties, type ReactNode, useEffect, useState, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   ArrowRight,
@@ -32,9 +32,6 @@ import {
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import type { KitsVm } from "../controllers/useKitsController";
 import { KitsEmptyState } from "./KitsEmptyState";
-import scaleYourGiftingImg from "../../../../assets/scale_your_gifting.png";
-import wellnessKitImg from "../../../../assets/wellness-kit.png";
-import workFromHomeKitImg from "../../../../assets/work-from-home-kit.png";
 import kitPreviewImg from "../../../../assets/kit-preview.png";
 import noKitsYetImg from "../../../../assets/no-kits-yet.png";
 import "../kits-page.css";
@@ -51,11 +48,13 @@ function KitsSectionEmptyState({
   description,
   secondary,
   illustration = true,
+  action,
 }: {
   title: string;
   description: string;
   secondary?: string;
   illustration?: boolean;
+  action?: ReactNode;
 }) {
   return (
     <div
@@ -91,6 +90,7 @@ function KitsSectionEmptyState({
           {secondary}
         </p>
       ) : null}
+      {action ? <div style={{ marginTop: 18 }}>{action}</div> : null}
     </div>
   );
 }
@@ -155,6 +155,18 @@ function formatDateString(dateStr?: string) {
     return dateStr;
   }
 }
+
+function formatRelativeSent(iso?: string): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "-";
+  const days = Math.floor((Date.now() - d.getTime()) / 86_400_000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 30) return `${days} days ago`;
+  return formatDateString(iso);
+}
+
 function getCuratedKitMeta(kit: any) {
   try {
     if (!kit.designNotes) return null;
@@ -165,86 +177,6 @@ function getCuratedKitMeta(kit: any) {
   } catch (e) { }
   return null;
 }
-
-const mockHistoryRows: KitRow[] = [
-  {
-    id: "hist-1",
-    name: "Freshers",
-    description: "Custom kit created in your workspace.",
-    audience: "Workspace",
-    image: kitPreviewImg,
-    items: 1,
-    status: "live",
-    lastSent: "Recently",
-    sentDate: "Recent",
-  },
-  {
-    id: "hist-2",
-    name: "Welcome Kit",
-    description: "New joiner welcome kit with essentials to get started.",
-    audience: "Workspace",
-    image: scaleYourGiftingImg,
-    items: 4,
-    status: "live",
-    lastSent: "Recently",
-    sentDate: "Recent",
-  },
-  {
-    id: "hist-3",
-    name: "Welcome Kit",
-    description: "New joiner welcome kit with essentials to get started.",
-    audience: "Workspace",
-    image: scaleYourGiftingImg,
-    items: 4,
-    status: "live",
-    lastSent: "Never sent",
-    sentDate: "Never sent",
-  },
-  {
-    id: "hist-4",
-    name: "Diwali Gift Box",
-    description: "Celebrate the festival of lights with our special Diwali kit.",
-    audience: "Workspace",
-    image: wellnessKitImg,
-    items: 5,
-    status: "live",
-    lastSent: "12 days ago",
-    sentDate: "May 28, 2026",
-  },
-  {
-    id: "hist-5",
-    name: "Client Appreciation Kit",
-    description: "A premium kit to thank and delight your top clients.",
-    audience: "Workspace",
-    image: kitPreviewImg,
-    items: 3,
-    status: "live",
-    lastSent: "5 days ago",
-    sentDate: "May 25, 2026",
-  },
-  {
-    id: "hist-6",
-    name: "Welcome Kit",
-    description: "New joiner welcome kit with essentials to get started.",
-    audience: "Workspace",
-    image: scaleYourGiftingImg,
-    items: 4,
-    status: "live",
-    lastSent: "20 days ago",
-    sentDate: "May 10, 2026",
-  },
-  {
-    id: "hist-7",
-    name: "Employee Milestone Kit",
-    description: "Recognize milestones and celebrate achievements.",
-    audience: "Workspace",
-    image: workFromHomeKitImg,
-    items: 4,
-    status: "draft",
-    lastSent: "-",
-    sentDate: "Never sent",
-  }
-];
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
@@ -533,51 +465,34 @@ export function KitsView(vm: KitsVm) {
     return { total: live + drafts + archived, live, drafts, archived };
   }, [allKits]);
 
-  // Construct complete Recent Activity history rows (real sends only when none exist)
+  // Recent Activity: only kits that have actually been sent (customised + curated clones).
+  // Workspace kits are tenant-scoped, so this includes sends by the company admin and invited users.
   const recentActivityRows = useMemo<KitRow[]>(() => {
-    const findKitByName = (name: string) =>
-      vm.kits.find((k) => k.name.trim().toLowerCase() === name.trim().toLowerCase());
-
-    const campaignRows: KitRow[] = (workspace?.campaigns ?? [])
-      .filter((c) => c.type !== "send_points")
-      .map((c) => {
-        const matchedKit = findKitByName(c.name);
+    return vm.kits
+      .filter((kit) => kit.sent && Boolean(kit.lastSentAt) && kit.status !== "archived")
+      .map((kit): KitRow => {
+        const curated = getCuratedKitMeta(kit);
         return {
-          id: matchedKit?.id ?? c.id,
-          name: c.name,
+          id: kit.id,
+          name: kit.name,
           description:
-            matchedKit?.description?.trim() || "Custom kit created in your workspace.",
-          audience: "Workspace",
-          image: matchedKit?.artworkUrl
-            ? resolveMediaUrl(matchedKit.artworkUrl)
-            : kitPreviewImg,
-          items: matchedKit?.items ?? 3,
-          status: c.status === "draft" ? "draft" : "live",
-          lastSent: c.createdAt ? "Recently" : "Recently",
-          sentDate: c.createdAt ? formatDateString(c.createdAt) : "Recent",
-          kit: matchedKit,
+            kit.description?.trim() ||
+            (curated ? "Curated kit sent from your workspace." : "Custom kit sent from your workspace."),
+          audience: curated ? "Curated" : "Customised",
+          image: kit.artworkUrl ? resolveMediaUrl(kit.artworkUrl) : kitPreviewImg,
+          items: kit.items,
+          status: kit.status === "live" ? "live" : kit.status === "archived" ? "archived" : "draft",
+          lastSent: formatRelativeSent(kit.lastSentAt),
+          sentDate: formatDateString(kit.lastSentAt),
+          kit,
         };
+      })
+      .sort((a, b) => {
+        const ta = a.kit?.lastSentAt ? new Date(a.kit.lastSentAt).getTime() : 0;
+        const tb = b.kit?.lastSentAt ? new Date(b.kit.lastSentAt).getTime() : 0;
+        return tb - ta;
       });
-
-    // No real kit sends yet — show a proper empty state instead of demo rows.
-    if (campaignRows.length === 0) return [];
-
-    const historyRows = mockHistoryRows.map((row): KitRow => {
-      const matchedKit = findKitByName(row.name);
-      return {
-        ...row,
-        id: matchedKit?.id ?? row.id,
-        description: matchedKit?.description?.trim() || row.description,
-        image: matchedKit?.artworkUrl
-          ? resolveMediaUrl(matchedKit.artworkUrl)
-          : row.image,
-        items: matchedKit?.items ?? row.items,
-        kit: matchedKit,
-      };
-    });
-
-    return [...campaignRows, ...historyRows];
-  }, [workspace?.campaigns, vm.kits]);
+  }, [vm.kits]);
 
   // Filtered & Sorted Recent Activity
   const processedRecentRows = useMemo(() => {
@@ -595,6 +510,13 @@ export function KitsView(vm: KitsVm) {
       list.sort((a, b) => a.name.localeCompare(b.name));
     } else if (recentSort === "items") {
       list.sort((a, b) => b.items - a.items);
+    } else {
+      // newest — sent date descending
+      list.sort((a, b) => {
+        const ta = a.kit?.lastSentAt ? new Date(a.kit.lastSentAt).getTime() : 0;
+        const tb = b.kit?.lastSentAt ? new Date(b.kit.lastSentAt).getTime() : 0;
+        return tb - ta;
+      });
     }
     return list;
   }, [recentActivityRows, recentTab, recentSearch, recentSort]);
@@ -660,6 +582,11 @@ export function KitsView(vm: KitsVm) {
     const start = (curatedPage - 1) * GRID_ITEMS_PER_PAGE;
     return processedCuratedRows.slice(start, start + GRID_ITEMS_PER_PAGE);
   }, [processedCuratedRows, curatedPage]);
+
+  const firstLiveKitId = useMemo(
+    () => vm.kits.find((k) => k.status === "live")?.id,
+    [vm.kits],
+  );
 
   // ── Handlers for Curated Action & Send ──
 
@@ -1068,8 +995,18 @@ export function KitsView(vm: KitsVm) {
         {activeSection === "recent" && (
           recentActivityRows.length === 0 ? (
             <KitsSectionEmptyState
-              title="No kits have been sent yet"
-              description="Once you send your first kit, delivery history and recipient activity will appear here."
+              title="No recent activity"
+              description="Kits that you or your team send will appear here once they have been sent."
+              action={
+                canSendKits || canCreateKits ? (
+                  <Link
+                    to={firstLiveKitId ? `/app/kits/${firstLiveKitId}/send` : "/app/kits/new"}
+                    className="btn btn-brand"
+                  >
+                    Send Your First Kit
+                  </Link>
+                ) : null
+              }
             />
           ) : (
           <div className="kits-list-card">

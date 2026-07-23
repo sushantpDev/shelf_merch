@@ -91,7 +91,7 @@ export function KitReviewPricingStep({
             <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)", fontWeight: 800 }}>
               {formatInr(total)}
             </b>
-            <span style={{ fontSize: 14, fontWeight: 400, color: "var(--ink-2)" }}> / kit + GST</span>
+            <span style={{ fontSize: 14, fontWeight: 400, color: "var(--ink-2)" }}> / kit including GST</span>
           </span>
         </div>
         <p className="muted" style={{ margin: "8px 0 0", fontSize: 12 }}>

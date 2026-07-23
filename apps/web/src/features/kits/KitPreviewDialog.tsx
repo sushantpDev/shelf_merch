@@ -20,6 +20,7 @@ export type KitPreviewData = {
   description: string;
   coverImage?: string;
   artworkUrl?: string;
+  packaging?: string;
   products: KitPreviewProduct[];
 };
 
@@ -119,6 +120,7 @@ export function buildKitPreviewFromWorkspace(
       coverFromMeta ||
       fallbackCover,
     artworkUrl: kit.artworkUrl,
+    packaging: kit.packaging === "box" ? "Premium box" : kit.packaging === "none" ? "No packaging" : kit.packaging,
     products,
   };
 }
@@ -306,9 +308,16 @@ export function KitPreviewDialog({
               </DialogTitle>
             </div>
 
-            <p style={{ color: "var(--gray-500)", fontSize: 14, lineHeight: 1.5, margin: "0 0 20px" }}>
+            <p style={{ color: "var(--gray-500)", fontSize: 14, lineHeight: 1.5, margin: "0 0 12px" }}>
               {data.description}
             </p>
+            {data.packaging ? (
+              <p className="muted" style={{ fontSize: 13, margin: "0 0 20px" }}>
+                Packaging: <strong style={{ color: "var(--ink)" }}>{data.packaging}</strong>
+              </p>
+            ) : (
+              <div style={{ marginBottom: 8 }} />
+            )}
 
             <div style={{ borderBottom: "1px solid var(--line)", marginBottom: 16 }} />
 

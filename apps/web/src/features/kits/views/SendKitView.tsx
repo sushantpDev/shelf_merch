@@ -827,16 +827,19 @@ export function SendKitView(vm: SendKitVm) {
               <SumRow k="Recipients" v={String(totals.qty)} /> */}
               <SumRow
                 k={`${totals.qty} kits × ${inr(totals.costPerKit)}`}
-                v={inr(totals.sub)}
+                v={inr(totals.total)}
                 emphasis
               />
-              <SumRow k="GST at 18%" v={inr(totals.tax)} />
               <SumRow k="Shipping" v="Free" />
               {/* <SumRow k="Service fee (12%)" v={inr(totals.fee)} /> */}
+              {/* GST is inclusive in price per kit — not added separately */}
               
               <div className="divider" />
-              <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                <b style={{ fontSize: 18 }}>Grand Total</b>
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                <div>
+                  <b style={{ fontSize: 18, display: "block" }}>Grand Total</b>
+                  <span className="muted" style={{ fontSize: 12 }}>incl. GST at 18%</span>
+                </div>
                 <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)" }}>{inr(totals.total)}</b>
               </div>
               <button type="button" className="btn btn-brand btn-block btn-lg" style={{ marginTop: 14 }} onClick={vm.onPayAndSend}>
