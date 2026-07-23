@@ -1,9 +1,10 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from "react";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { TintedGarment } from "@/components/store/TintedGarment";
 import type { UiProduct } from "@/services/mappers";
 import { DEFAULT_MOCKUP_TINT_HEX, isDefaultMockupTint } from "./colors";
 import {
+  bakeTintedMockup,
   defaultPlacement,
   designImgUrl,
   pickPrintArea,
@@ -157,6 +158,58 @@ function MaskArtworkComposite({
 }
 
 /**
+ * Live realistic tinted mockup. Whenever the colour swatch changes it bakes the
+ * recoloured garment mask (multiply keeps the fabric folds/shadows) plus the
+ * warped, fabric-blended artwork to a canvas — the same realistic path as the
+ * saved bake — and shows the result. While the bake is in flight (or if it
+ * can't run, e.g. a cross-origin mask), it falls back to the DOM mask+overlay
+ * composite so there is always a live preview.
+ */
+function TintedMockupImage({
+  product,
+  overlay,
+  tintHex,
+  savedPlacement,
+  fallback,
+}: {
+  product: UiProduct;
+  overlay: string;
+  tintHex: string;
+  savedPlacement?: Placement | null;
+  fallback: ReactElement;
+}) {
+  const [src, setSrc] = useState("");
+  const [failed, setFailed] = useState(false);
+  const reqRef = useRef(0);
+
+  useEffect(() => {
+    const req = ++reqRef.current;
+    setFailed(false);
+    bakeTintedMockup(product, overlay, savedPlacement ?? null, tintHex)
+      .then((url) => {
+        if (req !== reqRef.current) return;
+        if (url) setSrc(url);
+        else setFailed(true);
+      })
+      .catch(() => {
+        if (req === reqRef.current) setFailed(true);
+      });
+    // Keep the previous baked image visible while the next colour bakes.
+  }, [product, overlay, tintHex, savedPlacement]);
+
+  if (failed || !src) return fallback;
+  return (
+    <div className="img img-mockup">
+      <img
+        src={src}
+        alt={product.nm}
+        style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+      />
+    </div>
+  );
+}
+
+/**
  * Saved-design thumbnail. The baked Konva mockup (uploaded at the artwork step)
  * is the source of truth for the default look — it is preferred whenever
  * present. Live compositing remains for tinted colour variants (using the
@@ -209,6 +262,25 @@ export function DesignedProductThumb({
           style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
         />
       </div>
+    ) : !isDefaultTint && tintMask ? (
+      // Colour swatch selected: bake a realistic recoloured mockup (tinted
+      // garment + warped/blended artwork). Falls back to the DOM composite
+      // while baking or if the canvas bake can't run.
+      <TintedMockupImage
+        product={product}
+        overlay={overlay}
+        tintHex={liveTintHex}
+        savedPlacement={savedPlacement}
+        fallback={
+          <MaskArtworkComposite
+            product={product}
+            mask={tintMask}
+            overlay={overlay}
+            tintHex={liveTintHex}
+            savedPlacement={savedPlacement}
+          />
+        }
+      />
     ) : overlay && resolvedMask ? (
       <MaskArtworkComposite
         product={product}
