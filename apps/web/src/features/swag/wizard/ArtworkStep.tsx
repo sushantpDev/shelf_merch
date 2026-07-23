@@ -362,12 +362,12 @@ function ArtworkPickRow({
             </span>
             <span className="sw-art-pick-meta">
               {name ? <span className="sw-art-pick-name">{name}</span> : null}
-              <span className="sw-art-pick-quality">
+              {/* <span className="sw-art-pick-quality">
                 Print Quality:{" "}
                 <strong className={quality === "poor" ? "poor" : quality === "good" ? "good" : ""}>
                   {quality === "poor" ? "Poor Quality" : quality === "good" ? "Good Quality" : "Checking…"}
                 </strong>
-              </span>
+              </span> */}
               <span className="mut3 sw-art-pick-type">File Type: {fileType}</span>
             </span>
           </button>
