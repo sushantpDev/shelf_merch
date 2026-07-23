@@ -401,11 +401,27 @@ async function artworkFileFromInput(art: ArtworkInput): Promise<File | null> {
   let file: File | null = null;
   if (art.file instanceof File) {
     file = art.file;
-  } else if (art.preview?.startsWith("data:")) {
-    const res = await fetch(art.preview);
-    const blob = await res.blob();
-    const name = art.name || "artwork.png";
-    file = new File([blob], name, { type: blob.type || "image/png" });
+  } else if (art.preview) {
+    // Fetch the preview back into a File so collection.artworkUrl is persisted.
+    // Fresh uploads/pastes are data:/blob:; artwork reused from history comes in
+    // as an already-hosted http(s) or root-relative URL. That reused case
+    // previously returned null here, so artworkUrl stayed empty and the artwork
+    // was missing from live colour-tinted mockups (only baked into the mockup).
+    const src = art.preview;
+    if (
+      src.startsWith("data:") ||
+      src.startsWith("blob:") ||
+      /^https?:\/\//i.test(src) ||
+      src.startsWith("/")
+    ) {
+      try {
+        const res = await fetch(resolveMediaUrl(src) ?? src);
+        const blob = await res.blob();
+        file = new File([blob], art.name || "artwork.png", { type: blob.type || "image/png" });
+      } catch {
+        file = null;
+      }
+    }
   }
   if (!file) return null;
   return ensureUploadableArtworkFile(file);
