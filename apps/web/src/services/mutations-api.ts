@@ -240,6 +240,8 @@ function productRefFromUi(p: UiProduct) {
     name: p.nm,
     group: p.g || "tee",
     ...(mockupUrl ? { mockupUrl } : {}),
+    // Carry the saved Konva placement so live colour tints match the baked mockup.
+    ...(p.placement ? { placement: p.placement } : {}),
   };
 }
 
@@ -595,6 +597,9 @@ export async function addProductToShopApi(payload: {
     ...(payload.product.mockupUrl
       ? { mockupUrl: resolveMediaUrl(payload.product.mockupUrl) }
       : {}),
+    // catalogProduct has no placement — take it from the designed product so the
+    // shop-specific collection keeps the artwork size/position on colour variants.
+    ...(payload.product.placement ? { placement: payload.product.placement } : {}),
   };
   const catalogById = new Map(
     payload.catalog.filter((p) => p.id).map((p) => [p.id as string, p]),

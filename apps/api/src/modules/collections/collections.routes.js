@@ -30,6 +30,16 @@ const productRef = z.object({
   name: z.string().min(1),
   group: z.string().optional().default(''),
   mockupUrl: z.string().optional().default(''),
+  // Konva artwork placement — carried so shop-specific collections (Add to shop)
+  // recolour live colour variants at the same size/position as the baked mockup.
+  placement: z
+    .object({
+      xPct: z.number(),
+      yPct: z.number(),
+      wPct: z.number(),
+      rot: z.number(),
+    })
+    .nullish(),
 });
 
 const createSchema = z.object({
