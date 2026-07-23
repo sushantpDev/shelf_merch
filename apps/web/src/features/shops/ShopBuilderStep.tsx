@@ -1,5 +1,5 @@
 import { type Dispatch, useState } from "react";
-import { Check, SquarePen } from "lucide-react";
+import { SquarePen } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FullscreenOverlay } from "@/components/tenant/FullscreenOverlay";
 import {
@@ -10,8 +10,8 @@ import {
   type BannerSource,
 } from "./banner";
 import { BannerCustomUpload } from "./BannerCustomUpload";
+import { ShopHomePreview } from "./ShopHomePreview";
 import type { ShopDraft, ShopDraftAction } from "./shopDraft";
-import { BUILDER_CATEGORIES } from "./types";
 
 export function ShopBuilderStep({
   draft,
@@ -75,89 +75,58 @@ export function ShopBuilderStep({
         </button>
       </div>
 
-      <div className="scroll" style={{ flex: 1 }}>
-        <div
-          className={`shop-builder-banner${hasImage || isEmptyBanner ? " has-preset" : ""}${isEmptyBanner ? " is-empty" : ""}`}
-        >
-          {hasImage ? (
-            <img src={imageUrl} alt="" className="shop-builder-banner-img" />
-          ) : isEmptyBanner ? (
-            <img
-              src="/shop-banners/default-welcome.png"
-              alt=""
-              className="shop-builder-banner-img"
-            />
-          ) : (
+      <div className="scroll shop-builder-scroll fade-in" style={{ flex: 1 }}>
+        <ShopHomePreview
+          shopName={draft.name}
+          logoUrl={draft.logoUrl || undefined}
+          currency={draft.currency}
+          banner={
             <div
-              className={`shop-builder-banner-solid${theme.dots ? " shopbanner-merch" : ""}`}
-              style={bannerBackgroundStyle(source)}
-              aria-hidden
-            />
-          )}
+              className={`shop-builder-banner${hasImage || isEmptyBanner ? " has-preset" : ""}${isEmptyBanner ? " is-empty" : ""}`}
+            >
+              {hasImage ? (
+                <img src={imageUrl} alt="" className="shop-builder-banner-img" />
+              ) : isEmptyBanner ? (
+                <img
+                  src="/shop-banners/default-welcome.png"
+                  alt=""
+                  className="shop-builder-banner-img"
+                />
+              ) : (
+                <div
+                  className={`shop-builder-banner-solid${theme.dots ? " shopbanner-merch" : ""}`}
+                  style={bannerBackgroundStyle(source)}
+                  aria-hidden
+                />
+              )}
 
-          <div className="shop-builder-banner-content">
-            {draft.logoUrl ? (
-              <div className={`shop-builder-banner-logo${hasImage || isEmptyBanner ? " corner" : ""}`}>
-                <img src={draft.logoUrl} alt="Shop logo" />
-              </div>
-            ) : null}
-
-            {!hasImage && !isEmptyBanner ? (
-              <div className="shop-builder-banner-title" style={{ color: theme.text }}>
-                {draft.name || "Your shop name"}
-              </div>
-            ) : null}
-          </div>
-
-          <button
-            type="button"
-            className="shop-builder-banner-edit-center"
-            onClick={() => setBannerOpen(true)}
-          >
-            <SquarePen size={15} strokeWidth={2} />
-            Edit banner
-          </button>
-        </div>
-
-        <div className="shop-builder-body fade-in">
-          <div className="shop-builder-panel">
-            <h2 className="shop-builder-panel-title">Choose categories for your shop</h2>
-            <p className="shop-builder-panel-desc muted">
-              Pick categories for recipients to shop from. After saving, you can enable/disable
-              individual products.
-            </p>
-            <div className="shop-builder-cats">
-              {BUILDER_CATEGORIES.map(([category, , thumb]) => {
-                const selected = draft.categories.includes(category);
-                return (
-                  <button
-                    key={category}
-                    type="button"
-                    className={`optcard shop-builder-cat ${selected ? "on" : ""}`}
-                    aria-pressed={selected}
-                    onClick={() => dispatch({ type: "toggleCategory", category })}
+              <div className="shop-builder-banner-content">
+                {draft.logoUrl ? (
+                  <div
+                    className={`shop-builder-banner-logo${hasImage || isEmptyBanner ? " corner" : ""}`}
                   >
-                    <div
-                      className="shop-builder-cat-check"
-                      style={{
-                        borderColor: selected ? "var(--brand)" : "var(--line-strong)",
-                        background: selected ? "var(--brand)" : "#fff",
-                      }}
-                    >
-                      {selected ? <Check size={12} color="#fff" /> : null}
-                    </div>
-                    <div className="shop-builder-cat-label">
-                      <h4>{category}</h4>
-                    </div>
-                    <div className="shop-builder-cat-thumb">
-                      <img src={thumb} alt="" width={48} height={48} loading="lazy" decoding="async" />
-                    </div>
-                  </button>
-                );
-              })}
+                    <img src={draft.logoUrl} alt="Shop logo" />
+                  </div>
+                ) : null}
+
+                {!hasImage && !isEmptyBanner ? (
+                  <div className="shop-builder-banner-title" style={{ color: theme.text }}>
+                    {draft.name || "Your shop name"}
+                  </div>
+                ) : null}
+              </div>
+
+              <button
+                type="button"
+                className="shop-builder-banner-edit-center"
+                onClick={() => setBannerOpen(true)}
+              >
+                <SquarePen size={15} strokeWidth={2} />
+                Edit banner
+              </button>
             </div>
-          </div>
-        </div>
+          }
+        />
       </div>
 
       <Dialog open={bannerOpen} onOpenChange={setBannerOpen}>
