@@ -427,6 +427,7 @@ export async function getCatalog(token) {
   if (campaign.catalogMode === 'selected_products' && campaign.selectedProductIds.length) {
     const artworkByProductId = new Map();
     const mockupByProductId = new Map();
+    const placementByProductId = new Map();
     const preferredColorsByProductId = new Map();
     if (campaign.shopId) {
       const shopCollections = await Collection.find({
@@ -442,6 +443,7 @@ export async function getCatalog(token) {
           if (!pid) continue;
           if (col.artworkUrl && !artworkByProductId.has(pid)) artworkByProductId.set(pid, col.artworkUrl);
           if (ref.mockupUrl && !mockupByProductId.has(pid)) mockupByProductId.set(pid, ref.mockupUrl);
+          if (ref.placement && !placementByProductId.has(pid)) placementByProductId.set(pid, ref.placement);
           if (col.preferredColors?.length && !preferredColorsByProductId.has(pid)) {
             preferredColorsByProductId.set(pid, col.preferredColors);
           }
@@ -461,6 +463,7 @@ export async function getCatalog(token) {
           ...p,
           artworkUrl: artworkByProductId.get(String(p._id)) || '',
           mockupUrl: mockupByProductId.get(String(p._id)) || '',
+          placement: placementByProductId.get(String(p._id)) || null,
           preferredColors: preferredColorsByProductId.get(String(p._id)) || [],
         })),
       );
