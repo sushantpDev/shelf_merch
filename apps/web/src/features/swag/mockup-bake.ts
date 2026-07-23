@@ -341,6 +341,28 @@ export async function bakeTintedMockup(
     const dx = (size - w) / 2;
     const dy = (size - h) / 2;
     ctx.drawImage(maskImg, dx, dy, w, h);
+
+    // A production mask is a transparent cutout. If the source has an opaque
+    // background (a marketing/model photo, not a real mask), a multiply tint
+    // would recolour the whole background — so bail and let the caller fall
+    // back to the DOM TintedGarment, which flood-fills the background away
+    // before recolouring. Sample the four image corners for opacity.
+    let opaqueCorners = 0;
+    try {
+      const alphaAt = (x: number, y: number) =>
+        ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data[3];
+      const corners: Array<[number, number]> = [
+        [dx + 2, dy + 2],
+        [dx + w - 3, dy + 2],
+        [dx + 2, dy + h - 3],
+        [dx + w - 3, dy + h - 3],
+      ];
+      for (const [x, y] of corners) if (alphaAt(x, y) > 200) opaqueCorners += 1;
+    } catch {
+      return "";
+    }
+    if (opaqueCorners >= 3) return "";
+
     ctx.save();
     ctx.globalCompositeOperation = "multiply";
     ctx.fillStyle = tintHex;
