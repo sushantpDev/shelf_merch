@@ -36,9 +36,10 @@ function fileTypeFromUrl(url: string) {
 
 function labelFromUrl(url: string, fallback: string) {
   try {
+    // Keep the extension — publish re-uploads previous artwork as a File and
+    // the API allowlist requires both MIME and a matching extension.
     const file = url.split("?")[0].split("/").pop() || "";
-    const base = decodeURIComponent(file.replace(/\.[^.]+$/, ""));
-    return base || fallback;
+    return decodeURIComponent(file) || fallback;
   } catch {
     return fallback;
   }

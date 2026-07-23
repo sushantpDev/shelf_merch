@@ -58,13 +58,52 @@ function placementStyle(pl: Placement, artAspect: number): CSSProperties {
     left: `${pl.xPct}%`,
     top: `${pl.yPct}%`,
     width: `${pl.wPct}%`,
+    height: "auto",
+    maxWidth: "none",
+    maxHeight: "none",
     aspectRatio: `${1 / Math.max(artAspect, 0.01)}`,
     transform: `translate(-50%, -50%) rotate(${pl.rot || 0}deg)`,
     transformOrigin: "center center",
     objectFit: "contain",
     pointerEvents: "none",
+    zIndex: 2,
   };
 }
+
+/** Square stage matching Konva / bakeMockup — placement % is of this box. */
+function MockupStage({
+  isolation,
+  children,
+}: {
+  isolation?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="img img-mockup img-mockup-stage"
+      style={{
+        position: "relative",
+        width: "100%",
+        aspectRatio: "1 / 1",
+        overflow: "hidden",
+        ...(isolation ? { isolation: "isolate" as const } : null),
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** Garment fills the square stage the same way bakeMockup letterboxes the mask. */
+const STAGE_GARMENT_STYLE: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  display: "block",
+  margin: 0,
+};
 
 /** Live mask + artwork on the full square stage (Konva / bake coordinate system). */
 function LiveArtworkComposite({
@@ -85,13 +124,8 @@ function LiveArtworkComposite({
   );
 
   return (
-    <div className="img img-mockup" style={{ position: "relative" }}>
-      <img
-        src={base}
-        alt={product.nm}
-        loading="lazy"
-        style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
-      />
+    <MockupStage>
+      <img src={base} alt={product.nm} loading="lazy" style={STAGE_GARMENT_STYLE} />
       <img
         className="art-overlay-img"
         src={overlay}
@@ -103,7 +137,7 @@ function LiveArtworkComposite({
           if (aspect > 0) setArtAspect(aspect);
         }}
       />
-    </div>
+    </MockupStage>
   );
 }
 
@@ -129,13 +163,8 @@ function MaskArtworkComposite({
   const fx = artworkFabricFx(tintHex);
 
   return (
-    <div className="img img-mockup" style={{ position: "relative", isolation: "isolate" }}>
-      <TintedGarment
-        src={mask}
-        hex={tintHex}
-        alt={product.nm}
-        style={{ width: "100%", height: "100%" }}
-      />
+    <MockupStage isolation>
+      <TintedGarment src={mask} hex={tintHex} alt={product.nm} style={STAGE_GARMENT_STYLE} />
       {overlay ? (
         <img
           className="art-overlay-img"
@@ -153,7 +182,7 @@ function MaskArtworkComposite({
           }}
         />
       ) : null}
-    </div>
+    </MockupStage>
   );
 }
 

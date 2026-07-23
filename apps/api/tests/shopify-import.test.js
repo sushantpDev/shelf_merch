@@ -148,12 +148,18 @@ describe('Shopify catalog import', () => {
   });
 
   it('imports products as drafts with mapped fields and source id', async () => {
-    vi.stubGlobal('fetch', stubFetch(200, SHOPIFY_PAYLOAD));
+    const fetchMock = stubFetch(200, SHOPIFY_PAYLOAD);
+    vi.stubGlobal('fetch', fetchMock);
     const res = await importReq(catalogToken);
     expect(res.status).toBe(200);
     expect(res.body.imported).toBe(2);
     expect(res.body.updated).toBe(0);
     expect(res.body.skipped).toBe(0);
+
+    // First products page must request only Shopify-active catalog items.
+    const productListCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/products.json'));
+    expect(productListCall).toBeTruthy();
+    expect(String(productListCall[0])).toContain('status=active');
 
     const tee = await CatalogProduct.findOne({ 'source.externalId': '111' });
     expect(tee.status).toBe('draft');
@@ -168,6 +174,35 @@ describe('Shopify catalog import', () => {
     expect(tee.source.provider).toBe('shopify');
     // Imported products are made-to-order so they don't read as "out of stock".
     expect(tee.inventory.mode).toBe('made_to_order');
+  });
+
+  it('ignores draft and archived Shopify products even if returned', async () => {
+    const mixed = {
+      products: [
+        { ...SHOPIFY_PAYLOAD.products[0], status: 'active' },
+        { ...SHOPIFY_PAYLOAD.products[1], id: 333, title: 'Draft Mug', status: 'draft' },
+        {
+          id: 444,
+          title: 'Archived Cap',
+          handle: 'archived-cap',
+          vendor: 'Acme',
+          product_type: 'Apparel',
+          body_html: 'Old',
+          options: [],
+          images: [],
+          variants: [{ sku: 'CAP-1', price: '199', inventory_quantity: 0 }],
+          status: 'archived',
+        },
+      ],
+    };
+    vi.stubGlobal('fetch', stubFetch(200, mixed));
+    const res = await importReq(catalogToken);
+    expect(res.status).toBe(200);
+    expect(res.body.imported).toBe(1);
+    expect(await CatalogProduct.countDocuments({ 'source.provider': 'shopify' })).toBe(1);
+    const only = await CatalogProduct.findOne({ 'source.provider': 'shopify' });
+    expect(only.source.externalId).toBe('111');
+    expect(only.status).toBe('draft');
   });
 
   it('skips products already imported on re-import (idempotent)', async () => {

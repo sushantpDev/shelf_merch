@@ -363,10 +363,41 @@ export async function uploadKitMockupsApi(kitId: string, items: KitMockupUploadI
 
 type ArtworkInput = { file?: File; preview?: string; name?: string };
 
+const UPLOADABLE_ART_EXT = /\.(png|jpe?g|webp|gif)$/i;
+
+/** Map MIME → extension the API upload allowlist accepts. */
+function extForArtworkMime(mime: string): string {
+  if (mime === "image/jpeg" || mime === "image/jpg") return ".jpg";
+  if (mime === "image/webp") return ".webp";
+  if (mime === "image/gif") return ".gif";
+  return ".png";
+}
+
+/**
+ * API multer filter requires BOTH an allowlisted MIME and extension. Reused
+ * artwork often has a display name with no extension ("Existing artwork", or
+ * history labels with the suffix stripped) — that yields 415 with
+ * "Unsupported file type: image/png".
+ */
+function artworkUploadFilename(name: string | undefined, mime: string): string {
+  const raw = (name || "artwork").trim() || "artwork";
+  if (UPLOADABLE_ART_EXT.test(raw)) return raw;
+  const base = raw.replace(/\.[^.]+$/, "") || "artwork";
+  return `${base}${extForArtworkMime(mime)}`;
+}
+
+/** Ensure filename + MIME pair will pass the server upload allowlist. */
+function withUploadableArtworkName(file: File, preferredName?: string): File {
+  const mime = file.type || "image/png";
+  const filename = artworkUploadFilename(file.name || preferredName, mime);
+  if (filename === file.name && file.type === mime) return file;
+  return new File([file], filename, { type: mime });
+}
+
 /** Rasterize SVG (blocked by upload allowlist) to PNG so artwork can be stored. */
-async function ensureUploadableArtworkFile(file: File): Promise<File> {
+async function ensureUploadableArtworkFile(file: File, preferredName?: string): Promise<File> {
   const isSvg = file.type === "image/svg+xml" || /\.svg$/i.test(file.name);
-  if (!isSvg) return file;
+  if (!isSvg) return withUploadableArtworkName(file, preferredName);
 
   const objectUrl = URL.createObjectURL(file);
   try {
@@ -390,7 +421,8 @@ async function ensureUploadableArtworkFile(file: File): Promise<File> {
         "image/png",
       );
     });
-    const base = file.name.replace(/\.svg$/i, "") || "artwork";
+    const sourceName = preferredName || file.name;
+    const base = sourceName.replace(/\.svg$/i, "").replace(/\.[^.]+$/, "") || "artwork";
     return new File([blob], `${base}.png`, { type: "image/png" });
   } finally {
     URL.revokeObjectURL(objectUrl);
@@ -421,14 +453,15 @@ async function artworkFileFromInput(art: ArtworkInput): Promise<File | null> {
       try {
         const res = await fetch(fetchUrl);
         const blob = await res.blob();
-        file = new File([blob], art.name || "artwork.png", { type: blob.type || "image/png" });
+        const mime = blob.type || "image/png";
+        file = new File([blob], artworkUploadFilename(art.name, mime), { type: mime });
       } catch {
         file = null;
       }
     }
   }
   if (!file) return null;
-  return ensureUploadableArtworkFile(file);
+  return ensureUploadableArtworkFile(file, art.name);
 }
 
 /** Build an upload-ready artwork File (SVG → PNG). Exported for kit/collection flows. */

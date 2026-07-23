@@ -7,10 +7,48 @@ import {
   PlatformPageHeader,
   StatusTag,
 } from "../../../platform-ui";
-import type { CatalogVm } from "../controllers/useCatalogController";
+import type {
+  CatalogSort,
+  CatalogStatusFilter,
+  CatalogVm,
+} from "../controllers/useCatalogController";
+
+const STATUS_FILTERS: Array<{ key: CatalogStatusFilter; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "draft", label: "Draft" },
+  { key: "active", label: "Active" },
+  { key: "archived", label: "Archived" },
+  { key: "discontinued", label: "Discontinued" },
+];
+
+const SORT_OPTIONS: Array<{ value: CatalogSort; label: string }> = [
+  { value: "newest", label: "Newest" },
+  { value: "name", label: "Name" },
+  { value: "price-asc", label: "Price ↑" },
+  { value: "price-desc", label: "Price ↓" },
+  { value: "margin", label: "Margin" },
+  { value: "stock", label: "Stock" },
+];
 
 /** Platform product master with internal cost and margin. */
-export function CatalogView({ data, error, loading, canWrite }: CatalogVm) {
+export function CatalogView({
+  data,
+  error,
+  loading,
+  canWrite,
+  search,
+  onSearch,
+  statusFilter,
+  onStatusFilter,
+  sort,
+  onSort,
+  rows,
+}: CatalogVm) {
+  const filteredEmpty =
+    Boolean(data?.items.length) &&
+    rows.length === 0 &&
+    (search.trim() !== "" || statusFilter !== "all");
+
   return (
     <>
       <PlatformPageHeader
@@ -32,47 +70,95 @@ export function CatalogView({ data, error, loading, canWrite }: CatalogVm) {
       {loading && <PlatformLoading />}
       {error && <PlatformError message={error} />}
       {data && (
-        <DataTable
-          empty="No products yet."
-          rows={data.items as unknown as Record<string, unknown>[]}
-          columns={[
-            {
-              key: "name",
-              label: "Product",
-              render: (r) => (
-                <Link to={`/platform/catalog/${String(r._id)}`} className="lnk">
-                  {String(r.name)}
-                </Link>
-              ),
-            },
-            { key: "sku", label: "SKU" },
-            {
-              key: "status",
-              label: "Status",
-              render: (r) => <StatusTag status={String(r.status)} />,
-            },
-            {
-              key: "sellingPriceInr",
-              label: "Sell",
-              render: (r) => inr(Number(r.sellingPriceInr)),
-            },
-            {
-              key: "costPriceInr",
-              label: "Cost",
-              render: (r) => inr(Number(r.costPriceInr)),
-            },
-            {
-              key: "marginPct",
-              label: "Margin",
-              render: (r) => `${Number(r.marginPct)}%`,
-            },
-            {
-              key: "stock",
-              label: "Available",
-              render: (r) => String((r.inventory as { available?: number })?.available ?? 0),
-            },
-          ]}
-        />
+        <>
+          <div
+            className="row"
+            style={{ gap: 10, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}
+          >
+            <div className="tabs" style={{ maxWidth: 560, flex: "1 1 280px" }} role="tablist">
+              {STATUS_FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={statusFilter === f.key}
+                  className={statusFilter === f.key ? "on" : ""}
+                  onClick={() => onStatusFilter(f.key)}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <input
+              type="search"
+              className="inp"
+              placeholder="Search name or SKU…"
+              value={search}
+              onChange={(e) => onSearch(e.target.value)}
+              aria-label="Search catalog"
+              style={{ flex: "1 1 180px", maxWidth: 280, height: 40 }}
+            />
+            <label className="row" style={{ gap: 8, alignItems: "center", margin: 0 }}>
+              <span className="muted" style={{ fontSize: 12, fontWeight: 700 }}>
+                Sort
+              </span>
+              <select
+                className="inp"
+                value={sort}
+                onChange={(e) => onSort(e.target.value as CatalogSort)}
+                aria-label="Sort catalog"
+                style={{ width: "auto", height: 40, minWidth: 130 }}
+              >
+                {SORT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <DataTable
+            empty={filteredEmpty ? "No products match your filters." : "No products yet."}
+            rows={rows as unknown as Record<string, unknown>[]}
+            columns={[
+              {
+                key: "name",
+                label: "Product",
+                render: (r) => (
+                  <Link to={`/platform/catalog/${String(r._id)}`} className="lnk">
+                    {String(r.name)}
+                  </Link>
+                ),
+              },
+              { key: "sku", label: "SKU" },
+              {
+                key: "status",
+                label: "Status",
+                render: (r) => <StatusTag status={String(r.status)} />,
+              },
+              {
+                key: "sellingPriceInr",
+                label: "Sell",
+                render: (r) => inr(Number(r.sellingPriceInr)),
+              },
+              {
+                key: "costPriceInr",
+                label: "Cost",
+                render: (r) => inr(Number(r.costPriceInr)),
+              },
+              {
+                key: "marginPct",
+                label: "Margin",
+                render: (r) => `${Number(r.marginPct)}%`,
+              },
+              {
+                key: "stock",
+                label: "Available",
+                render: (r) => String((r.inventory as { available?: number })?.available ?? 0),
+              },
+            ]}
+          />
+        </>
       )}
     </>
   );

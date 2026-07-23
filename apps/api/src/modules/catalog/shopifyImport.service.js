@@ -217,7 +217,11 @@ function nextPageInfo(linkHeader) {
   return new URL(url).searchParams.get('page_info');
 }
 
-/** Fetch all products from the Shopify Admin REST API (cursor-paginated). */
+/**
+ * Fetch active products from the Shopify Admin REST API (cursor-paginated).
+ * Draft/archived Shopify products are excluded so only sellable catalog
+ * items are imported (always as platform drafts for review).
+ */
 export async function fetchShopifyProducts({ domain, token }) {
   if (!token) throw new ApiError(422, 'A Shopify Admin API access token is required', 'TOKEN_REQUIRED');
   const base = `https://${domain}/admin/api/${SHOPIFY_API_VERSION}/products.json`;
@@ -225,8 +229,11 @@ export async function fetchShopifyProducts({ domain, token }) {
   let pageInfo = null;
 
   for (let page = 0; page < MAX_PAGES; page += 1) {
+    // Cursor pages must only send page_info + limit — the status filter is
+    // baked into the first-page cursor by Shopify.
     const params = new URLSearchParams({ limit: '250' });
     if (pageInfo) params.set('page_info', pageInfo);
+    else params.set('status', 'active');
     let res;
     try {
       res = await fetch(`${base}?${params}`, {
@@ -242,7 +249,10 @@ export async function fetchShopifyProducts({ domain, token }) {
       throw new ApiError(502, `Shopify returned ${res.status} for "${domain}"`, 'SHOPIFY_ERROR');
     }
     const body = await res.json().catch(() => ({}));
-    products.push(...(body.products ?? []));
+    // Defense in depth: drop non-active rows if status is present on the payload.
+    products.push(
+      ...(body.products ?? []).filter((p) => !p.status || p.status === 'active'),
+    );
     pageInfo = nextPageInfo(res.headers.get('link'));
     if (!pageInfo) break;
   }
@@ -596,6 +606,8 @@ export async function importFromShopify({ domain, token, only = 'all' }) {
       mapped.sku = await uniqueSku(
         mapped.variants.find((v) => v.sku)?.sku || `SHOP-${externalId}`,
       );
+      // Always land as platform draft — never inherit Shopify "active".
+      mapped.status = 'draft';
       await CatalogProduct.create(mapped);
       product.imported += 1;
       items.push({ title: p.title, status: 'imported', kind: 'product' });

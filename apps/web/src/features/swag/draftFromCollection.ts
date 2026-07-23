@@ -15,7 +15,7 @@ export function draftFromCollection(collection: UiCollection, catalog: UiProduct
     step: collection.name.trim() ? step : 0,
     name: collection.name,
     picked,
-    art: artworkUrl ? { preview: artworkUrl, name: "Existing artwork" } : null,
+    art: artworkUrl ? { preview: artworkUrl, name: "Existing artwork.png" } : null,
     placements: {},
     placementEpoch: 0,
   };

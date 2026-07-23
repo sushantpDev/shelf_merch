@@ -23,7 +23,7 @@ export function ShopifyImportView({
         subtitle={
           kits
             ? "Pull only kit bundles from a Shopify store into the Kits collection. Catalog products are imported from the Catalog page."
-            : "Pull catalog products from a Shopify store as drafts for review. Kit bundles are imported separately from the Kits page."
+            : "Pull only active Shopify catalog products as drafts for review. Kit bundles are imported separately from the Kits page."
         }
         actions={
           <button type="button" className="btn btn-ghost btn-sm" onClick={onBack}>
@@ -59,7 +59,7 @@ export function ShopifyImportView({
             Used once for this import and never stored.{" "}
             {kits
               ? "Only kit bundles are imported, as curated active kits."
-              : "Imported products land as drafts — set cost, GST and HSN before publishing."}
+              : "Only active Shopify products are pulled, and they land as drafts — set cost, GST and HSN before publishing."}
           </p>
         </div>
         <button type="button" className="btn btn-brand" disabled={busy || !domain || !token} onClick={onRun}>
