@@ -1,7 +1,7 @@
 import { normalizeMongoId } from "@/lib/mongoId";
 import { ApiError, apiFetch } from "./api";
 import { getStoredUser } from "./auth-store";
-import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { mediaUrlForCanvas, resolveMediaUrl } from "@/lib/mediaUrl";
 import { mapCampaign, mapCollection, mapKit, type UiProduct } from "./mappers";
 
 const MONGO_ID = /^[a-f0-9]{24}$/i;
@@ -404,18 +404,22 @@ async function artworkFileFromInput(art: ArtworkInput): Promise<File | null> {
   } else if (art.preview) {
     // Fetch the preview back into a File so collection.artworkUrl is persisted.
     // Fresh uploads/pastes are data:/blob:; artwork reused from history comes in
-    // as an already-hosted http(s) or root-relative URL. That reused case
-    // previously returned null here, so artworkUrl stayed empty and the artwork
-    // was missing from live colour-tinted mockups (only baked into the mockup).
+    // as an already-hosted URL. That reused case previously returned null here,
+    // so artworkUrl stayed empty and the artwork was missing from live
+    // colour-tinted mockups (only baked into the mockup).
     const src = art.preview;
-    if (
-      src.startsWith("data:") ||
-      src.startsWith("blob:") ||
-      /^https?:\/\//i.test(src) ||
-      src.startsWith("/")
-    ) {
+    let fetchUrl = "";
+    if (src.startsWith("data:") || src.startsWith("blob:") || src.startsWith("/")) {
+      fetchUrl = src;
+    } else if (/^https?:\/\//i.test(src)) {
+      // Route remote (e.g. S3) artwork through the media proxy so the fetch is
+      // same-origin — a direct cross-origin fetch is blocked by CORS, which
+      // silently left artworkUrl empty.
+      fetchUrl = mediaUrlForCanvas(src);
+    }
+    if (fetchUrl) {
       try {
-        const res = await fetch(resolveMediaUrl(src) ?? src);
+        const res = await fetch(fetchUrl);
         const blob = await res.blob();
         file = new File([blob], art.name || "artwork.png", { type: blob.type || "image/png" });
       } catch {
@@ -506,7 +510,9 @@ export async function updateCollectionApi(payload: {
     catalogById,
   );
 
-  if (payload.artwork?.file) {
+  if (payload.artwork) {
+    // Not just `?.file` — reused-from-history artwork has only a hosted preview,
+    // and it must still be uploaded so collection.artworkUrl is persisted.
     const file = await artworkFileFromInput(payload.artwork);
     if (file) result = await uploadCollectionArtworkApi(result.id, file);
   }
