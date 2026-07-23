@@ -85,7 +85,7 @@ export function ShopBuilderStep({
               className={`shop-builder-banner${hasImage || isEmptyBanner ? " has-preset" : ""}${isEmptyBanner ? " is-empty" : ""}`}
             >
               {hasImage ? (
-                <img src={imageUrl} alt="" className="shop-builder-banner-img" />
+                <img src={imageUrl} alt="" className="shop-builder-banner-img h-[500px]" />
               ) : isEmptyBanner ? (
                 <img
                   src="/shop-banners/default-welcome.png"

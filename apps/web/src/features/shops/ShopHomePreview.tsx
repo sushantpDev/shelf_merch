@@ -15,14 +15,6 @@ type SampleProduct = {
 /** Sample catalog used only in the create-shop home preview. */
 const SAMPLE_PRODUCTS: SampleProduct[] = [
   {
-    id: "hoodie",
-    name: "Classic Pullover Hoodie",
-    brand: "Shelf Merch",
-    basePriceInr: 1899,
-    imageUrl: "/images/shops/products/hoodie.jpg",
-    category: "Merch",
-  },
-  {
     id: "jersey",
     name: "Performance Jersey",
     brand: "Shelf Merch",
@@ -46,6 +38,14 @@ const SAMPLE_PRODUCTS: SampleProduct[] = [
     imageUrl: "/images/shops/products/hat.jpg",
     category: "Merch",
   },
+  {
+    id: "hoodie",
+    name: "Classic Pullover Hoodie",
+    brand: "Shelf Merch",
+    basePriceInr: 1899,
+    imageUrl: "/images/shops/products/hoodie.jpg",
+    category: "Merch",
+  }
 ];
 
 /**
