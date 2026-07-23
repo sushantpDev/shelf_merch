@@ -170,7 +170,7 @@ export function MockupCanvas({
       }
 
       const realArt = buildRealisticArtwork(artImg, product?.g);
-      const node = new Konva.Image({
+      const node: Konva.Image = new Konva.Image({
         image: realArt,
         x: center0.x,
         y: center0.y,

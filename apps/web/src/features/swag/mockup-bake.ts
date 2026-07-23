@@ -306,6 +306,70 @@ export async function bakeMockup(
   }
 }
 
+/**
+ * Live realistic mockup recoloured to a garment colour. Recolours the
+ * transparent production mask to `tintHex` (multiply keeps the fabric's
+ * folds/shadows, then clip back to the mask alpha so the background stays
+ * clear) and bakes the warped/blended artwork on top — the same realistic
+ * path as bakeMockup, but tinted per colour swatch. Returns "" when there is
+ * no usable garment mask to recolour.
+ */
+export async function bakeTintedMockup(
+  ep: UiProduct,
+  artUrl: string,
+  placement: Placement | null,
+  tintHex: string,
+  size = 1000,
+): Promise<string> {
+  const maskUrl = designImgUrl(ep);
+  if (!maskUrl || !tintHex) return "";
+  try {
+    const [maskImg, artImg] = await Promise.all([
+      loadImageEl(maskUrl, true),
+      artUrl ? loadImageEl(artUrl, true).catch(() => null) : Promise.resolve(null),
+    ]);
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d")!;
+
+    // ── Garment: draw the mask, multiply the colour in (keeps fabric shading),
+    //    then clip back to the mask alpha so only the garment is recoloured.
+    const s = Math.min(size / maskImg.naturalWidth, size / maskImg.naturalHeight);
+    const w = maskImg.naturalWidth * s;
+    const h = maskImg.naturalHeight * s;
+    const dx = (size - w) / 2;
+    const dy = (size - h) / 2;
+    ctx.drawImage(maskImg, dx, dy, w, h);
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = tintHex;
+    ctx.fillRect(dx, dy, w, h);
+    ctx.globalCompositeOperation = "destination-in";
+    ctx.drawImage(maskImg, dx, dy, w, h);
+    ctx.restore();
+
+    // ── Artwork: warped + fabric-blended, multiplied onto the tinted garment.
+    if (artImg) {
+      const aspect = (artImg.naturalHeight || 1) / (artImg.naturalWidth || 1);
+      const pl = placement ?? defaultPlacement(ep, aspect);
+      const realArt = buildRealisticArtwork(artImg, ep?.g);
+      const w0 = (pl.wPct / 100) * size;
+      const h0 = w0 * aspect;
+      ctx.save();
+      ctx.globalCompositeOperation = "multiply";
+      ctx.globalAlpha = 0.96;
+      ctx.translate((pl.xPct / 100) * size, (pl.yPct / 100) * size);
+      ctx.rotate(((pl.rot || 0) * Math.PI) / 180);
+      ctx.drawImage(realArt, -w0 / 2, -h0 / 2, w0, h0);
+      ctx.restore();
+    }
+    return canvas.toDataURL("image/png");
+  } catch {
+    return "";
+  }
+}
+
 /** Resolved photo/mockup thumbnail for a product or baked design. */
 export function productThumbUrl(p: UiProduct, branded = false): string {
   if (branded && p.mockupUrl) return resolveMediaUrl(p.mockupUrl) || "";
