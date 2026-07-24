@@ -23,6 +23,7 @@ import {
   ShoppingBag,
   Store,
   Users,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { getStoredUser } from "@/services/api-bridge";
@@ -43,6 +44,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   campaigns: Megaphone,
   contacts: Users,
   support: LifeBuoy,
+  integrations: Zap,
   settings: Settings,
   catalog: LayoutGrid,
 };
