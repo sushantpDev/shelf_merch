@@ -944,6 +944,23 @@ export default function StoreShell({
     return `₹${inr.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
+  /** Checkout "You pay" — 0 when wallet covers all; partial shows Pts (₹). */
+  function fmtYouPayDue(inr: number) {
+    if (inr <= 0) {
+      return storeCurrency === "inr" ? "₹0 Credits" : "0 Pts";
+    }
+    if (storeCurrency === "points") {
+      return `${inrToPoints(inr).toLocaleString("en-IN")} Pts (${fmtUpiAmount(inr)})`;
+    }
+    return fmtUpiAmount(inr);
+  }
+
+  function youPayAmountInr() {
+    if (mode !== "redeem") return cartTotalInr;
+    if (!useRewardPoints) return cartTotalInr;
+    return upiDueInr;
+  }
+
   async function collectRazorpayPayment(amountInr: number) {
     if (!redemptionToken || !sessionToken) {
       throw new Error("Payment session expired — refresh and try again.");
@@ -1728,7 +1745,7 @@ export default function StoreShell({
                 {mode === "redeem" && paysWithUpi ? (
                   <div className="sf-bag-summary-row sf-bag-summary-row--muted">
                     <span>Pay via UPI</span>
-                    <b>{fmtUpiAmount(upiDueInr)}</b>
+                    <b>{fmtYouPayDue(upiDueInr)}</b>
                   </div>
                 ) : null}
                 {mode === "redeem" && balanceInr != null && useRewardPoints ? (
@@ -1740,26 +1757,16 @@ export default function StoreShell({
                   </div>
                 ) : null}
 
-                {mode === "redeem" && useRewardPoints && !paysWithUpi ? (
-                  <div className="sf-bag-summary-note">
-                    <span className="sf-bag-summary-note-icon" aria-hidden="true">
-                      ✦
-                    </span>
-                    <span>
-                      You&apos;ll earn nothing extra. You&apos;re redeeming your{" "}
-                      {storeCurrency === "inr" ? "credits" : "points"}.
-                    </span>
-                  </div>
-                ) : null}
-
                 <div className="sf-bag-summary-total">
                   <span>Total</span>
                   <b>
-                    {paysWithUpi
-                      ? fmtUpiAmount(upiDueInr)
-                      : canCheckout
-                        ? fmtCardPrice(cartTotalInr)
-                        : "—"}
+                    {mode === "redeem" && useRewardPoints
+                      ? fmtYouPayDue(youPayAmountInr())
+                      : paysWithUpi
+                        ? fmtUpiAmount(upiDueInr)
+                        : canCheckout
+                          ? fmtCardPrice(cartTotalInr)
+                          : "—"}
                   </b>
                 </div>
 
@@ -2121,12 +2128,24 @@ export default function StoreShell({
                 {mode === "redeem" && paysWithUpi ? (
                   <div className="sf-checkout-summary-row sf-checkout-summary-row--muted">
                     <span>Pay via UPI</span>
-                    <b>{fmtUpiAmount(upiDueInr)}</b>
+                    <b>{fmtYouPayDue(upiDueInr)}</b>
+                  </div>
+                ) : null}
+                {mode === "redeem" && balanceInr != null && useRewardPoints ? (
+                  <div className="sf-checkout-summary-row sf-checkout-summary-row--muted">
+                    <span>Remaining in wallet</span>
+                    <b>{navBalanceValue(Math.max(0, balanceInr - pointsApplied))}</b>
                   </div>
                 ) : null}
                 <div className="sf-checkout-summary-total">
                   <span>You pay</span>
-                  <b>{paysWithUpi ? fmtUpiAmount(upiDueInr) : fmtCardPrice(cartTotalInr)}</b>
+                  <b>
+                    {mode === "redeem" && useRewardPoints
+                      ? fmtYouPayDue(youPayAmountInr())
+                      : paysWithUpi
+                        ? fmtUpiAmount(upiDueInr)
+                        : fmtCardPrice(cartTotalInr)}
+                  </b>
                 </div>
                 <button
                   type="button"
@@ -2137,7 +2156,7 @@ export default function StoreShell({
                   {placing ? (
                     "Processing…"
                   ) : paysWithUpi ? (
-                    `Pay ${fmtUpiAmount(upiDueInr)} via UPI`
+                    `Pay ${fmtYouPayDue(upiDueInr)} via UPI`
                   ) : (
                     <>
                       <LockIcon />
@@ -2176,7 +2195,25 @@ export default function StoreShell({
                             <div className="sf-checkout-item-variant">{variantLabel}</div>
                           ) : null}
                           <div className="sf-checkout-item-meta">
-                            <span>Qty: {l.qty}</span>
+                            <div className="sf-bag-qty sf-checkout-item-qty">
+                              <button
+                                type="button"
+                                className="sf-bag-qty-btn"
+                                aria-label="Decrease quantity"
+                                onClick={() => bumpLineQty(l.key, -1)}
+                              >
+                                <MinusIcon />
+                              </button>
+                              <span className="sf-bag-qty-val">{l.qty}</span>
+                              <button
+                                type="button"
+                                className="sf-bag-qty-btn"
+                                aria-label="Increase quantity"
+                                onClick={() => bumpLineQty(l.key, 1)}
+                              >
+                                <PlusIcon />
+                              </button>
+                            </div>
                             <b className="sf-checkout-item-price">{fmtCardPrice(l.priceInr * l.qty)}</b>
                           </div>
                         </div>

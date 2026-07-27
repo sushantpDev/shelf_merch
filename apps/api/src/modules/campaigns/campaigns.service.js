@@ -7,7 +7,7 @@ import { Contact } from '../contacts/contact.model.js';
 import { Shop } from '../shops/shop.model.js';
 import { Kit } from '../kits/kit.model.js';
 import { CatalogProduct } from '../catalog/catalogProduct.model.js';
-import { customisedKitSendTotals, kitSendTotals, sumKitProductPrices } from '../kits/kitPricing.js';
+import { customisedKitSendTotals, curatedKitSendTotals, kitSendTotals, sumKitProductPrices } from '../kits/kitPricing.js';
 import { Wallet } from '../wallets/wallet.model.js';
 import { Tenant } from '../tenants/tenant.model.js';
 import * as ledger from '../../services/ledger.service.js';
@@ -354,16 +354,25 @@ export async function importRecipients({
             .lean();
           computed = customisedKitSendTotals(campaign.recipientCount, pkg, products);
         } else {
-          let unitPrice = Math.round(Number(kit.kitPrice) || 0);
-          if (unitPrice <= 0 && kit.productRefs?.length) {
+          let meta = null;
+          try {
+            meta = kit.designNotes ? JSON.parse(kit.designNotes) : null;
+          } catch {
+            meta = null;
+          }
+          let pricePerKit = Math.round(Number(meta?.approxValueInr) || 0);
+          if (pricePerKit <= 0) {
+            pricePerKit = Math.round(Number(kit.kitPrice) || 0);
+          }
+          if (pricePerKit <= 0 && kit.productRefs?.length) {
             const products = await CatalogProduct.find({
               _id: { $in: kit.productRefs.map((r) => r.catalogProductId).filter(Boolean) },
             })
               .select('basePriceInr')
               .lean();
-            unitPrice = sumKitProductPrices(products);
+            pricePerKit = sumKitProductPrices(products);
           }
-          computed = kitSendTotals(campaign.recipientCount, pkg, unitPrice);
+          computed = curatedKitSendTotals(campaign.recipientCount, pricePerKit);
         }
         // Checkout Grand Total is the source of truth when the client sends it;
         // otherwise recompute with the shared formula.
@@ -708,7 +717,11 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
   if (openRedemptionNow) {
     // Immediate / self: create fulfillment orders and open redemption now.
     // Self mode skips emails (recipient opens link themselves).
-    await createFulfillmentOrdersIfNeeded(campaign, tenantId);
+    try {
+      await createFulfillmentOrdersIfNeeded(campaign, tenantId);
+    } catch (err) {
+      console.error('Fulfillment order creation failed after launch:', err);
+    }
     transitionState('campaign', campaign, 'redemption_open', { userId: user.userId });
   }
   // Scheduled: stay at `launched` until sendAt — no emails, no point credit yet.
@@ -717,28 +730,33 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
   recordUsage(tenantId, 'campaigns.launched');
 
   if (sendInvitesNow) {
-    const ctx = await sendCampaignInvites(campaign, tenantId);
-    campaign.schedule = campaign.schedule || {};
-    campaign.schedule.invitesSentAt = new Date();
-    campaign.markModified('schedule');
-    await campaign.save();
+    try {
+      const ctx = await sendCampaignInvites(campaign, tenantId);
+      campaign.schedule = campaign.schedule || {};
+      campaign.schedule.invitesSentAt = new Date();
+      campaign.markModified('schedule');
+      await campaign.save();
 
+      if (entity.managerUserId) {
+        await notify({
+          type: 'campaign_launched',
+          tenantId,
+          userId: entity.managerUserId,
+          title: `Campaign launched: ${campaign.name}`,
+          body: ctx.isSurprise
+            ? `${campaign.recipientCount} surprise gift orders created.`
+            : ctx.isSingle
+              ? `One delivery order created for ${campaign.recipientCount} recipients.`
+              : `${campaign.recipientCount} recipients invited.`,
+          link: `/campaigns/${campaign._id}`,
+        });
+      }
+    } catch (err) {
+      // Wallet is already debited and campaign is launched — do not fail the API response.
+      console.error('Post-launch invite delivery failed:', err);
+    }
     if (campaign.kitId) {
       await Kit.updateOne({ _id: campaign.kitId, tenantId }, { lastSentAt: new Date() });
-    }
-    if (entity.managerUserId) {
-      await notify({
-        type: 'campaign_launched',
-        tenantId,
-        userId: entity.managerUserId,
-        title: `Campaign launched: ${campaign.name}`,
-        body: ctx.isSurprise
-          ? `${campaign.recipientCount} surprise gift orders created.`
-          : ctx.isSingle
-            ? `One delivery order created for ${campaign.recipientCount} recipients.`
-            : `${campaign.recipientCount} recipients invited.`,
-        link: `/campaigns/${campaign._id}`,
-      });
     }
   } else if (openRedemptionNow && campaign.kitId) {
     await Kit.updateOne({ _id: campaign.kitId, tenantId }, { lastSentAt: new Date() });

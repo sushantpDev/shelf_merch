@@ -47,10 +47,31 @@ export function sumCustomisedKitNetPrices(products = []) {
 }
 
 /**
- * Curated kit send math (unchanged):
- * ex-GST kit = products + packaging;
- * price per kit = ex-GST × 1.18;
- * grand total = recipients × GST-inclusive price per kit.
+ * Curated kit checkout — approxValueInr is GST-inclusive (18%).
+ */
+export function curatedKitSendTotals(recipientCount, pricePerKitInr) {
+  const qty = Math.max(0, Number(recipientCount) || 0);
+  const costPerKit = Math.max(0, Math.round(Number(pricePerKitInr) || 0));
+  const total = costPerKit * qty;
+  const tax = Math.ceil(total - total / (1 + GST_RATE));
+  return {
+    qty,
+    unitPrice: costPerKit,
+    pkgPerKit: 0,
+    costPerKit,
+    sub: total,
+    pkgCost: 0,
+    fee: 0,
+    ship: 0,
+    tax,
+    total,
+    kitGstRate: GST_RATE,
+  };
+}
+
+/**
+ * Legacy kit send math — unit price treated as ex-GST.
+ * Prefer curatedKitSendTotals for platform curated kits (approxValueInr).
  */
 export function kitSendTotals(recipientCount, packaging, kitUnitPriceInr) {
   const qty = Math.max(0, Number(recipientCount) || 0);

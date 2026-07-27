@@ -5,12 +5,16 @@ import type { PreDesignedKitsVm } from "../controllers/usePreDesignedKitsControl
 import noKitsYetImg from "../../../../assets/no-kits-yet.png";
 
 function templateImage(kit: PlatformKitTemplate): string {
+  if (kit.heroImage) return resolveMediaUrl(kit.heroImage) || noKitsYetImg;
   return resolveMediaUrl(kit.imageUrls?.[0]) || noKitsYetImg;
 }
 
 function templateItemLabel(kit: PlatformKitTemplate): string {
-  const count = kit.items?.length ?? 0;
-  return count ? `${count} item${count === 1 ? "" : "s"}` : "Curated bundle";
+  const itemCount =
+    (Array.isArray(kit.itemImages) && kit.itemImages.length) ||
+    kit.items?.length ||
+    0;
+  return itemCount ? `${itemCount} item${itemCount === 1 ? "" : "s"}` : "Curated bundle";
 }
 
 export function PreDesignedKitsView({ isLoading, kits, canCreateKits }: PreDesignedKitsVm) {

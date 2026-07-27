@@ -20,6 +20,9 @@ export function KitWizardView({
   pickQty,
   rules,
   imported,
+  heroImage,
+  itemImages,
+  variantImages,
   productName,
   onBack,
   onStep,
@@ -32,6 +35,11 @@ export function KitWizardView({
   onAddItem,
   onDropItem,
   onUploadImages,
+  onSelectHero,
+  onToggleItemImage,
+  onSetItemLabel,
+  onToggleVariantImage,
+  onSaveImageRoles,
   onPublish,
   onSaveDraft,
 }: KitWizardVm) {
@@ -311,11 +319,130 @@ export function KitWizardView({
               {!kit?.imageUrls?.length && <p className="muted">No images yet.</p>}
             </div>
             <input type="file" accept="image/*" multiple disabled={busy} onChange={(e) => onUploadImages(e.target.files)} />
+
+            {(kit?.imageUrls?.length ?? 0) > 0 && (
+              <>
+                <h3 style={{ margin: "24px 0 8px" }}>Hero Image</h3>
+                <p className="muted" style={{ marginBottom: 12, fontSize: 13 }}>
+                  Select exactly one image used as the kit cover.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 8 }}>
+                  {(kit?.imageUrls ?? []).map((url, idx) => (
+                    <label
+                      key={`hero-${url}`}
+                      className="row"
+                      style={{
+                        gap: 12,
+                        alignItems: "center",
+                        padding: 10,
+                        border: "1px solid var(--line)",
+                        borderRadius: 8,
+                        background: heroImage === url ? "var(--surface-2)" : "transparent",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="heroImage"
+                        checked={heroImage === url}
+                        onChange={() => onSelectHero(url)}
+                      />
+                      <img
+                        src={url}
+                        alt=""
+                        style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: "1px solid var(--line)" }}
+                      />
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>Image {idx + 1}</span>
+                    </label>
+                  ))}
+                </div>
+
+                <h3 style={{ margin: "24px 0 8px" }}>Included Products</h3>
+                <p className="muted" style={{ marginBottom: 12, fontSize: 13 }}>
+                  Select images that represent included products. Optional product names override Item 1, Item 2…
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 8 }}>
+                  {(kit?.imageUrls ?? []).map((url, idx) => {
+                    const selected = itemImages.find((it) => it.imageUrl === url);
+                    return (
+                      <div
+                        key={`item-${url}`}
+                        className="row"
+                        style={{
+                          gap: 12,
+                          alignItems: "center",
+                          padding: 10,
+                          border: "1px solid var(--line)",
+                          borderRadius: 8,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <label className="row" style={{ gap: 12, alignItems: "center", flex: 1, minWidth: 220 }}>
+                          <input
+                            type="checkbox"
+                            checked={!!selected}
+                            onChange={() => onToggleItemImage(url)}
+                          />
+                          <img
+                            src={url}
+                            alt=""
+                            style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: "1px solid var(--line)" }}
+                          />
+                          <span style={{ fontSize: 13, fontWeight: 600 }}>Image {idx + 1}</span>
+                        </label>
+                        {selected ? (
+                          <input
+                            className="inp"
+                            style={{ flex: 1, minWidth: 160 }}
+                            placeholder="Product name (optional)"
+                            value={selected.label || ""}
+                            onChange={(e) => onSetItemLabel(url, e.target.value)}
+                          />
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <h3 style={{ margin: "24px 0 8px" }}>Variants</h3>
+                <p className="muted" style={{ marginBottom: 12, fontSize: 13 }}>
+                  Select colour/appearance variants of this kit. These are not separate kits.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {(kit?.imageUrls ?? []).map((url, idx) => (
+                    <label
+                      key={`variant-${url}`}
+                      className="row"
+                      style={{
+                        gap: 12,
+                        alignItems: "center",
+                        padding: 10,
+                        border: "1px solid var(--line)",
+                        borderRadius: 8,
+                        background: variantImages.includes(url) ? "var(--surface-2)" : "transparent",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={variantImages.includes(url)}
+                        onChange={() => onToggleVariantImage(url)}
+                      />
+                      <img
+                        src={url}
+                        alt=""
+                        style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: "1px solid var(--line)" }}
+                      />
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>Image {idx + 1}</span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+
             <div className="row" style={{ gap: 8, marginTop: 18 }}>
               <button type="button" className="btn btn-ghost" onClick={() => onStep(1)}>
                 Back
               </button>
-              <button type="button" className="btn btn-brand" onClick={() => onStep(3)}>
+              <button type="button" className="btn btn-brand" disabled={busy} onClick={onSaveImageRoles}>
                 Continue
               </button>
             </div>

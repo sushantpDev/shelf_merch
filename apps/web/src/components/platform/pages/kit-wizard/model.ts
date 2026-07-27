@@ -9,9 +9,11 @@ export {
   publishKit,
   removeKitItem,
   updateKit,
+  updateKitImageRoles,
   uploadKitImages,
   type KitInput,
   type KitItem,
+  type KitItemImage,
   type PlatformKit,
   type ProductVariant,
 } from "@/services/platform-api";

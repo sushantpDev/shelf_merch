@@ -29,6 +29,7 @@ function isCuratedWorkspaceKit(kit: UiKit) {
 }
 
 function curatedCover(kit: PlatformKitTemplate) {
+  if (kit.heroImage) return resolveMediaUrl(kit.heroImage) || kitPreviewImg;
   return kit.imageUrls?.[0] ? resolveMediaUrl(kit.imageUrls[0]) : kitPreviewImg;
 }
 

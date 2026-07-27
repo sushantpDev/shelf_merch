@@ -413,16 +413,20 @@ export function KitsView(vm: KitsVm) {
   const curatedKitsRows = useMemo<KitRow[]>(() => {
     if (!platformKits) return [];
     return platformKits.map((kit): KitRow => {
-      const coverImg = kit.imageUrls?.[0] ? resolveMediaUrl(kit.imageUrls[0]) : kitPreviewImg;
+      const coverImg = kit.heroImage
+        ? resolveMediaUrl(kit.heroImage)
+        : kit.imageUrls?.[0]
+          ? resolveMediaUrl(kit.imageUrls[0])
+          : kitPreviewImg;
       const matchedWk = vm.kits.find((wk) => {
         const meta = getCuratedKitMeta(wk);
         return meta?.originalId === kit._id;
       });
 
-      // Platform kits (esp. Shopify imports) often have empty `items`; fall back to
-      // workspace clone count, then gallery product images (cover is index 0).
-      const imageItemCount =
-        (kit.imageUrls?.length ?? 0) > 1
+      // Prefer explicit itemImages; fall back to workspace clone / legacy gallery count.
+      const imageItemCount = Array.isArray(kit.itemImages) && kit.itemImages.length
+        ? kit.itemImages.length
+        : (kit.imageUrls?.length ?? 0) > 1
           ? (kit.imageUrls!.length - 1)
           : (kit.imageUrls?.length ?? 0) === 1
             ? 1
@@ -591,12 +595,19 @@ export function KitsView(vm: KitsVm) {
   // ── Handlers for Curated Action & Send ──
 
   const openRowPreview = (row: KitRow) => {
-    if (row.kit) {
-      setKitPreview(buildKitPreviewFromWorkspace(row.kit, catalog, row.image));
+    const curatedMeta = row.kit ? getCuratedKitMeta(row.kit) : null;
+    const resolvedPlatformKit =
+      row.platformKit ||
+      (curatedMeta?.originalId && platformKits
+        ? platformKits.find((k) => String(k._id) === String(curatedMeta.originalId))
+        : undefined);
+
+    if (resolvedPlatformKit) {
+      setKitPreview(buildKitPreviewFromPlatform(resolvedPlatformKit, catalog, row.image));
       return;
     }
-    if (row.platformKit) {
-      setKitPreview(buildKitPreviewFromPlatform(row.platformKit, catalog, row.image));
+    if (row.kit) {
+      setKitPreview(buildKitPreviewFromWorkspace(row.kit, catalog, row.image, platformKits));
       return;
     }
     setKitPreview({
@@ -645,7 +656,12 @@ export function KitsView(vm: KitsVm) {
 
     // Match prior curated-send behaviour when platform kits have empty/mismatched items.
     if (productRefs.length === 0 && catalogProducts.length > 0) {
-      const fallbackCount = Math.max(1, (kit.imageUrls?.length || 1) - 1 || 1);
+      const fallbackCount = Math.max(
+        1,
+        (Array.isArray(kit.itemImages) && kit.itemImages.length
+          ? kit.itemImages.length
+          : (kit.imageUrls?.length || 1) - 1) || 1,
+      );
       for (const product of catalogProducts.slice(0, fallbackCount)) {
         if (!product.id) continue;
         productRefs.push({
@@ -687,7 +703,11 @@ export function KitsView(vm: KitsVm) {
       curated: true,
       originalId: kit._id,
       description: kit.description || "",
+      approxValueInr: Math.round(Number(kit.approxValueInr) || 0),
       imageUrls: kit.imageUrls || [],
+      heroImage: kit.heroImage || kit.imageUrls?.[0] || "",
+      itemImages: kit.itemImages || [],
+      variantImages: kit.variantImages || [],
     });
 
     try {
@@ -1112,7 +1132,6 @@ export function KitsView(vm: KitsVm) {
                             </span>
                           )}
                         </div>
-                        <p>{row.description}</p>
                         <span className="kits-audience">{row.audience}</span>
                       </div>
                     </div>

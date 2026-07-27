@@ -144,6 +144,11 @@ export type KitItem = {
   qty?: number;
 };
 
+export type KitItemImage = {
+  imageUrl: string;
+  label?: string;
+};
+
 export type PlatformKit = {
   _id: string;
   name: string;
@@ -152,6 +157,9 @@ export type PlatformKit = {
   eligibleCampaignTypes: string[];
   approxValueInr: number;
   imageUrls: string[];
+  heroImage?: string;
+  itemImages?: KitItemImage[];
+  variantImages?: string[];
   items: KitItem[];
   rules?: KitRules;
   status: string;
@@ -166,6 +174,9 @@ export type KitInput = {
   eligibleCampaignTypes?: string[];
   approxValueInr?: number;
   rules?: Partial<KitRules>;
+  heroImage?: string;
+  itemImages?: KitItemImage[];
+  variantImages?: string[];
 };
 
 export function getPlatformKit(id: string) {
@@ -178,6 +189,20 @@ export function createKit(body: KitInput) {
 
 export function updateKit(id: string, body: Partial<KitInput>) {
   return apiFetch<PlatformKit>(`/platform/kits/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export type KitImageRolesInput = {
+  heroImage?: string;
+  itemImages?: KitItemImage[];
+  variantImages?: string[];
+};
+
+/** Update ONLY hero / included-product / variant image roles — no other kit fields. */
+export function updateKitImageRoles(id: string, body: KitImageRolesInput) {
+  return apiFetch<PlatformKit>(`/platform/kits/${id}/image-roles`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
 }
 
 export function addKitItem(id: string, item: KitItem) {

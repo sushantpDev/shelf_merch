@@ -329,8 +329,8 @@ export function SendPointsView({
                     : `${totals.totalPoints.toLocaleString("en-IN")} Pts (${inr(totals.sub)})`
                 }
               />
-              <SumRow k="Service fee (15%)" v={inr(totals.fee)} />
-              <SumRow k="Estimated GST (18%)" v={inr(totals.tax)} />
+              {/* <SumRow k="Service fee (15%)" v={inr(totals.fee)} /> */}
+              {/* <SumRow k="Estimated GST (18%)" v={inr(totals.tax)} /> */}
               <button
                 type="button"
                 className="lnk"
@@ -354,7 +354,7 @@ export function SendPointsView({
               >
                 <b style={{ fontSize: 18 }}>You pay</b>
                 <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)" }}>
-                  {inr(totals.total)}
+                  {inr(totals.sub)}
                 </b>
               </div>
               <button

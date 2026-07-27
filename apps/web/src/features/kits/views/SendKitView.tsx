@@ -9,6 +9,8 @@ import { PaymentPanel } from "@/features/send/PaymentPanel";
 import type { SendKitVm } from "../controllers/useSendKitController";
 import { DesignedProductThumb } from "@/features/swag/DesignedProductThumb";
 import { resolveKitItemOptions, getCuratedKitMeta } from "../controllers/useSendKitController";
+import { curatedIncludedItems } from "../KitPreviewDialog";
+import { usePlatformKits } from "../model";
 import type { UiProduct } from "@/services/mappers";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { KitPackagingStep } from "./KitPackagingStep";
@@ -171,6 +173,7 @@ export function SendKitView(vm: SendKitVm) {
   const [search, setSearch] = useState("");
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [emailDraft, setEmailDraft] = useState("");
+  const [selectedCuratedVariant, setSelectedCuratedVariant] = useState<string | null>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
   if (vm.isLoading) return <LoadingState message="Loading kit…" fullScreen={false} />;
@@ -185,9 +188,34 @@ export function SendKitView(vm: SendKitVm) {
   if (vm.isSending) return <LoadingState message="Placing order…" fullScreen={false} />;
 
   const { totals, kit } = vm;
+  const customisedProductPerKit = totals.itemsSubtotal ?? totals.unitPrice ?? 0;
+  const customisedKitsLineTotal = customisedProductPerKit * totals.qty;
+  const customisedSubtotal = customisedKitsLineTotal + totals.pkgCost;
+  const { data: platformKits } = usePlatformKits();
 
   const curatedMeta = getCuratedKitMeta(kit);
   const isCurated = !!curatedMeta;
+
+  const curatedItemImages = curatedMeta
+    ? curatedIncludedItems(
+        curatedMeta,
+        platformKits,
+        kit?.artworkUrl ? resolveMediaUrl(kit.artworkUrl) : undefined,
+      )
+    : [];
+
+  const curatedVariantImages = (() => {
+    if (!curatedMeta) return [] as string[];
+    if (curatedMeta.variantImages?.length) return curatedMeta.variantImages;
+    const platformKit = platformKits?.find(
+      (k) => String(k._id) === String(curatedMeta.originalId),
+    );
+    return platformKit?.variantImages || [];
+  })();
+  const activeCuratedVariant =
+    selectedCuratedVariant && curatedVariantImages.includes(selectedCuratedVariant)
+      ? selectedCuratedVariant
+      : curatedVariantImages[0] || null;
 
   const kitItems = draft.picked
     .map((idx) => vm.catalog[idx])
@@ -283,22 +311,61 @@ export function SendKitView(vm: SendKitVm) {
               {/* Read-only Product Images as cards */}
               <div>
                 <label style={{ fontSize: 13, fontWeight: 700, color: "var(--text-muted)", display: "block", marginBottom: 12 }}>
-                  Included Items ({Math.max(0, (curatedMeta.imageUrls?.length ?? 0) - 1)})
+                  Included Items ({curatedItemImages.length})
                 </label>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16 }}>
-                  {curatedMeta.imageUrls && curatedMeta.imageUrls.slice(1).map((imgUrl, idx) => (
-                    <div key={idx} className="card" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8, borderRadius: 12 }}>
+                  {curatedItemImages.map((item, idx) => (
+                    <div key={`${item.imageUrl}-${idx}`} className="card" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8, borderRadius: 12 }}>
                       <div style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <img
-                          src={resolveMediaUrl(imgUrl)}
-                          alt=""
+                          src={resolveMediaUrl(item.imageUrl)}
+                          alt={item.label}
                           style={{ maxWidth: "90%", maxHeight: "90%", objectFit: "contain" }}
                         />
                       </div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{item.label}</div>
                     </div>
                   ))}
                 </div>
               </div>
+
+              {curatedVariantImages.length > 0 ? (
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 700, color: "var(--text-muted)", display: "block", marginBottom: 12 }}>
+                    Variants
+                  </label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
+                    {curatedVariantImages.map((url, idx) => {
+                      const selected = activeCuratedVariant === url;
+                      return (
+                        <button
+                          key={`${url}-${idx}`}
+                          type="button"
+                          onClick={() => setSelectedCuratedVariant(url)}
+                          className="card"
+                          style={{
+                            padding: 12,
+                            borderRadius: 12,
+                            border: selected ? "2px solid var(--brand)" : "1px solid var(--line)",
+                            background: selected ? "var(--surface-2)" : undefined,
+                            cursor: "pointer",
+                            textAlign: "left",
+                          }}
+                        >
+                          <div style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
+                            <img
+                              src={resolveMediaUrl(url)}
+                              alt={`Variant ${idx + 1}`}
+                              style={{ maxWidth: "90%", maxHeight: "90%", objectFit: "contain" }}
+                            />
+                          </div>
+                          <div style={{ fontSize: 12, fontWeight: 700 }}>Variant {idx + 1}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
@@ -811,11 +878,15 @@ export function SendKitView(vm: SendKitVm) {
               <h3 style={{ fontSize: 18, marginBottom: 12 }}>Order summary</h3>
               {!vm.isCuratedKit ? (
                 <>
-                  <SumRow k="Products" v={inr((totals.itemsSubtotal ?? 0) * totals.qty)} />
+                  <SumRow k="Price per kit" v={inr(customisedProductPerKit)} />
+                  <SumRow
+                    k={`${totals.qty} kit${totals.qty === 1 ? "" : "s"} × ${inr(customisedProductPerKit)}`}
+                    v={inr(customisedKitsLineTotal)}
+                  />
                   {totals.pkgPerKit > 0 ? (
                     <SumRow k="Packaging" v={inr(totals.pkgCost)} />
                   ) : null}
-                  <SumRow k="Subtotal" v={inr((totals.taxablePerKit ?? 0) * totals.qty)} />
+                  <SumRow k="Subtotal" v={inr(customisedSubtotal)} large />
                   <SumRow
                     k={`GST (${Math.round((totals.kitGstRate ?? 0.18) * 100)}%)`}
                     v={inr(totals.tax)}
@@ -823,30 +894,39 @@ export function SendKitView(vm: SendKitVm) {
                   <div className="divider" />
                   <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
                     <div>
-                      <b style={{ fontSize: 18, display: "block" }}>Total</b>
+                      <b style={{ fontSize: 18, display: "block" }}>Grand Total</b>
                     </div>
                     <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)" }}>{inr(totals.total)}</b>
                   </div>
                 </>
               ) : (
                 <>
+                  <SumRow k="Price per kit (inc. GST)" v={inr(totals.costPerKit)} />
                   <SumRow
-                    k={`${totals.qty} kits × ${inr(totals.costPerKit)}`}
-                    v={inr(totals.total)}
+                    k={`${totals.qty} kit${totals.qty === 1 ? "" : "s"} × ${inr(totals.costPerKit)}`}
+                    v={inr(totals.costPerKit * totals.qty)}
                     emphasis
                   />
+                  <p className="muted" style={{ margin: "4px 0 0", fontSize: 12 }}>
+                    (incl. GST at 18%) 
+                  </p>
                   <SumRow k="Shipping" v="Free" />
                   <div className="divider" />
                   <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
                     <div>
                       <b style={{ fontSize: 18, display: "block" }}>Grand Total</b>
-                      <span className="muted" style={{ fontSize: 12 }}>incl. GST at 18%</span>
                     </div>
                     <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)" }}>{inr(totals.total)}</b>
                   </div>
                 </>
               )}
-              <button type="button" className="btn btn-brand btn-block btn-lg" style={{ marginTop: 14 }} onClick={vm.onPayAndSend}>
+              <button
+                type="button"
+                className="btn btn-brand btn-block btn-lg"
+                style={{ marginTop: 14 }}
+                disabled={vm.isSending}
+                onClick={vm.onPayAndSend}
+              >
                 Pay &amp; send
               </button>
             </div>
@@ -893,17 +973,37 @@ const cellAddr = (bg: string): React.CSSProperties => ({
   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
 });
 
-function SumRow({ k, v, emphasis }: { k: string; v: string; emphasis?: boolean }) {
-  const labelStyle = emphasis
-    ? { fontSize: 14, fontWeight: 700 as const, color: "var(--ink)" }
-    : { fontSize: 13 };
-  const valueStyle = emphasis
-    ? { fontWeight: 700 as const, fontSize: 15 }
-    : { fontWeight: 600 as const, fontSize: 13 };
+function SumRow({
+  k,
+  v,
+  emphasis,
+  large,
+}: {
+  k: string;
+  v: string;
+  emphasis?: boolean;
+  large?: boolean;
+}) {
+  const labelStyle = large
+    ? { fontSize: 16, fontWeight: 800 as const, color: "var(--ink)" }
+    : emphasis
+      ? { fontSize: 14, fontWeight: 700 as const, color: "var(--ink)" }
+      : { fontSize: 13 };
+  const valueStyle = large
+    ? { fontWeight: 800 as const, fontSize: 18 }
+    : emphasis
+      ? { fontWeight: 700 as const, fontSize: 15 }
+      : { fontWeight: 600 as const, fontSize: 13 };
 
   return (
-    <div className="row" style={{ justifyContent: "space-between", padding: emphasis ? "9px 0" : "7px 0" }}>
-      <span className={emphasis ? undefined : "muted"} style={labelStyle}>{k}</span>
+    <div
+      className="row"
+      style={{
+        justifyContent: "space-between",
+        padding: large ? "10px 0" : emphasis ? "9px 0" : "7px 0",
+      }}
+    >
+      <span className={emphasis || large ? undefined : "muted"} style={labelStyle}>{k}</span>
       <span className="num" style={valueStyle}>{v}</span>
     </div>
   );

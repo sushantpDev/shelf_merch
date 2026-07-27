@@ -196,6 +196,10 @@ export type PlatformKitTemplate = {
   description?: string;
   packaging?: "none" | "box" | "premium_box";
   imageUrls?: string[];
+  heroImage?: string;
+  itemImages?: Array<{ imageUrl: string; label?: string }>;
+  variantImages?: string[];
+  approxValueInr?: number;
   items?: Array<{ catalogProductId: string; qty?: number }>;
   status?: string;
 };

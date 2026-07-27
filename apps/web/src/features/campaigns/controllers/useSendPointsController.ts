@@ -412,7 +412,7 @@ export function useSendPointsController(): SendPointsVm {
       toast.error(`Minimum of ₹${MIN_POINTS_BUDGET_INR} must be allocated.`);
       return;
     }
-    const paymentTotal = Math.round(totals.total);
+    const paymentTotal = Math.round(totals.sub);
     if (draft.pay === "wallet") {
       const available = walletId && workspace ? spendableForWallet(workspace, walletId) : 0;
       const payWallet = walletId ? workspace?.wallets.find((w) => w.id === walletId) : undefined;

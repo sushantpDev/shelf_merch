@@ -8,11 +8,10 @@ import type { UiWallet } from "@/services/mappers";
 import { ensureSpendEntityForWalletApi } from "@/services/mutations-api";
 import { entityIdForWallet, spendableForWallet, walletsForCheckout } from "@/services/workspace-api";
 import {
+  curatedKitSendTotals,
   customisedKitSendTotals,
-  kitSendTotals,
   netPriceExGst,
   sumCustomisedKitNetPrices,
-  sumKitProductPrices,
   type KitSendTotals,
 } from "@/features/send/money";
 import { toSchedulePayload } from "@/features/send/types";
@@ -24,7 +23,7 @@ import {
   selectAllRecipientIds,
 } from "@/features/send/recipientSelection";
 import { kitPickedIndices } from "../wizard/kitDraft";
-import { useLaunchKitCampaign, useUpdateKit } from "../model";
+import { useLaunchKitCampaign, useUpdateKit, usePlatformKits } from "../model";
 import type { UiKit } from "../model";
 import {
   initialSendKitDraft,
@@ -155,7 +154,16 @@ export function getCuratedKitMeta(kit: UiKit | undefined) {
   try {
     const parsed = JSON.parse(kit.designNotes);
     if (parsed && parsed.curated) {
-      return parsed as { curated: boolean; originalId: string; description: string; imageUrls: string[] };
+      return parsed as {
+        curated: boolean;
+        originalId: string;
+        description: string;
+        approxValueInr?: number;
+        imageUrls: string[];
+        heroImage?: string;
+        itemImages?: Array<{ imageUrl: string; label?: string }>;
+        variantImages?: string[];
+      };
     }
   } catch {
     // ignore
@@ -283,6 +291,8 @@ export function useSendKitController(): SendKitVm {
       .filter(Boolean) as Array<{ id: string; name: string; priceInr: number; mockupUrl?: string }>;
   }, [kit, draft.picked, catalog]);
 
+  const { data: platformKits } = usePlatformKits();
+
   const isCuratedKit = !!getCuratedKitMeta(kit);
 
   const pickedProducts = useMemo(
@@ -290,15 +300,28 @@ export function useSendKitController(): SendKitVm {
     [draft.picked, catalog],
   );
 
-  const kitUnitPrice = useMemo(() => {
-    // Customised kits always recompute from catalog (GST-inclusive → net).
-    // Curated kits keep using persisted kitPrice / inclusive sum.
-    if (!isCuratedKit) {
-      return sumCustomisedKitNetPrices(pickedProducts);
+  const curatedPricePerKit = useMemo(() => {
+    if (!isCuratedKit) return 0;
+    const meta = getCuratedKitMeta(kit);
+    if (meta?.approxValueInr && meta.approxValueInr > 0) {
+      return Math.round(meta.approxValueInr);
+    }
+    const platformKit = platformKits?.find(
+      (k) => String(k._id) === String(meta?.originalId),
+    );
+    if (platformKit?.approxValueInr && platformKit.approxValueInr > 0) {
+      return Math.round(platformKit.approxValueInr);
     }
     if (kit?.kitPrice && kit.kitPrice > 0) return Math.round(kit.kitPrice);
-    return sumKitProductPrices(pickedProducts);
-  }, [isCuratedKit, kit?.kitPrice, pickedProducts]);
+    return 0;
+  }, [isCuratedKit, kit, platformKits]);
+
+  const totals = useMemo(() => {
+    if (!isCuratedKit) {
+      return customisedKitSendTotals(draft.selRecips.length, draft.pkg, pickedProducts);
+    }
+    return curatedKitSendTotals(draft.selRecips.length, curatedPricePerKit);
+  }, [isCuratedKit, draft.selRecips.length, draft.pkg, pickedProducts, curatedPricePerKit]);
 
   const checkoutWallets = useMemo(
     () => (workspace ? walletsForCheckout(workspace) : []),
@@ -306,12 +329,10 @@ export function useSendKitController(): SendKitVm {
   );
   const wallet =
     checkoutWallets.find((w) => w.id === selectedWalletId) ?? checkoutWallets[0];
-  const totals = useMemo(() => {
-    if (!isCuratedKit) {
-      return customisedKitSendTotals(draft.selRecips.length, draft.pkg, pickedProducts);
-    }
-    return kitSendTotals(draft.selRecips.length, draft.pkg, kitUnitPrice);
-  }, [isCuratedKit, draft.selRecips.length, draft.pkg, pickedProducts, kitUnitPrice]);
+
+  const kitUnitPrice = isCuratedKit
+    ? curatedPricePerKit
+    : sumCustomisedKitNetPrices(pickedProducts);
   const surpriseMissing =
     draft.mode === "surprise" ? missingAddress(pickerContacts, draft.selRecips) : [];
 
@@ -509,17 +530,20 @@ export function useSendKitController(): SendKitVm {
         })),
         recipVariants: draft.recipVariants,
       });
-      await refreshWorkspace();
-      toast.success(
-        draft.when === "sched"
-          ? `Kit scheduled — wallet debited. Recipients will be notified at the scheduled time.`
-          : `Order placed for ${draft.selRecips.length} recipients! 📦`,
-      );
-      navigate("/app/orders");
     } catch (err) {
-      setSending(false);
       toast.error(err instanceof Error ? err.message : "Failed to send kit");
+      return;
+    } finally {
+      setSending(false);
     }
+
+    toast.success(
+      draft.when === "sched"
+        ? `Kit scheduled — wallet debited. Recipients will be notified at the scheduled time.`
+        : `Order placed for ${draft.selRecips.length} recipients! 📦`,
+    );
+    navigate("/app/orders");
+    void refreshWorkspace().catch(() => undefined);
   }
 
   return {

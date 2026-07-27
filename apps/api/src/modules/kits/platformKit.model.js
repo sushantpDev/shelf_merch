@@ -9,6 +9,15 @@ const platformKitSchema = new mongoose.Schema(
     eligibleCampaignTypes: { type: [String], default: [] },
     approxValueInr: { type: Number, default: 0 },
     imageUrls: { type: [String], default: [] },
+    /** Explicit curated gallery roles — URLs must already exist in imageUrls. */
+    heroImage: { type: String, default: '' },
+    itemImages: [
+      {
+        imageUrl: { type: String, required: true },
+        label: { type: String, default: '' },
+      },
+    ],
+    variantImages: { type: [String], default: [] },
     items: [
       {
         catalogProductId: {

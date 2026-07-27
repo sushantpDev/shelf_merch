@@ -156,10 +156,12 @@ router.post(
     // Shopify-imported curated kits often have empty `items`. Fall back to
     // active catalog products so Send still works (mirrors prior frontend behaviour).
     if (productRefs.length === 0) {
-      const fallbackCount = Math.max(1, (platformKit.imageUrls?.length || 1) - 1 || 1);
+      const itemCount = Array.isArray(platformKit.itemImages) && platformKit.itemImages.length
+        ? platformKit.itemImages.length
+        : Math.max(1, (platformKit.imageUrls?.length || 1) - 1 || 1);
       const fallbackProducts = await CatalogProduct.find({ status: 'active' })
         .sort({ name: 1 })
-        .limit(fallbackCount)
+        .limit(itemCount)
         .lean();
       productRefs = fallbackProducts.map((product) => ({
         catalogProductId: product._id,
@@ -177,12 +179,27 @@ router.post(
       );
     }
 
+    const heroImage = String(platformKit.heroImage || '').trim() || platformKit.imageUrls?.[0] || '';
+    const itemImages = Array.isArray(platformKit.itemImages)
+      ? platformKit.itemImages.map((it) => ({
+          imageUrl: it.imageUrl,
+          label: it.label || '',
+        }))
+      : [];
+    const variantImages = Array.isArray(platformKit.variantImages) ? [...platformKit.variantImages] : [];
+
     const designNotes = JSON.stringify({
       curated: true,
       originalId: platformKitId,
       description: platformKit.description || '',
+      approxValueInr: Math.round(Number(platformKit.approxValueInr) || 0),
       imageUrls: platformKit.imageUrls || [],
+      heroImage,
+      itemImages,
+      variantImages,
     });
+
+    const curatedPrice = Math.round(Number(platformKit.approxValueInr) || 0);
 
     const kit = await Kit.create({
       tenantId: req.tenantId,
@@ -192,8 +209,8 @@ router.post(
       packaging: platformKit.packaging === 'none' ? 'none' : 'box',
       designNotes,
       status: 'live',
-      artworkUrl: platformKit.imageUrls?.[0] || '',
-      kitPrice: await resolveKitPrice(productRefs, 0),
+      artworkUrl: heroImage,
+      kitPrice: curatedPrice > 0 ? curatedPrice : await resolveKitPrice(productRefs, 0),
     });
 
     await upsertCustomisedKit(kit);

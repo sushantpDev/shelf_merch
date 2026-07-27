@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DesignedProductThumb } from "@/features/swag/DesignedProductThumb";
 import { resolveColorHex } from "@/lib/colorMap";
@@ -22,6 +22,8 @@ export type KitPreviewData = {
   artworkUrl?: string;
   packaging?: string;
   products: KitPreviewProduct[];
+  /** Curated kits only — visual appearance options (selection is local/UI-only). */
+  variantImages?: string[];
 };
 
 type ColorOption = { name: string; hex: string };
@@ -78,39 +80,176 @@ function productImageUrl(product?: UiProduct): string | undefined {
   );
 }
 
+type CuratedImageSource = {
+  originalId?: string;
+  heroImage?: string;
+  imageUrls?: string[];
+  itemImages?: Array<{ imageUrl: string; label?: string }>;
+  variantImages?: string[];
+};
+
+function galleryUrlsExcludingHero(source: CuratedImageSource): string[] {
+  const hero = String(source.heroImage || source.imageUrls?.[0] || "").trim();
+  const variantSet = new Set((source.variantImages || []).map(String));
+  return uniquePreserveOrder(
+    (source.imageUrls || []).filter((url) => {
+      const u = String(url).trim();
+      return u && u !== hero && !variantSet.has(u);
+    }),
+  );
+}
+
+/** Build included-product cards for curated kits — never catalog productRefs. */
+function buildCuratedItemProducts(
+  source: CuratedImageSource,
+  fallbackCover?: string,
+): KitPreviewProduct[] {
+  if (Array.isArray(source.itemImages) && source.itemImages.length > 0) {
+    return source.itemImages.map((item, i) => ({
+      key: `item-${i}-${item.imageUrl}`,
+      name: item.label?.trim() || `Item ${i + 1}`,
+      imageUrl: resolveMediaUrl(item.imageUrl),
+      variants: [],
+    }));
+  }
+
+  const gallery = galleryUrlsExcludingHero(source);
+  if (gallery.length > 0) {
+    return gallery.map((url, i) => ({
+      key: `gallery-${i}-${url}`,
+      name: `Item ${i + 1}`,
+      imageUrl: resolveMediaUrl(url),
+      variants: [],
+    }));
+  }
+
+  const hero =
+    (source.heroImage ? resolveMediaUrl(source.heroImage) : undefined) ||
+    (source.imageUrls?.[0] ? resolveMediaUrl(source.imageUrls[0]) : undefined) ||
+    fallbackCover;
+  if (hero) {
+    return [
+      {
+        key: "hero-fallback",
+        name: "Kit contents",
+        imageUrl: hero,
+        variants: [],
+      },
+    ];
+  }
+
+  return [];
+}
+
+function mergeCuratedImageSource(
+  meta?: CuratedImageSource | null,
+  platform?: CuratedImageSource | null,
+): CuratedImageSource {
+  return {
+    heroImage: meta?.heroImage || platform?.heroImage,
+    imageUrls: meta?.imageUrls?.length ? meta.imageUrls : platform?.imageUrls,
+    itemImages: meta?.itemImages?.length ? meta.itemImages : platform?.itemImages,
+    variantImages: meta?.variantImages?.length ? meta.variantImages : platform?.variantImages,
+  };
+}
+
+function findPlatformKitForMeta(
+  meta: { originalId?: string } | null | undefined,
+  platformKits?: PlatformKitTemplate[],
+): PlatformKitTemplate | undefined {
+  if (!meta?.originalId || !platformKits?.length) return undefined;
+  return platformKits.find((k) => String(k._id) === String(meta.originalId));
+}
+
+/** Included item cards for curated kits (preview, send flow, etc.). */
+export function curatedIncludedItems(
+  meta: CuratedImageSource,
+  platformKits?: PlatformKitTemplate[],
+  fallbackCover?: string,
+): Array<{ imageUrl: string; label: string }> {
+  const platformKit = findPlatformKitForMeta(meta, platformKits);
+  const source = mergeCuratedImageSource(meta, platformKit ?? null);
+  return buildCuratedItemProducts(source, fallbackCover).map((item) => ({
+    imageUrl: item.imageUrl || fallbackCover || "",
+    label: item.name,
+  }));
+}
+
 /** Build a read-only preview model from a workspace kit + catalog. */
 export function buildKitPreviewFromWorkspace(
   kit: UiKit,
   catalog: UiProduct[],
   fallbackCover?: string,
+  platformKits?: PlatformKitTemplate[],
 ): KitPreviewData {
   const byId = new Map(catalog.map((p) => [p.id, p]));
   let description = kit.description?.trim() || "";
   let coverFromMeta: string | undefined;
+  let itemProducts: KitPreviewProduct[] | undefined;
+  let variantImages: string[] | undefined;
+  let isCurated = false;
+  let curatedMeta: CuratedImageSource | null = null;
+
   try {
     if (kit.designNotes) {
       const meta = JSON.parse(kit.designNotes) as {
+        curated?: boolean;
+        originalId?: string;
         description?: string;
         imageUrls?: string[];
+        heroImage?: string;
+        itemImages?: Array<{ imageUrl: string; label?: string }>;
+        variantImages?: string[];
       };
+      if (meta.curated) {
+        isCurated = true;
+        curatedMeta = meta;
+      }
       if (!description && meta.description) description = meta.description;
-      if (meta.imageUrls?.[0]) coverFromMeta = resolveMediaUrl(meta.imageUrls[0]);
+      if (meta.heroImage) {
+        coverFromMeta = resolveMediaUrl(meta.heroImage);
+      } else if (meta.imageUrls?.[0]) {
+        coverFromMeta = resolveMediaUrl(meta.imageUrls[0]);
+      }
+      if (meta.curated && Array.isArray(meta.variantImages) && meta.variantImages.length > 0) {
+        variantImages = meta.variantImages
+          .map((url) => resolveMediaUrl(url) || url)
+          .filter(Boolean);
+      }
     }
   } catch {
     /* ignore */
   }
 
-  const products: KitPreviewProduct[] = (kit.productRefs ?? []).map((ref, i) => {
-    const product = byId.get(ref.catalogProductId);
-    return {
-      key: `${ref.catalogProductId}-${i}`,
-      name: ref.name || product?.nm || "Product",
-      brand: ref.brand || product?.brand,
-      imageUrl: productImageUrl(product),
-      product,
-      variants: product?.variants ?? [],
-    };
-  });
+  if (isCurated) {
+    const platformKit = findPlatformKitForMeta(curatedMeta, platformKits);
+    const imageSource = mergeCuratedImageSource(curatedMeta, platformKit ?? null);
+    if (!coverFromMeta) {
+      coverFromMeta =
+        (imageSource.heroImage ? resolveMediaUrl(imageSource.heroImage) : undefined) ||
+        (imageSource.imageUrls?.[0] ? resolveMediaUrl(imageSource.imageUrls[0]) : undefined);
+    }
+    if (!variantImages?.length && imageSource.variantImages?.length) {
+      variantImages = imageSource.variantImages
+        .map((url) => resolveMediaUrl(url) || url)
+        .filter(Boolean);
+    }
+    itemProducts = buildCuratedItemProducts(imageSource, fallbackCover);
+  }
+
+  const products: KitPreviewProduct[] =
+    itemProducts ??
+    (kit.productRefs ?? []).map((ref, i) => {
+      const product = byId.get(ref.catalogProductId);
+      return {
+        key: `${ref.catalogProductId}-${i}`,
+        name: ref.name || product?.nm || "Product",
+        brand: ref.brand || product?.brand,
+        imageUrl: productImageUrl(product),
+        product,
+        variants: product?.variants ?? [],
+      };
+    });
 
   return {
     name: kit.name,
@@ -122,6 +261,7 @@ export function buildKitPreviewFromWorkspace(
     artworkUrl: kit.artworkUrl,
     packaging: kit.packaging === "box" ? "Premium box" : kit.packaging === "none" ? "No packaging" : kit.packaging,
     products,
+    variantImages,
   };
 }
 
@@ -132,28 +272,24 @@ export function buildKitPreviewFromPlatform(
   fallbackCover?: string,
 ): KitPreviewData {
   const byId = new Map(catalog.map((p) => [p.id, p]));
-  const products: KitPreviewProduct[] = (kit.items ?? []).map((item, i) => {
-    const product = byId.get(String(item.catalogProductId));
-    return {
-      key: `${item.catalogProductId}-${i}`,
-      name: product?.nm || "Product",
-      brand: product?.brand,
-      imageUrl:
-        productImageUrl(product) ||
-        (kit.imageUrls?.[i + 1] ? resolveMediaUrl(kit.imageUrls[i + 1]) : undefined),
-      product,
-      variants: product?.variants ?? [],
-    };
-  });
+  const heroImage =
+    (kit.heroImage ? resolveMediaUrl(kit.heroImage) : undefined) ||
+    (kit.imageUrls?.[0] ? resolveMediaUrl(kit.imageUrls[0]) : undefined) ||
+    fallbackCover;
 
-  // Fall back to gallery thumbnails when catalog items are sparse.
-  if (products.length === 0 && kit.imageUrls && kit.imageUrls.length > 1) {
-    kit.imageUrls.slice(1).forEach((url, i) => {
+  const products = buildCuratedItemProducts(kit, fallbackCover);
+
+  // Manually composed kits may still reference catalog products.
+  if (!products.length && (kit.items ?? []).length > 0) {
+    (kit.items ?? []).forEach((item, i) => {
+      const product = byId.get(String(item.catalogProductId));
       products.push({
-        key: `gallery-${i}`,
-        name: `Item ${i + 1}`,
-        imageUrl: resolveMediaUrl(url),
-        variants: [],
+        key: `${item.catalogProductId}-${i}`,
+        name: product?.nm || "Product",
+        brand: product?.brand,
+        imageUrl: productImageUrl(product) || heroImage,
+        product,
+        variants: product?.variants ?? [],
       });
     });
   }
@@ -161,8 +297,11 @@ export function buildKitPreviewFromPlatform(
   return {
     name: kit.name,
     description: kit.description?.trim() || "No description available.",
-    coverImage: kit.imageUrls?.[0] ? resolveMediaUrl(kit.imageUrls[0]) : fallbackCover,
+    coverImage: heroImage,
     products,
+    variantImages: (kit.variantImages || [])
+      .map((url) => resolveMediaUrl(url) || url)
+      .filter(Boolean),
   };
 }
 
@@ -247,7 +386,16 @@ export function KitPreviewDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const productCount = data?.products.length ?? 0;
-  const wide = productCount > 4;
+  const wide = productCount > 4 || (data?.variantImages?.length ?? 0) > 0;
+  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setSelectedVariant(null);
+      return;
+    }
+    setSelectedVariant(data?.variantImages?.[0] ?? null);
+  }, [open, data?.name, data?.variantImages]);
 
   const productCards = useMemo(() => {
     if (!data) return [];
@@ -401,6 +549,68 @@ export function KitPreviewDialog({
                 </div>
               )}
             </div>
+
+            {(data.variantImages?.length ?? 0) > 0 ? (
+              <div style={{ marginBottom: 20 }}>
+                <h4
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    color: "var(--gray-500)",
+                    marginBottom: 12,
+                  }}
+                >
+                  Variants
+                </h4>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+                    gap: 12,
+                  }}
+                >
+                  {data.variantImages!.map((url, idx) => {
+                    const selected = selectedVariant === url;
+                    return (
+                      <button
+                        key={`${url}-${idx}`}
+                        type="button"
+                        onClick={() => setSelectedVariant(url)}
+                        style={{
+                          border: selected ? "2px solid var(--brand)" : "1px solid var(--line)",
+                          borderRadius: 8,
+                          padding: 10,
+                          background: selected ? "var(--surface-2)" : "var(--gray-50)",
+                          cursor: "pointer",
+                          textAlign: "left",
+                        }}
+                      >
+                        <div
+                          style={{
+                            aspectRatio: "1",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            overflow: "hidden",
+                            marginBottom: 8,
+                          }}
+                        >
+                          <img
+                            src={url}
+                            alt={`Variant ${idx + 1}`}
+                            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                          />
+                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ink)" }}>
+                          Variant {idx + 1}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 24 }}>
               <button

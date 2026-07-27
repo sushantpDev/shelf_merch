@@ -13,10 +13,12 @@ import {
   removeKitItem,
   type KitInput,
   type KitItem,
+  type KitItemImage,
   type PlatformKit,
   type ProductRow,
   type ProductVariant,
   updateKit,
+  updateKitImageRoles,
   uploadKitImages,
 } from "../model";
 
@@ -40,6 +42,10 @@ export function useKitWizardController(mode: "create" | "edit", kitId?: string) 
   const [pickVariantSku, setPickVariantSku] = useState("");
   const [pickQty, setPickQty] = useState(1);
 
+  const [heroImage, setHeroImage] = useState("");
+  const [itemImages, setItemImages] = useState<KitItemImage[]>([]);
+  const [variantImages, setVariantImages] = useState<string[]>([]);
+
   useEffect(() => {
     fetchPlatformProducts({ status: "active", limit: 200 })
       .then((res) => setProducts(res.items as ProductRow[]))
@@ -59,6 +65,14 @@ export function useKitWizardController(mode: "create" | "edit", kitId?: string) 
           approxValueInr: k.approxValueInr ?? 0,
           rules: k.rules,
         });
+        setHeroImage(k.heroImage || "");
+        setItemImages(
+          (k.itemImages || []).map((it) => ({
+            imageUrl: it.imageUrl,
+            label: it.label || "",
+          })),
+        );
+        setVariantImages(k.variantImages || []);
       })
       .catch((e) => setError(e.message));
   }, [mode, kitId]);
@@ -69,9 +83,22 @@ export function useKitWizardController(mode: "create" | "edit", kitId?: string) 
   const setRule = (k: keyof NonNullable<KitInput["rules"]>, v: boolean | number) =>
     setDetails((d) => ({ ...d, rules: { ...d.rules, [k]: v } }));
 
+  function syncImageRolesFromKit(k: PlatformKit) {
+    setHeroImage(k.heroImage || "");
+    setItemImages(
+      (k.itemImages || []).map((it) => ({
+        imageUrl: it.imageUrl,
+        label: it.label || "",
+      })),
+    );
+    setVariantImages(k.variantImages || []);
+  }
+
   async function refresh() {
     if (!id) return;
-    setKit(await getPlatformKit(id));
+    const k = await getPlatformKit(id);
+    setKit(k);
+    syncImageRolesFromKit(k);
   }
 
   async function saveDetails() {
@@ -79,7 +106,15 @@ export function useKitWizardController(mode: "create" | "edit", kitId?: string) 
     setError("");
     try {
       if (id) {
-        await updateKit(id, details);
+        // Only patch fields the details step edits — never send gallery/image defaults.
+        await updateKit(id, {
+          name: details.name,
+          description: details.description,
+          packaging: details.packaging,
+          eligibleCampaignTypes: details.eligibleCampaignTypes,
+          approxValueInr: details.approxValueInr,
+          rules: details.rules,
+        });
         await refresh();
       } else {
         const created = await createKit(details);
@@ -146,12 +181,67 @@ export function useKitWizardController(mode: "create" | "edit", kitId?: string) 
     }
   }
 
+  function toggleItemImage(url: string) {
+    setItemImages((prev) => {
+      const exists = prev.find((it) => it.imageUrl === url);
+      if (exists) return prev.filter((it) => it.imageUrl !== url);
+      return [...prev, { imageUrl: url, label: "" }];
+    });
+  }
+
+  function setItemLabel(url: string, label: string) {
+    setItemImages((prev) =>
+      prev.map((it) => (it.imageUrl === url ? { ...it, label } : it)),
+    );
+  }
+
+  function toggleVariantImage(url: string) {
+    setVariantImages((prev) =>
+      prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url],
+    );
+  }
+
+  async function persistImageRoles() {
+    if (!id) return;
+    await updateKitImageRoles(id, {
+      heroImage: heroImage || undefined,
+      itemImages,
+      variantImages,
+    });
+    await refresh();
+  }
+
+  async function saveImageRolesAndContinue() {
+    if (!id) return;
+    const urls = kit?.imageUrls ?? [];
+    if (urls.length > 0 && !heroImage) {
+      setError("Select exactly one hero image");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await persistImageRoles();
+      setStep(3);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save image roles");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function doPublish() {
     if (!id) return;
     setBusy(true);
     setError("");
     setProblems([]);
     try {
+      // Save image roles if user jumped to review without pressing Continue on step 2.
+      const urls = kit?.imageUrls ?? [];
+      if (urls.length > 0 && heroImage) {
+        await persistImageRoles();
+      }
+      // Publish only flips status — no other fields are written.
       await publishKit(id);
       navigate("/platform/kits");
     } catch (e) {
@@ -184,6 +274,9 @@ export function useKitWizardController(mode: "create" | "edit", kitId?: string) 
     pickQty,
     rules,
     imported,
+    heroImage,
+    itemImages,
+    variantImages,
     productName,
     onBack: () => navigate("/platform/kits"),
     onStep: setStep,
@@ -196,6 +289,11 @@ export function useKitWizardController(mode: "create" | "edit", kitId?: string) 
     onAddItem: addItem,
     onDropItem: dropItem,
     onUploadImages: uploadImages,
+    onSelectHero: setHeroImage,
+    onToggleItemImage: toggleItemImage,
+    onSetItemLabel: setItemLabel,
+    onToggleVariantImage: toggleVariantImage,
+    onSaveImageRoles: saveImageRolesAndContinue,
     onPublish: doPublish,
     onSaveDraft: () => navigate("/platform/kits"),
   };

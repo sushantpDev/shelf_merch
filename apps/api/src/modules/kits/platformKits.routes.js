@@ -33,6 +33,23 @@ const rulesSchema = z
   })
   .partial();
 
+const itemImageSchema = z.object({
+  imageUrl: z.string().min(1),
+  label: z.string().optional().default(''),
+});
+
+// PATCH schemas must not apply empty nested defaults — that wipes stored labels.
+const itemImageUpdateSchema = z.object({
+  imageUrl: z.string().min(1),
+  label: z.string().optional(),
+});
+
+const imageRolesSchema = z.object({
+  heroImage: z.string().optional(),
+  itemImages: z.array(itemImageUpdateSchema).optional(),
+  variantImages: z.array(z.string()).optional(),
+}).strict();
+
 const createKitSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional().default(''),
@@ -40,8 +57,64 @@ const createKitSchema = z.object({
   eligibleCampaignTypes: z.array(z.string()).optional().default([]),
   approxValueInr: z.number().nonnegative().optional().default(0),
   imageUrls: z.array(z.string()).optional().default([]),
+  heroImage: z.string().optional().default(''),
+  itemImages: z.array(itemImageSchema).optional().default([]),
+  variantImages: z.array(z.string()).optional().default([]),
   rules: rulesSchema.optional(),
 });
+
+// Partial updates must NOT apply empty defaults — otherwise omitted fields like
+// imageUrls get overwritten with [] and wipe uploaded gallery images.
+const updateKitSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
+  packaging: z.enum(['none', 'box', 'premium_box']).optional(),
+  eligibleCampaignTypes: z.array(z.string()).optional(),
+  approxValueInr: z.number().nonnegative().optional(),
+  imageUrls: z.array(z.string()).optional(),
+  heroImage: z.string().optional(),
+  itemImages: z.array(itemImageUpdateSchema).optional(),
+  variantImages: z.array(z.string()).optional(),
+  rules: rulesSchema.optional(),
+  status: z.enum(['draft', 'archived']).optional(),
+});
+
+/** Build a $set payload that only updates image-role fields, never wiping stored values. */
+function buildImageRolesSet(existing, body) {
+  const $set = {};
+
+  if (body.heroImage !== undefined) {
+    const next = String(body.heroImage).trim();
+    const current = String(existing.heroImage || '').trim();
+    if (next || !current) $set.heroImage = next;
+  }
+
+  if (body.itemImages !== undefined) {
+    const incoming = Array.isArray(body.itemImages) ? body.itemImages : [];
+    const current = Array.isArray(existing.itemImages) ? existing.itemImages : [];
+    if (!incoming.length && current.length) {
+      // Ignore accidental empty payloads — do not wipe configured items.
+    } else {
+      const byUrl = new Map(current.map((it) => [String(it.imageUrl), it]));
+      $set.itemImages = incoming.map((it) => ({
+        imageUrl: it.imageUrl,
+        label: String(it.label ?? '').trim() || String(byUrl.get(it.imageUrl)?.label ?? '').trim(),
+      }));
+    }
+  }
+
+  if (body.variantImages !== undefined) {
+    const incoming = Array.isArray(body.variantImages) ? body.variantImages : [];
+    const current = Array.isArray(existing.variantImages) ? existing.variantImages : [];
+    if (!incoming.length && current.length) {
+      // Ignore accidental empty payloads — do not wipe configured variants.
+    } else {
+      $set.variantImages = incoming;
+    }
+  }
+
+  return $set;
+}
 
 async function getKit(id) {
   const kit = await PlatformKit.findById(id);
@@ -103,14 +176,58 @@ platformKitsRouter.post(
 platformKitsRouter.patch(
   '/:id',
   kitsWrite,
-  validate({ params: idParam, body: createKitSchema.partial().extend({ status: z.enum(['draft', 'archived']).optional() }) }),
+  validate({ params: idParam, body: updateKitSchema }),
   asyncHandler(async (req, res) => {
     const kit = await getKit(req.params.id);
     const before = kit.toObject();
-    Object.assign(kit, req.body);
+    // Assign only keys present on the validated body (no implicit empties).
+    for (const [key, value] of Object.entries(req.body || {})) {
+      if (value === undefined) continue;
+      // Never wipe existing text/content with an empty PATCH payload.
+      if (key === 'description' && !String(value).trim() && String(kit.description || '').trim()) continue;
+      if (key === 'heroImage' && !String(value).trim() && String(kit.heroImage || '').trim()) continue;
+      if (key === 'imageUrls' && Array.isArray(value) && !value.length && (kit.imageUrls?.length ?? 0) > 0) continue;
+      if (key === 'itemImages' && Array.isArray(value) && !value.length && (kit.itemImages?.length ?? 0) > 0) continue;
+      if (key === 'variantImages' && Array.isArray(value) && !value.length && (kit.variantImages?.length ?? 0) > 0) continue;
+      kit[key] = value;
+    }
     await kit.save();
-    writeAudit({ req, action: 'kit.update', entityType: 'PlatformKit', entityId: kit._id, before: { name: before.name, status: before.status }, after: req.body });
+    writeAudit({ req, action: 'kit.update', entityType: 'PlatformKit', entityId: kit._id, before: { name: before.name, status: before.status, approxValueInr: before.approxValueInr, imageUrlsCount: before.imageUrls?.length }, after: req.body });
     res.json(kit);
+  }),
+);
+
+// Image-role updates touch ONLY heroImage / itemImages / variantImages — nothing else.
+platformKitsRouter.patch(
+  '/:id/image-roles',
+  kitsWrite,
+  validate({ params: idParam, body: imageRolesSchema }),
+  asyncHandler(async (req, res) => {
+    const kit = await getKit(req.params.id);
+    const before = {
+      heroImage: kit.heroImage,
+      itemImagesCount: kit.itemImages?.length ?? 0,
+      variantImagesCount: kit.variantImages?.length ?? 0,
+    };
+    const $set = buildImageRolesSet(kit.toObject(), req.body);
+    if (!Object.keys($set).length) {
+      return res.json(kit);
+    }
+    $set.updatedAt = new Date();
+    const updated = await PlatformKit.findByIdAndUpdate(
+      kit._id,
+      { $set },
+      { new: true, runValidators: true },
+    );
+    writeAudit({
+      req,
+      action: 'kit.image_roles_update',
+      entityType: 'PlatformKit',
+      entityId: kit._id,
+      before,
+      after: $set,
+    });
+    res.json(updated);
   }),
 );
 
@@ -175,6 +292,9 @@ platformKitsRouter.post(
     const imported = kit.source?.provider && kit.source.provider !== 'manual';
     if (!imported && !kit.items.length) {
       throw new ApiError(422, 'A kit needs at least one item before publishing', 'KIT_EMPTY');
+    }
+    if ((kit.imageUrls?.length ?? 0) > 0 && !String(kit.heroImage || '').trim()) {
+      throw new ApiError(422, 'Select a hero image before publishing', 'KIT_HERO_REQUIRED');
     }
     kit.status = 'active';
     await kit.save();
