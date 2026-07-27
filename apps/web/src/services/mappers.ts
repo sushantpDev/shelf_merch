@@ -6,6 +6,7 @@ import {
   normalizeCurrencyMode,
   type ShopCurrencyMode,
 } from "@/lib/storeCurrency";
+import { netPriceExGst } from "@/features/send/money";
 
 export type UiPrintArea = {
   key?: string;
@@ -28,7 +29,10 @@ export type UiProduct = {
   keyFeatures?: string;
   sizeGuide?: string;
   price: string;
-  /** Numeric catalog selling price (INR) — source of truth for kit pricing. */
+  /**
+   * Numeric catalog selling price (INR), GST-inclusive as stored in catalogProducts.
+   * Display uses `price` (ex-GST); kit checkout strips GST from this value by category.
+   */
   basePriceInr?: number;
   sw: number;
   colors?: string[];
@@ -252,7 +256,8 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
     description: p.description || "",
     keyFeatures: p.keyFeatures || "",
     sizeGuide: p.sizeGuide || "",
-    price: formatInr(p.basePriceInr ?? 0),
+    // Display excludes category GST; basePriceInr stays GST-inclusive from DB.
+    price: formatInr(netPriceExGst(Number(p.basePriceInr) || 0, p.category)),
     basePriceInr: Math.round(Number(p.basePriceInr) || 0),
     sw: Array.isArray(p.variants) ? Math.max(p.variants.length, 2) : 4,
     colors: variantColors,

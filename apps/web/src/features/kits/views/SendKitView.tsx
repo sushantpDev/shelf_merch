@@ -809,39 +809,43 @@ export function SendKitView(vm: SendKitVm) {
             />
             <div className="card" style={{ padding: 22, height: "fit-content" }}>
               <h3 style={{ fontSize: 18, marginBottom: 12 }}>Order summary</h3>
-              {/* <SumRow k="Kit" v={kit.name} /> */}
-
-              {/* <div style={{ margin: "10px 0 4px" }}>
-                <div className="muted" style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
-                  Kit Price Breakdown
-                </div>
-                {vm.pricedItems.map((item) => (
-                  <SumRow key={item.id} k={item.name} v={inr(item.priceInr)} />
-                ))}
-                {totals.pkgPerKit > 0 ? (
-                  <SumRow k="Packaging" v={inr(totals.pkgPerKit)} />
-                ) : null}
-                <SumRow k="Cost Per Kit" v={inr(totals.costPerKit)} emphasis />
-              </div> */}
-{/* 
-              <SumRow k="Recipients" v={String(totals.qty)} /> */}
-              <SumRow
-                k={`${totals.qty} kits × ${inr(totals.costPerKit)}`}
-                v={inr(totals.total)}
-                emphasis
-              />
-              <SumRow k="Shipping" v="Free" />
-              {/* <SumRow k="Service fee (12%)" v={inr(totals.fee)} /> */}
-              {/* GST is inclusive in price per kit — not added separately */}
-              
-              <div className="divider" />
-              <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-                <div>
-                  <b style={{ fontSize: 18, display: "block" }}>Grand Total</b>
-                  <span className="muted" style={{ fontSize: 12 }}>incl. GST at 18%</span>
-                </div>
-                <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)" }}>{inr(totals.total)}</b>
-              </div>
+              {!vm.isCuratedKit ? (
+                <>
+                  <SumRow k="Products" v={inr((totals.itemsSubtotal ?? 0) * totals.qty)} />
+                  {totals.pkgPerKit > 0 ? (
+                    <SumRow k="Packaging" v={inr(totals.pkgCost)} />
+                  ) : null}
+                  <SumRow k="Subtotal" v={inr((totals.taxablePerKit ?? 0) * totals.qty)} />
+                  <SumRow
+                    k={`GST (${Math.round((totals.kitGstRate ?? 0.18) * 100)}%)`}
+                    v={inr(totals.tax)}
+                  />
+                  <div className="divider" />
+                  <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                    <div>
+                      <b style={{ fontSize: 18, display: "block" }}>Total</b>
+                    </div>
+                    <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)" }}>{inr(totals.total)}</b>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <SumRow
+                    k={`${totals.qty} kits × ${inr(totals.costPerKit)}`}
+                    v={inr(totals.total)}
+                    emphasis
+                  />
+                  <SumRow k="Shipping" v="Free" />
+                  <div className="divider" />
+                  <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                    <div>
+                      <b style={{ fontSize: 18, display: "block" }}>Grand Total</b>
+                      <span className="muted" style={{ fontSize: 12 }}>incl. GST at 18%</span>
+                    </div>
+                    <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)" }}>{inr(totals.total)}</b>
+                  </div>
+                </>
+              )}
               <button type="button" className="btn btn-brand btn-block btn-lg" style={{ marginTop: 14 }} onClick={vm.onPayAndSend}>
                 Pay &amp; send
               </button>

@@ -7,7 +7,14 @@ import type { UiContact, UiProduct } from "@/services/mappers";
 import type { UiWallet } from "@/services/mappers";
 import { ensureSpendEntityForWalletApi } from "@/services/mutations-api";
 import { entityIdForWallet, spendableForWallet, walletsForCheckout } from "@/services/workspace-api";
-import { kitSendTotals, sumKitProductPrices, type KitSendTotals } from "@/features/send/money";
+import {
+  customisedKitSendTotals,
+  kitSendTotals,
+  netPriceExGst,
+  sumCustomisedKitNetPrices,
+  sumKitProductPrices,
+  type KitSendTotals,
+} from "@/features/send/money";
 import { toSchedulePayload } from "@/features/send/types";
 import {
   addRecipientsUpToLimit,
@@ -175,6 +182,8 @@ export type SendKitVm = {
   /** Line items for checkout kit price breakdown. */
   pricedItems: Array<{ id: string; name: string; priceInr: number; mockupUrl?: string }>;
   kitUnitPrice: number;
+  /** True when this workspace kit was cloned from a curated platform template. */
+  isCuratedKit: boolean;
   totals: KitSendTotals;
   surpriseMissing: UiContact[];
   wallet: UiWallet | undefined;
@@ -267,19 +276,29 @@ export function useSendKitController(): SendKitVm {
         return {
           id: product.id || product.nm,
           name: product.nm,
-          priceInr: Math.round(Number(product.basePriceInr) || 0),
+          priceInr: netPriceExGst(Number(product.basePriceInr) || 0, product.category),
           mockupUrl: ref?.mockupUrl || product.mockupUrl || "",
         };
       })
       .filter(Boolean) as Array<{ id: string; name: string; priceInr: number; mockupUrl?: string }>;
   }, [kit, draft.picked, catalog]);
 
+  const isCuratedKit = !!getCuratedKitMeta(kit);
+
+  const pickedProducts = useMemo(
+    () => draft.picked.map((idx) => catalog[idx]).filter(Boolean) as UiProduct[],
+    [draft.picked, catalog],
+  );
+
   const kitUnitPrice = useMemo(() => {
+    // Customised kits always recompute from catalog (GST-inclusive → net).
+    // Curated kits keep using persisted kitPrice / inclusive sum.
+    if (!isCuratedKit) {
+      return sumCustomisedKitNetPrices(pickedProducts);
+    }
     if (kit?.kitPrice && kit.kitPrice > 0) return Math.round(kit.kitPrice);
-    return sumKitProductPrices(
-      draft.picked.map((idx) => catalog[idx]).filter(Boolean) as UiProduct[],
-    );
-  }, [kit?.kitPrice, draft.picked, catalog]);
+    return sumKitProductPrices(pickedProducts);
+  }, [isCuratedKit, kit?.kitPrice, pickedProducts]);
 
   const checkoutWallets = useMemo(
     () => (workspace ? walletsForCheckout(workspace) : []),
@@ -287,7 +306,12 @@ export function useSendKitController(): SendKitVm {
   );
   const wallet =
     checkoutWallets.find((w) => w.id === selectedWalletId) ?? checkoutWallets[0];
-  const totals = kitSendTotals(draft.selRecips.length, draft.pkg, kitUnitPrice);
+  const totals = useMemo(() => {
+    if (!isCuratedKit) {
+      return customisedKitSendTotals(draft.selRecips.length, draft.pkg, pickedProducts);
+    }
+    return kitSendTotals(draft.selRecips.length, draft.pkg, kitUnitPrice);
+  }, [isCuratedKit, draft.selRecips.length, draft.pkg, pickedProducts, kitUnitPrice]);
   const surpriseMissing =
     draft.mode === "surprise" ? missingAddress(pickerContacts, draft.selRecips) : [];
 
@@ -513,6 +537,7 @@ export function useSendKitController(): SendKitVm {
     catalog,
     pricedItems,
     kitUnitPrice,
+    isCuratedKit,
     totals,
     surpriseMissing,
     wallet,

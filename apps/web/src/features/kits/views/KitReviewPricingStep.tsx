@@ -1,9 +1,31 @@
+import { useMemo } from "react";
 import { DesignedProductThumb } from "@/features/swag/DesignedProductThumb";
 import type { UiProduct } from "@/services/mappers";
-import { sumKitProductPrices } from "@/features/send/money";
+import { customisedKitSendTotals, netPriceExGst } from "@/features/send/money";
 
 function formatInr(n: number) {
   return `₹${Math.round(n).toLocaleString("en-IN")}`;
+}
+
+function SummaryRow({ label, value, emphasis }: { label: string; value: string; emphasis?: boolean }) {
+  return (
+    <div
+      className="row"
+      style={{
+        justifyContent: "space-between",
+        alignItems: "baseline",
+        marginTop: emphasis ? 12 : 8,
+        fontSize: emphasis ? 16 : 14,
+      }}
+    >
+      <span style={{ fontWeight: emphasis ? 800 : 600, color: emphasis ? "var(--ink)" : "var(--ink-2)" }}>
+        {label}
+      </span>
+      <b className="num" style={{ fontWeight: emphasis ? 800 : 700, fontSize: emphasis ? 18 : 14 }}>
+        {value}
+      </b>
+    </div>
+  );
 }
 
 /** Create-kit final step — review selected products and dynamic kit cost. */
@@ -16,7 +38,11 @@ export function KitReviewPricingStep({
   products: UiProduct[];
   artworkUrl?: string;
 }) {
-  const total = sumKitProductPrices(products);
+  // Packaging is chosen at send time — review shows products + kit GST only.
+  const pricing = useMemo(
+    () => customisedKitSendTotals(1, "none", products),
+    [products],
+  );
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -37,65 +63,60 @@ export function KitReviewPricingStep({
           <p className="muted" style={{ margin: 0 }}>No products selected.</p>
         ) : (
           <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 12 }}>
-            {products.map((p) => (
-              <li
-                key={p.id || p.nm}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  paddingBottom: 12,
-                  borderBottom: "1px solid var(--line)",
-                }}
-              >
-                <div
+            {products.map((p) => {
+              const netPrice = netPriceExGst(Number(p.basePriceInr) || 0, p.category);
+              return (
+                <li
+                  key={p.id || p.nm}
                   style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 8,
-                    overflow: "hidden",
-                    background: "var(--gray-100)",
-                    flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    paddingBottom: 12,
+                    borderBottom: "1px solid var(--line)",
                   }}
                 >
-                  <DesignedProductThumb
-                    product={p}
-                    artworkUrl={p.mockupUrl ? undefined : artworkUrl}
-                  />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)" }}>{p.nm}</div>
-                  {p.brand ? (
-                    <div className="muted" style={{ fontSize: 12 }}>{p.brand}</div>
-                  ) : null}
-                </div>
-                <b className="num" style={{ fontSize: 14, fontWeight: 800 }}>
-                  {formatInr(p.basePriceInr ?? 0)}
-                </b>
-              </li>
-            ))}
+                  <div
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 8,
+                      overflow: "hidden",
+                      background: "var(--gray-100)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <DesignedProductThumb
+                      product={p}
+                      artworkUrl={p.mockupUrl ? undefined : artworkUrl}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)" }}>{p.nm}</div>
+                    {p.brand ? (
+                      <div className="muted" style={{ fontSize: 12 }}>{p.brand}</div>
+                    ) : null}
+                  </div>
+                  <b className="num" style={{ fontSize: 14, fontWeight: 800 }}>
+                    {formatInr(netPrice)}
+                  </b>
+                </li>
+              );
+            })}
           </ul>
         )}
 
-        <div
-          className="row"
-          style={{
-            justifyContent: "space-between",
-            alignItems: "baseline",
-            marginTop: 16,
-            paddingTop: 4,
-          }}
-        >
-          <span style={{ fontSize: 16, fontWeight: 800, color: "var(--ink)" }}>Total Kit Cost</span>
-          <span style={{ display: "inline-flex", alignItems: "baseline" }}>
-            <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)", fontWeight: 800 }}>
-              {formatInr(total)}
-            </b>
-            <span style={{ fontSize: 14, fontWeight: 400, color: "var(--ink-2)" }}> / kit including GST</span>
-          </span>
+        <div style={{ marginTop: 16, paddingTop: 4, borderTop: "1px solid var(--line)" }}>
+          <SummaryRow label="Subtotal" value={formatInr(pricing.itemsSubtotal)} />
+          <SummaryRow
+            label={`GST (${Math.round(pricing.kitGstRate * 100)}%)`}
+            value={formatInr(pricing.tax)}
+          />
+          <div className="divider" style={{ margin: "12px 0" }} />
+          <SummaryRow label="Total" value={`${formatInr(pricing.costPerKit)} / kit`} emphasis />
         </div>
         <p className="muted" style={{ margin: "8px 0 0", fontSize: 12 }}>
-          Packaging, shipping, and GST are calculated at send time.
+          Product prices exclude GST by category. Packaging is added at send time.
         </p>
       </div>
     </div>

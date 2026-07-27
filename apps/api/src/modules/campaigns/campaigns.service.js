@@ -7,7 +7,7 @@ import { Contact } from '../contacts/contact.model.js';
 import { Shop } from '../shops/shop.model.js';
 import { Kit } from '../kits/kit.model.js';
 import { CatalogProduct } from '../catalog/catalogProduct.model.js';
-import { kitSendTotals, sumKitProductPrices } from '../kits/kitPricing.js';
+import { customisedKitSendTotals, kitSendTotals, sumKitProductPrices } from '../kits/kitPricing.js';
 import { Wallet } from '../wallets/wallet.model.js';
 import { Tenant } from '../tenants/tenant.model.js';
 import * as ledger from '../../services/ledger.service.js';
@@ -327,25 +327,46 @@ export async function importRecipients({
     campaign.creditsPerRecipient = 0;
     let budget = Math.round(totalBudget ?? 0);
 
-    // Recompute kit checkout from catalog kitPrice so wallet debit matches product pricing.
+    // Recompute kit checkout so wallet debit matches product pricing.
+    // Customised kits: strip product GST by category, then apply kit GST.
+    // Curated kits: keep existing inclusive kitPrice + 18% formula.
     if (campaign.type === 'kit' && campaign.kitId) {
       const kit = await Kit.findOne({ _id: campaign.kitId, tenantId });
       if (kit) {
-        let unitPrice = Math.round(Number(kit.kitPrice) || 0);
-        if (unitPrice <= 0 && kit.productRefs?.length) {
-          const products = await CatalogProduct.find({
-            _id: { $in: kit.productRefs.map((r) => r.catalogProductId).filter(Boolean) },
-          })
-            .select('basePriceInr')
-            .lean();
-          unitPrice = sumKitProductPrices(products);
+        let curated = false;
+        try {
+          const meta = kit.designNotes ? JSON.parse(kit.designNotes) : null;
+          curated = Boolean(meta?.curated);
+        } catch {
+          curated = false;
         }
+
         const pkg =
           packaging === 'none' ? 'none' : packaging === 'box' ? 'box' : kit.packaging === 'none' ? 'none' : 'box';
         campaign.packaging = pkg;
-        const computed = kitSendTotals(campaign.recipientCount, pkg, unitPrice);
+
+        let computed;
+        if (!curated && kit.productRefs?.length) {
+          const products = await CatalogProduct.find({
+            _id: { $in: kit.productRefs.map((r) => r.catalogProductId).filter(Boolean) },
+          })
+            .select('basePriceInr category')
+            .lean();
+          computed = customisedKitSendTotals(campaign.recipientCount, pkg, products);
+        } else {
+          let unitPrice = Math.round(Number(kit.kitPrice) || 0);
+          if (unitPrice <= 0 && kit.productRefs?.length) {
+            const products = await CatalogProduct.find({
+              _id: { $in: kit.productRefs.map((r) => r.catalogProductId).filter(Boolean) },
+            })
+              .select('basePriceInr')
+              .lean();
+            unitPrice = sumKitProductPrices(products);
+          }
+          computed = kitSendTotals(campaign.recipientCount, pkg, unitPrice);
+        }
         // Checkout Grand Total is the source of truth when the client sends it;
-        // otherwise recompute with the shared kitSendTotals formula.
+        // otherwise recompute with the shared formula.
         budget = Math.round(totalBudget ?? 0) > 0 ? Math.round(totalBudget) : Math.round(computed.total);
       }
     } else if (packaging === 'none' || packaging === 'box') {

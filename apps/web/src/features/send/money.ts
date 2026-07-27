@@ -23,6 +23,10 @@ export type KitSendTotals = {
   /** GST portion embedded in the inclusive kit price (not added separately). */
   tax: number;
   total: number;
+  /** Customised kits only — see CustomisedKitSendTotals. */
+  itemsSubtotal?: number;
+  kitGstRate?: number;
+  taxablePerKit?: number;
 };
 
 /** Sum of catalog basePriceInr for selected kit products (qty 1 each). */
@@ -33,7 +37,7 @@ export function sumKitProductPrices(
 }
 
 /**
- * Money math for a kit send:
+ * Money math for a kit send (Curated Kits — unchanged):
  * ex-GST kit = products + packaging;
  * price per kit = ex-GST × 1.18 (GST inclusive);
  * grand total = recipients × GST-inclusive price per kit.
@@ -62,6 +66,91 @@ export function kitSendTotals(
     ship: 0,
     tax,
     total,
+  };
+}
+
+type PricedCatalogProduct = {
+  basePriceInr?: number | null;
+  category?: string | null;
+};
+
+/** Product GST rate from catalog category. Apparel = 5%, everything else = 18%. */
+export function productGstRate(category?: string | null): number {
+  return String(category || "").trim().toLowerCase() === "apparel" ? 0.05 : 0.18;
+}
+
+/**
+ * Derive GST-exclusive net price from GST-inclusive basePriceInr.
+ * Formula: ceil(inclusive − inclusive × rate). Always round up.
+ */
+export function netPriceExGst(
+  basePriceInr: number,
+  category?: string | null,
+): number {
+  const inclusive = Math.max(0, Number(basePriceInr) || 0);
+  const rate = productGstRate(category);
+  return Math.ceil(inclusive - inclusive * rate);
+}
+
+/** Sum of net (ex-GST) product prices for one customised kit. */
+export function sumCustomisedKitNetPrices(products: PricedCatalogProduct[]): number {
+  return products.reduce(
+    (sum, p) => sum + netPriceExGst(Number(p.basePriceInr) || 0, p.category),
+    0,
+  );
+}
+
+/**
+ * Kit-level GST for customised kits:
+ * 5% only when every product is Apparel; otherwise 18%.
+ */
+export function customisedKitGstRate(products: PricedCatalogProduct[]): number {
+  if (!products.length) return GST_RATE;
+  return products.every((p) => productGstRate(p.category) === 0.05) ? 0.05 : GST_RATE;
+}
+
+export type CustomisedKitSendTotals = KitSendTotals & {
+  /** Net product prices (ex-GST), one kit. */
+  itemsSubtotal: number;
+  /** Kit GST rate applied to (items + packaging): 0.05 or 0.18. */
+  kitGstRate: number;
+  /** Items + packaging per kit (taxable base before kit GST). */
+  taxablePerKit: number;
+};
+
+/**
+ * Customised Kit checkout math only.
+ * basePriceInr is GST-inclusive; strip product GST by category, add packaging,
+ * then apply kit GST on (items + packaging).
+ */
+export function customisedKitSendTotals(
+  recipientCount: number,
+  packaging: "none" | "box",
+  products: PricedCatalogProduct[],
+): CustomisedKitSendTotals {
+  const qty = Math.max(0, recipientCount);
+  const itemsSubtotal = sumCustomisedKitNetPrices(products);
+  const pkgPerKit = packaging === "box" ? PREMIUM_BOX_PER_RECIP : 0;
+  const taxablePerKit = itemsSubtotal + pkgPerKit;
+  const kitGstRate = customisedKitGstRate(products);
+  const taxPerKit = Math.ceil(taxablePerKit * kitGstRate);
+  const costPerKit = taxablePerKit + taxPerKit;
+  const total = costPerKit * qty;
+  const tax = taxPerKit * qty;
+  return {
+    qty,
+    unitPrice: itemsSubtotal,
+    pkgPerKit,
+    costPerKit,
+    sub: taxablePerKit * qty,
+    pkgCost: pkgPerKit * qty,
+    fee: 0,
+    ship: 0,
+    tax,
+    total,
+    itemsSubtotal,
+    kitGstRate,
+    taxablePerKit,
   };
 }
 
