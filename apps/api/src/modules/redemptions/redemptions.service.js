@@ -21,6 +21,7 @@ import {
 } from '../kits/kitProductOptions.js';
 import { CatalogProduct } from '../catalog/catalogProduct.model.js';
 import { Order, sanitizeOrderItems } from '../orders/order.model.js';
+import { scheduleOrderInvoiceGeneration } from '../orderInvoices/orderInvoice.hooks.js';
 import { Contact } from '../contacts/contact.model.js';
 import { transitionRedemption, finalizeRecipientRedemption } from '../campaigns/campaigns.service.js';
 import { computeAmountBreakdown, amountBreakdownForKitCampaign } from '../../services/pricing.service.js';
@@ -623,6 +624,7 @@ export async function createSurpriseOrdersForCampaign({ tenantId, campaign }) {
       ],
     });
 
+    scheduleOrderInvoiceGeneration(order);
     transitionRedemption(recipient, 'order_created');
     await recipient.save();
     await applyOrderInventory(order, campaign);
@@ -732,6 +734,7 @@ export async function createSingleLocationOrderForCampaign({ tenantId, campaign 
     ],
   });
 
+  scheduleOrderInvoiceGeneration(order);
   for (const recipient of recipients) {
     transitionRedemption(recipient, 'order_created');
     await recipient.save();
@@ -918,6 +921,7 @@ export async function submitRedemption(
     statusHistory: [{ status: 'created', at: new Date(), actorUserId: null, note: 'Redemption submit' }],
   });
   recordUsage(recipient.tenantId, 'orders.created'); // §Gap E metering
+  scheduleOrderInvoiceGeneration(order);
 
   // Points campaigns stay open (pooled credits — the recipient can keep
   // ordering against remaining credit). Everything else, including one-shot

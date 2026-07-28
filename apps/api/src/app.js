@@ -37,6 +37,7 @@ import notificationsRoutes from './modules/notifications/notifications.routes.js
 import paymentsRoutes from './modules/payments/payments.routes.js';
 import invoicesRoutes from './modules/invoices/invoices.routes.js';
 import ordersRoutes from './modules/orders/orders.routes.js';
+import orderInvoiceRoutes from './modules/orderInvoices/orderInvoice.routes.js';
 import vendorsRoutes from './modules/vendors/vendors.routes.js';
 import shipmentsRoutes from './modules/shipments/shipments.routes.js';
 import { tenantSupportRouter, platformSupportRouter } from './modules/support/support.routes.js';
@@ -237,6 +238,7 @@ export function createApp() {
   api.use('/payments', paymentsRoutes);
   api.use('/invoices', invoicesRoutes);
   api.use('/orders', ordersRoutes);
+  api.use('/order-invoices', orderInvoiceRoutes);
   api.use('/support-tickets', tenantSupportRouter);
   api.use('/chat', chatRoutes);
   // Platform control plane (SUPER_ADMIN_FLOW) — /api/v1/platform/*

@@ -1,4 +1,5 @@
 import { Order } from '../orders/order.model.js';
+import { scheduleOrderInvoiceGeneration } from '../orderInvoices/orderInvoice.hooks.js';
 import { Campaign } from '../campaigns/campaign.model.js';
 import { Recipient } from '../campaigns/recipient.model.js';
 import { Tenant } from '../tenants/tenant.model.js';
@@ -263,6 +264,7 @@ export async function createReplacementOrder({ orderId, reason, actor }) {
     replacementOfOrderId: original._id,
   });
 
+  scheduleOrderInvoiceGeneration(replacement);
   await original.save();
   return { original, replacement };
 }
