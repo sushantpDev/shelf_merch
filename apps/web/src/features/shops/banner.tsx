@@ -141,14 +141,12 @@ export function readBannerImageFile(file: File): Promise<string> {
   });
 }
 
-/** Renders a shop banner with optional centered/left logo overlay and edit menu. */
+/** Renders a shop banner with optional edit menu. Shop logo is shown in the header, not on the banner. */
 export function ShopBanner({
   source,
   height = 96,
   aspect,
   radius = 0,
-  logoSize = 48,
-  layout = "left",
   onEdit,
 }: {
   source: BannerSource;
@@ -156,16 +154,12 @@ export function ShopBanner({
   /** When set (e.g. `"3 / 1"`), sizes by width and matches banner asset ratio so cover does not crop. */
   aspect?: string;
   radius?: number;
+  /** @deprecated Logo is no longer overlaid on the banner. */
   logoSize?: number;
+  /** @deprecated Logo is no longer overlaid on the banner. */
   layout?: "left" | "center";
   onEdit?: () => void;
 }) {
-  const logoUrl = source.logoUrl || "";
-  const logoPos: CSSProperties =
-    layout === "center"
-      ? { left: "50%", top: "50%", transform: "translate(-50%,-50%)" }
-      : { left: 18, top: "50%", transform: "translateY(-50%)" };
-
   return (
     <div
       className={`${bannerClasses(source)}${aspect ? " shopbanner-aspect-fit" : ""}`}
@@ -178,30 +172,6 @@ export function ShopBanner({
         ...bannerStyle(source),
       }}
     >
-      {logoUrl && (
-        <div
-          style={{
-            position: "absolute",
-            width: logoSize,
-            height: logoSize,
-            background: "#fff",
-            borderRadius: 12,
-            display: "grid",
-            placeItems: "center",
-            overflow: "hidden",
-            padding: 4,
-            zIndex: 1,
-            boxShadow: "0 2px 8px rgba(0,0,0,.12)",
-            ...logoPos,
-          }}
-        >
-          <img
-            src={logoUrl}
-            alt="Shop logo"
-            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }}
-          />
-        </div>
-      )}
       {onEdit && (
         <button
           type="button"

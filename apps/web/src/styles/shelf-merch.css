@@ -3116,9 +3116,9 @@ button.thumb{font:inherit;color:inherit}
   min-width:0;
 }
 .shop-builder-preview-logo{
-  height:28px;
+  height:40px;
   width:auto;
-  max-width:120px;
+  max-width:160px;
   object-fit:contain;
   display:block;
 }
@@ -3412,8 +3412,8 @@ button.thumb{font:inherit;color:inherit}
   position:relative;padding:10px 14px 10px 52px;border-bottom:1px solid var(--line);min-height:44px;
   display:flex;align-items:center;
 }
-.shop-layout-preview-logo img{height:28px;width:auto;max-width:140px;object-fit:contain;object-position:left center;display:block}
-.shop-layout-preview-logo-empty{width:28px;height:28px;border-radius:6px;background:var(--surface-2)}
+.shop-layout-preview-logo img{height:40px;width:auto;max-width:160px;object-fit:contain;object-position:left center;display:block}
+.shop-layout-preview-logo-empty{width:40px;height:40px;border-radius:6px;background:var(--surface-2)}
 .shop-layout-preview-tag{
   position:absolute;top:50%;left:12px;transform:translateY(-50%);
   font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
@@ -5966,11 +5966,11 @@ a.shop-collection-cell:hover{background:var(--gray-100)}
   display: none;
 }
 .sf-shopbrand--stadium .sf-shopbrand-mark {
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
   flex: none;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 .sf-shopbrand--stadium .sf-shopbrand-name {
   font-family: 'Inter', system-ui, sans-serif;
