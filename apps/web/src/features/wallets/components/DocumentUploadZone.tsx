@@ -186,44 +186,48 @@ export function DocumentUploadZone({
         <div className="wallet-doc-dropzone-icon" aria-hidden>
           <Upload size={20} strokeWidth={2} />
         </div>
-        <div className="wallet-doc-dropzone-copy">
-          <span className="wallet-doc-dropzone-title">
-            {isModal ? "Drag and drop your file here" : "Drag & drop or browse"}
-          </span>
-          <span className="wallet-doc-dropzone-hint">
-            {isModal ? "or click browse below" : "PDF or DOCX · up to 25 MB"}
-          </span>
+        <div className="wallet-doc-dropzone-body">
+          <div className="wallet-doc-dropzone-copy">
+            <div className="wallet-doc-dropzone-title">
+              {isModal ? "Drag and drop your file here" : "Drag & drop your document"}
+            </div>
+            <div className="wallet-doc-dropzone-hint">
+              {isModal ? "or click browse below" : "PDF or DOCX · up to 25 MB"}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="wallet-doc-browse"
+            onClick={(e) => {
+              e.stopPropagation();
+              inputRef.current?.click();
+            }}
+          >
+            Browse files
+          </button>
         </div>
-        <button
-          type="button"
-          className="wallet-doc-browse"
-          onClick={(e) => {
-            e.stopPropagation();
-            inputRef.current?.click();
-          }}
-        >
-          Browse files
-        </button>
       </div>
 
       {!isModal && (
         <div className="wallet-doc-sources">
-          <span className="wallet-doc-sources-label">Cloud</span>
-          {CLOUD_SOURCES.map((src) => {
-            const Icon = src.icon;
-            return (
-              <button
-                key={src.id}
-                type="button"
-                className="wallet-doc-chip wallet-doc-chip--soon"
-                onClick={() => onSourcePick(true)}
-              >
-                <Icon size={14} strokeWidth={2} aria-hidden />
-                {src.label}
-                <span className="wallet-doc-soon-badge">Soon</span>
-              </button>
-            );
-          })}
+          <span className="wallet-doc-sources-label">Or from cloud</span>
+          <div className="wallet-doc-sources-chips">
+            {CLOUD_SOURCES.map((src) => {
+              const Icon = src.icon;
+              return (
+                <button
+                  key={src.id}
+                  type="button"
+                  className="wallet-doc-chip wallet-doc-chip--soon"
+                  onClick={() => onSourcePick(true)}
+                >
+                  <Icon size={14} strokeWidth={2} aria-hidden />
+                  <span>{src.label}</span>
+                  <span className="wallet-doc-soon-badge">Soon</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import {
   createWalletOnlyApi,
   fundWalletApi,
   createRazorpayOrderApi,
+  verifyRazorpayPaymentApi,
   uploadWalletFundingDocumentApi,
   fetchWalletTransactionsApi,
 } from "@/services/mutations-api";
@@ -81,6 +82,20 @@ export function useCreateRazorpayOrder() {
   return useMutation({
     mutationFn: (payload: { walletId: string; amount: number }) =>
       createRazorpayOrderApi(payload.walletId, payload.amount),
+  });
+}
+
+export function useVerifyRazorpayPayment() {
+  const invalidateWorkspace = useInvalidateWorkspace();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: verifyRazorpayPaymentApi,
+    onSuccess: (data) => {
+      invalidateWorkspace();
+      if (data.walletId) {
+        queryClient.invalidateQueries({ queryKey: ["wallet-transactions", data.walletId] });
+      }
+    },
   });
 }
 

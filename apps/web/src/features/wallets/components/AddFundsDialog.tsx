@@ -12,7 +12,7 @@ import { inr } from "@/components/platform/platform-ui";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 import { useInvalidateWorkspace } from "@/hooks/useWorkspace";
 import { parseAmt, type WalletUploadFile } from "../types";
-import { useCreateRazorpayOrder, useFundWallet } from "../model";
+import { useCreateRazorpayOrder, useFundWallet, useVerifyRazorpayPayment } from "../model";
 import { DocumentUploadZone } from "./DocumentUploadZone";
 
 const PRESET_AMOUNTS = [10_000, 25_000, 50_000, 1_00_000, 2_00_000];
@@ -30,6 +30,7 @@ type Props = {
 export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Props) {
   const fund = useFundWallet();
   const rzpOrder = useCreateRazorpayOrder();
+  const verifyPayment = useVerifyRazorpayPayment();
   const invalidateWorkspace = useInvalidateWorkspace();
 
   const [step, setStep] = useState(1);
@@ -42,7 +43,7 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
   const [uploadFile, setUploadFile] = useState<WalletUploadFile | null>(null);
   const [paying, setPaying] = useState(false);
 
-  const busy = fund.isPending || rzpOrder.isPending || paying;
+  const busy = fund.isPending || rzpOrder.isPending || verifyPayment.isPending || paying;
 
   useEffect(() => {
     if (!open) {
@@ -133,12 +134,25 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
       await openRazorpayCheckout({
         order,
         walletName,
-        onSuccess: () => {
-          toast.success("Payment received", {
-            description: `${inr(amount)} will be added to your organization budget shortly.`,
-          });
-          invalidateWorkspace();
-          onOpenChange(false);
+        onSuccess: async (response) => {
+          try {
+            await verifyPayment.mutateAsync({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            toast.success("Payment received — submitted for review", {
+              description: `${inr(amount)} will be added to your organization budget once finance approves.`,
+            });
+            invalidateWorkspace();
+            onOpenChange(false);
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Payment verification failed", {
+              description: "If money was deducted, contact support — finance will reconcile your payment.",
+            });
+          } finally {
+            setPaying(false);
+          }
         },
         onDismiss: () => setPaying(false),
       });
@@ -151,7 +165,6 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
       } else if (message !== "Payment cancelled") {
         toast.error(message);
       }
-    } finally {
       setPaying(false);
     }
   }
@@ -177,7 +190,7 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
                   <DialogTitle>How much would you like to add?</DialogTitle>
                   <DialogDescription>
                     Add ₹1,00,000+ via PO and get up to 5% bonus funds after finance approval.
-                    Online payments via Razorpay are credited instantly.
+                    Online payments via Razorpay are also reviewed by finance before crediting.
                   </DialogDescription>
                 </DialogHeader>
 
@@ -255,7 +268,7 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
                       <div>
                         <div className="add-funds-method-title">Pay online (Razorpay)</div>
                         <div className="add-funds-method-sub">
-                          UPI, cards, or net banking — funds available immediately after payment.
+                          UPI, cards, or net banking — credited after finance approval.
                         </div>
                       </div>
                     </button>
@@ -360,7 +373,7 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
 
                 <AmountSummary
                   label="Amount to pay"
-                  badge={{ text: "Instant credit", tone: "instant" }}
+                  badge={{ text: "Pending review", tone: "pending" }}
                 />
 
                 <div className="add-funds-brand-card">
@@ -383,8 +396,8 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
 
                 <p className="add-funds-brand-hint">
                   <CreditCard size={14} strokeWidth={2} aria-hidden />
-                  Funds are credited to your organization budget automatically once payment is
-                  confirmed.
+                  Payment is collected via Razorpay. Your budget is credited after ShelfMerch finance
+                  approves the funding request.
                 </p>
               </div>
             )}
@@ -402,7 +415,7 @@ export function AddFundsDialog({ open, onOpenChange, walletId, walletName }: Pro
                   label={method === "online" ? "Total to pay" : "Amount requested"}
                   badge={
                     method === "online"
-                      ? { text: "Instant credit", tone: "instant" }
+                      ? { text: "Pending review", tone: "pending" }
                       : { text: "Pending review", tone: "pending" }
                   }
                 />

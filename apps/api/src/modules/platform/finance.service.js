@@ -6,6 +6,8 @@ import { Invoice } from '../invoices/invoice.model.js';
 import { CreditNote } from '../invoices/creditNote.model.js';
 import * as ledger from '../../services/ledger.service.js';
 import * as walletsService from '../wallets/wallets.service.js';
+import { createInvoiceForPayment } from '../invoices/invoices.service.js';
+import { notify } from '../notifications/notifications.service.js';
 import { ApiError, NotFoundError } from '../../utils/errors.js';
 import { getPagination, paginatedResponse } from '../../utils/pagination.js';
 
@@ -54,14 +56,35 @@ export async function approveFunding({ walletId, amount, performedBy }) {
     throw new ApiError(422, 'Enter an amount greater than zero', 'INVALID_AMOUNT');
   }
 
+  const isOnline = wallet.fundingMethod === 'online';
+  const docLabel = isOnline
+    ? `Online Payment ${wallet.fundingDocument.docNumber || ''}`.trim()
+    : `Funding approved (${wallet.fundingDocument.docType || 'PO'} ${wallet.fundingDocument.docNumber || ''})`.trim();
+
   const transaction = await ledger.createTransaction({
     tenantId: wallet.tenantId,
     walletId: wallet._id,
     type: 'fund_in',
     amount: creditAmount,
-    description: `Funding approved (${wallet.fundingDocument.docType || 'PO'} ${wallet.fundingDocument.docNumber || ''})`.trim(),
+    description: docLabel,
     performedBy,
   });
+
+  if (isOnline) {
+    const payment = await Payment.findOne({
+      tenantId: wallet.tenantId,
+      relatedType: 'wallet_funding',
+      relatedId: wallet._id,
+      provider: 'razorpay',
+      status: 'succeeded',
+      amount: creditAmount,
+    })
+      .sort({ createdAt: -1 })
+      .setOptions({ skipTenantGuard: true });
+    if (payment) {
+      await createInvoiceForPayment({ tenantId: wallet.tenantId, payment });
+    }
+  }
 
   const planned = wallet.fundingDocument.plannedAllocations ?? [];
   if (planned.length > 0) {
@@ -95,6 +118,17 @@ export async function approveFunding({ walletId, amount, performedBy }) {
     });
   } catch {
     // Setup may still be incomplete — funds are credited regardless.
+  }
+
+  if (refreshed.ownerUserId) {
+    await notify({
+      type: 'wallet_funded',
+      tenantId: refreshed.tenantId,
+      userId: refreshed.ownerUserId,
+      title: 'Budget funded',
+      body: `₹${creditAmount.toLocaleString('en-IN')} has been added to ${refreshed.name}.`,
+      link: `/wallets/${refreshed._id}`,
+    });
   }
 
   return { transaction, wallet: await getWalletAnyTenant(walletId) };

@@ -58,7 +58,7 @@ export async function openRazorpayCheckout(opts: {
   walletName?: string;
   title?: string;
   description?: string;
-  onSuccess: (response: RazorpayHandlerResponse) => void;
+  onSuccess: (response: RazorpayHandlerResponse) => void | Promise<void>;
   onDismiss?: () => void;
 }): Promise<void> {
   await loadRazorpayScript();
@@ -77,8 +77,7 @@ export async function openRazorpayCheckout(opts: {
       description: opts.description ?? (opts.walletName ? `Add funds to ${opts.walletName}` : "Complete your order"),
       theme: { color: "#3D5FD9" },
       handler: (response) => {
-        opts.onSuccess(response);
-        resolve();
+        Promise.resolve(opts.onSuccess(response)).then(resolve).catch(reject);
       },
       modal: {
         ondismiss: () => {

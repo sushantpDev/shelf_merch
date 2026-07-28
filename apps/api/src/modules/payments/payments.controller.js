@@ -18,6 +18,24 @@ export async function createRazorpayOrder(req, res) {
   res.status(201).json(result);
 }
 
+export async function verifyRazorpayPayment(req, res) {
+  const result = await paymentsService.verifyWalletPayment({
+    tenantId: req.tenantId,
+    userId: req.user.userId,
+    razorpayOrderId: req.body.razorpay_order_id,
+    razorpayPaymentId: req.body.razorpay_payment_id,
+    razorpaySignature: req.body.razorpay_signature,
+  });
+  writeAudit({
+    req,
+    action: 'payment.razorpay_verified',
+    entityType: 'Payment',
+    entityId: result.paymentId,
+    after: { walletId: result.walletId, amount: result.amount, status: result.status },
+  });
+  res.json(result);
+}
+
 export async function razorpayWebhook(req, res) {
   const signature = req.headers['x-razorpay-signature'];
   if (!signature) {

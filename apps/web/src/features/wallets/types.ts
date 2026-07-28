@@ -116,14 +116,6 @@ export function deptPaletteColor(index: number): string {
   return ORG_FALLBACK[index % ORG_FALLBACK.length];
 }
 
-export const ORG_STEPS = [
-  "Setup Budget",
-  "Departments",
-  "Allocate Budget",
-  "Assign Managers",
-  "Review & Finish",
-] as const;
-
 export const ALLOC_STEPS = [
   "Departments",
   "Allocate Budget",

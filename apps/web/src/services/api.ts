@@ -39,7 +39,22 @@ async function parseBody(res: Response): Promise<unknown> {
 }
 
 function errorFromResponse(status: number, body: unknown): ApiError {
-  if (status === 502 || status === 503 || status === 504) {
+  const apiError =
+    body && typeof body === "object" && "error" in body
+      ? (
+          body as {
+            error: {
+              message?: string;
+              code?: string;
+              details?: unknown;
+            };
+          }
+        ).error
+      : null;
+
+  // Prefer the API's own message when present (e.g. RAZORPAY_NOT_CONFIGURED).
+  // Only use the generic gateway copy when the proxy/upstream returned an empty body.
+  if ((status === 502 || status === 503 || status === 504) && !apiError?.message) {
     return new ApiError(
       status,
       "Server temporarily unavailable — wait a moment and try again",
@@ -47,22 +62,16 @@ function errorFromResponse(status: number, body: unknown): ApiError {
       body,
     );
   }
-  if (body && typeof body === "object" && "error" in body) {
-    const err = (body as {
-      error: {
-        message?: string;
-        code?: string;
-        details?: unknown;
-      };
-    }).error;
-    let message = err.message || "Request failed";
-    if (err.code === "VALIDATION_ERROR" && Array.isArray(err.details) && err.details.length) {
-      const first = err.details[0] as { path?: string; message?: string };
+
+  if (apiError) {
+    let message = apiError.message || "Request failed";
+    if (apiError.code === "VALIDATION_ERROR" && Array.isArray(apiError.details) && apiError.details.length) {
+      const first = apiError.details[0] as { path?: string; message?: string };
       message = `${message}: ${first.path || "field"} — ${first.message || "invalid"}`;
-    } else if (Array.isArray(err.details) && err.details.every((d) => typeof d === "string")) {
-      message = `${message}: ${(err.details as string[]).join("; ")}`;
+    } else if (Array.isArray(apiError.details) && apiError.details.every((d) => typeof d === "string")) {
+      message = `${message}: ${(apiError.details as string[]).join("; ")}`;
     }
-    return new ApiError(status, message, err.code || "API_ERROR", body);
+    return new ApiError(status, message, apiError.code || "API_ERROR", body);
   }
   return new ApiError(status, typeof body === "string" && body.trim() ? body : "Request failed");
 }

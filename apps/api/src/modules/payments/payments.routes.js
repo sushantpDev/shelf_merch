@@ -6,7 +6,7 @@ import { tenantArea } from '../../middleware/tenantAccess.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { idempotency } from '../../middleware/idempotency.middleware.js';
 import * as controller from './payments.controller.js';
-import { createRazorpayOrderSchema } from './payments.validation.js';
+import { createRazorpayOrderSchema, verifyRazorpayPaymentSchema } from './payments.validation.js';
 
 const router = Router();
 
@@ -19,6 +19,15 @@ router.post(
   idempotency(),
   validate({ body: createRazorpayOrderSchema }),
   asyncHandler(controller.createRazorpayOrder),
+);
+
+router.post(
+  '/razorpay/verify',
+  tenantArea('wallets', 'write'),
+  blockDuringImpersonation,
+  idempotency(),
+  validate({ body: verifyRazorpayPaymentSchema }),
+  asyncHandler(controller.verifyRazorpayPayment),
 );
 
 export default router;
