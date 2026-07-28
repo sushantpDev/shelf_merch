@@ -16,15 +16,11 @@ const PAY_METHODS = [
   { id: "upi", label: "UPI" },
 ] as const;
 
-<<<<<<< HEAD
-export function Step1Wallet({ state, dispatch, onProceedToPayment, paymentBusy }: StepProps) {
-=======
 export function Step1Wallet({
   state,
   dispatch,
   contactErrors = {},
 }: StepProps & { contactErrors?: WalletContactFieldErrors }) {
->>>>>>> pr-196
   const o = state.wallet;
   const setField = (field: keyof typeof o, value: string | number | boolean) =>
     dispatch({ type: "walletField", field, value });

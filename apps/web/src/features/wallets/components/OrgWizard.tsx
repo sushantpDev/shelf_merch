@@ -23,19 +23,12 @@ import {
   type WizardState,
 } from "../types";
 import {
-<<<<<<< HEAD
-  useCreateRazorpayOrder,
-  useCreateWallet,
-  useSyncOrgWizard,
-  useVerifyRazorpayPayment,
-} from "../model";
-=======
+
   validateWalletContactFields,
   walletContactFieldsValid,
   type WalletContactFieldErrors,
 } from "../walletContactFields";
 import { useCreateWallet, useSyncOrgWizard } from "../model";
->>>>>>> pr-196
 import { Step1Wallet } from "./steps/Step1Wallet";
 import { Step2Departments } from "./steps/Step2Departments";
 import { Step3Allocate } from "./steps/Step3Allocate";
@@ -301,16 +294,7 @@ export function OrgWizard({
       )}
 
       {isWalletFlow && n === 1 && (
-<<<<<<< HEAD
-        <Step1Wallet
-          state={state}
-          dispatch={dispatch}
-          onProceedToPayment={handlePayOnline}
-          paymentBusy={paymentBusy}
-        />
-=======
         <Step1Wallet state={state} dispatch={dispatch} contactErrors={contactErrors} />
->>>>>>> pr-196
       )}
       {!isWalletFlow && n === 2 && <Step2Departments state={state} dispatch={dispatch} />}
       {!isWalletFlow && n === 3 && <Step3Allocate state={state} dispatch={dispatch} />}
