@@ -23,11 +23,19 @@ import {
   type WizardState,
 } from "../types";
 import {
+<<<<<<< HEAD
   useCreateRazorpayOrder,
   useCreateWallet,
   useSyncOrgWizard,
   useVerifyRazorpayPayment,
 } from "../model";
+=======
+  validateWalletContactFields,
+  walletContactFieldsValid,
+  type WalletContactFieldErrors,
+} from "../walletContactFields";
+import { useCreateWallet, useSyncOrgWizard } from "../model";
+>>>>>>> pr-196
 import { Step1Wallet } from "./steps/Step1Wallet";
 import { Step2Departments } from "./steps/Step2Departments";
 import { Step3Allocate } from "./steps/Step3Allocate";
@@ -48,6 +56,7 @@ export function OrgWizard({
   onFinished: () => void;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [contactErrors, setContactErrors] = useState<WalletContactFieldErrors>({});
   const submitInFlight = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -80,6 +89,20 @@ export function OrgWizard({
     }
     if (w.amount <= 0) {
       toast.error("Enter a budget amount greater than zero");
+      return false;
+    }
+    const contactValidation = validateWalletContactFields(
+      {
+        address: w.address,
+        pinCode: w.pinCode,
+        mobileNumber: w.mobileNumber,
+        gstin: w.gstin,
+      },
+      { required: true },
+    );
+    setContactErrors(contactValidation);
+    if (!walletContactFieldsValid(contactValidation)) {
+      toast.error("Complete all required wallet details");
       return false;
     }
     if (w.funding === "upload" && !w.uploaded && !w.uploadFile) {
@@ -278,12 +301,16 @@ export function OrgWizard({
       )}
 
       {isWalletFlow && n === 1 && (
+<<<<<<< HEAD
         <Step1Wallet
           state={state}
           dispatch={dispatch}
           onProceedToPayment={handlePayOnline}
           paymentBusy={paymentBusy}
         />
+=======
+        <Step1Wallet state={state} dispatch={dispatch} contactErrors={contactErrors} />
+>>>>>>> pr-196
       )}
       {!isWalletFlow && n === 2 && <Step2Departments state={state} dispatch={dispatch} />}
       {!isWalletFlow && n === 3 && <Step3Allocate state={state} dispatch={dispatch} />}

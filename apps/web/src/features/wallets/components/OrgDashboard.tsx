@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ArrowDownToLine, CircleDollarSign, Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowDownToLine, CircleDollarSign, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { inr } from "@/components/platform/platform-ui";
 import { PageHeader } from "@/components/tenant/PageHeader";
@@ -15,6 +15,7 @@ import { Donut } from "./Donut";
 import { WalletHistory } from "./WalletHistory";
 import { EmptyBudgetState } from "./budget/EmptyBudgetState";
 import { RequestTopupDialog } from "./budget/RequestTopupDialog";
+import { WalletDetailsDialog } from "./WalletDetailsDialog";
 
 function ManagerInviteBadge({ status }: { status: "unassigned" | "pending" | "active" }) {
   if (status === "active") {
@@ -55,7 +56,17 @@ export function OrgDashboard({
   const { canWrite } = useTenantAccess();
   const canManageBudget = canWrite("wallets");
   const [topupOpen, setTopupOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const walletId = org.wallet.id;
+  const walletContactInitial = useMemo(
+    () => ({
+      address: org.wallet.address || "",
+      pinCode: org.wallet.pinCode || "",
+      mobileNumber: org.wallet.mobileNumber || "",
+      gstin: org.wallet.gstin || "",
+    }),
+    [org.wallet.address, org.wallet.gstin, org.wallet.mobileNumber, org.wallet.pinCode],
+  );
 
   useEffect(() => {
     if (openTopupOnMount && walletId) {
@@ -111,6 +122,11 @@ export function OrgDashboard({
         actions={
           canManageBudget ? (
             <div className="row" style={{ gap: 8 }}>
+              {walletId ? (
+                <button type="button" className="btn btn-ghost" onClick={() => setDetailsOpen(true)}>
+                  <Pencil size={16} /> Wallet details
+                </button>
+              ) : null}
               {walletId && !fundingPending ? (
                 <button type="button" className="btn btn-brand" onClick={() => setTopupOpen(true)}>
                   <Plus size={16} /> Request top-up
@@ -425,6 +441,15 @@ export function OrgDashboard({
           onOpenChange={setTopupOpen}
           walletId={walletId}
           walletName={o.name || "Organization budget"}
+        />
+      ) : null}
+
+      {walletId ? (
+        <WalletDetailsDialog
+          open={detailsOpen}
+          onOpenChange={setDetailsOpen}
+          walletId={walletId}
+          initial={walletContactInitial}
         />
       ) : null}
     </>

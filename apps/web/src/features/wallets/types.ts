@@ -43,6 +43,10 @@ export type WizardWallet = {
   status?: string;
   start: string;
   end: string;
+  address: string;
+  pinCode: string;
+  mobileNumber: string;
+  gstin: string;
   funding: string;
   docType: string;
   docNumber: string;

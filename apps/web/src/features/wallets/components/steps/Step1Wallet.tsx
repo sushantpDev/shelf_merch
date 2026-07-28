@@ -1,6 +1,8 @@
 import { inr } from "@/components/platform/platform-ui";
 import { amtInput, fmtDate, parseAmt } from "../../types";
 import { DocumentUploadZone } from "../DocumentUploadZone";
+import { WalletContactFieldsForm } from "../WalletContactFieldsForm";
+import type { WalletContactFieldErrors } from "../../walletContactFields";
 import type { StepProps } from "./StepProps";
 
 const FUNDING_OPTIONS = [
@@ -14,10 +16,21 @@ const PAY_METHODS = [
   { id: "upi", label: "UPI" },
 ] as const;
 
+<<<<<<< HEAD
 export function Step1Wallet({ state, dispatch, onProceedToPayment, paymentBusy }: StepProps) {
+=======
+export function Step1Wallet({
+  state,
+  dispatch,
+  contactErrors = {},
+}: StepProps & { contactErrors?: WalletContactFieldErrors }) {
+>>>>>>> pr-196
   const o = state.wallet;
   const setField = (field: keyof typeof o, value: string | number | boolean) =>
     dispatch({ type: "walletField", field, value });
+
+  const setContactField = (field: "address" | "pinCode" | "mobileNumber" | "gstin", value: string) =>
+    setField(field, value);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 22 }}>
@@ -96,6 +109,20 @@ export function Step1Wallet({ state, dispatch, onProceedToPayment, paymentBusy }
               onChange={(e) => setField("end", e.target.value)}
             />
           </div>
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <WalletContactFieldsForm
+            idPrefix="org"
+            values={{
+              address: o.address,
+              pinCode: o.pinCode,
+              mobileNumber: o.mobileNumber,
+              gstin: o.gstin,
+            }}
+            errors={contactErrors}
+            onChange={setContactField}
+          />
         </div>
 
         <div className="field" style={{ marginTop: 16 }}>

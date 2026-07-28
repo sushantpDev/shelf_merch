@@ -598,16 +598,41 @@ function orderItemTintHex(product: StoreProduct | undefined, color?: string) {
   return resolveColorHex(color, product.variants?.find((v) => v.color === color)?.colorHex);
 }
 
-function orderVariantLines(item?: StoreOrderItem) {
-  const lines: string[] = [];
-  if (item?.variant?.color) lines.push(`Color: ${item.variant.color}`);
-  if (item?.variant?.size) lines.push(`Size: ${item.variant.size}`);
-  return lines;
-}
-
 function orderItemLinePrice(item?: StoreOrderItem) {
   if (item?.unitPriceInr == null) return null;
   return item.unitPriceInr * (item.qty || 1);
+}
+
+function OrderItemVariants({
+  item,
+  products,
+  className,
+}: {
+  item?: StoreOrderItem;
+  products: StoreProduct[];
+  className?: string;
+}) {
+  const color = item?.variant?.color;
+  const size = item?.variant?.size;
+  if (!color && !size) return null;
+
+  const product = findStoreProductForOrderItem(products, item);
+  const colorHex = color
+    ? resolveColorHex(color, product?.variants?.find((v) => v.color === color)?.colorHex)
+    : undefined;
+
+  return (
+    <>
+      {color ? (
+        <div className={className}>
+          Color:{" "}
+          <span className="sf-order-color-swatch" style={{ background: colorHex }} title={color} aria-hidden="true" />
+          {color}
+        </div>
+      ) : null}
+      {size ? <div className={className}>Size: {size}</div> : null}
+    </>
+  );
 }
 
 function OrderItemLine({
@@ -621,7 +646,6 @@ function OrderItemLine({
   priceLabel: (inr: number) => string;
   layout: "row" | "detail";
 }) {
-  const variantLines = orderVariantLines(item);
   const linePrice = orderItemLinePrice(item);
 
   if (layout === "row") {
@@ -632,9 +656,7 @@ function OrderItemLine({
         </div>
         <div className="sf-order-row-main">
           <div className="sf-order-row-title">{item.name}</div>
-          {variantLines.map((line) => (
-            <div key={line} className="sf-order-row-variant">{line}</div>
-          ))}
+          <OrderItemVariants item={item} products={products} className="sf-order-row-variant" />
         </div>
         <div className="sf-order-row-price">
           {linePrice != null ? priceLabel(linePrice) : "—"}
@@ -647,9 +669,7 @@ function OrderItemLine({
     <div className="sf-order-detail-product">
       <div className="sf-order-detail-product-copy">
         <h2 className="sf-order-detail-title">{item.name}</h2>
-        {variantLines.map((line) => (
-          <p key={line}>{line}</p>
-        ))}
+        <OrderItemVariants item={item} products={products} className="sf-order-detail-variant" />
         <p className="sf-order-detail-price">
           {linePrice != null ? priceLabel(linePrice) : "—"}
           {item.qty && item.qty > 1 ? ` · Qty ${item.qty}` : ""}
@@ -1733,7 +1753,7 @@ export default function StoreShell({
               <div className="sf-bag-summary">
                 <h2 className="sf-bag-summary-title">Order Summary</h2>
                 <div className="sf-bag-summary-row">
-                  <span>Bag Total</span>
+                  <span>Bag Total (Inc. of GST)</span>
                   <b>{fmtCardPrice(cartTotalInr)}</b>
                 </div>
                 {mode === "redeem" && balanceInr != null && useRewardPoints && pointsApplied > 0 ? (
@@ -2116,7 +2136,7 @@ export default function StoreShell({
                   </div>
                 ) : null}
                 <div className="sf-checkout-summary-row">
-                  <span>Bag total</span>
+                  <span>Bag total (Inc. of GST)</span>
                   <b>{fmtCardPrice(cartTotalInr)}</b>
                 </div>
                 {mode === "redeem" && useRewardPoints && pointsApplied > 0 ? (
@@ -2160,7 +2180,7 @@ export default function StoreShell({
                   ) : (
                     <>
                       <LockIcon />
-                      Pay now
+                      Place Order
                     </>
                   )}
                 </button>
@@ -3666,7 +3686,11 @@ function OrderRowCard({
   const primary = items[0];
   const status = orderStatusDisplay(order);
   const qty = items.reduce((n, item) => n + (item.qty || 1), 0) || order.itemCount || 1;
-  const totalInr = order.total ?? orderItemLinePrice(primary) ?? 0;
+  const totalInr =
+    order.amountBreakdown?.subtotal ??
+    order.total ??
+    orderItemLinePrice(primary) ??
+    0;
   const secondaryPts =
     currencyMode === "inr"
       ? `${inrToPoints(totalInr).toLocaleString("en-IN")} Pts`
@@ -3815,27 +3839,15 @@ function OrderDetailView({
           <div className="sf-order-detail-card">
             <h2 className="sf-order-detail-card-title">Price details</h2>
             <div className="sf-order-detail-prices">
-              {breakdown?.subtotal != null ? (
-                <div className="sf-order-detail-price-row">
-                  <span>Subtotal</span>
-                  <span>{priceLabel(breakdown.subtotal)}</span>
-                </div>
-              ) : null}
-              {breakdown?.serviceFee != null && breakdown.serviceFee > 0 ? (
-                <div className="sf-order-detail-price-row">
-                  <span>Service fee</span>
-                  <span>{priceLabel(breakdown.serviceFee)}</span>
-                </div>
-              ) : null}
-              {breakdown?.gst != null && breakdown.gst > 0 ? (
-                <div className="sf-order-detail-price-row">
-                  <span>GST</span>
-                  <span>{priceLabel(breakdown.gst)}</span>
-                </div>
-              ) : null}
               <div className="sf-order-detail-price-row sf-order-detail-price-row--total">
-                <span>Total amount</span>
-                <b>{order.total != null ? priceLabel(order.total) : "—"}</b>
+                <span>Subtotal (inc of gst)</span>
+                <b>
+                  {breakdown?.subtotal != null
+                    ? priceLabel(breakdown.subtotal)
+                    : order.total != null
+                      ? priceLabel(order.total)
+                      : "—"}
+                </b>
               </div>
             </div>
           </div>

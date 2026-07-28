@@ -9,13 +9,13 @@ export const GST_RATE = 0.18;
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
-/** Points / storefront cart: items subtotal + 12% fee + 18% GST (no shipping/packaging). */
+/**
+ * Points / storefront cart: catalog prices are GST-inclusive.
+ * Do not add service fee or GST again — subtotal is the payable total.
+ */
 export function computeAmountBreakdown(items) {
   const subtotal = round2(items.reduce((sum, i) => sum + i.unitPriceInr * i.qty, 0));
-  const serviceFee = round2(subtotal * SERVICE_FEE_RATE);
-  const gst = round2((subtotal + serviceFee) * GST_RATE);
-  const total = round2(subtotal + serviceFee + gst);
-  return { subtotal, packaging: 0, shipping: 0, serviceFee, gst, total };
+  return { subtotal, packaging: 0, shipping: 0, serviceFee: 0, gst: 0, total: subtotal };
 }
 
 /**

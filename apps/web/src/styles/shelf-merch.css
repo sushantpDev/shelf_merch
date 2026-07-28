@@ -5502,6 +5502,30 @@ a.shop-collection-cell:hover{background:var(--gray-100)}
   color: #878787;
   line-height: 1.4;
 }
+.sf-order-detail-variant {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #878787;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sf-order-row-variant {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sf-order-color-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: -1px;
+}
 .sf-order-row-price {
   font-size: 14px;
   font-weight: 500;
