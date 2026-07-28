@@ -46,6 +46,13 @@ export async function fetchPlatformOrders(params?: { status?: string; limit?: nu
   return apiFetch<Paginated<Record<string, unknown>>>(`/platform/orders${q ? `?${q}` : ""}`);
 }
 
+export type ArtworkPlacement = {
+  xPct: number;
+  yPct: number;
+  wPct: number;
+  rot: number;
+};
+
 export type OrderItemProduct = {
   _id: string;
   name: string;
@@ -56,6 +63,10 @@ export type OrderItemProduct = {
   printAreas?: PrintArea[];
   variants?: ProductVariant[];
   artworkUrl?: string;
+  /** Baked design mockup from the collection/kit productRef. */
+  designedMockupUrl?: string;
+  /** Saved Konva placement from the design wizard. */
+  placement?: ArtworkPlacement | null;
 };
 
 export function fetchPlatformOrder(id: string) {

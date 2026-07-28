@@ -1,7 +1,21 @@
-import { type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { TintedGarment } from "@/components/store/TintedGarment";
+import {
+  defaultPlacement,
+  pickPrintArea,
+  type Placement,
+} from "@/features/swag/mockup-bake";
+import type { UiProduct } from "@/services/mappers";
 import type { OrderItemProduct, PrintArea, ProductVariant } from "../model";
+
+type AssetPreview = {
+  title: string;
+  downloadUrl?: string;
+  downloadName: string;
+  /** Full-size preview rendered in the modal. */
+  body: ReactNode;
+};
 
 export type OrderItem = {
   name?: string;
@@ -10,6 +24,8 @@ export type OrderItem = {
   unitPriceInr?: number;
   imageUrl?: string;
   artworkUrl?: string;
+  /** Saved Konva placement from the design wizard (collection/kit productRef). */
+  placement?: Placement | null;
   variant?: { size?: string; color?: string };
   product?: OrderItemProduct | null;
 };
@@ -45,85 +61,184 @@ export async function downloadArtwork(url: string, filename: string) {
   }
 }
 
+/** Minimal UiProduct so mockup-bake helpers can resolve print-area defaults. */
+function toUiProduct(product: OrderItemProduct | null | undefined, areas: PrintArea[]): UiProduct {
+  return {
+    id: product?._id,
+    g: "",
+    brand: "",
+    nm: product?.name ?? "",
+    price: "",
+    sw: 0,
+    maskImageUrl: product?.maskImageUrl,
+    baseImageUrl: product?.baseImageUrl,
+    printAreas: areas.map((a) => ({
+      key: a.key,
+      label: a.label,
+      mockupImageUrl: a.mockupImageUrl,
+      box: a.box,
+      maxWidthCm: a.maxWidthCm,
+      maxHeightCm: a.maxHeightCm,
+      dpi: a.dpi,
+      methods: a.methods,
+    })),
+  };
+}
+
+/** Artwork position as % of the square stage — same coords as Konva / bakeMockup. */
+function artworkPlacementStyle(pl: Placement, artAspect: number): CSSProperties {
+  return {
+    position: "absolute",
+    left: `${pl.xPct}%`,
+    top: `${pl.yPct}%`,
+    width: `${pl.wPct}%`,
+    height: "auto",
+    aspectRatio: `${1 / Math.max(artAspect, 0.01)}`,
+    transform: `translate(-50%, -50%) rotate(${pl.rot || 0}deg)`,
+    transformOrigin: "center center",
+    objectFit: "contain",
+    pointerEvents: "none",
+    zIndex: 2,
+    opacity: 0.96,
+    mixBlendMode: "multiply",
+  };
+}
+
 export function PrintAreaPreview({
   mockup,
   areas,
   tintHex,
   artworkUrl,
+  placement,
+  product,
+  onOpen,
+  large,
 }: {
   mockup: string;
   areas: PrintArea[];
   tintHex?: string;
   artworkUrl?: string;
+  /** Saved wizard placement; falls back to centering in the print-area box. */
+  placement?: Placement | null;
+  product?: OrderItemProduct | null;
+  /** When set, the preview is clickable (e.g. open lightbox). */
+  onOpen?: () => void;
+  /** Larger stage for the lightbox. */
+  large?: boolean;
 }) {
   const resolvedMockup = resolveMediaUrl(mockup);
   const resolvedArtwork = artworkUrl ? resolveMediaUrl(artworkUrl) : "";
-  const visible = areas.filter(
-    (a) => !a.mockupImageUrl || resolveMediaUrl(a.mockupImageUrl) === resolvedMockup,
-  );
+  const [artAspect, setArtAspect] = useState(1);
+
+  const uiProduct = toUiProduct(product, areas);
+  const primaryArea = pickPrintArea(uiProduct);
+  const visible = areas.filter((a) => {
+    if (!a.mockupImageUrl) return true;
+    return resolveMediaUrl(a.mockupImageUrl) === resolvedMockup;
+  });
+
+  const artPlacement =
+    placement ??
+    product?.placement ??
+    (resolvedArtwork ? defaultPlacement(uiProduct, artAspect) : null);
+
   return (
     <div
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      onClick={onOpen}
+      onKeyDown={
+        onOpen
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen();
+              }
+            }
+          : undefined
+      }
+      aria-label={onOpen ? "Open reference mockup full view" : undefined}
       style={{
         position: "relative",
         width: "100%",
         aspectRatio: "1 / 1",
+        maxWidth: large ? 560 : undefined,
+        margin: large ? "0 auto" : undefined,
         background: "var(--surface-2)",
         border: "1px solid var(--line)",
         borderRadius: 10,
         overflow: "hidden",
+        isolation: "isolate",
+        cursor: onOpen ? "zoom-in" : undefined,
       }}
     >
       <div style={{ position: "absolute", inset: 0 }}>
-        <TintedGarment src={mockup} hex={tintHex} alt="Design mockup" />
+        <TintedGarment
+          src={mockup}
+          hex={tintHex}
+          alt="Design mockup"
+          style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+        />
       </div>
-      {visible.map((a, i) => (
-        <div
-          key={a.key ?? i}
-          style={{
-            position: "absolute",
-            left: `${a.box.xPct}%`,
-            top: `${a.box.yPct}%`,
-            width: `${a.box.widthPct}%`,
-            height: `${a.box.heightPct}%`,
-            // Match Konva's top-left rotation origin so the editor and this
-            // preview show the print area at the same angle.
-            transform: a.rotationDeg ? `rotate(${a.rotationDeg}deg)` : undefined,
-            transformOrigin: "top left",
-            border: resolvedArtwork
-              ? "1px solid rgba(46,160,103,.5)"
-              : "2px dashed rgba(46,160,103,.7)",
-            background: resolvedArtwork ? "transparent" : "rgba(46,160,103,.1)",
-            boxSizing: "border-box",
-            pointerEvents: "none",
-            display: "grid",
-            placeItems: "center",
+
+      {/* Artwork on the square stage (Konva centre + width %), not stretched to the box. */}
+      {resolvedArtwork && artPlacement && (
+        <img
+          src={resolvedArtwork}
+          alt="Artwork"
+          style={artworkPlacementStyle(artPlacement, artAspect)}
+          onLoad={(e) => {
+            const img = e.currentTarget;
+            const aspect = (img.naturalHeight || 1) / (img.naturalWidth || 1);
+            if (aspect > 0) setArtAspect(aspect);
           }}
-        >
-          {resolvedArtwork && (
-            <img
-              src={resolvedArtwork}
-              alt="Artwork"
-              style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-            />
-          )}
-          <span
+        />
+      )}
+
+      {/* Print-area placeholders — outline only so vendors see the printable zone. */}
+      {visible.map((a, i) => {
+        const isPrimary = primaryArea && (a.key ? a.key === primaryArea.key : i === 0);
+        return (
+          <div
+            key={a.key ?? i}
             style={{
               position: "absolute",
-              top: -20,
-              left: 0,
-              fontSize: 11,
-              fontWeight: 700,
-              color: "var(--ink)",
-              background: "#fff",
-              padding: "1px 5px",
-              borderRadius: 4,
-              whiteSpace: "nowrap",
+              left: `${a.box.xPct}%`,
+              top: `${a.box.yPct}%`,
+              width: `${a.box.widthPct}%`,
+              height: `${a.box.heightPct}%`,
+              // Match Konva's top-left rotation origin so the editor and this
+              // preview show the print area at the same angle.
+              transform: a.rotationDeg ? `rotate(${a.rotationDeg}deg)` : undefined,
+              transformOrigin: "top left",
+              border: isPrimary
+                ? "1.5px dashed rgba(46,160,103,.85)"
+                : "1.5px dashed rgba(46,160,103,.45)",
+              background: "transparent",
+              boxSizing: "border-box",
+              pointerEvents: "none",
+              zIndex: 3,
             }}
           >
-            {a.label}
-          </span>
-        </div>
-      ))}
+            <span
+              style={{
+                position: "absolute",
+                top: 2,
+                left: 2,
+                fontSize: 10,
+                fontWeight: 700,
+                color: "var(--ink)",
+                background: "rgba(255,255,255,.92)",
+                padding: "1px 5px",
+                borderRadius: 4,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {a.label}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -157,10 +272,13 @@ export function FulfillmentTile({
   label,
   children,
   footer,
+  onOpen,
 }: {
   label: string;
   children: ReactNode;
   footer?: ReactNode;
+  /** Opens a full-view lightbox when the preview is clicked. */
+  onOpen?: () => void;
 }) {
   return (
     <div>
@@ -168,6 +286,20 @@ export function FulfillmentTile({
         {label}
       </div>
       <div
+        role={onOpen ? "button" : undefined}
+        tabIndex={onOpen ? 0 : undefined}
+        onClick={onOpen}
+        onKeyDown={
+          onOpen
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onOpen();
+                }
+              }
+            : undefined
+        }
+        aria-label={onOpen ? `Open ${label} full view` : undefined}
         style={{
           aspectRatio: "1 / 1",
           background: "var(--surface-2)",
@@ -176,12 +308,300 @@ export function FulfillmentTile({
           overflow: "hidden",
           display: "grid",
           placeItems: "center",
+          cursor: onOpen ? "zoom-in" : undefined,
         }}
       >
         {children}
       </div>
       {footer && <div style={{ marginTop: 8 }}>{footer}</div>}
     </div>
+  );
+}
+
+/** Full-view lightbox for a fulfilment asset — preview + download. */
+export function FulfillmentAssetModal({
+  title,
+  downloadUrl,
+  downloadName,
+  onClose,
+  children,
+}: {
+  title: string;
+  downloadUrl?: string;
+  downloadName: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,.5)",
+        display: "grid",
+        placeItems: "center",
+        zIndex: 50,
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="card"
+        style={{
+          padding: 20,
+          maxWidth: 720,
+          width: "100%",
+          maxHeight: "92vh",
+          overflowY: "auto",
+        }}
+      >
+        <div
+          className="row"
+          style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}
+        >
+          <h3 style={{ fontSize: 17, margin: 0 }}>{title}</h3>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        </div>
+        <div
+          style={{
+            background: "var(--surface-2)",
+            border: "1px solid var(--line)",
+            borderRadius: 10,
+            padding: 16,
+            minHeight: 280,
+            display: "grid",
+            placeItems: "center",
+          }}
+        >
+          {children}
+        </div>
+        <div className="row" style={{ gap: 8, marginTop: 14, justifyContent: "flex-end" }}>
+          {downloadUrl ? (
+            <button
+              type="button"
+              className="btn btn-soft btn-sm"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await downloadArtwork(downloadUrl, downloadName);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              ↓ Download
+            </button>
+          ) : null}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Production asset strip: artwork / base / mask / reference mockup with lightbox. */
+export function FulfillmentAssetStrip({
+  artworkUrl,
+  baseImg,
+  maskUrl,
+  tintHex,
+  variantColor,
+  mockup,
+  printAreas,
+  placement,
+  product,
+  designedMockupUrl,
+  sku,
+}: {
+  artworkUrl: string;
+  baseImg: string;
+  maskUrl: string;
+  tintHex?: string;
+  variantColor?: string;
+  mockup: string;
+  printAreas: PrintArea[];
+  placement?: Placement | null;
+  product?: OrderItemProduct | null;
+  designedMockupUrl?: string;
+  sku?: string;
+}) {
+  const [preview, setPreview] = useState<AssetPreview | null>(null);
+  const fileBase = sku || "asset";
+  const resolvedMask = maskUrl ? resolveMediaUrl(maskUrl) : "";
+  const resolvedDesigned = designedMockupUrl ? resolveMediaUrl(designedMockupUrl) : "";
+
+  return (
+    <>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+          gap: 14,
+          marginBottom: printAreas.length ? 16 : 0,
+        }}
+      >
+        {artworkUrl && (
+          <FulfillmentTile
+            label="Artwork — to print"
+            onOpen={() =>
+              setPreview({
+                title: "Artwork — to print",
+                downloadUrl: artworkUrl,
+                downloadName: `${fileBase}-design`,
+                body: (
+                  <img
+                    src={artworkUrl}
+                    alt="Artwork"
+                    style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }}
+                  />
+                ),
+              })
+            }
+            footer={
+              <button
+                type="button"
+                className="btn btn-soft btn-sm"
+                style={{ width: "100%" }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void downloadArtwork(artworkUrl, `${fileBase}-design`);
+                }}
+              >
+                ↓ Download
+              </button>
+            }
+          >
+            <img
+              src={artworkUrl}
+              alt="Artwork"
+              style={{ maxWidth: "82%", maxHeight: "82%", objectFit: "contain" }}
+            />
+          </FulfillmentTile>
+        )}
+        <FulfillmentTile
+          label="Base — production"
+          onOpen={
+            baseImg
+              ? () =>
+                  setPreview({
+                    title: "Base — production",
+                    downloadUrl: baseImg,
+                    downloadName: `${fileBase}-base`,
+                    body: (
+                      <img
+                        src={baseImg}
+                        alt="Base"
+                        style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }}
+                      />
+                    ),
+                  })
+              : undefined
+          }
+        >
+          {baseImg ? (
+            <img
+              src={baseImg}
+              alt="Base"
+              style={{ width: "100%", height: "100%", objectFit: "contain" }}
+            />
+          ) : (
+            <span className="mut3" style={{ fontSize: 12 }}>
+              Not available
+            </span>
+          )}
+        </FulfillmentTile>
+        <FulfillmentTile
+          label="Mask — tinted"
+          onOpen={
+            resolvedMask
+              ? () =>
+                  setPreview({
+                    title: "Mask — tinted",
+                    downloadUrl: resolvedMask,
+                    downloadName: `${fileBase}-mask`,
+                    body: (
+                      <div style={{ width: "min(100%, 480px)", aspectRatio: "1 / 1" }}>
+                        <TintedGarment
+                          src={maskUrl}
+                          hex={tintHex}
+                          alt={`${variantColor ?? "Garment"} mask`}
+                        />
+                      </div>
+                    ),
+                  })
+              : undefined
+          }
+        >
+          <TintedGarment
+            src={maskUrl || undefined}
+            hex={tintHex}
+            alt={`${variantColor ?? "Garment"} mask`}
+          />
+        </FulfillmentTile>
+        {printAreas.length > 0 && mockup && (
+          <div>
+            <div className="lbl" style={{ marginBottom: 6, fontSize: 10.5, letterSpacing: ".05em" }}>
+              {artworkUrl ? "Reference mockup" : "Print areas"}
+            </div>
+            <PrintAreaPreview
+              mockup={mockup}
+              areas={printAreas}
+              tintHex={tintHex}
+              artworkUrl={artworkUrl || undefined}
+              placement={placement}
+              product={product}
+              onOpen={() =>
+                setPreview({
+                  title: artworkUrl ? "Reference mockup" : "Print areas",
+                  downloadUrl: resolvedDesigned || artworkUrl || mockup,
+                  downloadName: `${fileBase}-mockup`,
+                  body: (
+                    <PrintAreaPreview
+                      mockup={mockup}
+                      areas={printAreas}
+                      tintHex={tintHex}
+                      artworkUrl={artworkUrl || undefined}
+                      placement={placement}
+                      product={product}
+                      large
+                    />
+                  ),
+                })
+              }
+            />
+          </div>
+        )}
+      </div>
+
+      {printAreas.length > 0 && <PrintSpecTable areas={printAreas} />}
+
+      {preview && (
+        <FulfillmentAssetModal
+          title={preview.title}
+          downloadUrl={preview.downloadUrl}
+          downloadName={preview.downloadName}
+          onClose={() => setPreview(null)}
+        >
+          {preview.body}
+        </FulfillmentAssetModal>
+      )}
+    </>
   );
 }
 

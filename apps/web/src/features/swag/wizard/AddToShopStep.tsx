@@ -1,10 +1,12 @@
 import { Check, Info, Store } from "lucide-react";
 import { DesignedProductThumb } from "../DesignedProductThumb";
+import { placementKey, type Placement } from "../mockup-bake";
 import type { UiProduct, UiShop } from "@/services/mappers";
 
 export function AddToShopStep({
   collectionName,
   products,
+  placements = {},
   artworkPreview,
   shops,
   picked,
@@ -12,11 +14,19 @@ export function AddToShopStep({
 }: {
   collectionName: string;
   products: UiProduct[];
+  /** Artwork-step placements keyed by `placementKey` — required for accurate preview. */
+  placements?: Record<string, Placement>;
   artworkPreview?: string;
   shops: UiShop[];
   picked: Set<string>;
   onToggle: (shopId: string) => void;
 }) {
+  const previewProducts = products.map((p, i) => {
+    const key = placementKey(p, i);
+    const placement = placements[key];
+    return placement ? { ...p, placement } : p;
+  });
+
   return (
     <div className="sw-art-studio">
       <div className="sw-art-layout">
@@ -36,7 +46,14 @@ export function AddToShopStep({
             <span>Select at least one shop, then click Publish to generate designs and publish.</span>
           </div>
         ) : (
-          <div className="sw-art-alert" style={{ background: "var(--green-50)", borderColor: "var(--green-100)", color: "var(--green-800)" }}>
+          <div
+            className="sw-art-alert"
+            style={{
+              background: "var(--green-50)",
+              borderColor: "var(--green-100)",
+              color: "var(--green-800)",
+            }}
+          >
             <span>
               {picked.size} {picked.size === 1 ? "shop" : "shops"} selected — ready to publish.
             </span>
@@ -92,7 +109,8 @@ export function AddToShopStep({
             <div>
               <div className="sw-art-preview-title">Collection preview</div>
               <div className="mut3 sw-art-preview-hint">
-                {products.length} {products.length === 1 ? "product" : "products"} in this collection
+                {previewProducts.length}{" "}
+                {previewProducts.length === 1 ? "product" : "products"} in this collection
               </div>
             </div>
             {picked.size > 0 ? (
@@ -105,7 +123,7 @@ export function AddToShopStep({
 
           <div className="sw-art-preview-scroll">
             <div className="sw-mockups">
-              {products.map((p, i) => (
+              {previewProducts.map((p, i) => (
                 <div key={`${p.id ?? p.nm}-${i}`} className="pcard mockup-card sw-mockup-card">
                   {artworkPreview ? (
                     <DesignedProductThumb product={p} artworkUrl={artworkPreview} />

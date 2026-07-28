@@ -104,27 +104,36 @@ export async function getPlatformOrderDetail(orderId) {
     : [];
   const productById = Object.fromEntries(catalogProducts.map((p) => [String(p._id), p]));
 
-  // Resolve print artwork: shop collections (Collection.artworkUrl) or kit branding.
+  // Resolve print artwork + Konva placement from shop collections or kit branding.
   const artworkByProductId = {};
+  const placementByProductId = {};
+  const designedMockupByProductId = {};
   if (campaign?.shopId) {
     const collections = await Collection.find({
-      shopId: campaign.shopId,
+      $or: [{ shopId: campaign.shopId }, { shopIds: campaign.shopId }],
       tenantId: order.tenantId,
       status: { $ne: 'archived' },
     })
       .select('productRefs artworkUrl')
       .lean();
     for (const col of collections) {
-      if (!col.artworkUrl) continue;
       for (const ref of col.productRefs ?? []) {
         const pid = String(ref.catalogProductId);
-        if (!artworkByProductId[pid]) artworkByProductId[pid] = col.artworkUrl;
+        if (col.artworkUrl && !artworkByProductId[pid]) {
+          artworkByProductId[pid] = col.artworkUrl;
+        }
+        if (ref.placement && !placementByProductId[pid]) {
+          placementByProductId[pid] = ref.placement;
+        }
+        if (ref.mockupUrl && !designedMockupByProductId[pid]) {
+          designedMockupByProductId[pid] = ref.mockupUrl;
+        }
       }
     }
   }
   if (campaign?.type === 'kit' && campaign?.kitId) {
     const kit = await Kit.findOne({ _id: campaign.kitId, tenantId: order.tenantId })
-      .select('artworkUrl')
+      .select('artworkUrl productRefs')
       .lean();
     if (kit?.artworkUrl) {
       for (const item of order.items ?? []) {
@@ -133,15 +142,28 @@ export async function getPlatformOrderDetail(orderId) {
         }
       }
     }
+    for (const ref of kit?.productRefs ?? []) {
+      const pid = String(ref.catalogProductId);
+      if (ref.placement && !placementByProductId[pid]) {
+        placementByProductId[pid] = ref.placement;
+      }
+      if (ref.mockupUrl && !designedMockupByProductId[pid]) {
+        designedMockupByProductId[pid] = ref.mockupUrl;
+      }
+    }
   }
 
   const obj = order.toObject();
   const items = (obj.items ?? []).map((item) => {
-    const product = item.catalogProductId ? productById[String(item.catalogProductId)] : null;
-    const artworkUrl = item.catalogProductId ? artworkByProductId[String(item.catalogProductId)] ?? '' : '';
+    const pid = item.catalogProductId ? String(item.catalogProductId) : '';
+    const product = pid ? productById[pid] : null;
+    const artworkUrl = pid ? artworkByProductId[pid] ?? '' : '';
+    const placement = pid ? placementByProductId[pid] ?? null : null;
+    const designedMockupUrl = pid ? designedMockupByProductId[pid] ?? '' : '';
     return {
       ...item,
       artworkUrl,
+      placement,
       product: product
         ? {
             _id: product._id,
@@ -153,6 +175,8 @@ export async function getPlatformOrderDetail(orderId) {
             printAreas: product.printAreas ?? [],
             variants: product.variants ?? [],
             artworkUrl,
+            placement,
+            designedMockupUrl,
           }
         : null,
     };

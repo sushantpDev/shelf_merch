@@ -11,6 +11,7 @@ export {
   setOrderStatus,
   uploadOrderMockup,
   type OrderItemProduct,
+  type ArtworkPlacement,
   type PrintArea,
   type ProductVariant,
 } from "@/services/platform-api";

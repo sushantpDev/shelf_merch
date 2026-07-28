@@ -1,7 +1,6 @@
 import { Link } from "react-router";
 import { resolveColorHex } from "@/lib/colorMap";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
-import { TintedGarment } from "@/components/store/TintedGarment";
 import {
   inr,
   PlatformError,
@@ -12,11 +11,8 @@ import {
 import type { OrderFulfillmentVm } from "../controllers/useOrderFulfillmentController";
 import {
   Chip,
-  downloadArtwork,
-  FulfillmentTile,
+  FulfillmentAssetStrip,
   matchVariantHex,
-  PrintAreaPreview,
-  PrintSpecTable,
   type OrderItem,
 } from "./fulfillment-parts";
 import { OrderFulfillmentActions } from "./OrderFulfillmentActions";
@@ -181,14 +177,18 @@ export function OrderFulfillmentView({
                 const rawArtworkUrl = item.artworkUrl || product?.artworkUrl || "";
                 const artworkUrl = rawArtworkUrl ? resolveMediaUrl(rawArtworkUrl) : "";
                 const printAreas = product?.printAreas ?? [];
+                // Prefer the production mask — print-area % coords are authored
+                // against it in the product wizard (same stage as Konva bake).
                 const mockup = resolveMediaUrl(
-                  printAreas[0]?.mockupImageUrl ||
-                    product?.maskImageUrl ||
+                  product?.maskImageUrl ||
+                    printAreas[0]?.mockupImageUrl ||
+                    product?.baseImageUrl ||
                     product?.primaryImageUrl ||
                     product?.imageUrls?.[0] ||
                     item.imageUrl ||
                     "",
                 );
+                const placement = item.placement ?? null;
 
                 const baseImg = product?.baseImageUrl ? resolveMediaUrl(product.baseImageUrl) : "";
                 return (
@@ -238,76 +238,19 @@ export function OrderFulfillmentView({
 
                     {/* Asset strip + print spec */}
                     <div style={{ padding: 18 }}>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
-                          gap: 14,
-                          marginBottom: printAreas.length ? 16 : 0,
-                        }}
-                      >
-                        {artworkUrl && (
-                          <FulfillmentTile
-                            label="Artwork — to print"
-                            footer={
-                              <button
-                                type="button"
-                                className="btn btn-soft btn-sm"
-                                style={{ width: "100%" }}
-                                onClick={() =>
-                                  downloadArtwork(artworkUrl, `${item.sku || "artwork"}-design`)
-                                }
-                              >
-                                ↓ Download
-                              </button>
-                            }
-                          >
-                            <img
-                              src={artworkUrl}
-                              alt="Artwork"
-                              style={{ maxWidth: "82%", maxHeight: "82%", objectFit: "contain" }}
-                            />
-                          </FulfillmentTile>
-                        )}
-                        <FulfillmentTile label="Base — production">
-                          {baseImg ? (
-                            <img
-                              src={baseImg}
-                              alt="Base"
-                              style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                            />
-                          ) : (
-                            <span className="mut3" style={{ fontSize: 12 }}>
-                              Not available
-                            </span>
-                          )}
-                        </FulfillmentTile>
-                        <FulfillmentTile label="Mask — tinted">
-                          <TintedGarment
-                            src={product?.maskImageUrl}
-                            hex={tintHex}
-                            alt={`${variant?.color ?? "Garment"} mask`}
-                          />
-                        </FulfillmentTile>
-                        {printAreas.length > 0 && mockup && (
-                          <div>
-                            <div
-                              className="lbl"
-                              style={{ marginBottom: 6, fontSize: 10.5, letterSpacing: ".05em" }}
-                            >
-                              {artworkUrl ? "Reference mockup" : "Print areas"}
-                            </div>
-                            <PrintAreaPreview
-                              mockup={mockup}
-                              areas={printAreas}
-                              tintHex={tintHex}
-                              artworkUrl={artworkUrl || undefined}
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      {printAreas.length > 0 && <PrintSpecTable areas={printAreas} />}
+                      <FulfillmentAssetStrip
+                        artworkUrl={artworkUrl}
+                        baseImg={baseImg}
+                        maskUrl={product?.maskImageUrl || ""}
+                        tintHex={tintHex}
+                        variantColor={variant?.color}
+                        mockup={mockup}
+                        printAreas={printAreas}
+                        placement={placement}
+                        product={product}
+                        designedMockupUrl={product?.designedMockupUrl}
+                        sku={item.sku}
+                      />
                     </div>
                   </div>
                 );

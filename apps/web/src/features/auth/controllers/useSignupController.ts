@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import { register, isPlatformUser, startGoogleAuth } from "../model";
+import { register, isPlatformUser } from "../model";
+import { isWorkEmail, WORK_EMAIL_ERROR } from "../workEmail";
 
 export type SignupVm = {
   email: string;
@@ -18,7 +19,6 @@ export type SignupVm = {
   onCompany: (company: string) => void;
   onToggleShowPassword: () => void;
   onSubmit: (e: React.FormEvent) => void;
-  onGoogleSignUp: () => void;
 };
 
 /** Controller for the signup screen: form state, register flow, redirect by role. */
@@ -38,8 +38,13 @@ export function useSignupController(): SignupVm {
     if (submitInFlight.current) return;
 
     const name = `${firstName.trim()} ${lastName.trim()}`.trim();
-    if (!email || !password || !name || !company) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password || !name || !company) {
       toast.error("Fill in all fields");
+      return;
+    }
+    if (!isWorkEmail(trimmedEmail)) {
+      toast.error(WORK_EMAIL_ERROR);
       return;
     }
     if (password.length < 8) {
@@ -49,7 +54,7 @@ export function useSignupController(): SignupVm {
     submitInFlight.current = true;
     setBusy(true);
     try {
-      const user = await register({ name, email, password, companyName: company });
+      const user = await register({ name, email: trimmedEmail, password, companyName: company });
       toast.success(`Welcome to Shelf Merch, ${user.name.split(" ")[0]}!`);
       if (isPlatformUser(user)) {
         navigate("/platform/dashboard");
@@ -78,6 +83,5 @@ export function useSignupController(): SignupVm {
     onCompany: setCompany,
     onToggleShowPassword: () => setShowPassword((s) => !s),
     onSubmit: submit,
-    onGoogleSignUp: () => startGoogleAuth("signup"),
   };
 }

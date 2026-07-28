@@ -1,7 +1,6 @@
 import { Eye, EyeOff } from "lucide-react";
 import type { LoginVm } from "../controllers/useLoginController";
 import { AuthLabel, AuthLayout, authInputClassName } from "./AuthLayout";
-import { GoogleButton } from "./GoogleButton";
 
 export function LoginView(vm: LoginVm) {
   return (
@@ -9,20 +8,10 @@ export function LoginView(vm: LoginVm) {
       title="Log in with your Shelf Merch account"
       footerLink={{ hint: "Don't have an account?", label: "Sign up", to: "/signup" }}
     >
-      <GoogleButton
-        label="Continue with Google"
-        disabled={vm.busy}
-        onClick={vm.onGoogleSignIn}
-      />
-
-      <div className="auth-simple-divider" aria-hidden>
-        <span>or</span>
-      </div>
-
       <form className="auth-simple-form" onSubmit={vm.onSubmit} aria-busy={vm.busy}>
         <fieldset className="auth-simple-fieldset" disabled={vm.busy}>
         <div className="auth-simple-field">
-          <AuthLabel htmlFor="login-email">Email</AuthLabel>
+          <AuthLabel htmlFor="login-email">Work email</AuthLabel>
           <input
             id="login-email"
             type="email"

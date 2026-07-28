@@ -192,6 +192,7 @@ export function SwagWizardView(vm: SwagWizardVm) {
       <AddToShopStep
         collectionName={draft.name}
         products={vm.pickedProducts}
+        placements={draft.placements}
         artworkPreview={draft.art?.preview}
         shops={vm.shops}
         picked={vm.pickedShops}

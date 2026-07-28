@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { login, isPlatformUser, ApiError, startGoogleAuth } from "../model";
+import { login, isPlatformUser, ApiError } from "../model";
+import { isWorkEmail, WORK_EMAIL_ERROR } from "../workEmail";
 
 export type LoginVm = {
   email: string;
@@ -13,7 +14,6 @@ export type LoginVm = {
   onToggleShowPassword: () => void;
   onSubmit: (e: React.FormEvent) => void;
   onForgotPassword: () => void;
-  onGoogleSignIn: () => void;
 };
 
 function loginErrorMessage(err: unknown): string {
@@ -50,6 +50,11 @@ export function useLoginController(): LoginVm {
       toast.error("Enter email and password");
       return;
     }
+    if (!isWorkEmail(trimmedEmail)) {
+      setError(WORK_EMAIL_ERROR);
+      toast.error(WORK_EMAIL_ERROR);
+      return;
+    }
 
     submitInFlight.current = true;
     setError("");
@@ -79,6 +84,5 @@ export function useLoginController(): LoginVm {
     onToggleShowPassword: () => setShowPassword((s) => !s),
     onSubmit: submit,
     onForgotPassword: () => toast("Reset link sent"),
-    onGoogleSignIn: () => startGoogleAuth("login"),
   };
 }
