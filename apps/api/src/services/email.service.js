@@ -96,6 +96,7 @@ export async function sendInviteEmail(
   const link = appUrl(`/accept-invite?token=${token}`);
   const { subject, html, text } = buildManagerInviteEmail({
     name,
+    email: to,
     departmentName,
     organizationName,
     roleTitle,
@@ -120,6 +121,7 @@ export async function sendManagerAssignmentEmail({
   const fullLink = link.startsWith('http') ? link : appUrl(link);
   const { subject, html, text } = buildManagerAssignmentEmail({
     name,
+    email: to,
     departmentName,
     organizationName,
     roleTitle,

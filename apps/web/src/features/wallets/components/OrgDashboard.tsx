@@ -9,6 +9,7 @@ import {
   deptPaletteColor,
   remainingWalletBalance,
   totalAllocatedAmount,
+  committedDepartments,
   type OrgSnapshot,
 } from "../types";
 import { Donut } from "./Donut";
@@ -89,10 +90,10 @@ export function OrgDashboard({
   const o = org.wallet;
   const fundingPending = o.fundingApproval === "pending";
   const total = o.amount;
-  const alloc = totalAllocatedAmount(org.departments);
+  const depts = committedDepartments(org.departments);
+  const alloc = totalAllocatedAmount(depts);
   const rem = o.unallocated ?? remainingWalletBalance(total, org.departments);
   const budgetLive = o.status === "active";
-  const depts = org.departments;
   const managersActive = depts.filter((d) => d.mgr.inviteStatus === "active").length;
   const managersPending = depts.filter((d) => d.mgr.inviteStatus === "pending").length;
   const canAllocate = Boolean(walletId) && !fundingPending && total > 0;
