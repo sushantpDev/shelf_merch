@@ -23,6 +23,7 @@ export const createWalletSchema = z.object({
 });
 
 /** Multipart wallet wizard — create + optional PO upload + funding request in one call. */
+
 export const setupWalletSchema = z.object({
   name: z.string().min(1),
   currency: z.enum(['INR', 'USD']).optional().default('INR'),
