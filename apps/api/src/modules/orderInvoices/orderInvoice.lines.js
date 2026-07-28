@@ -55,15 +55,19 @@ function kitUnitPriceInclGst(order, campaign, kitEntries) {
 
 /**
  * Build invoice line items for PDF + tax summary.
+ * Packaging is folded into the kit/product rate — never a separate line.
  * @returns {Promise<Array<{name, hsn, qty, rate, amount, profile}>>}
  */
 export async function buildOrderInvoiceLines({ order, campaign, kit, kitEntries = [] }) {
+  const packagingIncl = Math.round(Number(order.amountBreakdown?.packaging) || 0);
   const lines = [];
 
   if (campaign.type === 'kit' && campaign.kitId && kit) {
     const qty = kitQuantity(order, campaign);
     const unitIncl = kitUnitPriceInclGst(order, campaign, kitEntries);
-    const rate = priceWithoutGst(unitIncl, 'kit');
+    const packagingPerUnitIncl = qty > 0 ? packagingIncl / qty : packagingIncl;
+    const combinedIncl = Math.round(unitIncl + packagingPerUnitIncl);
+    const rate = priceWithoutGst(combinedIncl, 'kit');
     lines.push({
       name: kit.name || campaign.name || 'Kit',
       hsn: '',
@@ -72,35 +76,30 @@ export async function buildOrderInvoiceLines({ order, campaign, kit, kitEntries 
       amount: rate * qty,
       profile: 'kit',
     });
-  } else {
-    const merged = mergeItemsByName(order.items);
-    const categories = await categoryByProductId(merged.map((m) => m.catalogProductId));
-    for (const item of merged) {
-      const category = categories.get(String(item.catalogProductId)) || '';
-      const profile = gstProfileForCategory(category);
-      const rate = priceWithoutGst(item.unitPriceInr, profile);
-      lines.push({
-        name: item.name,
-        hsn: '',
-        qty: item.qty,
-        rate,
-        amount: rate * item.qty,
-        profile,
-      });
-    }
+    return lines;
   }
 
-  const packagingIncl = Math.round(Number(order.amountBreakdown?.packaging) || 0);
-  if (packagingIncl > 0) {
-    const rate = priceWithoutGst(packagingIncl, 'packaging');
+  const merged = mergeItemsByName(order.items);
+  const categories = await categoryByProductId(merged.map((m) => m.catalogProductId));
+  for (const item of merged) {
+    const category = categories.get(String(item.catalogProductId)) || '';
+    const profile = gstProfileForCategory(category);
+    const rate = priceWithoutGst(item.unitPriceInr, profile);
     lines.push({
-      name: 'Premium Packaging',
+      name: item.name,
       hsn: '',
-      qty: 1,
+      qty: item.qty,
       rate,
-      amount: rate,
-      profile: 'packaging',
+      amount: rate * item.qty,
+      profile,
     });
+  }
+
+  // Fold packaging into the first product line (ex-GST) when present.
+  if (packagingIncl > 0 && lines.length > 0) {
+    const pkgRate = priceWithoutGst(packagingIncl, 'packaging');
+    lines[0].rate += pkgRate;
+    lines[0].amount += pkgRate;
   }
 
   return lines;

@@ -62,6 +62,7 @@ export function OrdersView(vm: OrdersVm) {
                   <th>Order details</th>
                   <th>Status</th>
                   <th>Amount</th>
+                  <th>Invoice</th>
                   <th>View</th>
                 </tr>
               </thead>
@@ -93,6 +94,30 @@ export function OrdersView(vm: OrdersVm) {
                     </td>
                     <td className="num data-list-cell data-list-amount">{inr(o.amount)}</td>
                     <td className="data-list-cell">
+                      <span className="row" style={{ gap: 10 }}>
+                        <button
+                          type="button"
+                          className="lnk"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            vm.onViewInvoice(o);
+                          }}
+                        >
+                          View
+                        </button>
+                        <button
+                          type="button"
+                          className="lnk"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            vm.onDownloadInvoice(o);
+                          }}
+                        >
+                          Download
+                        </button>
+                      </span>
+                    </td>
+                    <td className="data-list-cell">
                       <span className="lnk">{o.track ? "Tracking" : "View"}</span>
                     </td>
                   </tr>
@@ -106,7 +131,8 @@ export function OrdersView(vm: OrdersVm) {
       <OrderDetailDialogView
         order={vm.selected}
         onOpenChange={vm.onDialogOpenChange}
-        onDownloadInvoice={vm.onDownloadInvoice}
+        onViewInvoice={() => vm.selected && vm.onViewInvoice(vm.selected)}
+        onDownloadInvoice={() => vm.selected && vm.onDownloadInvoice(vm.selected)}
         onTrackShipment={vm.onTrackShipment}
       />
     </>

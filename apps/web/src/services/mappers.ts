@@ -145,6 +145,8 @@ export type UiOrder = {
   track: string;
   delivered: string;
   items: [string, string][];
+  invoicePdfUrl?: string;
+  invoiceNumber?: string;
 };
 
 export type UiCampaign = {
@@ -482,6 +484,8 @@ export function mapOrder(o: any, campaignName = ""): UiOrder {
     track: o.trackingNumber || "",
     delivered: deliveredEntry ? formatDate(deliveredEntry.at) : "",
     items: (o.items || []).map((i: { name: string; qty: number }) => [i.name, String(i.qty)]),
+    invoicePdfUrl: o.invoicePdfUrl || "",
+    invoiceNumber: o.invoiceNumber || o.orderNumber,
   };
 }
 

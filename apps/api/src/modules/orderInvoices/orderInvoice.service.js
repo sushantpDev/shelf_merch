@@ -76,12 +76,12 @@ async function loadKitContext(campaign, tenantId) {
   return { kit, kitEntries };
 }
 
-export async function generateAndStoreOrderInvoice(orderDoc) {
+export async function generateAndStoreOrderInvoice(orderDoc, { force = false, skipEmail = false } = {}) {
   const order = orderDoc.toObject ? orderDoc.toObject() : orderDoc;
   const tenantId = order.tenantId;
 
   const existing = await OrderInvoice.findOne({ orderId: order._id, tenantId });
-  if (existing?.pdfUrl) return existing;
+  if (existing?.pdfUrl && !force) return existing;
 
   const campaign = await Campaign.findOne({ _id: order.campaignId, tenantId }).lean();
   if (!campaign) throw new NotFoundError('Campaign not found for order');
@@ -135,7 +135,7 @@ export async function generateAndStoreOrderInvoice(orderDoc) {
     { upsert: true, new: true },
   );
 
-  if (!isShopOrder(campaign)) {
+  if (!skipEmail && !existing && !isShopOrder(campaign)) {
     await emailInvoiceToCompanyAdmin({ order, campaign, wallet, invoice, pdfBuffer });
   }
 
@@ -205,6 +205,16 @@ export async function getOrderInvoiceByOrderId({ tenantId, orderId }) {
   const invoice = await OrderInvoice.findOne({ orderId, tenantId }).lean();
   if (!invoice) throw new NotFoundError('Invoice not found for this order');
   return invoice;
+}
+
+/** Generate invoice for an existing order if missing; return stored invoice. */
+export async function ensureOrderInvoice({ tenantId, orderId }) {
+  const { Order } = await import('../orders/order.model.js');
+  const order = await Order.findOne({ _id: orderId, tenantId });
+  if (!order) throw new NotFoundError('Order not found');
+
+  // Always rebuild so layout/pricing fixes apply to older invoices.
+  return generateAndStoreOrderInvoice(order, { force: true, skipEmail: true });
 }
 
 export async function getOrderInvoiceByOrderNumber({ tenantId, orderNumber }) {
