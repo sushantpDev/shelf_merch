@@ -119,8 +119,11 @@ export const corsOrigins = () =>
     .map((o) => o.trim())
     .filter(Boolean);
 
+/** True when checkout can create orders (webhook secret is optional for that). */
 export const razorpayConfigured = () =>
-  Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET && env.RAZORPAY_WEBHOOK_SECRET);
+  Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
+
+export const razorpayWebhookConfigured = () => Boolean(env.RAZORPAY_WEBHOOK_SECRET);
 
 export const msg91Configured = () =>
   Boolean(env.MSG91_AUTH_KEY && env.MSG91_OTP_TEMPLATE_ID);

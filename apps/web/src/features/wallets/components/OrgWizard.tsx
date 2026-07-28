@@ -10,19 +10,24 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { LoadingState } from "@/components/LoadingState";
+import { openRazorpayCheckout } from "@/lib/razorpay";
 import type { WizardAction } from "../reducer";
 import {
   ALLOC_STEP_MAX,
   ALLOC_STEP_MIN,
   ALLOC_STEPS,
-  ORG_STEPS,
   allocationFromPool,
   departmentsToSync,
   isAllocateEditFlow,
   wizardCommittedAllocations,
   type WizardState,
 } from "../types";
-import { useCreateWallet, useSyncOrgWizard } from "../model";
+import {
+  useCreateRazorpayOrder,
+  useCreateWallet,
+  useSyncOrgWizard,
+  useVerifyRazorpayPayment,
+} from "../model";
 import { Step1Wallet } from "./steps/Step1Wallet";
 import { Step2Departments } from "./steps/Step2Departments";
 import { Step3Allocate } from "./steps/Step3Allocate";
@@ -45,10 +50,17 @@ export function OrgWizard({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const submitInFlight = useRef(false);
   const [submitting, setSubmitting] = useState(false);
+  const [paying, setPaying] = useState(false);
   const createWallet = useCreateWallet();
+  const rzpOrder = useCreateRazorpayOrder();
+  const verifyPayment = useVerifyRazorpayPayment();
   const sync = useSyncOrgWizard();
   const isWalletFlow = state.flow === "wallet";
-  const busy = submitting || createWallet.isPending || sync.isPending;
+  const isPayOnline = isWalletFlow && state.wallet.funding === "pay";
+  const busy = submitting || sync.isPending;
+  const paymentBusy =
+    paying ||
+    (isPayOnline && (createWallet.isPending || rzpOrder.isPending || verifyPayment.isPending));
   const n = state.step;
   const isEditAllocate = isAllocateEditFlow(state.flow, state.mode);
   const fromPool = allocationFromPool(state.departments);
@@ -81,9 +93,69 @@ export function OrgWizard({
     return true;
   }
 
+  async function handlePayOnline() {
+    if (!validateWalletStep()) return;
+    if (paying || submitInFlight.current) return;
+    submitInFlight.current = true;
+    setPaying(true);
+    try {
+      const { walletId } = await createWallet.mutateAsync(state);
+      const order = await rzpOrder.mutateAsync({ walletId, amount: state.wallet.amount });
+      await openRazorpayCheckout({
+        order,
+        walletName: state.wallet.name,
+        description: `Fund ${state.wallet.name}`,
+        onSuccess: async (response) => {
+          try {
+            await verifyPayment.mutateAsync({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            dispatch({ type: "finished", walletId, invites: [] });
+            toast.success("Payment received — submitted for review", {
+              description: `${inr(state.wallet.amount)} will be added to ${state.wallet.name} once finance approves.`,
+            });
+            onFinished();
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Payment verification failed", {
+              description: "If money was deducted, contact support — finance will reconcile your payment.",
+            });
+            submitInFlight.current = false;
+            setPaying(false);
+          }
+        },
+        onDismiss: () => {
+          toast.message("Payment cancelled", {
+            description: "Your budget was saved as a draft. You can pay later from Add funds.",
+          });
+          submitInFlight.current = false;
+          setPaying(false);
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Payment could not be started";
+      if (message === "Payment cancelled") {
+        // handled in onDismiss
+      } else if (message.includes("RAZORPAY_NOT_CONFIGURED") || message.includes("not configured")) {
+        toast.error("Razorpay is not configured", {
+          description: "Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to the API .env file.",
+        });
+      } else {
+        toast.error(message);
+      }
+      submitInFlight.current = false;
+      setPaying(false);
+    }
+  }
+
   function handleNext() {
     if (isWalletFlow) {
       if (!validateWalletStep()) return;
+      if (isPayOnline) {
+        void handlePayOnline();
+        return;
+      }
       setConfirmOpen(true);
       return;
     }
@@ -146,11 +218,8 @@ export function OrgWizard({
     );
   }
 
-  const stepLabels = isWalletFlow ? [ORG_STEPS[0]] : [...ALLOC_STEPS];
-  const stepNumbers = isWalletFlow ? [1] : [2, 3, 4, 5];
-  const displayStepIndex = isWalletFlow ? 0 : n - ALLOC_STEP_MIN;
-  const displayStepTotal = stepLabels.length;
-  const displayStepLabel = stepLabels[displayStepIndex] ?? "";
+  const stepLabels = [...ALLOC_STEPS];
+  const stepNumbers = [2, 3, 4, 5];
 
   return (
     <>
@@ -176,37 +245,46 @@ export function OrgWizard({
           <h1>{isWalletFlow ? "Setup budget" : "Allocate budget"}</h1>
           <div className="sub">
             {isWalletFlow
-              ? `${account} · submit a Purchase Order or Agreement to fund your organization budget.`
+              ? isPayOnline
+                ? `${account} · pay online to fund your organization budget.`
+                : `${account} · submit a Purchase Order or Agreement to fund your organization budget.`
               : `${account} · split your organization budget across departments and assign managers.`}
           </div>
         </div>
       </div>
 
-      <div className="org-stepper">
-        {stepLabels.map((label, i) => {
-          const s = stepNumbers[i];
-          const cls = s < n ? "done" : s === n ? "active" : "";
-          return (
-            <div key={label} className={`org-step ${cls}`}>
-              <button
-                type="button"
-                className="sbtn"
-                onClick={() => !isWalletFlow && dispatch({ type: "goto", step: s })}
-                disabled={isWalletFlow}
-              >
-                <div className="snum">{s < n ? "✓" : i + 1}</div>
-                <div className="smeta">
-                  {/* <span className="seye">Step {i + 1}</span> */}
-                  <span className="slabel">{label}</span>
-                </div>
-              </button>
-              {i < stepLabels.length - 1 && <div className="sline" />}
-            </div>
-          );
-        })}
-      </div>
+      {!isWalletFlow && (
+        <div className="org-stepper">
+          {stepLabels.map((label, i) => {
+            const s = stepNumbers[i];
+            const cls = s < n ? "done" : s === n ? "active" : "";
+            return (
+              <div key={label} className={`org-step ${cls}`}>
+                <button
+                  type="button"
+                  className="sbtn"
+                  onClick={() => dispatch({ type: "goto", step: s })}
+                >
+                  <div className="snum">{s < n ? "✓" : i + 1}</div>
+                  <div className="smeta">
+                    <span className="slabel">{label}</span>
+                  </div>
+                </button>
+                {i < stepLabels.length - 1 && <div className="sline" />}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-      {isWalletFlow && n === 1 && <Step1Wallet state={state} dispatch={dispatch} />}
+      {isWalletFlow && n === 1 && (
+        <Step1Wallet
+          state={state}
+          dispatch={dispatch}
+          onProceedToPayment={handlePayOnline}
+          paymentBusy={paymentBusy}
+        />
+      )}
       {!isWalletFlow && n === 2 && <Step2Departments state={state} dispatch={dispatch} />}
       {!isWalletFlow && n === 3 && <Step3Allocate state={state} dispatch={dispatch} />}
       {!isWalletFlow && n === 4 && <Step4Managers state={state} dispatch={dispatch} />}
@@ -233,18 +311,19 @@ export function OrgWizard({
             <ArrowLeft size={15} /> Back
           </button>
         </span>
-        {/* <div className="note">
-          Step {displayStepIndex + 1} of {displayStepTotal} · <b>{displayStepLabel}</b>
-        </div> */}
         <button
           type="button"
           className="btn btn-brand"
           id="org-next"
-          disabled={over}
+          disabled={over || paymentBusy}
           onClick={handleNext}
         >
           {isWalletFlow
-            ? "Submit for review"
+            ? isPayOnline
+              ? paymentBusy
+                ? "Opening checkout…"
+                : "Proceed to payment"
+              : "Submit for review"
             : n === ALLOC_STEP_MAX
               ? "Finish allocation"
               : "Continue"}

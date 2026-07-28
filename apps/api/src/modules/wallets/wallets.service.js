@@ -82,6 +82,37 @@ export async function setupWallet({ tenantId, userId, data, file }) {
     return withMeta(await getWallet({ tenantId, walletId: pending._id }));
   }
 
+  const fundingMethod = data.fundingMethod ?? 'po_upload';
+
+  // Draft exists but funding was never submitted to finance (e.g. client retry).
+  const orphanDraft = await Wallet.findOne({
+    tenantId,
+    name: trimmedName,
+    status: { $in: ['draft', 'wallet_created'] },
+    balance: 0,
+    $or: [
+      { 'fundingDocument.approvalStatus': '' },
+      { 'fundingDocument.approvalStatus': { $exists: false } },
+    ],
+  });
+  if (orphanDraft && fundingMethod === 'po_upload' && data.amount > 0) {
+    if (file) {
+      const { url } = await uploadFile({ tenantId, kind: 'document', file });
+      orphanDraft.fundingDocument.fileUrl = url;
+      await orphanDraft.save();
+    }
+    await fundWallet({
+      tenantId,
+      walletId: orphanDraft._id,
+      userId,
+      amount: data.amount,
+      description: 'Organization wallet setup funding',
+      docType: data.docType,
+      docNumber: data.docNumber,
+    });
+    return withMeta(await getWallet({ tenantId, walletId: orphanDraft._id }));
+  }
+
   await removeOrphanDraft({ tenantId, name: trimmedName });
 
   let wallet = null;
@@ -101,15 +132,15 @@ export async function setupWallet({ tenantId, userId, data, file }) {
     });
 
     const walletId = wallet._id;
-    const fundingMethod = data.fundingMethod ?? 'po_upload';
+    const setupFundingMethod = data.fundingMethod ?? 'po_upload';
 
-    if (fundingMethod === 'po_upload' && file) {
+    if (setupFundingMethod === 'po_upload' && file) {
       const { url } = await uploadFile({ tenantId, kind: 'document', file });
       wallet.fundingDocument.fileUrl = url;
       await wallet.save();
     }
 
-    if (data.amount > 0 && fundingMethod === 'po_upload') {
+    if (data.amount > 0 && setupFundingMethod === 'po_upload') {
       await fundWallet({
         tenantId,
         walletId,
@@ -153,7 +184,7 @@ export async function updateWallet({ tenantId, walletId, patch }) {
 
 /**
  * §7.4 /fund — PO uploads submit a finance approval request (no ledger credit until
- * platform finance approves). Online payments credit immediately via Razorpay webhook.
+ * platform finance approves). Online payments follow the same approval gate after Razorpay capture.
  */
 export async function fundWallet({
   tenantId,

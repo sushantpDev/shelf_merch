@@ -1,4 +1,3 @@
-import { toast } from "sonner";
 import { inr } from "@/components/platform/platform-ui";
 import { amtInput, fmtDate, parseAmt } from "../../types";
 import { DocumentUploadZone } from "../DocumentUploadZone";
@@ -15,7 +14,7 @@ const PAY_METHODS = [
   { id: "upi", label: "UPI" },
 ] as const;
 
-export function Step1Wallet({ state, dispatch }: StepProps) {
+export function Step1Wallet({ state, dispatch, onProceedToPayment, paymentBusy }: StepProps) {
   const o = state.wallet;
   const setField = (field: keyof typeof o, value: string | number | boolean) =>
     dispatch({ type: "walletField", field, value });
@@ -150,7 +149,7 @@ export function Step1Wallet({ state, dispatch }: StepProps) {
                 />
               </div>
             </div>
-            <div className="field">
+            <div className="field" style={{ marginTop: 16 }}>
               <label className="lbl">Upload document</label>
               <DocumentUploadZone
                 file={o.uploadFile}
@@ -216,9 +215,10 @@ export function Step1Wallet({ state, dispatch }: StepProps) {
             <button
               type="button"
               className="btn btn-dark btn-block"
-              onClick={() => toast("Redirecting to secure payment…")}
+              disabled={paymentBusy || !onProceedToPayment}
+              onClick={() => onProceedToPayment?.()}
             >
-              Proceed to payment
+              {paymentBusy ? "Opening checkout…" : "Proceed to payment"}
             </button>
           </>
         )}

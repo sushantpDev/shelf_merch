@@ -241,8 +241,19 @@ export function OrgDashboard({
           </span>
           <span style={{ margin: "0 8px" }}>·</span>
           <span>
-            Valid {fmtDate(o.start)} → {fmtDate(o.end)} · Funded via{" "}
-            {o.funding === "upload" ? `${o.docType} ${o.docNumber}` : "online payment"}
+            Valid {fmtDate(o.start)} → {fmtDate(o.end)}
+            {fundingPending ? (
+              <>
+                {" "}
+                · {inr(o.requestedAmount || 0)} online payment pending approval
+              </>
+            ) : total > 0 ? (
+              <>
+                {" "}
+                · Funded via{" "}
+                {o.funding === "upload" ? `${o.docType} ${o.docNumber}` : "online payment"}
+              </>
+            ) : null}
           </span>
         </div>
       </div>

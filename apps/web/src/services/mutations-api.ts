@@ -44,6 +44,7 @@ async function ensureWalletFunded(
   walletId: string,
   amount: number,
   fundingMethod: "po_upload" | "online" = "po_upload",
+  opts?: { docType?: string; docNumber?: string },
 ): Promise<void> {
   if (amount <= 0) return;
   const existing = await apiFetch<{
@@ -64,6 +65,9 @@ async function ensureWalletFunded(
         body: JSON.stringify({
           amount,
           description: "Organization wallet setup funding",
+          fundingMethod: "po_upload",
+          docType: opts?.docType ?? "",
+          docNumber: opts?.docNumber ?? "",
         }),
       });
     } catch (err) {
@@ -74,6 +78,21 @@ async function ensureWalletFunded(
   }
 
   // Online funding uses Razorpay checkout — not POST /fund.
+}
+
+async function completePoFundingSubmission(
+  walletId: string,
+  org: OrgWizardState,
+  fundingMethod: "po_upload" | "online",
+): Promise<void> {
+  if (fundingMethod !== "po_upload") return;
+  if (org.wallet.uploadFile?.file) {
+    await uploadWalletFundingDocumentApi(walletId, org.wallet.uploadFile.file);
+  }
+  await ensureWalletFunded(walletId, org.wallet.amount, "po_upload", {
+    docType: org.wallet.docType,
+    docNumber: org.wallet.docNumber,
+  });
 }
 
 async function tryResolveExistingWalletId(id: string): Promise<string | null> {
@@ -160,7 +179,10 @@ async function createWalletAndFund(org: OrgWizardState): Promise<string> {
   }
 
   const existing = await findRecoverableWalletId(org.wallet.name);
-  if (existing) return existing;
+  if (existing) {
+    await completePoFundingSubmission(existing, org, fundingMethod);
+    return existing;
+  }
 
   try {
     const wallet = await apiFetch<Record<string, unknown>>("/wallets/setup", {
@@ -170,7 +192,10 @@ async function createWalletAndFund(org: OrgWizardState): Promise<string> {
     return walletIdFromResponse(wallet);
   } catch (err) {
     const recovered = await findRecoverableWalletId(org.wallet.name);
-    if (recovered) return recovered;
+    if (recovered) {
+      await completePoFundingSubmission(recovered, org, fundingMethod);
+      return recovered;
+    }
     await cleanupOrphanDraftByName(org.wallet.name);
     throw err;
   }
@@ -984,6 +1009,29 @@ export async function createRazorpayOrderApi(
     method: "POST",
     idempotencyKey: `rzp-order-${walletId}-${amount}-${Date.now()}`,
     body: JSON.stringify({ walletId, amount }),
+  });
+}
+
+export type VerifyRazorpayPaymentResult = {
+  verified: boolean;
+  idempotent?: boolean;
+  paymentId: string;
+  walletId: string;
+  amount: number;
+  status: string;
+  pendingApproval?: boolean;
+  invoiceId?: string;
+};
+
+export async function verifyRazorpayPaymentApi(payload: {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}): Promise<VerifyRazorpayPaymentResult> {
+  return apiFetch("/payments/razorpay/verify", {
+    method: "POST",
+    idempotencyKey: `rzp-verify-${payload.razorpay_payment_id}`,
+    body: JSON.stringify(payload),
   });
 }
 

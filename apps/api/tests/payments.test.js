@@ -123,10 +123,13 @@ describe('Razorpay webhook (§9.3)', () => {
       .send(raw);
     expect(res1.status).toBe(200);
     expect(res1.body.handled).toBe(true);
-    expect(res1.body.invoiceId).toBeTruthy();
+    expect(res1.body.pendingApproval).toBe(true);
 
     const updatedWallet = await Wallet.findOne({ _id: wallet._id, tenantId: tenant._id });
-    expect(updatedWallet.balance).toBe(500);
+    expect(updatedWallet.balance).toBe(0);
+    expect(updatedWallet.fundingDocument.approvalStatus).toBe('pending');
+    expect(updatedWallet.fundingDocument.requestedAmount).toBe(500);
+    expect(updatedWallet.fundingMethod).toBe('online');
 
     const res2 = await request(app)
       .post('/api/v1/payments/razorpay/webhook')
@@ -136,9 +139,45 @@ describe('Razorpay webhook (§9.3)', () => {
     expect(res2.status).toBe(200);
     expect(res2.body.idempotent).toBe(true);
 
-    expect(await Invoice.countDocuments({ tenantId: tenant._id })).toBe(1);
+    expect(await Invoice.countDocuments({ tenantId: tenant._id })).toBe(0);
     const replayWallet = await Wallet.findOne({ _id: wallet._id, tenantId: tenant._id });
-    expect(replayWallet.balance).toBe(500);
+    expect(replayWallet.balance).toBe(0);
+  });
+});
+
+describe('Razorpay verify', () => {
+  it('rejects invalid checkout signature', async () => {
+    await Payment.create({
+      tenantId: tenant._id,
+      relatedType: 'wallet_funding',
+      relatedId: wallet._id,
+      provider: 'razorpay',
+      providerRefId: 'order_verify_1',
+      razorpayOrderId: 'order_verify_1',
+      amount: 100,
+      currency: 'INR',
+      status: 'pending',
+    });
+
+    const res = await request(app)
+      .post('/api/v1/payments/razorpay/verify')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        razorpay_order_id: 'order_verify_1',
+        razorpay_payment_id: 'pay_verify_1',
+        razorpay_signature: 'not-a-valid-signature',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error?.code).toBe('INVALID_PAYMENT_SIGNATURE');
+  });
+
+  it('rejects missing fields', async () => {
+    const res = await request(app)
+      .post('/api/v1/payments/razorpay/verify')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ razorpay_order_id: 'order_x' });
+    expect(res.status).toBe(400);
   });
 });
 
