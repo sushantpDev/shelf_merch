@@ -71,6 +71,10 @@ export type WorkspaceSnapshot = {
       fundingApproval?: string;
       requestedAmount?: number;
       fundingFileUrl?: string;
+      address?: string;
+      pinCode?: string;
+      mobileNumber?: string;
+      gstin?: string;
     };
     departments: ReturnType<typeof mapEntityToDept>[];
   };
@@ -110,6 +114,10 @@ type ApiWalletRow = {
   };
   status?: string;
   updatedAt?: string;
+  address?: string;
+  pinCode?: string;
+  mobileNumber?: string;
+  gstin?: string;
 };
 
 function isEmptyDraftWallet(w: ApiWalletRow): boolean {
@@ -146,6 +154,10 @@ function mapWalletOrgFields(
       : Math.max(0, balance - allocated),
     start: w.validFrom ? new Date(w.validFrom).toISOString().slice(0, 10) : "",
     end: w.validTo ? new Date(w.validTo).toISOString().slice(0, 10) : "",
+    address: w.address || "",
+    pinCode: w.pinCode || "",
+    mobileNumber: w.mobileNumber || "",
+    gstin: w.gstin || "",
     funding: w.fundingMethod === "online" ? "pay" : "upload",
     docType: w.fundingDocument?.docType || "Purchase Order",
     docNumber: w.fundingDocument?.docNumber || "",

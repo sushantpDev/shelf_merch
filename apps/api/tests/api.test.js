@@ -339,6 +339,10 @@ describe('wallet setup wizard + state machine', () => {
       .field('docType', 'Purchase Order')
       .field('docNumber', 'PO-SETUP-01')
       .field('amount', '500000')
+      .field('address', '12 MG Road, Hyderabad')
+      .field('pinCode', '500089')
+      .field('mobileNumber', '9876543210')
+      .field('gstin', '36ABCDE1234F1Z5')
       .attach('document', pdf, { filename: 'po.pdf', contentType: 'application/pdf' });
 
     expect(res.status).toBe(201);
@@ -346,6 +350,10 @@ describe('wallet setup wizard + state machine', () => {
     expect(res.body.fundingDocument.approvalStatus).toBe('pending');
     expect(res.body.fundingDocument.requestedAmount).toBe(500_000);
     expect(res.body.fundingDocument.fileUrl).toBeTruthy();
+    expect(res.body.address).toBe('12 MG Road, Hyderabad');
+    expect(res.body.pinCode).toBe('500089');
+    expect(res.body.mobileNumber).toBe('9876543210');
+    expect(res.body.gstin).toBe('36ABCDE1234F1Z5');
 
     const count = await Wallet.countDocuments({ tenantId: tenantA._id, name: 'FY2026 Setup Budget' });
     expect(count).toBe(1);
@@ -359,6 +367,10 @@ describe('wallet setup wizard + state machine', () => {
       .field('fundingMethod', 'po_upload')
       .field('docNumber', 'PO-BAD')
       .field('amount', '1000')
+      .field('address', '12 MG Road')
+      .field('pinCode', '500089')
+      .field('mobileNumber', '9876543210')
+      .field('gstin', '36ABCDE1234F1Z5')
       .attach('document', Buffer.from('not-a-pdf'), {
         filename: 'bad.png',
         contentType: 'image/png',

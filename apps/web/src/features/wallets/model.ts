@@ -6,6 +6,7 @@ import {
   createRazorpayOrderApi,
   uploadWalletFundingDocumentApi,
   fetchWalletTransactionsApi,
+  updateWalletContactApi,
 } from "@/services/mutations-api";
 import { useInvalidateWorkspace } from "@/hooks/useWorkspace";
 import { departmentsForSync, type WizardState } from "./types";
@@ -40,6 +41,23 @@ export function useCreateWallet() {
   const invalidateWorkspace = useInvalidateWorkspace();
   return useMutation({
     mutationFn: (state: WizardState) => createWalletOnlyApi({ wallet: state.wallet }),
+    onSuccess: () => invalidateWorkspace(),
+  });
+}
+
+/** Update wallet billing/contact details. */
+export function useUpdateWalletContact() {
+  const invalidateWorkspace = useInvalidateWorkspace();
+  return useMutation({
+    mutationFn: (payload: {
+      walletId: string;
+      fields: {
+        address: string;
+        pinCode: string;
+        mobileNumber: string;
+        gstin: string;
+      };
+    }) => updateWalletContactApi(payload.walletId, payload.fields),
     onSuccess: () => invalidateWorkspace(),
   });
 }

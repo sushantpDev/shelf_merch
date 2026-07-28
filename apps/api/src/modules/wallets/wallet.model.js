@@ -37,6 +37,10 @@ const walletSchema = new mongoose.Schema(
       ],
     },
     ownerUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    address: { type: String, default: '' },
+    pinCode: { type: String, default: '' },
+    mobileNumber: { type: String, default: '' },
+    gstin: { type: String, default: '' },
   },
   { timestamps: true },
 );

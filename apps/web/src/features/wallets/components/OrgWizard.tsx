@@ -22,6 +22,11 @@ import {
   wizardCommittedAllocations,
   type WizardState,
 } from "../types";
+import {
+  validateWalletContactFields,
+  walletContactFieldsValid,
+  type WalletContactFieldErrors,
+} from "../walletContactFields";
 import { useCreateWallet, useSyncOrgWizard } from "../model";
 import { Step1Wallet } from "./steps/Step1Wallet";
 import { Step2Departments } from "./steps/Step2Departments";
@@ -43,6 +48,7 @@ export function OrgWizard({
   onFinished: () => void;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [contactErrors, setContactErrors] = useState<WalletContactFieldErrors>({});
   const submitInFlight = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const createWallet = useCreateWallet();
@@ -68,6 +74,20 @@ export function OrgWizard({
     }
     if (w.amount <= 0) {
       toast.error("Enter a budget amount greater than zero");
+      return false;
+    }
+    const contactValidation = validateWalletContactFields(
+      {
+        address: w.address,
+        pinCode: w.pinCode,
+        mobileNumber: w.mobileNumber,
+        gstin: w.gstin,
+      },
+      { required: true },
+    );
+    setContactErrors(contactValidation);
+    if (!walletContactFieldsValid(contactValidation)) {
+      toast.error("Complete all required wallet details");
       return false;
     }
     if (w.funding === "upload" && !w.uploaded && !w.uploadFile) {
@@ -206,7 +226,9 @@ export function OrgWizard({
         })}
       </div>
 
-      {isWalletFlow && n === 1 && <Step1Wallet state={state} dispatch={dispatch} />}
+      {isWalletFlow && n === 1 && (
+        <Step1Wallet state={state} dispatch={dispatch} contactErrors={contactErrors} />
+      )}
       {!isWalletFlow && n === 2 && <Step2Departments state={state} dispatch={dispatch} />}
       {!isWalletFlow && n === 3 && <Step3Allocate state={state} dispatch={dispatch} />}
       {!isWalletFlow && n === 4 && <Step4Managers state={state} dispatch={dispatch} />}

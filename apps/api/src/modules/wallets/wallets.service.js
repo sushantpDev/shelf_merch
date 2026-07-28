@@ -32,6 +32,15 @@ export async function getWallet({ tenantId, walletId }) {
   return Wallet.findOne({ _id: walletId, tenantId });
 }
 
+function walletContactPayload(data) {
+  const payload = {};
+  if (data.address != null) payload.address = String(data.address).trim();
+  if (data.pinCode != null) payload.pinCode = String(data.pinCode).trim();
+  if (data.mobileNumber != null) payload.mobileNumber = String(data.mobileNumber).trim();
+  if (data.gstin != null) payload.gstin = String(data.gstin).trim().toUpperCase();
+  return payload;
+}
+
 export async function createWallet({ tenantId, userId, data }) {
   const wallet = await Wallet.create({
     tenantId,
@@ -42,6 +51,7 @@ export async function createWallet({ tenantId, userId, data }) {
     validTo: data.validTo,
     fundingMethod: data.fundingMethod,
     fundingDocument: data.fundingDocument ?? {},
+    ...walletContactPayload(data),
   });
   return withMeta(wallet);
 }
@@ -98,6 +108,7 @@ export async function setupWallet({ tenantId, userId, data, file }) {
         docType: data.docType ?? '',
         docNumber: data.docNumber ?? '',
       },
+      ...walletContactPayload(data),
     });
 
     const walletId = wallet._id;

@@ -155,6 +155,10 @@ async function createWalletAndFund(org: OrgWizardState): Promise<string> {
   form.append("docType", org.wallet.docType || "");
   form.append("docNumber", org.wallet.docNumber || "");
   form.append("amount", String(org.wallet.amount));
+  form.append("address", org.wallet.address.trim());
+  form.append("pinCode", org.wallet.pinCode.trim());
+  form.append("mobileNumber", org.wallet.mobileNumber.trim());
+  form.append("gstin", org.wallet.gstin.trim().toUpperCase());
   if (fundingMethod === "po_upload" && org.wallet.uploadFile?.file) {
     form.append("document", org.wallet.uploadFile.file);
   }
@@ -182,6 +186,27 @@ export async function createWalletOnlyApi(
 ): Promise<{ walletId: string }> {
   const walletId = await createWalletAndFund(org as OrgWizardState);
   return { walletId };
+}
+
+/** Update wallet contact / billing details (address, pin, mobile, GSTIN). */
+export async function updateWalletContactApi(
+  walletId: string,
+  fields: {
+    address: string;
+    pinCode: string;
+    mobileNumber: string;
+    gstin: string;
+  },
+): Promise<void> {
+  await apiFetch(`/wallets/${walletId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      address: fields.address.trim(),
+      pinCode: fields.pinCode.trim(),
+      mobileNumber: fields.mobileNumber.trim(),
+      gstin: fields.gstin.trim().toUpperCase(),
+    }),
+  });
 }
 
 async function resolveWalletId(org: OrgWizardState, createNewWallet = false): Promise<string> {

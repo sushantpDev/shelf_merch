@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { objectId } from '../users/users.validation.js';
 import { TRANSACTION_TYPES } from './walletTransaction.model.js';
+import {
+  walletContactFieldsOptional,
+  walletContactFieldsRequired,
+} from './walletContact.validation.js';
 
 export const createWalletSchema = z.object({
   name: z.string().min(1),
@@ -15,6 +19,7 @@ export const createWalletSchema = z.object({
       fileUrl: z.string().optional().default(''),
     })
     .optional(),
+  ...walletContactFieldsOptional,
 });
 
 /** Multipart wallet wizard — create + optional PO upload + funding request in one call. */
@@ -27,6 +32,7 @@ export const setupWalletSchema = z.object({
   docType: z.string().optional().default(''),
   docNumber: z.string().optional().default(''),
   amount: z.coerce.number().nonnegative().optional().default(0),
+  ...walletContactFieldsRequired,
 });
 
 export const updateWalletSchema = z
@@ -35,6 +41,7 @@ export const updateWalletSchema = z
     validFrom: z.coerce.date().nullable(),
     validTo: z.coerce.date().nullable(),
     fundingMethod: z.enum(['po_upload', 'online']),
+    ...walletContactFieldsOptional,
     fundingDocument: z
     .object({
       docType: z.string().optional(),
