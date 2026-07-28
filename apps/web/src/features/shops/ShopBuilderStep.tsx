@@ -101,14 +101,6 @@ export function ShopBuilderStep({
               )}
 
               <div className="shop-builder-banner-content">
-                {draft.logoUrl ? (
-                  <div
-                    className={`shop-builder-banner-logo${hasImage || isEmptyBanner ? " corner" : ""}`}
-                  >
-                    <img src={draft.logoUrl} alt="Shop logo" />
-                  </div>
-                ) : null}
-
                 {!hasImage && !isEmptyBanner ? (
                   <div className="shop-builder-banner-title" style={{ color: theme.text }}>
                     {draft.name || "Your shop name"}
