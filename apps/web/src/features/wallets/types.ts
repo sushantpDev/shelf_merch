@@ -222,6 +222,22 @@ export const totalAlloc = (departments: WizardDept[]): number =>
 export const totalAllocatedAmount = (departments: WizardDept[]): number =>
   departments.reduce((sum, d) => sum + (d.allocated || 0), 0);
 
+/**
+ * Departments that completed allocation (have budget and/or a manager).
+ * Stub rows left by a failed allocate/invite run are excluded from the dashboard.
+ */
+export function committedDepartments<T extends {
+  allocated?: number;
+  mgr?: { email?: string; name?: string; inviteStatus?: string };
+}>(departments: T[]): T[] {
+  return departments.filter((d) => {
+    if ((d.allocated ?? 0) > 0) return true;
+    if (d.mgr?.email?.trim() || d.mgr?.name?.trim()) return true;
+    if (d.mgr?.inviteStatus === "pending" || d.mgr?.inviteStatus === "active") return true;
+    return false;
+  });
+}
+
 /** Allocations that count against the wallet total inside the wizard (selected depts only). */
 export const wizardCommittedAllocations = (departments: WizardDept[]): number =>
   totalAlloc(departments);

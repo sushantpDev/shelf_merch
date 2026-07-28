@@ -1101,6 +1101,8 @@ export async function syncOrgWizardApi(
   const allocationsByWallet = new Map<string, Array<{ entityId: string; amount: number }>>();
   const walletsToActivate = new Set<string>();
   const invites: OrgWizardInvite[] = [];
+  /** Entities created during this sync — rolled back if finish fails mid-way. */
+  const createdEntityIds = new Set<string>();
 
   const pushAllocation = (walletId: string, entityId: string, amount: number) => {
     if (amount === 0) return;
@@ -1108,6 +1110,34 @@ export async function syncOrgWizardApi(
     list.push({ entityId, amount });
     allocationsByWallet.set(walletId, list);
     walletsToActivate.add(walletId);
+  };
+
+  const isIncompleteEntity = (entity: ApiEntityRow) => {
+    const allocated = Number(entity.allocatedAmount ?? 0);
+    const mgrRef = entity.managerUserId;
+    const mgrEmail = String(
+      entity.managerEmail ??
+        (mgrRef && typeof mgrRef === "object" ? mgrRef.email : "") ??
+        "",
+    ).trim();
+    return allocated <= 0 && !mgrRef && !mgrEmail;
+  };
+
+  const deleteIfIncomplete = async (entityId: string) => {
+    if (!MONGO_ID.test(entityId)) return;
+    try {
+      const entity = await apiFetch<ApiEntityRow>(`/entities/${entityId}`);
+      if (!isIncompleteEntity(entity)) return;
+      await apiFetch(`/entities/${entityId}`, { method: "DELETE" });
+    } catch {
+      // Best-effort rollback — original error is still thrown to the caller.
+    }
+  };
+
+  /** Remove stub departments left behind when allocate/invite fails. */
+  const rollbackFailedAllocation = async (candidateIds: Iterable<string>) => {
+    const ids = new Set([...candidateIds, ...createdEntityIds]);
+    await Promise.all([...ids].map((id) => deleteIfIncomplete(id)));
   };
 
   const allocationDeltas: Array<{ walletId: string; entityId: string; delta: number }> = [];
@@ -1149,161 +1179,177 @@ export async function syncOrgWizardApi(
   };
   const entityPlans = new Map<string, EntityPlan>();
 
-  for (const dept of org.departments) {
-    const existingId = String(dept.id);
-    const isMongoId = MONGO_ID.test(existingId);
-    let entityId = isMongoId ? existingId : "";
-    let currentAllocated = 0;
+  try {
+    for (const dept of org.departments) {
+      const existingId = String(dept.id);
+      const isMongoId = MONGO_ID.test(existingId);
+      let entityId = isMongoId ? existingId : "";
+      let currentAllocated = 0;
 
-    if (entityId) {
-      const entity = await apiFetch<ApiEntityRow>(`/entities/${entityId}`);
-      const entityWalletId = normalizeMongoId(entity.walletId);
-      if (entityWalletId && entityWalletId !== defaultWalletId) {
-        entityId = "";
-        currentAllocated = 0;
-      } else {
-        currentAllocated = Number(entity.allocatedAmount ?? 0);
-        await apiFetch(`/entities/${entityId}`, {
-          method: "PATCH",
+      if (entityId) {
+        const entity = await apiFetch<ApiEntityRow>(`/entities/${entityId}`);
+        const entityWalletId = normalizeMongoId(entity.walletId);
+        if (entityWalletId && entityWalletId !== defaultWalletId) {
+          entityId = "";
+          currentAllocated = 0;
+        } else {
+          currentAllocated = Number(entity.allocatedAmount ?? 0);
+          await apiFetch(`/entities/${entityId}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              name: dept.name,
+              description: dept.desc || "",
+              colorHex: dept.color || "#2563EB",
+              expectedUsers: dept.users || 0,
+              managerEmail: entity.managerEmail,
+              managerName: entity.managerName,
+            }),
+          });
+        }
+      }
+
+      if (!entityId) {
+        const byIdentity = entityByDepartmentManager.get(
+          identityKey(dept.name, dept.mgr?.email),
+        );
+        const byName = byIdentity ?? entityByName.get(dept.name.trim().toLowerCase());
+        if (byName && entityBelongsToWallet(byName)) {
+          entityId = normalizeMongoId(byName._id ?? byName.id);
+          currentAllocated = Number(byName.allocatedAmount ?? 0);
+          await apiFetch(`/entities/${entityId}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              name: dept.name,
+              description: dept.desc || "",
+              colorHex: dept.color || "#2563EB",
+              expectedUsers: dept.users || 0,
+            }),
+          });
+        }
+      }
+
+      if (!entityId) {
+        const entity = await apiFetch<ApiEntityRow>("/entities", {
+          method: "POST",
           body: JSON.stringify({
+            walletId: defaultWalletId,
             name: dept.name,
             description: dept.desc || "",
             colorHex: dept.color || "#2563EB",
             expectedUsers: dept.users || 0,
-            managerEmail: entity.managerEmail,
-            managerName: entity.managerName,
           }),
         });
+        entityId = normalizeMongoId(entity._id ?? entity.id);
+        createdEntityIds.add(entityId);
+      }
+
+      const selected = (dept as { selected?: boolean }).selected !== false;
+      if (!selected) continue;
+
+      const target = Number(dept.allocated) || 0;
+      const prev = entityPlans.get(entityId);
+      if (!prev) {
+        entityPlans.set(entityId, { dept, entityId, target, currentAllocated });
       }
     }
 
-    if (!entityId) {
-      const byIdentity = entityByDepartmentManager.get(
-        identityKey(dept.name, dept.mgr?.email),
-      );
-      const byName = byIdentity ?? entityByName.get(dept.name.trim().toLowerCase());
-      if (byName && entityBelongsToWallet(byName)) {
-        entityId = normalizeMongoId(byName._id ?? byName.id);
-        currentAllocated = Number(byName.allocatedAmount ?? 0);
+    for (const { dept, entityId, target, currentAllocated } of entityPlans.values()) {
+      const mgrEmail = dept.mgr?.email?.trim();
+      if (mgrEmail) {
+        const mgrName = dept.mgr.name?.trim() || mgrEmail.split("@")[0] || "Manager";
+        const res = await apiFetch<{
+          manager?: { email?: string };
+          inviteToken?: string;
+        }>(`/entities/${entityId}/assign-manager`, {
+          method: "POST",
+          body: JSON.stringify({
+            name: mgrName,
+            email: mgrEmail,
+            role: dept.mgr.role || "",
+            mobile: dept.mgr.mobile || "",
+            sendInvite: Boolean(dept.mgr.invite),
+          }),
+        });
+        if (dept.mgr.invite) {
+          invites.push({
+            email: mgrEmail,
+            name: mgrName,
+            entityName: dept.name,
+            inviteToken: res.inviteToken,
+          });
+        }
+      } else if (dept.mgr?.name?.trim() || dept.mgr?.role?.trim()) {
         await apiFetch(`/entities/${entityId}`, {
           method: "PATCH",
           body: JSON.stringify({
-            name: dept.name,
-            description: dept.desc || "",
-            colorHex: dept.color || "#2563EB",
-            expectedUsers: dept.users || 0,
+            managerName: dept.mgr.name?.trim() || "",
+            managerTitle: dept.mgr.role || "",
           }),
         });
       }
+
+      if (target > 0) {
+        plannedAllocations.push({ entityId, amount: target });
+      }
+
+      const delta = target - currentAllocated;
+      if (delta !== 0) {
+        allocationDeltas.push({ walletId: defaultWalletId, entityId, delta });
+      }
     }
 
-    if (!entityId) {
-      const entity = await apiFetch<ApiEntityRow>("/entities", {
-        method: "POST",
-        body: JSON.stringify({
-          walletId: defaultWalletId,
-          name: dept.name,
-          description: dept.desc || "",
-          colorHex: dept.color || "#2563EB",
-          expectedUsers: dept.users || 0,
-        }),
-      });
-      entityId = normalizeMongoId(entity._id ?? entity.id);
+    allocationDeltas.sort((a, b) => a.delta - b.delta);
+    for (const { walletId, entityId, delta } of allocationDeltas) {
+      pushAllocation(walletId, entityId, delta);
     }
 
-    const selected = (dept as { selected?: boolean }).selected !== false;
-    if (!selected) continue;
+    const walletMeta = await apiFetch<{
+      fundingMethod?: string;
+      fundingDocument?: { approvalStatus?: string };
+    }>(`/wallets/${defaultWalletId}`);
+    const poPending =
+      walletMeta.fundingMethod === "po_upload" &&
+      walletMeta.fundingDocument?.approvalStatus === "pending";
 
-    const target = Number(dept.allocated) || 0;
-    const prev = entityPlans.get(entityId);
-    if (!prev) {
-      entityPlans.set(entityId, { dept, entityId, target, currentAllocated });
-    }
-  }
-
-  for (const { dept, entityId, target, currentAllocated } of entityPlans.values()) {
-    const mgrEmail = dept.mgr?.email?.trim();
-    if (mgrEmail) {
-      const mgrName = dept.mgr.name?.trim() || mgrEmail.split("@")[0] || "Manager";
-      const res = await apiFetch<{
-        manager?: { email?: string };
-        inviteToken?: string;
-      }>(`/entities/${entityId}/assign-manager`, {
-        method: "POST",
-        body: JSON.stringify({
-          name: mgrName,
-          email: mgrEmail,
-          role: dept.mgr.role || "",
-          mobile: dept.mgr.mobile || "",
-          sendInvite: Boolean(dept.mgr.invite),
-        }),
-      });
-      if (dept.mgr.invite) {
-        invites.push({
-          email: mgrEmail,
-          name: mgrName,
-          entityName: dept.name,
-          inviteToken: res.inviteToken,
+    if (poPending) {
+      if (plannedAllocations.length > 0) {
+        await apiFetch(`/wallets/${defaultWalletId}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            fundingDocument: { plannedAllocations },
+          }),
         });
       }
-    } else if (dept.mgr?.name?.trim() || dept.mgr?.role?.trim()) {
-      await apiFetch(`/entities/${entityId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          managerName: dept.mgr.name?.trim() || "",
-          managerTitle: dept.mgr.role || "",
-        }),
+      return { walletId: defaultWalletId, invites };
+    }
+
+    for (const [walletId, allocations] of allocationsByWallet) {
+      if (!allocations.length) continue;
+      const ordered = [...allocations].sort((a, b) => a.amount - b.amount);
+      await apiFetch(`/wallets/${walletId}/allocate`, {
+        method: "POST",
+        idempotencyKey: `alloc-${walletId}-${Date.now()}-${ordered.map((a) => `${a.entityId}:${a.amount}`).join("|")}`,
+        body: JSON.stringify({ allocations: ordered }),
       });
     }
 
-    if (target > 0) {
-      plannedAllocations.push({ entityId, amount: target });
+    for (const walletId of walletsToActivate) {
+      await apiFetch(`/wallets/${walletId}/activate`, { method: "POST" });
     }
 
-    const delta = target - currentAllocated;
-    if (delta !== 0) {
-      allocationDeltas.push({ walletId: defaultWalletId, entityId, delta });
-    }
-  }
-
-  allocationDeltas.sort((a, b) => a.delta - b.delta);
-  for (const { walletId, entityId, delta } of allocationDeltas) {
-    pushAllocation(walletId, entityId, delta);
-  }
-
-  const walletMeta = await apiFetch<{
-    fundingMethod?: string;
-    fundingDocument?: { approvalStatus?: string };
-  }>(`/wallets/${defaultWalletId}`);
-  const poPending =
-    walletMeta.fundingMethod === "po_upload" &&
-    walletMeta.fundingDocument?.approvalStatus === "pending";
-
-  if (poPending) {
-    if (plannedAllocations.length > 0) {
-      await apiFetch(`/wallets/${defaultWalletId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          fundingDocument: { plannedAllocations },
-        }),
-      });
-    }
     return { walletId: defaultWalletId, invites };
+  } catch (err) {
+    await rollbackFailedAllocation(entityPlans.keys());
+    // Also clear any other stub departments left on this wallet from a prior failed run.
+    try {
+      const fresh = await apiFetch<ApiEntityRow[]>("/entities");
+      const stubs = (fresh ?? [])
+        .filter((e) => normalizeMongoId(e.walletId) === defaultWalletId && isIncompleteEntity(e))
+        .map((e) => normalizeMongoId(e._id ?? e.id));
+      await Promise.all(stubs.map((id) => deleteIfIncomplete(id)));
+    } catch {
+      // Best-effort.
+    }
+    throw err;
   }
-
-  for (const [walletId, allocations] of allocationsByWallet) {
-    if (!allocations.length) continue;
-    const ordered = [...allocations].sort((a, b) => a.amount - b.amount);
-    await apiFetch(`/wallets/${walletId}/allocate`, {
-      method: "POST",
-      idempotencyKey: `alloc-${walletId}-${Date.now()}-${ordered.map((a) => `${a.entityId}:${a.amount}`).join("|")}`,
-      body: JSON.stringify({ allocations: ordered }),
-    });
-  }
-
-  for (const walletId of walletsToActivate) {
-    await apiFetch(`/wallets/${walletId}/activate`, { method: "POST" });
-  }
-
-  return { walletId: defaultWalletId, invites };
 }

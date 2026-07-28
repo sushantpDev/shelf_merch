@@ -8,9 +8,31 @@ import { sendInviteEmail, sendManagerAssignmentEmail } from '../../services/emai
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+async function clearStaleManagerBindings(userId) {
+  try {
+    const { Entity } = await import('../entities/entity.model.js');
+    await Entity.updateMany(
+      { managerUserId: userId },
+      {
+        $set: {
+          managerUserId: null,
+          managerInvitePending: false,
+          managerEmail: '',
+          managerName: '',
+        },
+      },
+    ).setOptions({ skipTenantGuard: true });
+  } catch {
+    // Best-effort — invite should still proceed.
+  }
+}
+
 /**
  * Creates an invited user + role assignment and returns the invite token.
  * Reused by /users/invite and /entities/:id/assign-manager.
+ *
+ * Emails are globally unique. An unused invite (`status: invited`) on another
+ * workspace can be reclaimed. Active accounts on another workspace cannot.
  */
 export async function inviteUser(
   {
@@ -27,11 +49,41 @@ export async function inviteUser(
   },
   session = null,
 ) {
-  const normalizedEmail = email.toLowerCase();
+  const normalizedEmail = email.toLowerCase().trim();
   let user = await User.findOne({ email: normalizedEmail }).session(session);
 
-  if (user && String(user.tenantId) !== String(tenantId)) {
-    throw new ConflictError('This email is already registered to another workspace');
+  // Soft-deleted row still occupies the unique email index — revive for this tenant.
+  if (!user) {
+    const deleted = await User.findOne({ email: normalizedEmail })
+      .setOptions({ includeDeleted: true })
+      .session(session);
+    if (deleted?.deletedAt) {
+      user = deleted;
+      user.deletedAt = null;
+      user.tenantId = tenantId;
+      user.status = 'invited';
+      user.passwordHash = null;
+      await RoleAssignment.deleteMany({ userId: user._id }).session(session);
+      await clearStaleManagerBindings(user._id);
+    }
+  }
+
+  if (user && String(user.tenantId ?? '') !== String(tenantId)) {
+    if (user.status === 'invited') {
+      // Never activated elsewhere — move the invite to this workspace.
+      await RoleAssignment.deleteMany({ userId: user._id }).session(session);
+      await clearStaleManagerBindings(user._id);
+      user.tenantId = tenantId;
+      user.passwordHash = null;
+    } else if (!user.tenantId) {
+      throw new ConflictError(
+        `"${normalizedEmail}" is a ShelfMerch platform account and cannot be invited as a department manager. Use a different email.`,
+      );
+    } else {
+      throw new ConflictError(
+        `"${normalizedEmail}" is already registered to another workspace. Use a different email for this manager.`,
+      );
+    }
   }
 
   let inviteToken = null;
@@ -54,15 +106,17 @@ export async function inviteUser(
     );
   } else if (user.status === 'invited') {
     inviteToken = crypto.randomBytes(32).toString('hex');
+    user.tenantId = tenantId;
     user.inviteTokenHash = sha256(inviteToken);
     user.inviteTokenExpiresAt = new Date(Date.now() + INVITE_TTL_MS);
+    if (name) user.name = name;
+    if (phone) user.phone = phone;
+    await user.save({ session });
+  } else {
+    // Active user in this workspace — update profile fields if provided.
     if (name && user.name !== name) user.name = name;
     if (phone) user.phone = phone;
-    await user.save({ session });
-  } else if (user.status === 'active' && name && user.name !== name) {
-    user.name = name;
-    if (phone) user.phone = phone;
-    await user.save({ session });
+    if (user.isModified()) await user.save({ session });
   }
 
   const entityIds = assignedEntityIds.length
