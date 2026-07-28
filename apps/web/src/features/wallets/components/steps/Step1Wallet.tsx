@@ -20,6 +20,8 @@ export function Step1Wallet({
   state,
   dispatch,
   contactErrors = {},
+  onProceedToPayment,
+  paymentBusy = false,
 }: StepProps & { contactErrors?: WalletContactFieldErrors }) {
   const o = state.wallet;
   const setField = (field: keyof typeof o, value: string | number | boolean) =>
