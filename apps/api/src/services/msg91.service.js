@@ -55,7 +55,7 @@ export async function sendOtpSms(mobile, otp) {
   return { success: true, provider: 'msg91', requestId: body.request_id };
 }
 
-/** Transactional SMS (campaign invites, order updates) via MSG91 Flow API. */
+/** Transactional SMS (order updates, etc.) — never use the OTP template (that sends verification codes). */
 export async function sendSms(mobile, message) {
   const normalized = normalizeIndianMobile(mobile);
 
@@ -64,26 +64,10 @@ export async function sendSms(mobile, message) {
     return { success: true, provider: 'stub' };
   }
 
-  // Flow API with a plain-text fallback route for MVP transactional messages.
-  const res = await fetch('https://control.msg91.com/api/v5/flow/', {
-    method: 'POST',
-    headers: {
-      authkey: env.MSG91_AUTH_KEY,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      template_id: env.MSG91_OTP_TEMPLATE_ID,
-      short_url: '0',
-      recipients: [{ mobiles: normalized, var: message }],
-    }),
-  });
-
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    logger.warn({ status: res.status, body }, 'MSG91 SMS failed — falling back to log');
-    logger.info({ mobile: normalized, message }, 'MSG91 SMS (fallback log)');
-    return { success: true, provider: 'log_fallback' };
-  }
-
-  return { success: true, provider: 'msg91' };
+  // OTP template_id triggers MSG91's OTP API semantics — log only until a flow template exists.
+  logger.info(
+    { mobile: normalized, message },
+    'MSG91 transactional SMS skipped — configure a dedicated flow template for non-OTP messages',
+  );
+  return { success: true, provider: 'skipped_otp_template' };
 }

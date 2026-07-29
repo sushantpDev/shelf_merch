@@ -16,6 +16,9 @@ import {
  * SMS: MSG91 when credentials are set; otherwise structured logs (tests/dev).
  */
 
+/** Invite types are email-only — SMS must not fire (MSG91 OTP template is not transactional). */
+const EMAIL_ONLY_NOTIFICATION_TYPES = new Set(['redemption_invite', 'surprise_gift']);
+
 export async function deliverNotification({
   type,
   tenantId = null,
@@ -61,7 +64,7 @@ export async function deliverNotification({
       await sendNotificationEmail({ to: email, title, body, link });
     }
   }
-  if (phone) {
+  if (phone && !EMAIL_ONLY_NOTIFICATION_TYPES.has(type)) {
     const message = [title, body, link].filter(Boolean).join(' — ');
     await sendSms(phone, message);
   }

@@ -550,7 +550,6 @@ async function sendCampaignInvites(campaign, tenantId) {
         type: ctx.isSurprise ? 'surprise_gift' : 'redemption_invite',
         tenantId,
         email: r.email,
-        phone: r.phone || null,
         title: ctx.inviteTitle,
         body: ctx.inviteBody,
         link: ctx.isSurprise ? '' : `/redeem/${r.redemptionToken}`,
