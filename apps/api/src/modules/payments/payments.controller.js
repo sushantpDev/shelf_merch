@@ -7,6 +7,7 @@ export async function createRazorpayOrder(req, res) {
     userId: req.user.userId,
     walletId: req.body.walletId,
     amountInr: req.body.amount,
+    purpose: req.body.purpose,
   });
   writeAudit({
     req,

@@ -98,8 +98,11 @@ export function useFundWallet() {
 
 export function useCreateRazorpayOrder() {
   return useMutation({
-    mutationFn: (payload: { walletId: string; amount: number }) =>
-      createRazorpayOrderApi(payload.walletId, payload.amount),
+    mutationFn: (payload: {
+      walletId: string;
+      amount: number;
+      purpose?: "wallet_funding" | "campaign_spend";
+    }) => createRazorpayOrderApi(payload.walletId, payload.amount, payload.purpose ?? "wallet_funding"),
   });
 }
 

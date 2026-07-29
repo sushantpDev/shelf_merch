@@ -4,7 +4,11 @@ import { softDeletePlugin } from '../../plugins/softDelete.plugin.js';
 
 const paymentSchema = new mongoose.Schema(
   {
-    relatedType: { type: String, enum: ['wallet_funding', 'campaign_checkout'], required: true },
+    relatedType: {
+      type: String,
+      enum: ['wallet_funding', 'campaign_checkout', 'campaign_spend'],
+      required: true,
+    },
     relatedId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
     /** User who initiated the payment (wallet funding). */
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },

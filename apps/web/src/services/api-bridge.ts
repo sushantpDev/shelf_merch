@@ -513,6 +513,12 @@ export async function launchPointsCampaignFlow(payload: {
   schedule?: { mode: "now" | "scheduled" | "self"; sendAt?: string | null; timezone?: string };
   contactIds: string[];
   contacts: Array<{ id: string; name: string; email: string; phone?: string }>;
+  paymentMode?: "wallet" | "upi" | "card";
+  razorpay?: {
+    orderId: string;
+    paymentId: string;
+    signature?: string;
+  };
 }) {
   const recipients = payload.contactIds
     .map((id) => {
@@ -546,6 +552,8 @@ export async function launchPointsCampaignFlow(payload: {
     message: payload.message,
     schedule: payload.schedule,
     recipients,
+    paymentMode: payload.paymentMode,
+    razorpay: payload.razorpay,
   });
 }
 

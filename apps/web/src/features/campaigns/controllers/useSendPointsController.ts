@@ -2,8 +2,14 @@ import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { useWorkspace, useInvalidateWorkspace } from "@/hooks/useWorkspace";
+import { openRazorpayCheckout } from "@/lib/razorpay";
 import { formatWalletAmount } from "@/lib/walletFormat";
-import { ensureSpendEntityForWalletApi, getCampaignApi } from "@/services/mutations-api";
+import {
+  createRazorpayOrderApi,
+  ensureSpendEntityForWalletApi,
+  getCampaignApi,
+  verifyRazorpayPaymentApi,
+} from "@/services/mutations-api";
 import { entityIdForWallet, spendableForWallet, walletsForCheckout } from "@/services/workspace-api";
 import { pointsSendTotals } from "@/features/send/money";
 import { toSchedulePayload } from "@/features/send/types";
@@ -58,7 +64,6 @@ export type SendPointsVm = {
   onBack: () => void;
   onPayNow: () => void;
   onSaveAndExit: () => void;
-  onApplyPromo: () => void;
   onToggleRecip: (id: string) => void;
   onSelectAllRecips: () => void;
   onAddRecipientEmails: (raw: string) => void;
@@ -337,7 +342,7 @@ export function useSendPointsController(): SendPointsVm {
           selectedWalletId,
           selRecips: draft.selRecips,
           recips: draft.recips,
-          pay: draft.pay === "card" ? "card" : "wallet",
+          pay: draft.pay === "upi" || draft.pay === "card" ? draft.pay : "wallet",
           preview: draft.preview,
           when: schedulePayload.mode,
         },
@@ -413,7 +418,10 @@ export function useSendPointsController(): SendPointsVm {
       return;
     }
     const paymentTotal = Math.round(totals.sub);
-    if (draft.pay === "wallet") {
+    const payingWithWallet = draft.pay === "wallet";
+    const paymentMode = draft.pay === "card" ? "card" : draft.pay === "upi" ? "upi" : "wallet";
+
+    if (payingWithWallet) {
       const available = walletId && workspace ? spendableForWallet(workspace, walletId) : 0;
       const payWallet = walletId ? workspace?.wallets.find((w) => w.id === walletId) : undefined;
       if (available < paymentTotal) {
@@ -423,8 +431,49 @@ export function useSendPointsController(): SendPointsVm {
         return;
       }
     }
-    setSending(true);
+
+    if (!payingWithWallet && !walletId) {
+      toast.error("Select a wallet to attach this campaign to before paying online");
+      return;
+    }
+
+    let razorpay:
+      | { orderId: string; paymentId: string; signature: string }
+      | undefined;
+
     try {
+      // Collect UPI/card payment first — do not flip `sending` yet or the checkout
+      // unmounts into LoadingState and Razorpay cannot open cleanly.
+      if (!payingWithWallet) {
+        const order = await createRazorpayOrderApi(walletId!, paymentTotal, "campaign_spend");
+        const response = await new Promise<{
+          razorpay_order_id: string;
+          razorpay_payment_id: string;
+          razorpay_signature: string;
+        }>((resolve, reject) => {
+          void openRazorpayCheckout({
+            order,
+            description: `Pay ₹${paymentTotal.toLocaleString("en-IN")} for shop points`,
+            preferredMethod: paymentMode === "card" ? "card" : "upi",
+            onSuccess: resolve,
+            onDismiss: () => reject(new Error("Payment cancelled")),
+          }).catch(reject);
+        });
+
+        await verifyRazorpayPaymentApi({
+          razorpay_order_id: response.razorpay_order_id,
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_signature: response.razorpay_signature,
+        });
+
+        razorpay = {
+          orderId: response.razorpay_order_id,
+          paymentId: response.razorpay_payment_id,
+          signature: response.razorpay_signature,
+        };
+      }
+
+      setSending(true);
       await launch.mutateAsync({
         campaignId,
         entityId: String(entityId),
@@ -445,18 +494,39 @@ export function useSendPointsController(): SendPointsVm {
           email: c.email,
           phone: c.phone,
         })),
+        paymentMode,
+        razorpay,
       });
       await refreshWorkspace();
       const scheduled = draft.when === "sched";
       toast.success(
         scheduled
-          ? `Campaign scheduled — wallet debited. Emails and points will go out at the scheduled time.`
+          ? payingWithWallet
+            ? `Campaign scheduled — wallet debited. Emails and points will go out at the scheduled time.`
+            : `Campaign scheduled — payment received. Emails and points will go out at the scheduled time.`
           : `Points sent to ${draft.selRecips.length} recipients! 🎉`,
       );
       navigate(`/app/shops/${String(shopId)}?tab=sent-gifts`);
     } catch (err) {
       setSending(false);
-      toast.error(err instanceof Error ? err.message : "Failed to launch campaign");
+      const message = err instanceof Error ? err.message : "Failed to launch campaign";
+      if (message === "Payment cancelled") {
+        toast.message("Payment cancelled");
+        return;
+      }
+      if (message.includes("RAZORPAY_NOT_CONFIGURED") || message.includes("not configured")) {
+        toast.error("Razorpay is not configured", {
+          description: "Add RAZORPAY_KEY_ID and related keys to the API .env file.",
+        });
+        return;
+      }
+      if (message.includes("temporarily unavailable") || message.includes("GATEWAY")) {
+        toast.error("Could not reach the payment server", {
+          description: "Confirm the API is running on port 4000, then try Pay again.",
+        });
+        return;
+      }
+      toast.error(message);
     }
   }
 
@@ -483,7 +553,6 @@ export function useSendPointsController(): SendPointsVm {
     onBack: () => setStep((s) => (s - 1) as SendPointsStep),
     onPayNow: payNow,
     onSaveAndExit: saveAndExit,
-    onApplyPromo: () => toast("Promo applied"),
     onToggleRecip,
     onSelectAllRecips,
     onAddRecipientEmails,

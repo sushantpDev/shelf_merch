@@ -16,10 +16,15 @@ import { notify } from '../notifications/notifications.service.js';
 import { recordUsage } from '../../services/usage.service.js';
 import { ApiError, ForbiddenError, NotFoundError } from '../../utils/errors.js';
 import { assertEntityAccess } from '../../middleware/abac.middleware.js';
+import { assertCampaignSpendPayment } from '../payments/payments.service.js';
 
 function withCampaignMeta(campaign) {
   const obj = campaign.toObject ? campaign.toObject() : campaign;
   return { ...obj, validNextStatuses: validNextStatuses('campaign', obj.status) };
+}
+
+function isExternalPay(paymentMode) {
+  return paymentMode === 'upi' || paymentMode === 'card';
 }
 
 const INCOMPLETE_CAMPAIGN_STATUSES = ['draft', 'recipients_uploaded', 'credits_allocated', 'approved'];
@@ -406,6 +411,9 @@ export async function allocateCredits({
   user,
   creditsPerRecipient,
   totalBudget: totalBudgetOverride,
+  paymentMode = 'wallet',
+  razorpayOrderId,
+  razorpayPaymentId,
 }) {
   const campaign = await Campaign.findOne({ _id: campaignId, tenantId });
   if (!campaign) throw new NotFoundError('Campaign not found');
@@ -426,27 +434,43 @@ export async function allocateCredits({
   }
 
   const totalBudget = Math.round(totalBudgetOverride ?? perRecipient * count);
-  await assertWalletCanSpend({
-    tenantId,
-    entityId: campaign.entityId,
-    amount: totalBudget,
-    user,
-  });
-  const entity = await Entity.findOne({ _id: campaign.entityId, tenantId });
-  if (user?.scopeType === 'entity') {
-    const entityAvailable = entity.allocatedAmount - entity.spentAmount;
-    if (totalBudget > entityAvailable) {
-      throw new ApiError(
-        422,
-        `Total budget ₹${totalBudget} exceeds entity available budget ₹${entityAvailable}`,
-        'INSUFFICIENT_ENTITY_BUDGET',
-      );
+  const externalPay = isExternalPay(paymentMode);
+
+  if (externalPay) {
+    await assertCampaignSpendPayment({
+      tenantId,
+      expectedAmountInr: totalBudget,
+      razorpayOrderId,
+      razorpayPaymentId,
+      campaignId: campaign._id,
+    });
+  } else {
+    await assertWalletCanSpend({
+      tenantId,
+      entityId: campaign.entityId,
+      amount: totalBudget,
+      user,
+    });
+    const entity = await Entity.findOne({ _id: campaign.entityId, tenantId });
+    if (user?.scopeType === 'entity') {
+      const entityAvailable = entity.allocatedAmount - entity.spentAmount;
+      if (totalBudget > entityAvailable) {
+        throw new ApiError(
+          422,
+          `Total budget ₹${totalBudget} exceeds entity available budget ₹${entityAvailable}`,
+          'INSUFFICIENT_ENTITY_BUDGET',
+        );
+      }
     }
   }
 
   campaign.creditsPerRecipient = perRecipient;
   campaign.recipientCount = count;
   campaign.totalBudget = totalBudget;
+  campaign.paymentMode = externalPay ? paymentMode : 'wallet';
+  if (externalPay && razorpayPaymentId) {
+    campaign.razorpayPaymentId = razorpayPaymentId;
+  }
   // Scheduled sends: hold point credit until sendAt (wallet is still debited at launch).
   const deferCredits = campaign.schedule?.mode === 'scheduled';
   await Recipient.updateMany(
@@ -655,8 +679,15 @@ export async function processDueScheduledCampaigns({ limit = 50 } = {}) {
   return results;
 }
 
-/** §7.8 /launch — idempotent wallet debit + invite notifications. */
-export async function launchCampaign({ tenantId, campaignId, user }) {
+/** §7.8 /launch — idempotent wallet debit (or Razorpay-paid) + invite notifications. */
+export async function launchCampaign({
+  tenantId,
+  campaignId,
+  user,
+  paymentMode = 'wallet',
+  razorpayOrderId,
+  razorpayPaymentId,
+}) {
   const campaign = await Campaign.findOne({ _id: campaignId, tenantId });
   if (!campaign) throw new NotFoundError('Campaign not found');
   if (user?.scopeType === 'entity') {
@@ -684,32 +715,54 @@ export async function launchCampaign({ tenantId, campaignId, user }) {
   const entity = await Entity.findOne({ _id: campaign.entityId, tenantId });
   if (!entity) throw new NotFoundError('Entity not found');
 
-  const { wallet } = await ledger.resolveSpendWalletForEntity({
-    tenantId,
-    entityId: campaign.entityId,
-  });
+  const mode = isExternalPay(paymentMode)
+    ? paymentMode
+    : isExternalPay(campaign.paymentMode)
+      ? campaign.paymentMode
+      : 'wallet';
+  const externalPay = isExternalPay(mode);
+  const payOrderId = razorpayOrderId || undefined;
+  const payPaymentId = razorpayPaymentId || campaign.razorpayPaymentId || undefined;
 
-  // Re-validate funds immediately before debit so Send never proceeds on a stale balance.
-  if (campaign.totalBudget > 0) {
-    await assertWalletCanSpend({
+  if (externalPay) {
+    await assertCampaignSpendPayment({
+      tenantId,
+      expectedAmountInr: campaign.totalBudget,
+      razorpayOrderId: payOrderId,
+      razorpayPaymentId: payPaymentId,
+      campaignId: campaign._id,
+    });
+    campaign.paymentMode = mode;
+    campaign.razorpayPaymentId = payPaymentId;
+  } else {
+    const { wallet } = await ledger.resolveSpendWalletForEntity({
       tenantId,
       entityId: campaign.entityId,
-      amount: campaign.totalBudget,
-      user,
     });
-  }
 
-  const spendFromEntity = user?.scopeType === 'entity';
-  if (campaign.totalBudget > 0) {
-    await ledger.createTransaction({
-      tenantId,
-      walletId: wallet._id,
-      type: 'campaign_spend',
-      amount: -Math.round(campaign.totalBudget),
-      relatedEntityId: spendFromEntity ? entity._id : null,
-      description: `Campaign launch: ${campaign.name}`,
-      performedBy: user.userId,
-    });
+    // Re-validate funds immediately before debit so Send never proceeds on a stale balance.
+    if (campaign.totalBudget > 0) {
+      await assertWalletCanSpend({
+        tenantId,
+        entityId: campaign.entityId,
+        amount: campaign.totalBudget,
+        user,
+      });
+    }
+
+    const spendFromEntity = user?.scopeType === 'entity';
+    if (campaign.totalBudget > 0) {
+      await ledger.createTransaction({
+        tenantId,
+        walletId: wallet._id,
+        type: 'campaign_spend',
+        amount: -Math.round(campaign.totalBudget),
+        relatedEntityId: spendFromEntity ? entity._id : null,
+        description: `Campaign launch: ${campaign.name}`,
+        performedBy: user.userId,
+      });
+    }
+    campaign.paymentMode = 'wallet';
   }
 
   transitionState('campaign', campaign, 'launched', { userId: user.userId });

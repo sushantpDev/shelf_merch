@@ -59,6 +59,9 @@ export async function allocateCredits(req, res) {
     user: req.user,
     creditsPerRecipient: req.body.creditsPerRecipient,
     totalBudget: req.body.totalBudget,
+    paymentMode: req.body.paymentMode,
+    razorpayOrderId: req.body.razorpay_order_id,
+    razorpayPaymentId: req.body.razorpay_payment_id,
   });
   writeAudit({
     req,
@@ -75,6 +78,9 @@ export async function launch(req, res) {
     tenantId: req.tenantId,
     campaignId: req.params.id,
     user: req.user,
+    paymentMode: req.body?.paymentMode,
+    razorpayOrderId: req.body?.razorpay_order_id,
+    razorpayPaymentId: req.body?.razorpay_payment_id,
   });
   writeAudit({ req, action: 'campaign.launch', entityType: 'Campaign', entityId: campaign._id, after: { status: campaign.status } });
   res.json(campaign);

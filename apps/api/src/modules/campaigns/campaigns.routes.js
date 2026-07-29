@@ -12,6 +12,7 @@ import {
   updateCampaignSchema,
   importRecipientsSchema,
   allocateCreditsSchema,
+  launchCampaignSchema,
   campaignIdParams,
   savePointsDraftSchema,
 } from './campaigns.validation.js';
@@ -63,7 +64,7 @@ router.post(
   canOperate,
   entityScope,
   idempotency({ required: true }),
-  validate({ params: campaignIdParams }),
+  validate({ params: campaignIdParams, body: launchCampaignSchema }),
   asyncHandler(controller.launch),
 );
 router.post(
