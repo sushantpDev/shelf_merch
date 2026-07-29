@@ -19,6 +19,7 @@ import {
 import type { PointsSendTotals } from "@/features/send/money";
 import type { ShopCurrencyMode } from "@/lib/storeCurrency";
 import type { UiShop } from "@/services/mappers";
+import type { SendingPointsRecipient } from "@/components/SendingPointsAnimation";
 import { useLaunchPointsCampaign, useSavePointsCampaignDraft } from "../model";
 import type { UiContact, UiWallet } from "../model";
 import {
@@ -35,10 +36,16 @@ import type { SendPointsAction, SendPointsDraft } from "../pointsDraft";
 
 export type SendPointsStep = 0 | 1 | 2 | 3;
 
+export type SendPointsPhase = "idle" | "sending" | "success" | "error";
+
 export type SendPointsVm = {
   isLoading: boolean;
   isSending: boolean;
   isSaving: boolean;
+  sendPhase: SendPointsPhase;
+  sendError: string | null;
+  sendRecipients: SendingPointsRecipient[];
+  onDismissSendError: () => void;
   step: SendPointsStep;
   draft: SendPointsDraft;
   dispatch: (action: SendPointsAction) => void;
@@ -77,7 +84,10 @@ export function useSendPointsController(): SendPointsVm {
   const saveDraft = useSavePointsCampaignDraft();
   const [step, setStep] = useState<SendPointsStep>(0);
   const [sending, setSending] = useState(false);
+  const [sendPhase, setSendPhase] = useState<SendPointsPhase>("idle");
+  const [sendError, setSendError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const successNavTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hydrating, setHydrating] = useState(Boolean(campaignParam));
   const [selectedWalletId, setSelectedWalletId] = useState("");
   const [campaignId, setCampaignId] = useState<string | undefined>(campaignParam);
@@ -98,7 +108,28 @@ export function useSendPointsController(): SendPointsVm {
     () => mergePickerContacts(contacts, draft.selRecips),
     [contacts, draft.selRecips],
   );
+  const sendRecipients = useMemo<SendingPointsRecipient[]>(
+    () =>
+      draft.selRecips.map((id) => {
+        if (isManualRecipientId(id)) {
+          const email = emailFromManualRecipientId(id);
+          return { id, name: email.split("@")[0] || email };
+        }
+        const contact = pickerContacts.find((c) => c.id === id);
+        return {
+          id,
+          name: contact?.name || contact?.email || "Recipient",
+        };
+      }),
+    [draft.selRecips, pickerContacts],
+  );
   const recipientLimit = draft.recips;
+
+  useEffect(() => {
+    return () => {
+      if (successNavTimer.current) clearTimeout(successNavTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!shop || seededScope.current) return;
@@ -424,6 +455,8 @@ export function useSendPointsController(): SendPointsVm {
       }
     }
     setSending(true);
+    setSendPhase("sending");
+    setSendError(null);
     try {
       await launch.mutateAsync({
         campaignId,
@@ -447,23 +480,38 @@ export function useSendPointsController(): SendPointsVm {
         })),
       });
       await refreshWorkspace();
+      setSendPhase("success");
       const scheduled = draft.when === "sched";
       toast.success(
         scheduled
           ? `Campaign scheduled — wallet debited. Emails and points will go out at the scheduled time.`
           : `Points sent to ${draft.selRecips.length} recipients! 🎉`,
       );
-      navigate(`/app/shops/${String(shopId)}?tab=sent-gifts`);
+      if (successNavTimer.current) clearTimeout(successNavTimer.current);
+      successNavTimer.current = setTimeout(() => {
+        navigate(`/app/shops/${String(shopId)}?tab=sent-gifts`);
+      }, 1400);
     } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to launch campaign";
+      setSendPhase("error");
+      setSendError(message);
       setSending(false);
-      toast.error(err instanceof Error ? err.message : "Failed to launch campaign");
+      toast.error(message);
     }
   }
 
   return {
     isLoading: (isLoading && !workspace) || hydrating,
-    isSending: sending || launch.isPending,
+    isSending: sending || launch.isPending || sendPhase === "success" || sendPhase === "error",
     isSaving: saving || saveDraft.isPending,
+    sendPhase,
+    sendError,
+    sendRecipients,
+    onDismissSendError: () => {
+      setSendPhase("idle");
+      setSendError(null);
+      setSending(false);
+    },
     step,
     draft,
     dispatch,

@@ -4130,6 +4130,72 @@ a.shop-collection-cell:hover{background:var(--gray-100)}
 .sm-skeleton-line.short{width:55%;margin-bottom:14px}
 @keyframes sm-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
+/* --- Sending points loading (ring + count) --- */
+.spa-root{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:24px;padding:48px 20px;min-height:340px;width:100%;max-width:400px;margin:0 auto;
+}
+.spa-ring-wrap{
+  position:relative;width:112px;height:112px;flex:none;
+}
+.spa-ring-svg{
+  width:100%;height:100%;transform:rotate(-90deg);
+  transform-origin:50% 50%;
+  animation:spa-ring-spin 1.1s linear infinite;
+}
+.spa-ring-wrap--done .spa-ring-svg{animation:none}
+.spa-ring-track{
+  fill:none;stroke:var(--line);stroke-width:4;
+}
+.spa-ring-progress{
+  fill:none;stroke:var(--brand);stroke-width:4;stroke-linecap:round;
+  stroke-dasharray:88 276;
+}
+.spa-ring-wrap--done .spa-ring-progress{
+  stroke:var(--green-600);stroke-dasharray:276;stroke-dashoffset:0;
+}
+.spa-ring-wrap--done .spa-ring-track{stroke:color-mix(in srgb,var(--green-600) 18%,var(--line))}
+.spa-ring-icon{
+  position:absolute;inset:0;display:grid;place-items:center;
+  color:var(--brand-d);
+}
+.spa-ring-wrap--done .spa-ring-icon{color:var(--green-600)}
+.spa-meta{text-align:center;width:100%;max-width:300px}
+.spa-count{
+  margin:0;font-family:var(--disp);font-size:40px;font-weight:800;letter-spacing:-.03em;
+  color:var(--ink);line-height:1.1;
+}
+.spa-count-unit{font-size:16px;font-weight:700;color:var(--ink-3);margin-left:4px}
+.spa-title{margin:14px 0 0;font-size:14px;font-weight:600;color:var(--ink-2)}
+.spa-title--err{color:var(--danger);font-weight:700}
+.spa-title-row{
+  display:inline-flex;align-items:center;gap:6px;color:var(--green-600);font-weight:700;
+}
+.spa-sub{margin:8px 0 0;font-size:13px;color:var(--ink-2);line-height:1.45}
+.spa-bar{
+  margin:14px auto 0;width:100%;max-width:220px;height:4px;border-radius:999px;
+  background:var(--line);overflow:hidden;position:relative;
+}
+.spa-bar-fill{
+  display:block;height:100%;width:36%;border-radius:inherit;background:var(--brand);
+}
+.spa-bar--indeterminate .spa-bar-fill{animation:spa-bar-slide 1.4s ease-in-out infinite}
+.spa-bar--done .spa-bar-fill{width:100%;animation:none;background:var(--green-600)}
+
+@keyframes spa-ring-spin{
+  from{transform:rotate(-90deg)}
+  to{transform:rotate(270deg)}
+}
+@keyframes spa-bar-slide{
+  0%{transform:translateX(-120%)}
+  100%{transform:translateX(280%)}
+}
+
+@media (prefers-reduced-motion: reduce){
+  .spa-ring-svg{animation:none !important}
+  .spa-bar--indeterminate .spa-bar-fill{animation:none !important;width:55%;opacity:.85}
+}
+
 /* --- left sub rail (branded swag / settings) --- */
 .subrail{width:188px;flex:none;display:flex;flex-direction:column;gap:2px}
 .subrail .item{

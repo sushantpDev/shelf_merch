@@ -1,6 +1,7 @@
 import { ArrowLeftRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { LoadingState } from "@/components/LoadingState";
+import { SendingPointsAnimation } from "@/components/SendingPointsAnimation";
 import { inr } from "@/components/platform/platform-ui";
 import { WizardChrome } from "@/features/swag/wizard/WizardChrome";
 import { RecipientPicker } from "@/features/send/RecipientPicker";
@@ -28,6 +29,10 @@ export function SendPointsView({
   isLoading,
   isSending,
   isSaving,
+  sendPhase,
+  sendError,
+  sendRecipients,
+  onDismissSendError,
   step,
   draft,
   dispatch,
@@ -65,12 +70,26 @@ export function SendPointsView({
 
   const pprError = budgetPerRecipientError(pprRaw);
   const budgetStepValid = Boolean(draft.recips) && isValidBudgetPerRecipient(pprRaw);
+  const sendTotalUnits = usesCredits
+    ? Math.round(totals.sub)
+    : Math.round(totals.totalPoints);
 
   if (isLoading) {
     return <LoadingState message="Loading…" fullScreen={false} />;
   }
-  if (isSending) {
-    return <LoadingState message={`Sending ${unitLower}…`} fullScreen={false} />;
+  if (isSending || sendPhase !== "idle") {
+    return (
+      <div className="sm-loading-inline" style={{ minHeight: 420 }}>
+        <SendingPointsAnimation
+          recipients={sendRecipients}
+          totalPoints={sendTotalUnits}
+          isComplete={sendPhase === "success"}
+          error={sendPhase === "error" ? sendError : null}
+          onRetry={onDismissSendError}
+          unitLabel={unitLower}
+        />
+      </div>
+    );
   }
 
   const footer = (
