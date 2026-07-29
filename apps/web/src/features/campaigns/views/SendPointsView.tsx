@@ -14,6 +14,7 @@ import {
   unitLabel,
   unitLabelLower,
 } from "@/lib/storeCurrency";
+import { formatWalletAmount } from "@/lib/walletFormat";
 import {
   budgetPerRecipientError,
   isValidBudgetPerRecipient,
@@ -45,7 +46,6 @@ export function SendPointsView({
   onBack,
   onPayNow,
   onSaveAndExit,
-  onApplyPromo,
   pickerContacts,
   onToggleRecip,
   onSelectAllRecips,
@@ -65,6 +65,17 @@ export function SendPointsView({
 
   const pprError = budgetPerRecipientError(pprRaw);
   const budgetStepValid = Boolean(draft.recips) && isValidBudgetPerRecipient(pprRaw);
+  const payingWithWallet = draft.pay === "wallet";
+  const checkoutWallets = wallets?.length ? wallets : wallet ? [wallet] : [];
+  const activeCheckoutWallet =
+    checkoutWallets.find((w) => w.id === selectedWalletId) ?? checkoutWallets[0];
+  const walletBalance = activeCheckoutWallet ? walletAvailable(activeCheckoutWallet) : 0;
+  const purchaseAmount = Math.round(totals.sub);
+  const remainingBalance = Math.max(0, walletBalance - purchaseAmount);
+  const walletCur = activeCheckoutWallet?.cur ?? "INR";
+  const purchasePointsLabel = usesCredits
+    ? formatPointsQuantity(totals.totalPoints, currencyMode)
+    : `${totals.totalPoints.toLocaleString("en-IN")} Pts`;
 
   if (isLoading) {
     return <LoadingState message="Loading…" fullScreen={false} />;
@@ -331,39 +342,50 @@ export function SendPointsView({
               />
               {/* <SumRow k="Service fee (15%)" v={inr(totals.fee)} /> */}
               {/* <SumRow k="Estimated GST (18%)" v={inr(totals.tax)} /> */}
-              <button
-                type="button"
-                className="lnk"
-                style={{
-                  fontSize: 12.5,
-                  margin: "8px 0",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 0,
-                  display: "block",
-                }}
-                onClick={onApplyPromo}
-              >
-                Apply promo code
-              </button>
               <div className="divider" />
-              <div
-                className="row"
-                style={{ justifyContent: "space-between", alignItems: "center" }}
-              >
-                <b style={{ fontSize: 18 }}>You pay</b>
-                <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)" }}>
-                  {inr(totals.sub)}
-                </b>
-              </div>
+              {payingWithWallet ? (
+                <div style={{ marginTop: 4 }}>
+                  <SumRow
+                    k="Wallet balance"
+                    v={formatWalletAmount(walletBalance, walletCur)}
+                  />
+                  <SumRow
+                    k="Purchase amount"
+                    v={`${inr(purchaseAmount)} (${purchasePointsLabel})`}
+                  />
+                  <SumRow k="Amount paid now" v={inr(0)} />
+                  <div
+                    className="row"
+                    style={{
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "10px 0 0",
+                    }}
+                  >
+                    <b style={{ fontSize: 15 }}>Remaining balance</b>
+                    <b className="num" style={{ fontSize: 18, fontFamily: "var(--disp)" }}>
+                      {formatWalletAmount(remainingBalance, walletCur)}
+                    </b>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="row"
+                  style={{ justifyContent: "space-between", alignItems: "center" }}
+                >
+                  <b style={{ fontSize: 18 }}>You pay</b>
+                  <b className="num" style={{ fontSize: 22, fontFamily: "var(--disp)" }}>
+                    {inr(totals.sub)}
+                  </b>
+                </div>
+              )}
               <button
                 type="button"
                 className="btn btn-brand btn-block btn-lg"
                 style={{ marginTop: 14 }}
                 onClick={onPayNow}
               >
-                Pay now
+                {payingWithWallet ? `Confirm & ${flowTitle}` : `Pay ${inr(purchaseAmount)}`}
               </button>
               <button
                 type="button"

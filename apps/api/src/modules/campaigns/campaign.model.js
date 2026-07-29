@@ -38,6 +38,9 @@ const campaignSchema = new mongoose.Schema(
     creditsPerRecipient: { type: Number, default: 0 }, // INR
     recipientCount: { type: Number, default: 0 }, // cached
     totalBudget: { type: Number, default: 0 }, // checkout grand total charged at launch
+    /** How the send was paid — wallet debit vs Razorpay UPI/card. */
+    paymentMode: { type: String, enum: ['wallet', 'upi', 'card'], default: 'wallet' },
+    razorpayPaymentId: { type: String, default: '' },
     /** Kit packaging chosen at send checkout — drives order amount breakdown. */
     packaging: { type: String, enum: ['none', 'box'], default: 'none' },
     message: {
@@ -57,7 +60,7 @@ const campaignSchema = new mongoose.Schema(
       selectedWalletId: { type: String, default: '' },
       selRecips: [{ type: String }],
       recips: { type: Number, default: 0 },
-      pay: { type: String, enum: ['wallet', 'card'], default: 'wallet' },
+      pay: { type: String, enum: ['wallet', 'upi', 'card'], default: 'wallet' },
       preview: { type: String, enum: ['landing', 'email'], default: 'landing' },
       when: { type: String, enum: ['now', 'scheduled', 'self'], default: 'now' },
     },

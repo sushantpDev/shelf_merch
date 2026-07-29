@@ -137,18 +137,7 @@ export function PaymentPanel({
       )}
 
       {option("upi", "UPI / Netbanking", "Pay instantly via any UPI app or bank")}
-      {option("card", "Debit / credit card", "Visa, Mastercard, RuPay, Amex")}
-
-      {selected === "card" && (
-        <>
-          <div className="field" style={{ marginTop: 6 }}>
-            <input className="inp" placeholder="Name on card" />
-          </div>
-          <div className="field">
-            <input className="inp" placeholder="Card number" />
-          </div>
-        </>
-      )}
+      {option("card", "Debit / credit card", "Pay securely via Razorpay — Visa, Mastercard, RuPay, Amex")}
 
       <div className="field" style={{ marginTop: 14 }}>
         <label className="lbl">Billing</label>

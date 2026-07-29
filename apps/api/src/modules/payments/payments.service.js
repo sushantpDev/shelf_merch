@@ -29,13 +29,21 @@ function mapRazorpayError(err) {
   );
 }
 
-/** §7.11 — create Razorpay order for wallet online funding. */
-export async function createRazorpayOrder({ tenantId, userId, walletId, amountInr }) {
+/** §7.11 — create Razorpay order for wallet online funding or campaign UPI/card spend. */
+export async function createRazorpayOrder({
+  tenantId,
+  userId,
+  walletId,
+  amountInr,
+  purpose = 'wallet_funding',
+}) {
   if (amountInr < 1) throw new ApiError(422, 'Amount must be at least ₹1', 'INVALID_AMOUNT');
 
   const wallet = await Wallet.findOne({ _id: walletId, tenantId });
   if (!wallet) throw new NotFoundError('Wallet not found');
-  if (wallet.fundingDocument.approvalStatus === 'pending') {
+
+  const isCampaignSpend = purpose === 'campaign_spend';
+  if (!isCampaignSpend && wallet.fundingDocument.approvalStatus === 'pending') {
     throw new ApiError(
       422,
       'A funding request is already pending finance approval',
@@ -44,7 +52,8 @@ export async function createRazorpayOrder({ tenantId, userId, walletId, amountIn
   }
 
   const amountPaise = Math.round(amountInr * 100);
-  const receipt = razorpayReceipt('w', walletId);
+  const receipt = razorpayReceipt(isCampaignSpend ? 'c' : 'w', walletId);
+  const relatedType = isCampaignSpend ? 'campaign_spend' : 'wallet_funding';
 
   const razorpay = getRazorpayClient();
   let order;
@@ -57,7 +66,7 @@ export async function createRazorpayOrder({ tenantId, userId, walletId, amountIn
         tenantId: String(tenantId),
         walletId: String(walletId),
         performedBy: String(userId),
-        purpose: 'wallet_funding',
+        purpose: isCampaignSpend ? 'campaign_spend' : 'wallet_funding',
         walletName: wallet.name?.slice(0, 100) ?? '',
       },
     });
@@ -67,7 +76,7 @@ export async function createRazorpayOrder({ tenantId, userId, walletId, amountIn
 
   const payment = await Payment.create({
     tenantId,
-    relatedType: 'wallet_funding',
+    relatedType,
     relatedId: wallet._id,
     userId,
     provider: 'razorpay',
@@ -94,8 +103,8 @@ export function verifyCheckoutSignature(orderId, paymentId, signature) {
 }
 
 /**
- * Frontend checkout success → verify HMAC + queue wallet funding for finance approval.
- * Idempotent with the webhook path (same payment cannot be submitted twice).
+ * Frontend checkout success → verify HMAC.
+ * Wallet funding queues finance approval; campaign spend marks payment captured for launch.
  */
 export async function verifyWalletPayment({
   tenantId,
@@ -105,6 +114,26 @@ export async function verifyWalletPayment({
   razorpaySignature,
 }) {
   verifyPaymentSignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+
+  const pendingOrDone = await Payment.findOne({
+    tenantId,
+    provider: 'razorpay',
+    $or: [
+      { razorpayOrderId },
+      { providerRefId: razorpayOrderId },
+      { razorpayPaymentId },
+      { providerRefId: razorpayPaymentId },
+    ],
+  }).setOptions({ skipTenantGuard: true });
+
+  if (pendingOrDone?.relatedType === 'campaign_spend') {
+    return settleCampaignSpendPayment({
+      payment: pendingOrDone,
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature,
+    });
+  }
 
   const payment = await findWalletFundingPayment(tenantId, razorpayOrderId, razorpayPaymentId);
   if (!payment) throw new NotFoundError('Payment not found');
@@ -158,6 +187,111 @@ export async function verifyWalletPayment({
     status: 'pending_approval',
     pendingApproval: true,
   };
+}
+
+/** Mark a campaign UPI/card payment as succeeded (no wallet credit). */
+async function settleCampaignSpendPayment({
+  payment,
+  razorpayOrderId,
+  razorpayPaymentId,
+  razorpaySignature,
+}) {
+  if (payment.status === 'succeeded') {
+    return {
+      verified: true,
+      idempotent: true,
+      paymentId: String(payment._id),
+      walletId: String(payment.relatedId),
+      amount: payment.amount,
+      status: 'succeeded',
+      pendingApproval: false,
+      purpose: 'campaign_spend',
+    };
+  }
+  if (payment.status === 'failed') {
+    throw new ApiError(422, 'Payment previously marked as failed', 'PAYMENT_FAILED');
+  }
+
+  const razorpay = getRazorpayClient();
+  const rzPayment = await razorpay.payments.fetch(razorpayPaymentId);
+  if (rzPayment.status !== 'captured' && rzPayment.status !== 'authorized') {
+    throw new ApiError(422, 'Payment was not captured', 'PAYMENT_NOT_CAPTURED');
+  }
+  if (rzPayment.order_id !== razorpayOrderId) {
+    throw new ApiError(422, 'Payment order mismatch', 'PAYMENT_ORDER_MISMATCH');
+  }
+  const expectedPaise = Math.round(payment.amount * 100);
+  if (rzPayment.amount !== expectedPaise) {
+    throw new ApiError(422, 'Payment amount does not match order', 'PAYMENT_AMOUNT_MISMATCH');
+  }
+
+  payment.providerRefId = razorpayPaymentId;
+  payment.razorpayOrderId = razorpayOrderId;
+  payment.razorpayPaymentId = razorpayPaymentId;
+  payment.razorpaySignature = razorpaySignature;
+  payment.status = 'succeeded';
+  await payment.save();
+
+  return {
+    verified: true,
+    paymentId: String(payment._id),
+    walletId: String(payment.relatedId),
+    amount: payment.amount,
+    status: 'succeeded',
+    pendingApproval: false,
+    purpose: 'campaign_spend',
+  };
+}
+
+/**
+ * Confirm a captured campaign_spend payment covers `expectedAmountInr` and has not been used.
+ * Returns the payment document for launch to attach to the campaign.
+ */
+export async function assertCampaignSpendPayment({
+  tenantId,
+  expectedAmountInr,
+  razorpayOrderId,
+  razorpayPaymentId,
+  campaignId,
+}) {
+  if (!razorpayOrderId || !razorpayPaymentId) {
+    throw new ApiError(422, 'Razorpay payment is required for UPI / card checkout', 'PAYMENT_REQUIRED');
+  }
+
+  const payment = await Payment.findOne({
+    tenantId,
+    relatedType: 'campaign_spend',
+    status: 'succeeded',
+    $or: [
+      { razorpayPaymentId },
+      { providerRefId: razorpayPaymentId },
+      { razorpayOrderId },
+      { providerRefId: razorpayOrderId },
+    ],
+  }).setOptions({ skipTenantGuard: true });
+
+  if (!payment) {
+    throw new ApiError(422, 'Razorpay payment not found or not verified', 'PAYMENT_NOT_FOUND');
+  }
+  if (payment.razorpayPaymentId && payment.razorpayPaymentId !== razorpayPaymentId) {
+    throw new ApiError(422, 'Payment id mismatch', 'PAYMENT_MISMATCH');
+  }
+  if (Math.abs(payment.amount - expectedAmountInr) > 0.01) {
+    throw new ApiError(422, 'Payment amount does not match order total', 'PAYMENT_AMOUNT_MISMATCH');
+  }
+
+  const Campaign = (await import('../campaigns/campaign.model.js')).Campaign;
+  const reused = await Campaign.findOne({
+    tenantId,
+    razorpayPaymentId,
+    ...(campaignId ? { _id: { $ne: campaignId } } : {}),
+    status: { $in: ['launched', 'redemption_open', 'redemption_closed', 'fulfilled'] },
+  }).lean();
+  if (reused) {
+    throw new ApiError(422, 'This payment was already used for another campaign', 'PAYMENT_ALREADY_USED');
+  }
+
+  return payment;
 }
 
 /** Razorpay order for redemption checkout (points + UPI top-up). */
@@ -373,12 +507,12 @@ async function processPaymentCaptured(entity, rawEvent) {
   }
 
   if (!payment) {
-    // Campaign checkout payments are settled via frontend verify, not wallet credit.
+    // Campaign checkout / spend payments are settled via frontend verify, not wallet credit.
     const other = await Payment.findOne({
       provider: 'razorpay',
       $or: [{ razorpayOrderId: orderId }, { providerRefId: orderId }, { providerRefId: paymentId }],
     }).setOptions({ skipTenantGuard: true });
-    if (other?.relatedType === 'campaign_checkout') {
+    if (other?.relatedType === 'campaign_checkout' || other?.relatedType === 'campaign_spend') {
       if (other.status !== 'succeeded') {
         other.providerRefId = paymentId;
         other.razorpayPaymentId = paymentId;
@@ -386,7 +520,7 @@ async function processPaymentCaptured(entity, rawEvent) {
         other.rawWebhookPayload = rawEvent;
         await other.save();
       }
-      return { handled: true, relatedType: 'campaign_checkout', paymentId: String(other._id) };
+      return { handled: true, relatedType: other.relatedType, paymentId: String(other._id) };
     }
     logger.warn({ orderId, paymentId }, 'Payment record not found for webhook');
     return { handled: false, reason: 'payment_not_found' };

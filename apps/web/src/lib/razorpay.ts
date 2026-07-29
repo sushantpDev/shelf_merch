@@ -11,7 +11,13 @@ type RazorpayCheckoutOptions = {
   order_id: string;
   name: string;
   description?: string;
-  prefill?: { name?: string; email?: string; contact?: string };
+  prefill?: { name?: string; email?: string; contact?: string; method?: string };
+  method?: {
+    netbanking?: boolean;
+    card?: boolean;
+    upi?: boolean;
+    wallet?: boolean;
+  };
   theme?: { color?: string };
   handler: (response: RazorpayHandlerResponse) => void;
   modal?: { ondismiss?: () => void };
@@ -58,6 +64,8 @@ export async function openRazorpayCheckout(opts: {
   walletName?: string;
   title?: string;
   description?: string;
+  /** Prefer a payment family in checkout (card vs UPI/netbanking). */
+  preferredMethod?: "card" | "upi";
   onSuccess: (response: RazorpayHandlerResponse) => void | Promise<void>;
   onDismiss?: () => void;
 }): Promise<void> {
@@ -67,6 +75,13 @@ export async function openRazorpayCheckout(opts: {
     throw new Error("Razorpay checkout is unavailable");
   }
 
+  const methodPreference =
+    opts.preferredMethod === "card"
+      ? { card: true, netbanking: false, upi: false, wallet: false }
+      : opts.preferredMethod === "upi"
+        ? { card: false, netbanking: true, upi: true, wallet: false }
+        : undefined;
+
   return new Promise((resolve, reject) => {
     const rzp = new RazorpayCtor({
       key: opts.order.keyId,
@@ -75,6 +90,8 @@ export async function openRazorpayCheckout(opts: {
       order_id: opts.order.orderId,
       name: opts.title ?? "Shelf Merch",
       description: opts.description ?? (opts.walletName ? `Add funds to ${opts.walletName}` : "Complete your order"),
+      ...(methodPreference ? { method: methodPreference } : {}),
+      ...(opts.preferredMethod ? { prefill: { method: opts.preferredMethod } } : {}),
       theme: { color: "#3D5FD9" },
       handler: (response) => {
         Promise.resolve(opts.onSuccess(response)).then(resolve).catch(reject);
