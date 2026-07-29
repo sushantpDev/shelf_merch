@@ -554,7 +554,6 @@ export function useSendPointsController(): SendPointsVm {
       setSendError(message);
       setSending(false);
 
-      const message = err instanceof Error ? err.message : "Failed to launch campaign";
       if (message === "Payment cancelled") {
         toast.message("Payment cancelled");
         return;
