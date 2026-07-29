@@ -161,4 +161,54 @@ export async function uploadFile({ tenantId, kind, file }) {
   return uploadLocal(key, file.buffer);
 }
 
+/** Upload a raw buffer (e.g. generated PDF) to configured storage. */
+export async function uploadBuffer({
+  tenantId,
+  kind,
+  buffer,
+  filename,
+  contentType = 'application/pdf',
+}) {
+  const ext = path.extname(filename) || '.pdf';
+  const key = `${tenantId}/${kind}/${crypto.randomBytes(12).toString('hex')}${ext}`;
+
+  if (env.STORAGE_DRIVER === 'local') {
+    return uploadLocal(key, buffer);
+  }
+
+  const { PutObjectCommand } = await import('@aws-sdk/client-s3');
+
+  if (useR2()) {
+    const client = await getR2();
+    await client.send(
+      new PutObjectCommand({
+        Bucket: env.R2_BUCKET,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      }),
+    );
+    return { key, url: `${env.R2_ENDPOINT}/${env.R2_BUCKET}/${key}` };
+  }
+
+  if (useS3()) {
+    try {
+      const client = await getS3();
+      await client.send(
+        new PutObjectCommand({
+          Bucket: env.S3_BUCKET_NAME,
+          Key: key,
+          Body: buffer,
+          ContentType: contentType,
+        }),
+      );
+      return { key, url: s3PublicUrl(key) };
+    } catch (err) {
+      mapS3Error(err);
+    }
+  }
+
+  return uploadLocal(key, buffer);
+}
+
 export { LOCAL_UPLOAD_DIR };

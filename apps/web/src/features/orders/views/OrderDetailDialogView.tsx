@@ -12,6 +12,7 @@ import type { UiOrder } from "../model";
 type Props = {
   order: UiOrder | null;
   onOpenChange: (open: boolean) => void;
+  onViewInvoice: () => void;
   onDownloadInvoice: () => void;
   onTrackShipment: () => void;
 };
@@ -20,6 +21,7 @@ type Props = {
 export function OrderDetailDialogView({
   order,
   onOpenChange,
+  onViewInvoice,
   onDownloadInvoice,
   onTrackShipment,
 }: Props) {
@@ -64,6 +66,9 @@ export function OrderDetailDialogView({
             </div>
 
             <div className="row" style={{ marginTop: 18, gap: 10 }}>
+              <button type="button" className="btn btn-ghost btn-block" onClick={onViewInvoice}>
+                View invoice
+              </button>
               <button type="button" className="btn btn-ghost btn-block" onClick={onDownloadInvoice}>
                 Download invoice
               </button>

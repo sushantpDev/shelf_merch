@@ -800,7 +800,7 @@ export async function savePointsCampaignDraftApi(payload: {
     selectedWalletId: string;
     selRecips: string[];
     recips: number;
-    pay: "wallet" | "card";
+    pay: "wallet" | "upi" | "card";
     preview: "landing" | "email";
     when: "now" | "scheduled" | "self";
   };
@@ -840,10 +840,24 @@ export async function launchPointsCampaignApi(payload: {
   message: { from: string; body: string };
   schedule?: { mode: "now" | "scheduled" | "self"; sendAt?: string | null; timezone?: string };
   recipients: Array<{ name: string; email: string; phone?: string; contactId?: string }>;
+  paymentMode?: "wallet" | "upi" | "card";
+  razorpay?: {
+    orderId: string;
+    paymentId: string;
+    signature?: string;
+  };
 }) {
   let campaignId = payload.campaignId;
   let existingStatus: string | undefined;
   const schedule = payload.schedule ?? { mode: "now" as const };
+  const paymentMode = payload.paymentMode ?? "wallet";
+  const razorpayBody =
+    payload.razorpay && paymentMode !== "wallet"
+      ? {
+          razorpay_order_id: payload.razorpay.orderId,
+          razorpay_payment_id: payload.razorpay.paymentId,
+        }
+      : {};
 
   if (campaignId) {
     const existing = await apiFetch<Record<string, unknown>>(`/campaigns/${campaignId}`);
@@ -897,6 +911,8 @@ export async function launchPointsCampaignApi(payload: {
       body: JSON.stringify({
         creditsPerRecipient: payload.creditsPerRecipient,
         ...(payload.totalBudget != null ? { totalBudget: payload.totalBudget } : {}),
+        paymentMode,
+        ...razorpayBody,
       }),
     });
   }
@@ -904,6 +920,10 @@ export async function launchPointsCampaignApi(payload: {
   const launched = await apiFetch<Record<string, unknown>>(`/campaigns/${campaignId}/launch`, {
     method: "POST",
     idempotencyKey: `launch-${campaignId}-${Date.now()}`,
+    body: JSON.stringify({
+      paymentMode,
+      ...razorpayBody,
+    }),
   });
   return mapCampaign(launched);
 }
@@ -1029,11 +1049,12 @@ export type RazorpayOrderResult = {
 export async function createRazorpayOrderApi(
   walletId: string,
   amount: number,
+  purpose: "wallet_funding" | "campaign_spend" = "wallet_funding",
 ): Promise<RazorpayOrderResult> {
   return apiFetch("/payments/razorpay/order", {
     method: "POST",
-    idempotencyKey: `rzp-order-${walletId}-${amount}-${Date.now()}`,
-    body: JSON.stringify({ walletId, amount }),
+    idempotencyKey: `rzp-order-${walletId}-${amount}-${purpose}-${Date.now()}`,
+    body: JSON.stringify({ walletId, amount, purpose }),
   });
 }
 

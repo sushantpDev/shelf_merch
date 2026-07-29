@@ -1,6 +1,7 @@
 import { Order, sanitizeOrderItems } from './order.model.js';
 import { Campaign } from '../campaigns/campaign.model.js';
 import { Recipient } from '../campaigns/recipient.model.js';
+import { OrderInvoice } from '../orderInvoices/orderInvoice.model.js';
 import { transitionState, validNextStatuses } from '../../services/stateMachine.service.js';
 import { amountBreakdownForKitCampaign } from '../../services/pricing.service.js';
 import { ApiError, NotFoundError, ForbiddenError } from '../../utils/errors.js';
@@ -97,17 +98,27 @@ export async function listOrders({ tenantId, user, query }) {
   ]);
 
   const campaignIds = [...new Set(items.map((o) => String(o.campaignId)))];
-  const campaigns = await Campaign.find({ _id: { $in: campaignIds }, tenantId }).select(
-    'name entityId type totalBudget recipientCount fulfillmentMode packaging',
-  );
+  const orderIds = items.map((o) => o._id);
+  const [campaigns, invoices] = await Promise.all([
+    Campaign.find({ _id: { $in: campaignIds }, tenantId }).select(
+      'name entityId type totalBudget recipientCount fulfillmentMode packaging shopId',
+    ),
+    OrderInvoice.find({ orderId: { $in: orderIds }, tenantId })
+      .select('orderId pdfUrl invoiceNumber')
+      .lean(),
+  ]);
   const campaignById = Object.fromEntries(campaigns.map((c) => [String(c._id), c]));
+  const invoiceByOrderId = Object.fromEntries(invoices.map((i) => [String(i.orderId), i]));
 
   const enriched = items.map((o) => {
     const campaign = campaignById[String(o.campaignId)];
     const amountBreakdown = alignKitOrderBreakdown(o, campaign);
+    const invoice = invoiceByOrderId[String(o._id)];
     return withMeta(o, {
       campaignName: campaign?.name ?? '',
       amountBreakdown,
+      invoicePdfUrl: invoice?.pdfUrl || '',
+      invoiceNumber: invoice?.invoiceNumber || o.orderNumber,
     });
   });
 
@@ -119,11 +130,12 @@ export async function getOrder({ tenantId, user, orderId }) {
   if (!order) throw new NotFoundError('Order not found');
   await assertOrderAccess({ tenantId, user, order });
 
-  const [campaign, recipient] = await Promise.all([
+  const [campaign, recipient, invoice] = await Promise.all([
     Campaign.findOne({ _id: order.campaignId, tenantId }).select(
-      'name entityId type totalBudget recipientCount fulfillmentMode packaging',
+      'name entityId type totalBudget recipientCount fulfillmentMode packaging shopId',
     ),
     Recipient.findOne({ _id: order.recipientId, tenantId }).select('name email'),
+    OrderInvoice.findOne({ orderId: order._id, tenantId }).select('pdfUrl invoiceNumber').lean(),
   ]);
 
   const lean = order.toObject();
@@ -133,6 +145,8 @@ export async function getOrder({ tenantId, user, orderId }) {
     campaignName: campaign?.name ?? '',
     recipient: recipient ? { name: recipient.name, email: recipient.email } : null,
     amountBreakdown,
+    invoicePdfUrl: invoice?.pdfUrl || '',
+    invoiceNumber: invoice?.invoiceNumber || order.orderNumber,
   });
 }
 

@@ -75,7 +75,18 @@ export const allocateCreditsSchema = z.object({
     .min(250, 'Minimum of ₹250 must be allocated'),
   /** Full checkout total in INR (incl. fees/tax). Falls back to credits × recipients. */
   totalBudget: z.number().positive().optional(),
+  paymentMode: z.enum(['wallet', 'upi', 'card']).optional().default('wallet'),
+  razorpay_order_id: z.string().min(1).optional(),
+  razorpay_payment_id: z.string().min(1).optional(),
 });
+
+export const launchCampaignSchema = z
+  .object({
+    paymentMode: z.enum(['wallet', 'upi', 'card']).optional().default('wallet'),
+    razorpay_order_id: z.string().min(1).optional(),
+    razorpay_payment_id: z.string().min(1).optional(),
+  })
+  .default({});
 
 export const campaignIdParams = z.object({ id: objectId });
 
@@ -105,7 +116,7 @@ export const savePointsDraftSchema = z.object({
       selectedWalletId: z.string().optional(),
       selRecips: z.array(z.string()).optional(),
       recips: z.number().nonnegative().optional(),
-      pay: z.enum(['wallet', 'card']).optional(),
+      pay: z.enum(['wallet', 'upi', 'card']).optional(),
       preview: z.enum(['landing', 'email']).optional(),
       when: z.enum(['now', 'scheduled', 'self']).optional(),
     })

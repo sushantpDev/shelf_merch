@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { apiFetch } from "@/services/api";
 import type { UiOrder } from "../model";
 
 export type OrdersVm = {
@@ -13,9 +15,49 @@ export type OrdersVm = {
   onQuery: (query: string) => void;
   onSelect: (order: UiOrder) => void;
   onDialogOpenChange: (open: boolean) => void;
-  onDownloadInvoice: () => void;
+  onViewInvoice: (order: UiOrder) => void;
+  onDownloadInvoice: (order: UiOrder) => void;
   onTrackShipment: () => void;
 };
+
+function invoiceMediaUrl(url?: string) {
+  const raw = url?.trim();
+  if (!raw) return "";
+  return resolveMediaUrl(raw);
+}
+
+async function resolveInvoiceUrl(order: UiOrder): Promise<string> {
+  // Always hit generate so older PDFs pick up layout/pricing fixes.
+  try {
+    const invoice = await apiFetch<{ pdfUrl?: string }>(
+      `/order-invoices/by-order/${order.id}/generate`,
+      { method: "POST" },
+    );
+    const url = invoiceMediaUrl(invoice.pdfUrl);
+    if (url) {
+      order.invoicePdfUrl = invoice.pdfUrl || url;
+      return url;
+    }
+  } catch {
+    // Fall through to cached URL if generate fails.
+  }
+  return invoiceMediaUrl(order.invoicePdfUrl);
+}
+
+function openInvoice(url: string) {
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+function downloadInvoice(url: string, filename: string) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
 
 /** Controller for the orders screen: workspace slice, search filter, detail dialog. */
 export function useOrdersController(): OrdersVm {
@@ -31,6 +73,32 @@ export function useOrdersController(): OrdersVm {
       (o) => o.name.toLowerCase().includes(q) || o.orderNumber.toLowerCase().includes(q),
     );
   }, [workspace?.orders, query]);
+
+  async function onViewInvoice(order: UiOrder) {
+    const toastId = toast.loading("Opening invoice…");
+    const url = await resolveInvoiceUrl(order);
+    toast.dismiss(toastId);
+    if (!url) {
+      toast.message("Invoice is being generated", {
+        description: "Try again in a moment if this order was just placed.",
+      });
+      return;
+    }
+    openInvoice(url);
+  }
+
+  async function onDownloadInvoice(order: UiOrder) {
+    const toastId = toast.loading("Preparing invoice…");
+    const url = await resolveInvoiceUrl(order);
+    toast.dismiss(toastId);
+    if (!url) {
+      toast.message("Invoice is being generated", {
+        description: "Try again in a moment if this order was just placed.",
+      });
+      return;
+    }
+    downloadInvoice(url, `${order.invoiceNumber || order.orderNumber}.pdf`);
+  }
 
   return {
     isLoading: isLoading && !workspace,
@@ -49,7 +117,12 @@ export function useOrdersController(): OrdersVm {
     onDialogOpenChange: (open) => {
       if (!open) setSelected(null);
     },
-    onDownloadInvoice: () => toast.success("Invoice downloaded"),
+    onViewInvoice: (order) => {
+      void onViewInvoice(order);
+    },
+    onDownloadInvoice: (order) => {
+      void onDownloadInvoice(order);
+    },
     onTrackShipment: () => toast("Opening carrier tracking…"),
   };
 }

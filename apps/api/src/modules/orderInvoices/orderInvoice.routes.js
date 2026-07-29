@@ -13,6 +13,7 @@ const router = Router();
 router.use(authenticate, resolveTenant, requireTenantContext);
 
 const canRead = tenantArea('orders', 'read');
+const canWrite = tenantArea('orders', 'write');
 
 const orderIdParams = z.object({ orderId: objectId });
 
@@ -21,7 +22,26 @@ router.get(
   canRead,
   validate({ params: orderIdParams }),
   asyncHandler(async (req, res) => {
-    res.json(await service.getOrderInvoiceByOrderId({ tenantId: req.tenantId, orderId: req.params.orderId }));
+    res.json(
+      await service.getOrderInvoiceByOrderId({
+        tenantId: req.tenantId,
+        orderId: req.params.orderId,
+      }),
+    );
+  }),
+);
+
+/** Generate (or return existing) invoice PDF for an order — fixes pre-existing orders. */
+router.post(
+  '/by-order/:orderId/generate',
+  canWrite,
+  validate({ params: orderIdParams }),
+  asyncHandler(async (req, res) => {
+    const invoice = await service.ensureOrderInvoice({
+      tenantId: req.tenantId,
+      orderId: req.params.orderId,
+    });
+    res.status(201).json(invoice);
   }),
 );
 
