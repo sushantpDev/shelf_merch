@@ -7,7 +7,7 @@ import type { UiContact } from "../model";
 import { contactToForm, ROLES } from "../types";
 
 export type ContactsTab = "permissions" | "directory";
-export type SortKey = "email" | "name" | "integrated";
+export type SortKey = "email" | "name";
 export type SortDir = "asc" | "desc";
 
 export type RoleCounts = { admins: number; senders: number; members: number };
@@ -49,11 +49,6 @@ export type ContactsVm = {
   onFooterLink: (link: string) => void;
 };
 
-export function integratedLabel(c: UiContact) {
-  if (c.employeeCode) return "HRIS";
-  return "—";
-}
-
 function roleCounts(contacts: UiContact[]): RoleCounts {
   let admins = 0;
   let senders = 0;
@@ -69,8 +64,8 @@ function roleCounts(contacts: UiContact[]): RoleCounts {
 function sortContacts(list: UiContact[], key: SortKey, dir: SortDir) {
   const mul = dir === "asc" ? 1 : -1;
   return [...list].sort((a, b) => {
-    const av = key === "email" ? a.email : key === "name" ? a.name : integratedLabel(a);
-    const bv = key === "email" ? b.email : key === "name" ? b.name : integratedLabel(b);
+    const av = key === "email" ? a.email : a.name;
+    const bv = key === "email" ? b.email : b.name;
     return av.localeCompare(bv, undefined, { sensitivity: "base" }) * mul;
   });
 }
@@ -152,25 +147,32 @@ export function useContactsController(): ContactsVm {
     }
   }
 
-  async function onDelete(contact: UiContact) {
+  function onDelete(contact: UiContact) {
     if (contact.role === "Owner") {
       toast.error("The workspace owner contact cannot be deleted");
       return;
     }
     const label = contact.name || contact.email;
-    if (!window.confirm(`Delete contact "${label}"? This cannot be undone.`)) return;
-    try {
-      await deleteContact.mutateAsync(contact.id);
-      setSelected((prev) => {
-        const next = new Set(prev);
-        next.delete(contact.id);
-        return next;
-      });
-      if (editing?.id === contact.id) setEditing(null);
-      toast.success("Contact deleted");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not delete contact");
-    }
+    toast(`Delete contact "${label}"? This cannot be undone.`, {
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          try {
+            await deleteContact.mutateAsync(contact.id);
+            setSelected((prev) => {
+              const next = new Set(prev);
+              next.delete(contact.id);
+              return next;
+            });
+            if (editing?.id === contact.id) setEditing(null);
+            toast.success("Contact deleted");
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Could not delete contact");
+          }
+        },
+      },
+      cancel: { label: "Cancel", onClick: () => {} },
+    });
   }
 
   return {
