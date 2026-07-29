@@ -14,7 +14,6 @@ import { ContactFormDialog } from "../ContactFormDialog";
 import { ROLES } from "../types";
 import type { UiContact } from "../model";
 import {
-  integratedLabel,
   type ContactsVm,
   type SortKey,
 } from "../controllers/useContactsController";
@@ -239,14 +238,6 @@ export function ContactsView(vm: ContactsVm) {
                         />
                         <th>Role</th>
                         <th>Dept</th>
-                        {vm.tab === "permissions" && (
-                          <SortHead
-                            label="Integrated with"
-                            col="integrated"
-                            sortKey={vm.sortKey}
-                            onToggleSort={vm.onToggleSort}
-                          />
-                        )}
                         <th>Home address</th>
                         <th className="contacts-th-actions" aria-label="Actions" />
                       </tr>
@@ -283,14 +274,7 @@ export function ContactsView(vm: ContactsVm) {
                               </select>
                             )}
                           </td>
-                          {vm.tab === "permissions" ? (
-                            <>
-                              <td className="contacts-td-muted">{emptyCell(c.department)}</td>
-                              <td className="contacts-td-muted">{integratedLabel(c)}</td>
-                            </>
-                          ) : (
-                            <td className="contacts-td-muted">{emptyCell(c.department)}</td>
-                          )}
+                          <td className="contacts-td-muted">{emptyCell(c.department)}</td>
                           <td className="contacts-td-muted">{emptyCell(c.loc)}</td>
                           <td className="contacts-td-actions">
                             {vm.canManageContacts ? (
