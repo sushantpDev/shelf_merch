@@ -213,6 +213,34 @@ export const appRouter = createBrowserRouter([
         lazy: page(() => import("@/features/legal/TermsOfServicePage"), "TermsOfServicePage"),
       },
       {
+        path: "docs/zoho-people",
+        lazy: page(
+          () => import("@/features/docs/zoho-people/ZohoPeopleDocsHomePage"),
+          "ZohoPeopleDocsHomePage",
+        ),
+      },
+      {
+        path: "docs/zoho-people/user-guide",
+        lazy: page(
+          () => import("@/features/docs/zoho-people/ZohoPeopleUserGuidePage"),
+          "ZohoPeopleUserGuidePage",
+        ),
+      },
+      {
+        path: "docs/zoho-people/admin-guide",
+        lazy: page(
+          () => import("@/features/docs/zoho-people/ZohoPeopleAdminGuidePage"),
+          "ZohoPeopleAdminGuidePage",
+        ),
+      },
+      {
+        path: "case-studies/zoho-people",
+        lazy: page(
+          () => import("@/features/docs/case-studies/ZohoPeopleExampleWorkflowPage"),
+          "ZohoPeopleExampleWorkflowPage",
+        ),
+      },
+      {
         path: "auth/google",
         lazy: page(() => import("@/features/auth/GoogleAuthCallbackPage"), "GoogleAuthCallbackPage"),
       },

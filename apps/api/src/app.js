@@ -69,6 +69,7 @@ import {
 } from './middleware/zohoPeopleEmbed.middleware.js';
 import { sendPrivacyPolicy } from './modules/legal/privacyPolicy.controller.js';
 import { sendTermsOfService } from './modules/legal/termsOfService.controller.js';
+import { sendDocsPage, DOCS_PUBLIC_ROUTES } from './modules/docs/docs.controller.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIST = path.resolve(__dirname, '../../web/dist');
@@ -319,13 +320,18 @@ export function createApp() {
   app.get('/legal/privacy-policy', sendPrivacyPolicy);
   app.get('/legal/terms-of-service', sendTermsOfService);
 
+  /** Public Zoho People documentation — full HTML for Marketplace reviewers & customers. */
+  for (const routePath of DOCS_PUBLIC_ROUTES) {
+    app.get(routePath, sendDocsPage(routePath));
+  }
+
   // Production: serve the Vite SPA from the same origin as the API.
   if (env.NODE_ENV === 'production' && existsSync(WEB_DIST)) {
     app.use(express.static(WEB_DIST, { index: false, maxAge: '1d' }));
     app.get('*', (req, res, next) => {
       if (req.method !== 'GET' && req.method !== 'HEAD') return next();
       if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) return next();
-      // /zoho/people(*) and /legal/* are registered above.
+      // /zoho/people(*), /legal/*, /docs/*, and /case-studies/* are registered above.
       res.sendFile('index.html', { root: WEB_DIST });
     });
   }

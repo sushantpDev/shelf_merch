@@ -170,8 +170,9 @@ const FOOTER_COLUMNS = [
     title: "Resources",
     links: [
       { label: "Help Center", href: "#" },
+      { label: "Documentation", href: "/docs/zoho-people" },
       { label: "Blog", href: "#" },
-      { label: "Case Studies", href: "#" },
+      { label: "Case Studies", href: "/case-studies/zoho-people" },
       { label: "Partnerships", href: "#" },
       { label: "Videos", href: "#" },
       { label: "Contact Us", href: "mailto:support@shelfmerch.com" },
