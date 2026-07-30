@@ -38,23 +38,27 @@ export function sumKitProductPrices(
 
 /**
  * Curated kit checkout — approxValueInr is already GST-inclusive (18%).
- * Grand total = recipients × price per kit. Shipping shown as free.
+ * When packaging is included, add premium box (ex-GST) + 18% GST per kit.
  */
 export function curatedKitSendTotals(
   recipientCount: number,
   pricePerKitInr: number,
+  packaging: "none" | "box" = "none",
 ): KitSendTotals {
   const qty = Math.max(0, recipientCount);
-  const costPerKit = Math.max(0, Math.round(pricePerKitInr));
+  const kitIncl = Math.max(0, Math.round(pricePerKitInr));
+  const pkgPerKit = packaging === "box" ? PREMIUM_BOX_PER_RECIP : 0;
+  const pkgInclPerKit = pkgPerKit > 0 ? Math.round(pkgPerKit * (1 + GST_RATE)) : 0;
+  const costPerKit = kitIncl + pkgInclPerKit;
   const total = costPerKit * qty;
   const tax = Math.ceil(total - total / (1 + GST_RATE));
   return {
     qty,
-    unitPrice: costPerKit,
-    pkgPerKit: 0,
+    unitPrice: kitIncl,
+    pkgPerKit,
     costPerKit,
     sub: total,
-    pkgCost: 0,
+    pkgCost: pkgInclPerKit * qty,
     fee: 0,
     ship: 0,
     tax,

@@ -34,7 +34,7 @@ export function gateWalletForCuratedKitSend(
     return { allowed: false, reason: "no_wallet" };
   }
 
-  const required = curatedKitSendTotals(1, pricePerKitInr).total;
+  const required = curatedKitSendTotals(1, pricePerKitInr, "box").total;
   const available = spendableForWallet(workspace, wallet.id);
   if (available < required) {
     return {

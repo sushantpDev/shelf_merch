@@ -323,6 +323,8 @@ export function renderOrderInvoicePdf(data) {
     if (gst.sgst25 > 0) gstRows.push(['SGST @2.5%', gst.sgst25]);
     if (gst.cgst9 > 0) gstRows.push(['CGST @9%', gst.cgst9]);
     if (gst.sgst9 > 0) gstRows.push(['SGST @9%', gst.sgst9]);
+    if (gst.packagingCgst9 > 0) gstRows.push(['CGST @9% (Packaging)', gst.packagingCgst9]);
+    if (gst.packagingSgst9 > 0) gstRows.push(['SGST @9% (Packaging)', gst.packagingSgst9]);
     if (data.roundOff) gstRows.push(['Round Off', data.roundOff]);
 
     for (const [label, amt] of gstRows) {
@@ -500,7 +502,13 @@ export function renderOrderInvoicePdf(data) {
 export function computeInvoiceTotals(lines) {
   const taxableTotal = lines.reduce((s, l) => s + l.amount, 0);
   const bodyGst = summarizeBodyGst(lines);
-  const gstTotal = bodyGst.cgst25 + bodyGst.sgst25 + bodyGst.cgst9 + bodyGst.sgst9;
+  const gstTotal =
+    bodyGst.cgst25 +
+    bodyGst.sgst25 +
+    bodyGst.cgst9 +
+    bodyGst.sgst9 +
+    (bodyGst.packagingCgst9 || 0) +
+    (bodyGst.packagingSgst9 || 0);
   const rawTotal = taxableTotal + gstTotal;
   // Round up to the next rupee when there are paise — never reduce the total.
   const paise = Math.round(rawTotal * 100);

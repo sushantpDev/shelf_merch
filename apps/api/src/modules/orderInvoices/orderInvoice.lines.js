@@ -4,13 +4,21 @@ import {
   gstProfileForCategory,
   lineTaxAmounts,
   priceWithoutGst,
+  formatHsn,
 } from './orderInvoice.pricing.js';
 
-async function categoryByProductId(ids) {
+async function catalogMetaByProductId(ids) {
   const unique = [...new Set(ids.filter(Boolean).map(String))];
   if (!unique.length) return new Map();
-  const rows = await CatalogProduct.find({ _id: { $in: unique } }).select('category').lean();
-  return new Map(rows.map((r) => [String(r._id), r.category || '']));
+  const rows = await CatalogProduct.find({ _id: { $in: unique } })
+    .select('category hsnCode')
+    .lean();
+  return new Map(
+    rows.map((r) => [
+      String(r._id),
+      { category: r.category || '', hsnCode: String(r.hsnCode || '').trim() },
+    ]),
+  );
 }
 
 function mergeItemsByName(items = []) {
@@ -55,51 +63,96 @@ function kitUnitPriceInclGst(order, campaign, kitEntries) {
 
 /**
  * Build invoice line items for PDF + tax summary.
- * Packaging is folded into the kit/product rate — never a separate line.
+ * Kit packaging (₹49/recipient ex-GST) is always a separate line with 18% GST.
  * @returns {Promise<Array<{name, hsn, qty, rate, amount, profile}>>}
  */
 export async function buildOrderInvoiceLines({ order, campaign, kit, kitEntries = [] }) {
-  const packagingIncl = Math.round(Number(order.amountBreakdown?.packaging) || 0);
+  // Kit campaigns store packaging as ex-GST (PREMIUM_BOX_PER_RECIP × qty).
+  const packagingExGst = Math.round(Number(order.amountBreakdown?.packaging) || 0);
   const lines = [];
+  const isKitOrder = campaign?.type === 'kit' && Boolean(campaign?.kitId);
 
-  if (campaign.type === 'kit' && campaign.kitId && kit) {
+  if (Array.isArray(order.items) && order.items.length > 0) {
+    const merged = mergeItemsByName(order.items);
+    const catalogMeta = await catalogMetaByProductId(merged.map((m) => m.catalogProductId));
+    for (const item of merged) {
+      const meta = catalogMeta.get(String(item.catalogProductId)) || {};
+      const category = meta.category || '';
+      const profile = gstProfileForCategory(category);
+      // Curated kit single-line orders store approxValue as GST-inclusive unit price.
+      // Catalog product lines are also GST-inclusive.
+      const rate = priceWithoutGst(item.unitPriceInr, profile);
+      lines.push({
+        name: item.name,
+        hsn: String(item.hsnCode || meta.hsnCode || '').trim(),
+        qty: item.qty,
+        rate,
+        amount: rate * item.qty,
+        profile,
+      });
+    }
+  } else if (isKitOrder && kit) {
     const qty = kitQuantity(order, campaign);
-    const unitIncl = kitUnitPriceInclGst(order, campaign, kitEntries);
-    const packagingPerUnitIncl = qty > 0 ? packagingIncl / qty : packagingIncl;
-    const combinedIncl = Math.round(unitIncl + packagingPerUnitIncl);
-    const rate = priceWithoutGst(combinedIncl, 'kit');
-    lines.push({
-      name: kit.name || campaign.name || 'Kit',
-      hsn: '',
-      qty,
-      rate,
-      amount: rate * qty,
-      profile: 'kit',
-    });
-    return lines;
+
+    if (kitEntries.length > 0) {
+      for (const { ref, product } of kitEntries) {
+        const category = product.category || '';
+        const profile = gstProfileForCategory(category);
+        const unitIncl = Math.round(Number(product.basePriceInr) || 0);
+        const rate = priceWithoutGst(unitIncl, profile);
+        lines.push({
+          name: ref.name || product.name || 'Item',
+          hsn: String(product.hsnCode || '').trim(),
+          qty,
+          rate,
+          amount: rate * qty,
+          profile,
+        });
+      }
+    } else {
+      // Curated kit with no catalog products — kit price only (packaging is separate).
+      const unitIncl = kitUnitPriceInclGst(order, campaign, kitEntries);
+      const rate = priceWithoutGst(unitIncl, 'kit');
+      lines.push({
+        name: kit.name || campaign.name || 'Kit',
+        hsn: '',
+        qty,
+        rate,
+        amount: rate * qty,
+        profile: 'kit',
+      });
+    }
+  } else {
+    const merged = mergeItemsByName(order.items);
+    const catalogMeta = await catalogMetaByProductId(merged.map((m) => m.catalogProductId));
+    for (const item of merged) {
+      const meta = catalogMeta.get(String(item.catalogProductId)) || {};
+      const category = meta.category || '';
+      const profile = gstProfileForCategory(category);
+      const rate = priceWithoutGst(item.unitPriceInr, profile);
+      lines.push({
+        name: item.name,
+        hsn: String(item.hsnCode || meta.hsnCode || '').trim(),
+        qty: item.qty,
+        rate,
+        amount: rate * item.qty,
+        profile,
+      });
+    }
   }
 
-  const merged = mergeItemsByName(order.items);
-  const categories = await categoryByProductId(merged.map((m) => m.catalogProductId));
-  for (const item of merged) {
-    const category = categories.get(String(item.catalogProductId)) || '';
-    const profile = gstProfileForCategory(category);
-    const rate = priceWithoutGst(item.unitPriceInr, profile);
+  // Packaging as its own line (ex-GST ₹49/kit). Taxed at 18% (CGST 9% + SGST 9%).
+  if (packagingExGst > 0) {
+    const pkgQty = isKitOrder ? kitQuantity(order, campaign) : 1;
+    const pkgRate = pkgQty > 0 ? Math.round(packagingExGst / pkgQty) : packagingExGst;
     lines.push({
-      name: item.name,
+      name: 'Packaging',
       hsn: '',
-      qty: item.qty,
-      rate,
-      amount: rate * item.qty,
-      profile,
+      qty: pkgQty,
+      rate: pkgRate,
+      amount: pkgRate * pkgQty,
+      profile: 'packaging',
     });
-  }
-
-  // Fold packaging into the first product line (ex-GST) when present.
-  if (packagingIncl > 0 && lines.length > 0) {
-    const pkgRate = priceWithoutGst(packagingIncl, 'packaging');
-    lines[0].rate += pkgRate;
-    lines[0].amount += pkgRate;
   }
 
   return lines;
@@ -120,13 +173,28 @@ export function aggregateGstRows(lines) {
   return [...buckets.values()];
 }
 
+/**
+ * Body GST rows under the items table.
+ * Packaging CGST/SGST are kept separate from product/kit GST so each
+ * appears as its own CGST @9% / SGST @9% pair.
+ */
 export function summarizeBodyGst(lines) {
-  const totals = { cgst25: 0, sgst25: 0, cgst9: 0, sgst9: 0 };
+  const totals = {
+    cgst25: 0,
+    sgst25: 0,
+    cgst9: 0,
+    sgst9: 0,
+    packagingCgst9: 0,
+    packagingSgst9: 0,
+  };
   for (const line of lines) {
     const taxable = line.amount;
     if (line.profile === 'apparel') {
       totals.cgst25 += taxable * 0.025;
       totals.sgst25 += taxable * 0.025;
+    } else if (line.profile === 'packaging') {
+      totals.packagingCgst9 += taxable * 0.09;
+      totals.packagingSgst9 += taxable * 0.09;
     } else {
       totals.cgst9 += taxable * 0.09;
       totals.sgst9 += taxable * 0.09;
@@ -137,6 +205,8 @@ export function summarizeBodyGst(lines) {
     sgst25: Math.round(totals.sgst25 * 100) / 100,
     cgst9: Math.round(totals.cgst9 * 100) / 100,
     sgst9: Math.round(totals.sgst9 * 100) / 100,
+    packagingCgst9: Math.round(totals.packagingCgst9 * 100) / 100,
+    packagingSgst9: Math.round(totals.packagingSgst9 * 100) / 100,
   };
 }
 
@@ -145,7 +215,7 @@ export function buildHsnSummary(lines) {
   return groups.map((g) => {
     const tax = lineTaxAmounts(g.taxable, g.profile);
     return {
-      hsn: g.hsn || '-',
+      hsn: g.profile === 'packaging' ? 'Packaging' : formatHsn(g.hsn),
       taxable: g.taxable,
       cgstRate: tax.cgstRate,
       cgstAmt: tax.cgstAmt,
