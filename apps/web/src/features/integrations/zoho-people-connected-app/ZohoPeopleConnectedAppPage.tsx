@@ -57,8 +57,6 @@ function formatDate(value: string | null | undefined) {
   });
 }
 
-type PageProps = { sandbox?: boolean };
-
 function ZohoPeopleConnectedAppView({ vm }: { vm: ZohoPeopleConnectedAppVm }) {
   const tile = {
     id: "zoho-people",
@@ -71,6 +69,11 @@ function ZohoPeopleConnectedAppView({ vm }: { vm: ZohoPeopleConnectedAppVm }) {
     vm.status === "needs_attention" ||
     vm.status === "expired" ||
     vm.status === "error";
+
+  const showSignedOut =
+    vm.authPhase === "signed_out" ||
+    vm.authPhase === "waiting_popup" ||
+    vm.authPhase === "exchanging";
 
   return (
     <main className="zoho-connected-app" data-sandbox={vm.sandbox ? "true" : "false"}>
@@ -86,16 +89,29 @@ function ZohoPeopleConnectedAppView({ vm }: { vm: ZohoPeopleConnectedAppVm }) {
         <p className="zoho-connected-app-tagline">Zoho People Connected App</p>
       </header>
 
-      {!vm.authenticated ? (
+      {showSignedOut ? (
         <section className="zoho-connected-app-signin" aria-labelledby="zoho-signin-heading">
           <h1 id="zoho-signin-heading">Sign in required</h1>
-          <p>Sign in to ShelfMerch to connect your Zoho People account.</p>
+          {vm.authPhase === "waiting_popup" || vm.authPhase === "exchanging" ? (
+            <p className="zoho-embed-auth-wait">
+              <Loader2 className="zoho-integ-spin" size={18} aria-hidden="true" />
+              Waiting for ShelfMerch sign-in…
+            </p>
+          ) : (
+            <p>Sign in to ShelfMerch to connect your Zoho People account.</p>
+          )}
+          {vm.popupBlocked ? (
+            <p className="zoho-embed-auth-error" role="alert">
+              Allow popups and try again.
+            </p>
+          ) : null}
           <button
             type="button"
             className="zoho-integ-btn zoho-integ-btn--primary"
-            onClick={vm.onOpenShelfMerch}
+            onClick={vm.onSignIn}
+            disabled={vm.authPhase === "waiting_popup" || vm.authPhase === "exchanging"}
           >
-            Open ShelfMerch
+            Sign in to ShelfMerch
           </button>
         </section>
       ) : (

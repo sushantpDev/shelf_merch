@@ -24,7 +24,7 @@ export function assertZohoConfigured() {
  * Build Zoho India Accounts authorization URL and persist OAuth state server-side.
  * Does not expose client secret. Returns { url, state } for the controller to set cookies.
  */
-export async function beginZohoConnect({ tenantId, userId }) {
+export async function beginZohoConnect({ tenantId, userId, embedPopup = false }) {
   assertZohoConfigured();
   const redirectUri = zohoRedirectUri();
   if (env.NODE_ENV === 'development') {
@@ -32,7 +32,7 @@ export async function beginZohoConnect({ tenantId, userId }) {
   }
 
   const state = generateOAuthState();
-  await storeOAuthState(state, { tenantId, userId });
+  await storeOAuthState(state, { tenantId, userId, embedPopup });
 
   const params = new URLSearchParams({
     scope: ZOHO_SCOPES,

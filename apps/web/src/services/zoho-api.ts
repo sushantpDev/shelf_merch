@@ -30,6 +30,7 @@ export type ZohoStatusResponse = {
   configured: boolean;
   status: ZohoConnectionStatus;
   integration: ZohoIntegrationPublic | null;
+  canManage?: boolean;
 };
 
 export type ZohoSyncSummary = {
@@ -102,4 +103,26 @@ export function disconnectZoho() {
   return zohoFetch<{ ok: boolean; status: ZohoConnectionStatus }>("/disconnect", {
     method: "DELETE",
   });
+}
+
+/** First-party only — mint one-time embed code (Bearer required; never in URL). */
+export function issueZohoEmbedCode(requestId: string) {
+  return zohoFetch<{ code: string; requestId: string; expiresInSec: number }>("/embed/issue", {
+    method: "POST",
+    body: JSON.stringify({ requestId }),
+  });
+}
+
+/** Iframe exchanges one-time code for HttpOnly embed session cookie. */
+export function exchangeZohoEmbedCode(code: string, requestId: string) {
+  return zohoFetch<{ ok: boolean }>("/embed/exchange", {
+    method: "POST",
+    body: JSON.stringify({ code, requestId }),
+  });
+}
+
+/** Popup OAuth: bridge cookie then navigate to connect with popup=1. */
+export async function startZohoConnectPopup(): Promise<void> {
+  await zohoFetch<{ ok: boolean }>("/bridge", { method: "POST" });
+  window.location.assign(`${ZOHO_API_BASE}/connect?popup=1`);
 }

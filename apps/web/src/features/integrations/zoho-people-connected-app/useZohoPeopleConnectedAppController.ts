@@ -1,26 +1,35 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   disconnectZoho,
+  exchangeZohoEmbedCode,
   fetchZohoStatus,
-  startZohoConnect,
   syncZohoEmployees,
   type ZohoConnectionStatus,
   type ZohoIntegrationPublic,
 } from "@/services/zoho-api";
-import { canAccessTenantArea } from "@/services/tenant-access";
-import { getStoredUser, isAuthenticated } from "@/services/auth-store";
+import { isAuthenticated } from "@/services/auth-store";
 import { ApiError } from "@/services/api";
+import {
+  createEmbedRequestId,
+  isZohoEmbedAuthMessage,
+  isZohoEmbedOAuthMessage,
+  shelfmerchPostMessageOrigin,
+} from "./zoho-embed-messaging";
 
 const ZOHO_QUERY_KEY = ["zoho-people-connected-app", "status"] as const;
 
-export const SHELFMERCH_INTEGRATIONS_URL =
-  "https://shelfmerch.io/app/integrations?source=zoho-people";
+export type EmbedAuthPhase =
+  | "signed_out"
+  | "waiting_popup"
+  | "exchanging"
+  | "authenticated";
 
 export type ZohoPeopleConnectedAppVm = {
   sandbox: boolean;
-  authenticated: boolean;
+  authPhase: EmbedAuthPhase;
+  popupBlocked: boolean;
   status: ZohoConnectionStatus;
   configured: boolean;
   integration: ZohoIntegrationPublic | null;
@@ -29,46 +38,156 @@ export type ZohoPeopleConnectedAppVm = {
   connecting: boolean;
   disconnecting: boolean;
   canManage: boolean;
-  authError: boolean;
+  onSignIn: () => void;
   onConnect: () => void;
   onSync: () => void;
   onDisconnect: () => void;
-  onOpenShelfMerch: () => void;
 };
+
+function openCenteredPopup(url: string, name: string) {
+  const width = 520;
+  const height = 640;
+  const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
+  const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2);
+  const features = `popup=yes,width=${width},height=${height},left=${left},top=${top}`;
+  return window.open(url, name, features);
+}
 
 /** Controller for the Zoho People Connected App embed (`/zoho/people`). */
 export function useZohoPeopleConnectedAppController(sandbox: boolean): ZohoPeopleConnectedAppVm {
+  const [authPhase, setAuthPhase] = useState<EmbedAuthPhase>("signed_out");
+  const [popupBlocked, setPopupBlocked] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [authenticated, setAuthenticated] = useState(() => isAuthenticated());
+  const [canManage, setCanManage] = useState(false);
   const queryClient = useQueryClient();
-  const user = getStoredUser();
-  const canManage = canAccessTenantArea(user?.role, "integrations", "write");
-
-  useEffect(() => {
-    const sync = () => setAuthenticated(isAuthenticated());
-    window.addEventListener("sm:auth-change", sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener("sm:auth-change", sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
+  const popupRef = useRef<Window | null>(null);
+  const pendingRequestIdRef = useRef<string | null>(null);
+  const targetOrigin = shelfmerchPostMessageOrigin();
 
   const statusQuery = useQuery({
     queryKey: ZOHO_QUERY_KEY,
     queryFn: fetchZohoStatus,
-    enabled: authenticated,
+    enabled: authPhase === "authenticated",
     staleTime: 30_000,
     retry: false,
   });
 
   useEffect(() => {
+    if (statusQuery.data?.canManage != null) {
+      setCanManage(Boolean(statusQuery.data.canManage));
+    }
+  }, [statusQuery.data?.canManage]);
+
+  // Probe for existing embed session cookie on load.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchZohoStatus();
+        if (!cancelled) {
+          setCanManage(Boolean(data.canManage));
+          setAuthPhase("authenticated");
+        }
+      } catch {
+        if (!cancelled && isAuthenticated()) {
+          setAuthPhase("authenticated");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!statusQuery.error) return;
     const err = statusQuery.error;
     if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-      setAuthenticated(false);
+      setAuthPhase("signed_out");
     }
   }, [statusQuery.error]);
+
+  const exchangeCode = useCallback(
+    async (code: string, requestId: string) => {
+      setAuthPhase("exchanging");
+      try {
+        await exchangeZohoEmbedCode(code, requestId);
+        setAuthPhase("authenticated");
+        setPopupBlocked(false);
+        await queryClient.invalidateQueries({ queryKey: ZOHO_QUERY_KEY });
+      } catch (err) {
+        setAuthPhase("signed_out");
+        toast.error(err instanceof ApiError ? err.message : "Sign-in failed");
+      }
+    },
+    [queryClient],
+  );
+
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== targetOrigin) return;
+      if (popupRef.current && event.source !== popupRef.current) return;
+
+      if (isZohoEmbedAuthMessage(event.data)) {
+        if (
+          pendingRequestIdRef.current &&
+          event.data.requestId !== pendingRequestIdRef.current
+        ) {
+          return;
+        }
+        void exchangeCode(event.data.code, event.data.requestId);
+        popupRef.current = null;
+        pendingRequestIdRef.current = null;
+        return;
+      }
+
+      if (isZohoEmbedOAuthMessage(event.data)) {
+        setConnecting(false);
+        popupRef.current = null;
+        if (event.data.status === "connected") {
+          toast.success("Zoho People connected");
+          void queryClient.invalidateQueries({ queryKey: ZOHO_QUERY_KEY });
+        } else {
+          toast.error("Could not connect Zoho People");
+        }
+      }
+    }
+
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [exchangeCode, queryClient, targetOrigin]);
+
+  const onSignIn = useCallback(() => {
+    const requestId = createEmbedRequestId();
+    pendingRequestIdRef.current = requestId;
+    const url = `/zoho/people/embed-auth?requestId=${encodeURIComponent(requestId)}`;
+    const popup = openCenteredPopup(url, "shelfmerch-zoho-embed-auth");
+    if (!popup) {
+      setPopupBlocked(true);
+      pendingRequestIdRef.current = null;
+      return;
+    }
+    popupRef.current = popup;
+    setPopupBlocked(false);
+    setAuthPhase("waiting_popup");
+  }, []);
+
+  const onConnect = useCallback(() => {
+    if (!canManage) {
+      toast.error("Only company administrators can connect Zoho People");
+      return;
+    }
+    setConnecting(true);
+    const popup = openCenteredPopup("/zoho/people/oauth-bridge", "shelfmerch-zoho-oauth");
+    if (!popup) {
+      setConnecting(false);
+      setPopupBlocked(true);
+      toast.error("Allow popups and try again");
+      return;
+    }
+    popupRef.current = popup;
+    setPopupBlocked(false);
+  }, [canManage]);
 
   const syncMutation = useMutation({
     mutationFn: syncZohoEmployees,
@@ -94,44 +213,21 @@ export function useZohoPeopleConnectedAppController(sandbox: boolean): ZohoPeopl
     },
   });
 
-  const onConnect = useCallback(async () => {
-    if (!canManage) {
-      toast.error("Only company administrators can connect Zoho People");
-      return;
-    }
-    setConnecting(true);
-    try {
-      await startZohoConnect();
-    } catch (err) {
-      setConnecting(false);
-      toast.error(err instanceof ApiError ? err.message : "Could not start Zoho connection");
-    }
-  }, [canManage]);
-
-  const onOpenShelfMerch = useCallback(() => {
-    window.open(SHELFMERCH_INTEGRATIONS_URL, "_blank", "noopener,noreferrer");
-  }, []);
-
-  const authError =
-    Boolean(statusQuery.error) &&
-    statusQuery.error instanceof ApiError &&
-    (statusQuery.error.status === 401 || statusQuery.error.status === 403);
-
   return {
     sandbox,
-    authenticated: authenticated && !authError,
+    authPhase,
+    popupBlocked,
     status: statusQuery.data?.status ?? "not_connected",
     configured: statusQuery.data?.configured ?? false,
     integration: statusQuery.data?.integration ?? null,
-    loading: authenticated && statusQuery.isLoading,
+    loading: authPhase === "authenticated" && statusQuery.isLoading,
     syncing: syncMutation.isPending,
     connecting,
     disconnecting: disconnectMutation.isPending,
     canManage,
-    authError,
+    onSignIn,
     onConnect,
     onSync: () => syncMutation.mutate(),
     onDisconnect: () => disconnectMutation.mutate(),
-    onOpenShelfMerch,
   };
 }

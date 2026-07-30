@@ -26,6 +26,7 @@ export async function storeOAuthState(state, record) {
   const payload = {
     tenantId: String(record.tenantId),
     userId: String(record.userId),
+    embedPopup: Boolean(record.embedPopup),
     createdAt: Date.now(),
   };
   const redisOk = await ensureRedisReady(1_500);
@@ -65,7 +66,12 @@ export async function consumeOAuthState(state) {
     throw new ApiError(400, 'Invalid or expired OAuth state', 'INVALID_OAUTH_STATE');
   }
   memoryStates.delete(state);
-  return { tenantId: entry.tenantId, userId: entry.userId, createdAt: entry.createdAt };
+  return {
+    tenantId: entry.tenantId,
+    userId: entry.userId,
+    embedPopup: Boolean(entry.embedPopup),
+    createdAt: entry.createdAt,
+  };
 }
 
 /** Test helper — clear in-memory OAuth states. */

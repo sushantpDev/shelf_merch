@@ -9,13 +9,22 @@ import { beginZohoConnect, completeZohoConnection } from './zohoOAuth.service.js
 import { consumeOAuthState } from './zohoOAuthState.service.js';
 import { disconnectZoho } from './zohoToken.service.js';
 import { syncZohoEmployees } from './zohoSync.service.js';
+import { issueEmbedAuthCode, exchangeEmbedAuthCode, resolveEmbedSession } from './zohoEmbedAuth.service.js';
+import { User } from '../../users/user.model.js';
+import { RoleAssignment } from '../../roles/roleAssignment.model.js';
+import { signAccessToken } from '../../auth/auth.service.js';
 import {
   clearAuthBridgeCookie,
   clearOAuthStateCookie,
   readCookies,
   setAuthBridgeCookie,
+  setEmbedSessionCookie,
   setOAuthStateCookie,
+  setOAuthPopupCookie,
+  clearOAuthPopupCookie,
+  isOAuthPopupRequest,
   ZOHO_AUTH_BRIDGE_COOKIE,
+  ZOHO_EMBED_SESSION_COOKIE,
   ZOHO_OAUTH_STATE_COOKIE,
 } from './zohoCookies.js';
 
@@ -26,6 +35,16 @@ function clientRedirect(query) {
   // Prefer absolute URL when BASE_URL/APP_URL is set; otherwise relative (same origin).
   const target = base ? `${base}${path}?${qs}` : `${path}?${qs}`;
   return target;
+}
+
+function embedPopupRedirect(query) {
+  const base = (env.BASE_URL || env.APP_URL || '').replace(/\/$/, '');
+  const qs = new URLSearchParams(query).toString();
+  return base ? `${base}/zoho/people/oauth-done?${qs}` : `/zoho/people/oauth-done?${qs}`;
+}
+
+function integrationsWriteAllowed(user) {
+  return user?.role === 'company_admin';
 }
 
 function publicStatus(doc) {
@@ -39,27 +58,47 @@ function publicStatus(doc) {
 export async function getStatus(req, res) {
   const doc = await ZohoIntegration.findOne({ tenantId: req.tenantId });
   const status = publicStatus(doc);
+  const canManage = integrationsWriteAllowed(req.user);
   if (!doc || status === ZOHO_PUBLIC_STATUSES.not_connected) {
     return res.json({
       configured: zohoPeopleConfigured(),
       status: ZOHO_PUBLIC_STATUSES.not_connected,
       integration: null,
+      canManage,
     });
   }
   return res.json({
     configured: zohoPeopleConfigured(),
     status,
     integration: doc.toPublicJSON(),
+    canManage,
   });
 }
 
 /**
  * Sets an HttpOnly cookie so the subsequent browser navigation to GET /connect
  * can authenticate without putting the JWT in the query string.
+ * Accepts Bearer JWT or an existing embedded-session cookie (popup from iframe).
  */
 export async function bridge(req, res) {
   const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  let token = header.startsWith('Bearer ') ? header.slice(7) : null;
+
+  if (!token && req.authSource === 'embed_session' && req.user?.userId) {
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      throw new ApiError(401, 'Missing access token', 'UNAUTHORIZED');
+    }
+    const assignment = await RoleAssignment.findOne({
+      userId: user._id,
+      tenantId: req.tenantId,
+    }).lean();
+    if (!assignment) {
+      throw new ApiError(401, 'Missing access token', 'UNAUTHORIZED');
+    }
+    token = signAccessToken(user, assignment);
+  }
+
   if (!token) {
     throw new ApiError(401, 'Missing access token', 'UNAUTHORIZED');
   }
@@ -68,39 +107,48 @@ export async function bridge(req, res) {
 }
 
 export async function connect(req, res) {
+  const embedPopup = req.query.popup === '1' || req.query.popup === 'true';
   const { url, state } = await beginZohoConnect({
     tenantId: req.tenantId,
     userId: req.user.userId,
+    embedPopup,
   });
   setOAuthStateCookie(res, state);
+  if (embedPopup) setOAuthPopupCookie(res);
   clearAuthBridgeCookie(res);
   return res.redirect(302, url);
 }
 
 export async function callback(req, res) {
   const { code, state, error, location: zohoLocation } = req.query;
+  const popupMode = isOAuthPopupRequest(req);
 
   clearOAuthStateCookie(res);
 
+  const finish = (query) => {
+    if (popupMode) clearOAuthPopupCookie(res);
+    return res.redirect(302, popupMode ? embedPopupRedirect(query) : clientRedirect(query));
+  };
+
   if (error) {
-    return res.redirect(302, clientRedirect({ zoho: 'error', reason: 'denied' }));
+    return finish({ zoho: 'error', reason: 'denied' });
   }
 
   const cookies = readCookies(req);
   const cookieState = cookies[ZOHO_OAUTH_STATE_COOKIE];
   if (!state || !cookieState || cookieState !== state) {
-    return res.redirect(302, clientRedirect({ zoho: 'error', reason: 'state' }));
+    return finish({ zoho: 'error', reason: 'state' });
   }
 
   let oauthRecord;
   try {
     oauthRecord = await consumeOAuthState(state);
   } catch {
-    return res.redirect(302, clientRedirect({ zoho: 'error', reason: 'state' }));
+    return finish({ zoho: 'error', reason: 'state' });
   }
 
   if (!code || typeof code !== 'string') {
-    return res.redirect(302, clientRedirect({ zoho: 'error', reason: 'code' }));
+    return finish({ zoho: 'error', reason: 'code' });
   }
 
   try {
@@ -110,10 +158,31 @@ export async function callback(req, res) {
       code,
       zohoLocation: typeof zohoLocation === 'string' ? zohoLocation : '',
     });
-    return res.redirect(302, clientRedirect({ zoho: 'connected' }));
+    return finish({ zoho: 'connected' });
   } catch {
-    return res.redirect(302, clientRedirect({ zoho: 'error' }));
+    return finish({ zoho: 'error' });
   }
+}
+
+export async function issueEmbedAuth(req, res) {
+  const requestId =
+    typeof req.body?.requestId === 'string' && req.body.requestId.trim()
+      ? req.body.requestId.trim()
+      : '';
+  const result = await issueEmbedAuthCode({
+    tenantId: req.tenantId,
+    userId: req.user.userId,
+    requestId,
+  });
+  return res.json(result);
+}
+
+export async function exchangeEmbedAuth(req, res) {
+  const code = typeof req.body?.code === 'string' ? req.body.code : '';
+  const requestId = typeof req.body?.requestId === 'string' ? req.body.requestId : '';
+  const { sessionToken, expiresInSec } = await exchangeEmbedAuthCode({ code, requestId });
+  setEmbedSessionCookie(res, sessionToken, expiresInSec);
+  return res.json({ ok: true });
 }
 
 export async function syncEmployees(req, res) {
@@ -126,10 +195,21 @@ export async function disconnect(req, res) {
   return res.json({ ok: true, status: ZOHO_PUBLIC_STATUSES.not_connected });
 }
 
-/** Authenticate using Bearer header or the short-lived Zoho bridge cookie. */
+/** Authenticate using Bearer header, Zoho bridge cookie, or embedded-session cookie. */
 export function extractZohoAccessToken(req) {
   const header = req.headers.authorization || '';
   if (header.startsWith('Bearer ')) return header.slice(7);
   const cookies = readCookies(req);
   return cookies[ZOHO_AUTH_BRIDGE_COOKIE] || null;
+}
+
+export function extractEmbedSessionToken(req) {
+  const cookies = readCookies(req);
+  return cookies[ZOHO_EMBED_SESSION_COOKIE] || null;
+}
+
+export async function resolveEmbedSessionUser(req) {
+  const token = extractEmbedSessionToken(req);
+  if (!token) return null;
+  return resolveEmbedSession(token);
 }

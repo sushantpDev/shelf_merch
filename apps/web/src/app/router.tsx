@@ -245,6 +245,30 @@ export const appRouter = createBrowserRouter([
         ),
       },
       {
+        path: "zoho/people/embed-auth",
+        lazy: page(
+          () =>
+            import("@/features/integrations/zoho-people-connected-app/ZohoPeopleEmbedAuthPage"),
+          "ZohoPeopleEmbedAuthPage",
+        ),
+      },
+      {
+        path: "zoho/people/oauth-done",
+        lazy: page(
+          () =>
+            import("@/features/integrations/zoho-people-connected-app/ZohoPeopleEmbedAuthPage"),
+          "ZohoPeopleOAuthDonePage",
+        ),
+      },
+      {
+        path: "zoho/people/oauth-bridge",
+        lazy: page(
+          () =>
+            import("@/features/integrations/zoho-people-connected-app/ZohoPeopleEmbedAuthPage"),
+          "ZohoPeopleOAuthBridgePage",
+        ),
+      },
+      {
         path: "platform",
         lazy: page(() => import("@/components/platform/PlatformLayout")),
         children: platformChildren,
