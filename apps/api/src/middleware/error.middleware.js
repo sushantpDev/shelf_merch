@@ -1,5 +1,5 @@
 import { ApiError } from '../utils/errors.js';
-import { logger } from '../config/logger.js';
+import { logger, safeRequestPath } from '../config/logger.js';
 import { captureException } from '../config/observability.js';
 
 export function notFoundHandler(_req, res) {
@@ -30,7 +30,8 @@ export function errorHandler(err, req, res, _next) {
     });
   }
 
-  logger.error({ err, path: req.originalUrl }, 'Unhandled error');
-  captureException(err, { path: req.originalUrl, requestId: req.requestId, tenantId: req.tenantId });
+  const path = safeRequestPath(req);
+  logger.error({ err, path }, 'Unhandled error');
+  captureException(err, { path, requestId: req.requestId, tenantId: req.tenantId });
   res.status(500).json({ error: { code: 'INTERNAL', message: 'Internal server error' } });
 }

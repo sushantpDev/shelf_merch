@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import mongoose from 'mongoose';
 import { pinoHttp } from 'pino-http';
-import { logger } from './config/logger.js';
+import { createPinoHttpOptions } from './config/logger.js';
 import { existsSync } from 'node:fs';
 import { env, corsOrigins } from './config/env.js';
 import { ensureRedisReady } from './config/redis.js';
@@ -149,18 +149,9 @@ export function createApp() {
   app.use(express.json({ limit: '1mb' }));
   // Defence-in-depth against NoSQL operator injection on every parsed request.
   app.use(sanitizeMongoInput);
+  // Sole HTTP access logger — serializers from config/logger.js omit query/Location/tokens.
   if (env.NODE_ENV !== 'test') {
-    app.use(
-      pinoHttp({
-        logger,
-        genReqId: (req) => req.requestId,
-        customProps: (req) => ({
-          tenantId: req.tenantId ?? undefined,
-          userId: req.user?.userId ?? undefined,
-        }),
-        autoLogging: { ignore: (req) => req.url.includes('/health') },
-      }),
-    );
+    app.use(pinoHttp(createPinoHttpOptions()));
   }
 
   // Serve user uploads defused: never sniff the content type, sandbox any

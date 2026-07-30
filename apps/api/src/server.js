@@ -1,5 +1,5 @@
 import { env } from './config/env.js';
-import { logger } from './config/logger.js';
+import { logger, logActiveLoggerConfig } from './config/logger.js';
 import { connectDb, disconnectDb } from './config/db.js';
 import { initObservability } from './config/observability.js';
 import { createApp } from './app.js';
@@ -7,6 +7,8 @@ import { startScheduledCampaignWorker } from './jobs/scheduledCampaign.worker.js
 
 async function main() {
   await initObservability();
+  // Prove which logger module production is running (no secrets / env dumps).
+  logActiveLoggerConfig();
   await connectDb();
 
   // Ensure overdue scheduled sends are recovered even when the dedicated

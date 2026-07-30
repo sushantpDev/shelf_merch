@@ -1,4 +1,4 @@
-import { logger } from '../config/logger.js';
+import { logger, safeRequestPath } from '../config/logger.js';
 
 /**
  * Defence-in-depth against NoSQL operator injection (§security hardening C1).
@@ -48,7 +48,7 @@ export function sanitizeMongoInput(req, _res, next) {
   }
   if (stripped) {
     logger.warn(
-      { path: req.originalUrl, ip: req.ip },
+      { path: safeRequestPath(req), ip: req.ip },
       'Stripped $-prefixed keys from request input (possible NoSQL injection attempt)',
     );
   }
