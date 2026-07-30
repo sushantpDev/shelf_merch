@@ -154,7 +154,7 @@ router.post(
     }
 
     // Shopify-imported curated kits often have empty `items`. Fall back to
-    // active catalog products so Send still works (mirrors prior frontend behaviour).
+    // active catalog products when available (optional — not required for send).
     if (productRefs.length === 0) {
       const itemCount = Array.isArray(platformKit.itemImages) && platformKit.itemImages.length
         ? platformKit.itemImages.length
@@ -171,13 +171,8 @@ router.post(
       }));
     }
 
-    if (productRefs.length === 0) {
-      throw new ApiError(
-        422,
-        'Curated kit has no resolvable catalog products. Add products to the catalog first.',
-        'EMPTY_CURATED_KIT',
-      );
-    }
+    // Curated kits are self-contained (itemImages, approxValueInr in designNotes).
+    // productRefs may be empty when the tenant catalog has no matching products.
 
     const heroImage = String(platformKit.heroImage || '').trim() || platformKit.imageUrls?.[0] || '';
     const itemImages = Array.isArray(platformKit.itemImages)

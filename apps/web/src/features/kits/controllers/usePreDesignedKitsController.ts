@@ -1,16 +1,154 @@
-import { usePlatformKits } from "../model";
-import type { PlatformKitTemplate } from "../model";
+import { useState, useCallback } from "react";
+import { useNavigate } from "react-router";
+import { toast } from "sonner";
+import { usePlatformKits, useEnsureCuratedKit, type PlatformKitTemplate } from "../model";
 import { useTenantAccess } from "@/hooks/useTenantAccess";
+import { useWorkspace } from "@/hooks/useWorkspace";
+import { buildKitPreviewFromPlatform, type KitPreviewData } from "../KitPreviewDialog";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
+import {
+  gateWalletForCuratedKitSend,
+  insufficientFundsMessage,
+} from "../curatedKitWalletGate";
+import noKitsYetImg from "../../../../assets/no-kits-yet.png";
 
 export type PreDesignedKitsVm = {
   isLoading: boolean;
   kits: PlatformKitTemplate[] | undefined;
-  canCreateKits: boolean;
+  canSendKits: boolean;
+  kitPreview: KitPreviewData | null;
+  onPreviewOpenChange: (open: boolean) => void;
+  onPreview: (kit: PlatformKitTemplate) => void;
+  onSend: (kit: PlatformKitTemplate) => void;
+  sendPending: boolean;
 };
+
+function templateImage(kit: PlatformKitTemplate): string {
+  if (kit.heroImage) return resolveMediaUrl(kit.heroImage) || noKitsYetImg;
+  return resolveMediaUrl(kit.imageUrls?.[0]) || noKitsYetImg;
+}
+
+function curatedPricePerKit(kit: PlatformKitTemplate): number {
+  return Math.max(0, Math.round(Number(kit.approxValueInr) || 0));
+}
+
+function buildProductRefs(
+  kit: PlatformKitTemplate,
+  catalogProducts: Array<{
+    id?: string;
+    brand?: string;
+    nm?: string;
+    g?: string;
+    category?: string;
+  }>,
+) {
+  const productRefs: Array<{
+    catalogProductId: string;
+    brand?: string;
+    name: string;
+    group?: string;
+  }> = [];
+
+  for (const item of kit.items || []) {
+    const pid = String(item.catalogProductId ?? "");
+    if (!pid) continue;
+    const product = catalogProducts.find((p) => p.id === pid);
+    if (!product?.id) continue;
+    if (productRefs.some((r) => r.catalogProductId === product.id)) continue;
+    productRefs.push({
+      catalogProductId: product.id,
+      brand: product.brand || "",
+      name: product.nm || "Product",
+      group: product.g || product.category || "",
+    });
+  }
+
+  if (productRefs.length === 0 && catalogProducts.length > 0) {
+    const fallbackCount = Math.max(
+      1,
+      (Array.isArray(kit.itemImages) && kit.itemImages.length
+        ? kit.itemImages.length
+        : (kit.imageUrls?.length || 1) - 1) || 1,
+    );
+    for (const product of catalogProducts.slice(0, fallbackCount)) {
+      if (!product.id) continue;
+      productRefs.push({
+        catalogProductId: product.id,
+        brand: product.brand || "",
+        name: product.nm || "Product",
+        group: product.g || product.category || "",
+      });
+    }
+  }
+
+  return productRefs;
+}
 
 /** Controller for the pre-designed kits widget: platform kit templates query. */
 export function usePreDesignedKitsController(): PreDesignedKitsVm {
+  const navigate = useNavigate();
   const { data: kits, isLoading } = usePlatformKits();
-  const { canCreateKits } = useTenantAccess();
-  return { isLoading, kits, canCreateKits: canCreateKits() };
+  const { canSendKits } = useTenantAccess();
+  const { data: workspace } = useWorkspace();
+  const ensureCuratedKit = useEnsureCuratedKit();
+  const [kitPreview, setKitPreview] = useState<KitPreviewData | null>(null);
+
+  const catalog = workspace?.catalogProducts ?? [];
+
+  const onPreview = useCallback(
+    (kit: PlatformKitTemplate) => {
+      setKitPreview(buildKitPreviewFromPlatform(kit, catalog, templateImage(kit)));
+    },
+    [catalog],
+  );
+
+  const onSend = useCallback(
+    async (kit: PlatformKitTemplate) => {
+      if (!workspace) {
+        toast.error("Workspace is still loading — try again in a moment.");
+        return;
+      }
+
+      const gate = gateWalletForCuratedKitSend(workspace, curatedPricePerKit(kit));
+      if (!gate.allowed) {
+        if (gate.reason === "no_wallet") {
+          navigate("/app/wallets", { state: { startCreateWallet: true } });
+          return;
+        }
+        if (gate.reason === "pending_approval") {
+          toast.message("Your wallet is under review. Once approved, you'll be able to send kits.");
+          return;
+        }
+        toast.error(
+          insufficientFundsMessage(gate.available, gate.required, gate.currency),
+        );
+        return;
+      }
+
+      const productRefs = buildProductRefs(kit, catalog);
+      try {
+        const ensured = await ensureCuratedKit.mutateAsync({
+          platformKitId: kit._id,
+          productRefs: productRefs.length ? productRefs : undefined,
+        });
+        navigate(`/app/kits/${ensured.id}/send`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to prepare curated kit for send");
+      }
+    },
+    [workspace, catalog, ensureCuratedKit, navigate],
+  );
+
+  return {
+    isLoading,
+    kits,
+    canSendKits: canSendKits(),
+    kitPreview,
+    onPreviewOpenChange: (open) => {
+      if (!open) setKitPreview(null);
+    },
+    onPreview,
+    onSend,
+    sendPending: ensureCuratedKit.isPending,
+  };
 }
