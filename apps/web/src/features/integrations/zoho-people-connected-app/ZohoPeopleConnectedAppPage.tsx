@@ -1,0 +1,230 @@
+import { Loader2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { IntegrationMark } from "../views/IntegrationDetailView";
+import zohoPeopleIcon from "../../../../assets/integrations/zoho-people.svg";
+import {
+  useZohoPeopleConnectedAppController,
+  type ZohoPeopleConnectedAppVm,
+} from "./useZohoPeopleConnectedAppController";
+
+function statusLabel(status: ZohoPeopleConnectedAppVm["status"]) {
+  switch (status) {
+    case "connected":
+      return "Connected";
+    case "needs_attention":
+      return "Needs attention";
+    case "expired":
+      return "Connection expired";
+    case "error":
+      return "Error";
+    default:
+      return "Not connected";
+  }
+}
+
+function statusClass(status: ZohoPeopleConnectedAppVm["status"]) {
+  switch (status) {
+    case "connected":
+      return "zoho-status zoho-status--connected";
+    case "needs_attention":
+    case "expired":
+      return "zoho-status zoho-status--expired";
+    case "error":
+      return "zoho-status zoho-status--error";
+    default:
+      return "zoho-status zoho-status--idle";
+  }
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+type PageProps = { sandbox?: boolean };
+
+function ZohoPeopleConnectedAppView({ vm }: { vm: ZohoPeopleConnectedAppVm }) {
+  const tile = {
+    id: "zoho-people",
+    name: "Zoho People",
+    icon: zohoPeopleIcon,
+  };
+
+  const connected =
+    vm.status === "connected" ||
+    vm.status === "needs_attention" ||
+    vm.status === "expired" ||
+    vm.status === "error";
+
+  return (
+    <main className="zoho-connected-app" data-sandbox={vm.sandbox ? "true" : "false"}>
+      <header className="zoho-connected-app-header">
+        <div className="zoho-connected-app-brand">
+          <span className="zoho-connected-app-brand-name">ShelfMerch</span>
+          {vm.sandbox ? (
+            <span className="zoho-connected-app-sandbox-badge" role="status">
+              Sandbox
+            </span>
+          ) : null}
+        </div>
+        <p className="zoho-connected-app-tagline">Zoho People Connected App</p>
+      </header>
+
+      {!vm.authenticated ? (
+        <section className="zoho-connected-app-signin" aria-labelledby="zoho-signin-heading">
+          <h1 id="zoho-signin-heading">Sign in required</h1>
+          <p>Sign in to ShelfMerch to connect your Zoho People account.</p>
+          <button
+            type="button"
+            className="zoho-integ-btn zoho-integ-btn--primary"
+            onClick={vm.onOpenShelfMerch}
+          >
+            Open ShelfMerch
+          </button>
+        </section>
+      ) : (
+        <section className="zoho-integ-card zoho-connected-app-card" aria-labelledby="zoho-people-heading">
+          <div className="zoho-integ-card-head">
+            <IntegrationMark tile={tile} size="large" />
+            <div className="zoho-integ-card-title">
+              <div className="zoho-integ-card-title-row">
+                <h1 id="zoho-people-heading">Zoho People</h1>
+                <span className={statusClass(vm.status)} role="status">
+                  {vm.loading ? "Checking…" : statusLabel(vm.status)}
+                </span>
+              </div>
+              <p>Connect Zoho People to sync employees into ShelfMerch.</p>
+            </div>
+          </div>
+
+          {connected && vm.integration && (
+            <dl className="zoho-integ-meta">
+              <div>
+                <dt>Organisation</dt>
+                <dd>
+                  {vm.integration.zohoOrganizationName ||
+                    vm.integration.zohoOrganizationId ||
+                    "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>Last synced</dt>
+                <dd>{formatDate(vm.integration.lastSyncedAt)}</dd>
+              </div>
+            </dl>
+          )}
+
+          <div className="zoho-integ-actions">
+            {!connected && (
+              <button
+                type="button"
+                className="zoho-integ-btn zoho-integ-btn--primary"
+                onClick={vm.onConnect}
+                disabled={!vm.canManage || vm.connecting || vm.loading}
+                aria-busy={vm.connecting}
+              >
+                {vm.connecting ? (
+                  <>
+                    <Loader2 className="zoho-integ-spin" size={16} aria-hidden="true" />
+                    Connecting…
+                  </>
+                ) : (
+                  "Connect Zoho People"
+                )}
+              </button>
+            )}
+
+            {connected && (
+              <>
+                <button
+                  type="button"
+                  className="zoho-integ-btn zoho-integ-btn--primary"
+                  onClick={vm.onSync}
+                  disabled={!vm.canManage || vm.syncing || vm.status === "expired"}
+                  aria-busy={vm.syncing}
+                >
+                  {vm.syncing ? (
+                    <>
+                      <Loader2 className="zoho-integ-spin" size={16} aria-hidden="true" />
+                      Syncing…
+                    </>
+                  ) : (
+                    "Sync Employees"
+                  )}
+                </button>
+
+                {vm.status === "expired" && (
+                  <button
+                    type="button"
+                    className="zoho-integ-btn"
+                    onClick={vm.onConnect}
+                    disabled={!vm.canManage || vm.connecting}
+                  >
+                    Reconnect
+                  </button>
+                )}
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button
+                      type="button"
+                      className="zoho-integ-btn zoho-integ-btn--danger"
+                      disabled={!vm.canManage || vm.disconnecting}
+                    >
+                      Disconnect
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Disconnect Zoho People?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        ShelfMerch will stop syncing employees from Zoho People. Existing contacts
+                        and orders are kept. You can reconnect later.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={vm.onDisconnect}>Disconnect</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
+          </div>
+
+          {!vm.configured && !vm.loading && (
+            <p className="zoho-integ-hint" role="note">
+              Zoho People is not configured on this server.
+            </p>
+          )}
+        </section>
+      )}
+    </main>
+  );
+}
+
+export function ZohoPeopleConnectedAppPage() {
+  const vm = useZohoPeopleConnectedAppController(false);
+  return <ZohoPeopleConnectedAppView vm={vm} />;
+}
+
+export function ZohoPeopleConnectedAppSandboxPage() {
+  const vm = useZohoPeopleConnectedAppController(true);
+  return <ZohoPeopleConnectedAppView vm={vm} />;
+}

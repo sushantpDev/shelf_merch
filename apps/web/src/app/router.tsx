@@ -229,6 +229,22 @@ export const appRouter = createBrowserRouter([
         },
       },
       {
+        path: "zoho/people",
+        lazy: page(
+          () =>
+            import("@/features/integrations/zoho-people-connected-app/ZohoPeopleConnectedAppPage"),
+          "ZohoPeopleConnectedAppPage",
+        ),
+      },
+      {
+        path: "zoho/people/sandbox",
+        lazy: page(
+          () =>
+            import("@/features/integrations/zoho-people-connected-app/ZohoPeopleConnectedAppPage"),
+          "ZohoPeopleConnectedAppSandboxPage",
+        ),
+      },
+      {
         path: "platform",
         lazy: page(() => import("@/components/platform/PlatformLayout")),
         children: platformChildren,

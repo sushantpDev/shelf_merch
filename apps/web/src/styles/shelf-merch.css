@@ -11176,7 +11176,8 @@ tr:hover .camp-avatar {
   gap: 10px;
   margin-bottom: 8px;
 }
-.zoho-integ-card-title h2 {
+.zoho-integ-card-title h2,
+.zoho-integ-card-title h1 {
   margin: 0;
   color: var(--ink-2);
   font-family: var(--disp);
@@ -11310,6 +11311,77 @@ tr:hover .camp-avatar {
   .zoho-integ-card-head {
     flex-direction: column;
   }
+}
+
+/* ── Zoho People Connected App (/zoho/people) ─────────────────────── */
+.zoho-connected-app {
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: clamp(20px, 4vw, 40px);
+  background:
+    radial-gradient(120% 80% at 10% -10%, rgba(34, 120, 90, 0.1), transparent 55%),
+    linear-gradient(180deg, #f3f6f4 0%, #e8eee9 100%);
+  color: var(--ink-2, #14201a);
+  font-family: var(--sans, "Segoe UI", system-ui, sans-serif);
+}
+.zoho-connected-app-header {
+  width: min(720px, 100%);
+  margin: 0 auto 22px;
+}
+.zoho-connected-app-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.zoho-connected-app-brand-name {
+  font-family: var(--disp, Georgia, "Times New Roman", serif);
+  font-size: clamp(28px, 5vw, 36px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.zoho-connected-app-sandbox-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border: 1px solid #b7c4bb;
+  border-radius: 3px;
+  background: #fff;
+  color: #4d5c54;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.zoho-connected-app-tagline {
+  margin: 0;
+  color: #66756c;
+  font-size: 14px;
+}
+.zoho-connected-app-card,
+.zoho-connected-app-signin {
+  width: min(720px, 100%);
+  margin: 0 auto;
+}
+.zoho-connected-app-signin {
+  padding: 28px 24px;
+  border: 1px solid var(--line-2, #d5ddd7);
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(14, 30, 22, 0.04);
+}
+.zoho-connected-app-signin h1 {
+  margin: 0 0 10px;
+  font-family: var(--disp, Georgia, "Times New Roman", serif);
+  font-size: 24px;
+  font-weight: 800;
+}
+.zoho-connected-app-signin p {
+  margin: 0 0 18px;
+  color: #66756c;
+  font-size: 15px;
+  line-height: 1.45;
 }
 
 @media (max-width: 1180px) {

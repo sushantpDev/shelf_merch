@@ -61,9 +61,27 @@ import mediaRoutes from './modules/media/media.routes.js';
 import chatRoutes from './modules/chat/chat.routes.js';
 import { platformReportsRouter } from './modules/reports/reports.routes.js';
 import zohoIntegrationsRoutes from './modules/integrations/zoho/zoho.routes.js';
+import {
+  applyZohoPeopleEmbedHeaders,
+  zohoPeopleEmbedHeaderMiddleware,
+} from './middleware/zohoPeopleEmbed.middleware.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIST = path.resolve(__dirname, '../../web/dist');
+
+/** Minimal HTML for Connected App routes when the SPA build is absent (tests / misconfig). */
+const ZOHO_CONNECTED_APP_HTML_FALLBACK = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ShelfMerch · Zoho People</title>
+</head>
+<body>
+  <div id="root" data-page="zoho-people-connected-app"></div>
+</body>
+</html>
+`;
 
 function isSameHostOrigin(origin, hostHeader) {
   if (!origin || !hostHeader) return false;
@@ -137,6 +155,8 @@ export function createApp() {
   // Seed request-scoped context (requestId) first so every downstream log correlates.
   app.use(requestContextMiddleware);
   app.use(helmet(helmetOptions()));
+  // Zoho Connected App pages only — must run after helmet so we can override frame headers.
+  app.use(zohoPeopleEmbedHeaderMiddleware);
   app.use((req, res, next) => cors(resolveCorsOptions(req))(req, res, next));
 
   // §9.3 — Razorpay webhook must verify signature against the raw body.
@@ -260,12 +280,29 @@ export function createApp() {
    */
   app.use('/api/integrations/zoho', globalHttpRateLimit, zohoIntegrationsRoutes);
 
+  /**
+   * Zoho People Connected App (externally hosted inside Zoho People / Sigma).
+   * Always registered so embed headers are applied and routes return 200 even
+   * before/without a full SPA build (tests). Production prefers web/dist/index.html.
+   */
+  const sendZohoConnectedAppPage = (req, res) => {
+    applyZohoPeopleEmbedHeaders(res);
+    const indexHtml = path.join(WEB_DIST, 'index.html');
+    if (existsSync(indexHtml)) {
+      return res.sendFile('index.html', { root: WEB_DIST });
+    }
+    return res.status(200).type('html').send(ZOHO_CONNECTED_APP_HTML_FALLBACK);
+  };
+  app.get('/zoho/people', sendZohoConnectedAppPage);
+  app.get('/zoho/people/sandbox', sendZohoConnectedAppPage);
+
   // Production: serve the Vite SPA from the same origin as the API.
   if (env.NODE_ENV === 'production' && existsSync(WEB_DIST)) {
     app.use(express.static(WEB_DIST, { index: false, maxAge: '1d' }));
     app.get('*', (req, res, next) => {
       if (req.method !== 'GET' && req.method !== 'HEAD') return next();
       if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) return next();
+      // /zoho/people(*) is registered above with embed headers.
       res.sendFile('index.html', { root: WEB_DIST });
     });
   }
