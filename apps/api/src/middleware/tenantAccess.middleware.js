@@ -24,6 +24,8 @@ const MATRIX = {
   campaignOps: { read: BOTH, write: BOTH },
   /** Recipient directory — company admins and entity managers upload and manage recipients. */
   contacts: { read: BOTH, write: BOTH },
+  /** HRIS / SSO connectors — company admins connect; managers may view status. */
+  integrations: { read: BOTH, write: [COMPANY_ADMIN] },
   settings: { read: BOTH, write: [COMPANY_ADMIN] },
   catalog: { read: BOTH, write: [] },
   users: { read: [COMPANY_ADMIN], write: [COMPANY_ADMIN] },

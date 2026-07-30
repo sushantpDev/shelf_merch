@@ -221,6 +221,14 @@ export const appRouter = createBrowserRouter([
         children: tenantChildren,
       },
       {
+        // Spec alias — OAuth success lands on /dashboard/integrations?zoho=…
+        path: "dashboard/integrations",
+        loader: ({ request }) => {
+          const url = new URL(request.url);
+          return redirect(`/app/integrations${url.search}`);
+        },
+      },
+      {
         path: "platform",
         lazy: page(() => import("@/components/platform/PlatformLayout")),
         children: platformChildren,

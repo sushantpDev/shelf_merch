@@ -10,6 +10,7 @@ import {
 } from "../data";
 import type { IntegrationsVm } from "../controllers/useIntegrationsController";
 import { IntegrationDetailView, IntegrationMark } from "./IntegrationDetailView";
+import { ZohoPeopleCard } from "./ZohoPeopleCard";
 
 function IntegrationTile({
   item,
@@ -56,7 +57,7 @@ function Section({ title, desc, children }: { title: string; desc: string; child
   );
 }
 
-/** Integrations screen: tile grid sections, or the selected tile's detail page. */
+/** Integrations screen: Zoho People card, tile grid sections, or a selected tile detail. */
 export function IntegrationsView(vm: IntegrationsVm) {
   if (vm.selected) {
     return (
@@ -72,6 +73,13 @@ export function IntegrationsView(vm: IntegrationsVm) {
   return (
     <div className="bonus-integ-page">
       <h1>Integrations</h1>
+
+      <Section
+        title="HRIS"
+        desc="Connect your HR system to import employees and keep onboarding kit recipients up to date."
+      >
+        <ZohoPeopleCard zoho={vm.zoho} />
+      </Section>
 
       <Section
         title="Collaboration tools"

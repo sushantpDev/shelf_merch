@@ -25,6 +25,10 @@ async function main() {
       },
       `ShelfMerch listening on ${base}`,
     );
+    if (env.ZOHO_REDIRECT_URI) {
+      // Safe: redirect URI only — never Client ID, secret, codes, or tokens.
+      logger.info(`Zoho OAuth redirect URI: ${env.ZOHO_REDIRECT_URI}`);
+    }
   });
 
   const shutdown = async (signal) => {

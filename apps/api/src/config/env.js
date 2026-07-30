@@ -23,25 +23,54 @@ const mongoUriSchema = isTest
   ? z.string().optional().default('')
   : z.string().min(1, 'Set MONGO_URL or MONGODB_URI to your MongoDB Atlas connection string');
 
+const ZOHO_CALLBACK_PATH = '/api/integrations/zoho/callback';
+
+/**
+ * Validate ZOHO_REDIRECT_URI shape. Must be an absolute URL whose pathname is
+ * exactly /api/integrations/zoho/callback (no trailing slash).
+ */
+export function validateZohoRedirectUri(raw) {
+  if (!raw || typeof raw !== 'string') {
+    return { ok: false, message: 'ZOHO_REDIRECT_URI is required when Zoho is enabled' };
+  }
+  if (raw.endsWith('/')) {
+    return {
+      ok: false,
+      message:
+        'ZOHO_REDIRECT_URI must not end with a trailing slash ' +
+        '(expected ...' + ZOHO_CALLBACK_PATH + ')',
+    };
+  }
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(raw);
+  } catch {
+    return { ok: false, message: 'ZOHO_REDIRECT_URI must be a valid absolute URL' };
+  }
+  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+    return { ok: false, message: 'ZOHO_REDIRECT_URI must use http or https' };
+  }
+  if (parsedUrl.pathname !== ZOHO_CALLBACK_PATH) {
+    return {
+      ok: false,
+      message: 'ZOHO_REDIRECT_URI pathname must be exactly ' + ZOHO_CALLBACK_PATH,
+    };
+  }
+  if (parsedUrl.search || parsedUrl.hash) {
+    return { ok: false, message: 'ZOHO_REDIRECT_URI must not include query or hash' };
+  }
+  return { ok: true, value: raw };
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  /** Bind address — use 0.0.0.0 in production so the VPS IP is reachable. */
-  HOST: z.string().default(isProd ? '0.0.0.0' : '0.0.0.0'),
+  HOST: z.string().default('0.0.0.0'),
   PORT: z.coerce.number().int().positive().default(isProd ? 8080 : 4000),
-  /**
-   * Number of trusted reverse-proxy hops in front of the app (Express `trust
-   * proxy`). Behind the HAProxy LB = 1; behind Cloudflare → HAProxy = 2. Only
-   * trusted hops may set `X-Forwarded-For`, so this must match the real topology
-   * or per-IP rate limits can be spoofed.
-   */
   TRUST_PROXY: z.coerce.number().int().min(0).default(1),
 
   MONGODB_URI: mongoUriSchema,
   REDIS_URL: z.string().default('redis://localhost:6379'),
 
-  // §Gap F — observability. LOG_LEVEL tunes pino; SENTRY_DSN /
-  // OTEL_EXPORTER_OTLP_ENDPOINT activate error reporting + tracing when their
-  // (optional) packages are installed. Empty = disabled.
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   SENTRY_DSN: z.string().optional().default(''),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional().default(''),
@@ -60,9 +89,7 @@ const envSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().optional().default(''),
   AWS_REGION: z.string().optional().default(''),
   S3_BUCKET_NAME: z.string().optional().default(''),
-  /** Optional CDN or custom domain base, e.g. https://shelfmerch.io */
   S3_PUBLIC_BASE_URL: z.string().optional().default(''),
-  /** auto = R2 → S3 → local; override with local while fixing IAM */
   STORAGE_DRIVER: z.enum(['auto', 'local', 's3', 'r2']).default('auto'),
 
   RAZORPAY_KEY_ID: z.string().optional().default(''),
@@ -79,47 +106,64 @@ const envSchema = z.object({
   EMAIL_PASSWORD: z.string().optional().default(''),
   EMAIL_FROM: z.string().optional().default(''),
   APP_URL: z.string().optional().default('http://localhost:8080'),
-  /**
-   * Comma-separated allowed CORS origins in production (e.g. http://72.62.76.198:8080).
-   * Empty no longer means "allow all" — cross-origin requests are refused unless the
-   * Origin is listed or matches the request Host (see resolveCorsOptions).
-   */
   CORS_ORIGINS: z.string().optional().default(''),
-
-  /**
-   * Content-Security-Policy mode for the production SPA + API:
-   *   report-only (default) — send CSP as report-only so a misconfigured policy
-   *     can't break the app; validate in staging, then switch to enforce.
-   *   enforce — send an enforcing Content-Security-Policy.
-   *   off — no CSP header (not recommended).
-   */
   CSP_MODE: z.enum(['enforce', 'report-only', 'off']).default('report-only'),
   GOOGLE_CLIENT_ID: z.string().optional().default(''),
   GOOGLE_CLIENT_SECRET: z.string().optional().default(''),
   GOOGLE_CALLBACK_URL: z.string().optional().default(''),
   BASE_URL: z.string().optional().default(''),
-  /** SPA route that receives tokens after Google OAuth (hash fragment). */
   CLIENT_URL: z.string().optional().default(''),
+
+  ZOHO_CLIENT_ID: z.string().optional().default(''),
+  ZOHO_CLIENT_SECRET: z.string().optional().default(''),
+  ZOHO_REDIRECT_URI: z.string().optional().default(''),
+  ZOHO_ACCOUNTS_URL: z.string().optional().default('https://accounts.zoho.in'),
+  TOKEN_ENCRYPTION_KEY: isProd
+    ? z.string().optional().default('')
+    : z.string().optional().default('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'),
 });
 
 const parsed = envSchema.safeParse(processEnv);
 if (!parsed.success) {
   const issues = parsed.error.issues
-    .map((i) => `  - ${i.path.join('.')}: ${i.message}`)
+    .map((i) => '  - ' + i.path.join('.') + ': ' + i.message)
     .join('\n');
-  // eslint-disable-next-line no-console
-  console.error(`Invalid environment configuration:\n${issues}`);
+  console.error('Invalid environment configuration:\n' + issues);
   process.exit(1);
 }
 
 export const env = parsed.data;
+
+const zohoPartial =
+  Boolean(env.ZOHO_CLIENT_ID) ||
+  Boolean(env.ZOHO_CLIENT_SECRET) ||
+  Boolean(env.ZOHO_REDIRECT_URI);
+if (zohoPartial) {
+  const missing = [];
+  if (!env.ZOHO_CLIENT_ID) missing.push('ZOHO_CLIENT_ID');
+  if (!env.ZOHO_CLIENT_SECRET) missing.push('ZOHO_CLIENT_SECRET');
+  if (!env.ZOHO_REDIRECT_URI) missing.push('ZOHO_REDIRECT_URI');
+  if (!env.TOKEN_ENCRYPTION_KEY) missing.push('TOKEN_ENCRYPTION_KEY');
+  if (!env.ZOHO_ACCOUNTS_URL) missing.push('ZOHO_ACCOUNTS_URL');
+  if (missing.length) {
+    console.error(
+      'Invalid Zoho People configuration — set all of: ' + missing.join(', ') +
+        ' (or leave all Zoho vars empty to disable the integration).',
+    );
+    process.exit(1);
+  }
+  const redirectCheck = validateZohoRedirectUri(env.ZOHO_REDIRECT_URI);
+  if (!redirectCheck.ok) {
+    console.error('Invalid Zoho People configuration:\n  - ZOHO_REDIRECT_URI: ' + redirectCheck.message);
+    process.exit(1);
+  }
+}
 
 export const corsOrigins = () =>
   env.CORS_ORIGINS.split(',')
     .map((o) => o.trim())
     .filter(Boolean);
 
-/** True when checkout can create orders (webhook secret is optional for that). */
 export const razorpayConfigured = () =>
   Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
 
@@ -136,14 +180,30 @@ export const googleAuthConfigured = () =>
 export const googleCallbackUrl = () => {
   if (env.GOOGLE_CALLBACK_URL) return env.GOOGLE_CALLBACK_URL.replace(/\/$/, '');
   const base = (env.BASE_URL || env.APP_URL).replace(/\/$/, '');
-  return `${base}/api/v1/auth/google/callback`;
+  return base + '/api/v1/auth/google/callback';
 };
 
 export const googleClientUrl = () => {
   if (env.CLIENT_URL) return env.CLIENT_URL.replace(/\/$/, '');
   const base = (env.BASE_URL || env.APP_URL).replace(/\/$/, '');
-  return `${base}/auth/google`;
+  return base + '/auth/google';
 };
+
+export const zohoPeopleConfigured = () =>
+  Boolean(env.ZOHO_CLIENT_ID && env.ZOHO_CLIENT_SECRET && env.ZOHO_REDIRECT_URI && env.TOKEN_ENCRYPTION_KEY);
+
+export const zohoAccountsUrl = () =>
+  (env.ZOHO_ACCOUNTS_URL || 'https://accounts.zoho.in').replace(/\/$/, '');
+
+export const zohoRedirectUri = () => {
+  const result = validateZohoRedirectUri(env.ZOHO_REDIRECT_URI);
+  if (!result.ok) {
+    throw new Error(result.message);
+  }
+  return result.value;
+};
+
+export const zohoIntegrationsClientPath = () => '/dashboard/integrations';
 
 export const s3Configured = () =>
   Boolean(env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY && env.AWS_REGION && env.S3_BUCKET_NAME);

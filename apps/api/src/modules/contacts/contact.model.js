@@ -14,6 +14,15 @@ const contactSchema = new mongoose.Schema(
     },
     department: { type: String, default: '' },
     employeeCode: { type: String, default: '' },
+    /** Optional split name fields (e.g. Zoho People sync). */
+    firstName: { type: String, default: '' },
+    lastName: { type: String, default: '' },
+    designation: { type: String, default: '' },
+    workLocation: { type: String, default: '' },
+    dateOfJoining: { type: Date, default: null },
+    employmentStatus: { type: String, default: '' },
+    /** Zoho People form record id — upsert key with tenantId. */
+    zohoRecordId: { type: String, default: '', index: true },
     source: { type: String, enum: ['manual', 'csv', 'hris'], default: 'manual' },
     address: {
       line1: { type: String, default: '' },
@@ -30,5 +39,9 @@ const contactSchema = new mongoose.Schema(
 contactSchema.plugin(tenantScopePlugin);
 contactSchema.plugin(softDeletePlugin);
 contactSchema.index({ tenantId: 1, email: 1 }, { unique: true });
+contactSchema.index(
+  { tenantId: 1, zohoRecordId: 1 },
+  { unique: true, partialFilterExpression: { zohoRecordId: { $gt: '' } } },
+);
 
 export const Contact = mongoose.model('Contact', contactSchema);

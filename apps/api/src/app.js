@@ -60,6 +60,7 @@ import { platformKitsRouter } from './modules/kits/platformKits.routes.js';
 import mediaRoutes from './modules/media/media.routes.js';
 import chatRoutes from './modules/chat/chat.routes.js';
 import { platformReportsRouter } from './modules/reports/reports.routes.js';
+import zohoIntegrationsRoutes from './modules/integrations/zoho/zoho.routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIST = path.resolve(__dirname, '../../web/dist');
@@ -260,6 +261,13 @@ export function createApp() {
   api.use('/platform/impersonate', platformImpersonateRouter);
 
   app.use('/api/v1', api);
+
+  /**
+   * Zoho People OAuth + sync — mounted at /api/integrations/zoho/* so the
+   * registered redirect URI can be https://shelfmerch.io/api/integrations/zoho/callback
+   * (outside the /api/v1 versioned surface, matching Zoho console config).
+   */
+  app.use('/api/integrations/zoho', globalHttpRateLimit, zohoIntegrationsRoutes);
 
   // Production: serve the Vite SPA from the same origin as the API.
   if (env.NODE_ENV === 'production' && existsSync(WEB_DIST)) {

@@ -1,3 +1,4 @@
+import zohoPeopleIcon from "../../../assets/integrations/zoho-people.svg";
 import googleChatIcon from "../../../assets/integrations/google-chat.svg";
 import microsoftTeamsIcon from "../../../assets/integrations/microsoft-teams.svg";
 import zapierIcon from "../../../assets/integrations/zapier.png";
@@ -23,6 +24,14 @@ export type Integration = {
 };
 
 export const INTEGRATIONS: Integration[] = [
+  {
+    id: "zoho-people",
+    name: "Zoho People",
+    category: "HRIS",
+    desc: "Connect your Zoho People account to import employees and manage onboarding kit orders.",
+    connected: false,
+    icon: zohoPeopleIcon,
+  },
   {
     id: "darwinbox",
     name: "Darwinbox",
@@ -174,6 +183,7 @@ export const USER_MANAGEMENT_TOOLS: Tile[] = [
     desc: "Seamlessly integrate your Human Resources Information or Management System.",
     recommended: true,
   },
+  app("zoho-people"),
   app("darwinbox"),
   app("keka"),
 ].filter(Boolean) as Tile[];
