@@ -7,6 +7,8 @@ export const ZOHO_AUTH_BRIDGE_COOKIE = 'zoho_auth_bridge';
 export const ZOHO_EMBED_SESSION_COOKIE = '__Host-shelfmerch-zoho-embed';
 /** Short-lived marker so OAuth callback can redirect to the embed popup page. */
 export const ZOHO_OAUTH_POPUP_COOKIE = 'zoho_oauth_popup';
+/** First-party popup OAuth launch session — __Host- prefix (Secure, Path=/, no Domain). */
+export const ZOHO_OAUTH_LAUNCH_COOKIE = '__Host-shelfmerch-zoho-oauth-launch';
 
 export function readCookies(req) {
   const header = req.headers?.cookie;
@@ -121,4 +123,32 @@ export function clearOAuthPopupCookie(res) {
 
 export function isOAuthPopupRequest(req) {
   return readCookies(req)[ZOHO_OAUTH_POPUP_COOKIE] === '1';
+}
+
+/**
+ * OAuth launch session for embed popup connect — HttpOnly, Secure, SameSite=Lax.
+ * __Host- prefix requires Path=/ and no Domain attribute.
+ */
+export function setOAuthLaunchSessionCookie(res, sessionToken, maxAgeSec = 5 * 60) {
+  const parts = [
+    `${ZOHO_OAUTH_LAUNCH_COOKIE}=${encodeURIComponent(sessionToken)}`,
+    'Path=/',
+    'HttpOnly',
+    'Secure',
+    'SameSite=Lax',
+    `Max-Age=${maxAgeSec}`,
+  ];
+  res.append('Set-Cookie', parts.join('; '));
+}
+
+export function clearOAuthLaunchSessionCookie(res) {
+  const parts = [
+    `${ZOHO_OAUTH_LAUNCH_COOKIE}=`,
+    'Path=/',
+    'HttpOnly',
+    'Secure',
+    'SameSite=Lax',
+    'Max-Age=0',
+  ];
+  res.append('Set-Cookie', parts.join('; '));
 }

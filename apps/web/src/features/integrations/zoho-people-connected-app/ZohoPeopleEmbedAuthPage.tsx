@@ -9,9 +9,11 @@ import {
   createEmbedRequestId,
   EMBED_OPENER_MISSING,
   sendEmbedAuthAndAwaitAck,
+  sendOAuthDoneAndAwaitAck,
   shelfmerchPostMessageOrigin,
-  SHELFMERCH_ZOHO_EMBED_OAUTH,
+  SHELFMERCH_ZOHO_OAUTH_BRIDGE_READY,
 } from "./zoho-embed-messaging";
+import { exchangeZohoOAuthLaunch, ZOHO_CONNECT_URL } from "@/services/zoho-api";
 
 /**
  * Popup page: first-party login, then issue one-time embed code and postMessage parent.
@@ -141,23 +143,45 @@ export function ZohoPeopleEmbedAuthPage() {
   );
 }
 
-/** Popup relay after Zoho OAuth — notifies opener iframe and closes. */
+/** Popup relay after Zoho OAuth — notifies opener iframe and closes after ACK. */
 export function ZohoPeopleOAuthDonePage() {
   const [params] = useSearchParams();
   const zoho = params.get("zoho");
+  const requestId = params.get("requestId") || "";
   const reason = params.get("reason") || undefined;
+  const closedRef = useRef(false);
 
   useEffect(() => {
     const status = zoho === "connected" ? "connected" : "error";
     const targetOrigin = shelfmerchPostMessageOrigin();
-    if (window.opener && !window.opener.closed) {
-      window.opener.postMessage(
-        { type: SHELFMERCH_ZOHO_EMBED_OAUTH, status, reason },
-        targetOrigin,
-      );
+
+    if (!window.opener || !requestId) {
+      return;
     }
-    window.setTimeout(() => window.close(), 400);
-  }, [zoho, reason]);
+
+    let cancelled = false;
+    (async () => {
+      try {
+        await sendOAuthDoneAndAwaitAck({
+          opener: window.opener as Window,
+          status,
+          requestId,
+          reason,
+          targetOrigin,
+        });
+        if (!cancelled && !closedRef.current) {
+          closedRef.current = true;
+          window.close();
+        }
+      } catch {
+        // Leave popup open if ACK never arrives.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [zoho, reason, requestId]);
 
   return (
     <main className="zoho-connected-app zoho-embed-auth-popup">
@@ -169,28 +193,61 @@ export function ZohoPeopleOAuthDonePage() {
 }
 
 /**
- * Popup bridge: establish OAuth bridge cookie then redirect to Zoho connect (popup mode).
- * Route: /zoho/people/oauth-bridge
+ * Popup bridge: handshake with iframe for one-time OAuth launch code, then connect.
+ * Route: /zoho/people/oauth-bridge?requestId=...
  */
 export function ZohoPeopleOAuthBridgePage() {
+  const [params] = useSearchParams();
+  const requestId = params.get("requestId") || "";
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!requestId) {
+      setError("Invalid OAuth launch request.");
+      return;
+    }
+
+    if (!window.opener) {
+      setError("Unable to communicate with Zoho People. Please close this window and try again.");
+      return;
+    }
+
+    const targetOrigin = shelfmerchPostMessageOrigin();
     let cancelled = false;
-    (async () => {
+
+    const onLaunch = async (event: MessageEvent) => {
+      if (event.origin !== targetOrigin) return;
+      if (event.source !== window.opener) return;
+      if (!event.data || typeof event.data !== "object") return;
+      if (event.data.type !== "SHELFMERCH_ZOHO_OAUTH_LAUNCH") return;
+      if (event.data.requestId !== requestId) return;
+      if (typeof event.data.code !== "string") return;
+
+      window.removeEventListener("message", onLaunch);
+
       try {
-        const { startZohoConnectPopup } = await import("@/services/zoho-api");
-        await startZohoConnectPopup();
+        await exchangeZohoOAuthLaunch(event.data.code, requestId);
+        if (cancelled) return;
+        const connectUrl = `${ZOHO_CONNECT_URL}?popup=1&requestId=${encodeURIComponent(requestId)}`;
+        window.location.assign(connectUrl);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof ApiError ? err.message : "Could not start Zoho connection");
         }
       }
-    })();
+    };
+
+    window.addEventListener("message", onLaunch);
+    window.opener.postMessage(
+      { type: SHELFMERCH_ZOHO_OAUTH_BRIDGE_READY, requestId },
+      targetOrigin,
+    );
+
     return () => {
       cancelled = true;
+      window.removeEventListener("message", onLaunch);
     };
-  }, []);
+  }, [requestId]);
 
   return (
     <main className="zoho-connected-app zoho-embed-auth-popup">

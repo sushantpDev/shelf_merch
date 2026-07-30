@@ -56,6 +56,26 @@ async function zohoFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     credentials: "include",
   });
 
+  return parseZohoResponse<T>(res);
+}
+
+/** Zoho API calls authenticated by embed session cookie only (no Bearer). */
+async function zohoEmbedSessionFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  if (init.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const res = await fetch(`${ZOHO_API_BASE}${path}`, {
+    ...init,
+    headers,
+    credentials: "include",
+  });
+
+  return parseZohoResponse<T>(res);
+}
+
+async function parseZohoResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
   let body: unknown = null;
   if (text) {
@@ -121,16 +141,28 @@ export function exchangeZohoEmbedCode(code: string, requestId: string) {
   });
 }
 
+/** Iframe issues one-time OAuth launch code (embed session cookie auth). */
+export function issueZohoOAuthLaunch(requestId: string) {
+  return zohoEmbedSessionFetch<{ code: string; requestId: string; expiresInSec: number }>(
+    "/oauth-launch/issue",
+    { method: "POST", body: JSON.stringify({ requestId }) },
+  );
+}
+
+/** Popup exchanges launch code for temporary OAuth launch session cookie. */
+export function exchangeZohoOAuthLaunch(code: string, requestId: string) {
+  return zohoEmbedSessionFetch<{ ok: boolean }>("/oauth-launch/exchange", {
+    method: "POST",
+    body: JSON.stringify({ code, requestId }),
+  });
+}
+
+export const ZOHO_CONNECT_URL = `${ZOHO_API_BASE}/connect`;
+
 /** Report a safe embed client event (no secrets). */
 export function reportZohoEmbedEvent(event: string, requestId?: string) {
   return zohoFetch<{ ok: boolean }>("/embed/event", {
     method: "POST",
     body: JSON.stringify({ event, requestId }),
   });
-}
-
-/** Popup OAuth: bridge cookie then navigate to connect with popup=1. */
-export async function startZohoConnectPopup(): Promise<void> {
-  await zohoFetch<{ ok: boolean }>("/bridge", { method: "POST" });
-  window.location.assign(`${ZOHO_API_BASE}/connect?popup=1`);
 }

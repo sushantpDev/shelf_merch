@@ -33,6 +33,27 @@ const zohoEmbedIssueRateLimit = rateLimit([
   },
 ]);
 
+const zohoOAuthLaunchIssueRateLimit = rateLimit([
+  { prefix: 'zoho:oauth-launch:issue:ip', limit: 20, windowSec: 15 * 60, key: clientIp, critical: true },
+  {
+    prefix: 'zoho:oauth-launch:issue:user',
+    limit: 10,
+    windowSec: 15 * 60,
+    key: (req) => req.user?.userId || clientIp(req),
+    critical: true,
+  },
+]);
+
+const zohoOAuthLaunchExchangeRateLimit = rateLimit([
+  {
+    prefix: 'zoho:oauth-launch:exchange:ip',
+    limit: 30,
+    windowSec: 15 * 60,
+    key: clientIp,
+    critical: true,
+  },
+]);
+
 const zohoEmbedExchangeRateLimit = rateLimit([
   { prefix: 'zoho:embed:exchange:ip', limit: 30, windowSec: 15 * 60, key: clientIp, critical: true },
 ]);
@@ -119,6 +140,37 @@ async function authenticateZoho(req, _res, next) {
   return next(new UnauthorizedError('Missing access token'));
 }
 
+/**
+ * GET /connect accepts first-party JWT (Bearer / bridge cookie) or a temporary
+ * OAuth launch session cookie from the embed popup handshake.
+ */
+async function authenticateZohoConnect(req, _res, next) {
+  const token = controller.extractZohoAccessToken(req);
+  if (token) {
+    try {
+      await attachUserFromAccessToken(req, token);
+      return next();
+    } catch {
+      return next(new UnauthorizedError('Invalid or expired access token'));
+    }
+  }
+
+  try {
+    const launchUser = await controller.resolveOAuthLaunchSessionUser(req);
+    if (launchUser) {
+      req.user = launchUser;
+      req.impersonation = { isImpersonating: false, originalUserId: null };
+      req.authSource = 'oauth_launch_session';
+      setRequestContext({ userId: launchUser.userId, tenantId: launchUser.tenantId });
+      return next();
+    }
+  } catch {
+    return next(new UnauthorizedError('Invalid OAuth launch session'));
+  }
+
+  return next(new UnauthorizedError('Missing access token'));
+}
+
 const adminWrite = [
   authenticateZoho,
   resolveTenant,
@@ -142,6 +194,22 @@ const embedIssue = [
   tenantArea('integrations', 'read'),
 ];
 
+const oauthLaunchIssue = [
+  authenticateZoho,
+  resolveTenant,
+  requireTenantContext,
+  blockDuringImpersonation,
+  tenantArea('integrations', 'write'),
+];
+
+const connectWrite = [
+  authenticateZohoConnect,
+  resolveTenant,
+  requireTenantContext,
+  blockDuringImpersonation,
+  tenantArea('integrations', 'write'),
+];
+
 router.get('/status', ...adminRead, asyncHandler(controller.getStatus));
 router.post(
   '/bridge',
@@ -153,9 +221,20 @@ router.post(
   zohoOAuthRateLimit,
   asyncHandler(controller.bridge),
 );
-router.get('/connect', ...adminWrite, zohoOAuthRateLimit, asyncHandler(controller.connect));
+router.get('/connect', ...connectWrite, zohoOAuthRateLimit, asyncHandler(controller.connect));
 /** Public OAuth callback — state cookie + server-side state record bind the session. */
 router.get('/callback', zohoOAuthRateLimit, asyncHandler(controller.callback));
+router.post(
+  '/oauth-launch/issue',
+  ...oauthLaunchIssue,
+  zohoOAuthLaunchIssueRateLimit,
+  asyncHandler(controller.issueOAuthLaunch),
+);
+router.post(
+  '/oauth-launch/exchange',
+  zohoOAuthLaunchExchangeRateLimit,
+  asyncHandler(controller.exchangeOAuthLaunch),
+);
 router.post(
   '/embed/issue',
   ...embedIssue,

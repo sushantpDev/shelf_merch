@@ -27,6 +27,7 @@ export async function storeOAuthState(state, record) {
     tenantId: String(record.tenantId),
     userId: String(record.userId),
     embedPopup: Boolean(record.embedPopup),
+    requestId: typeof record.requestId === 'string' ? record.requestId : '',
     createdAt: Date.now(),
   };
   const redisOk = await ensureRedisReady(1_500);
@@ -70,6 +71,7 @@ export async function consumeOAuthState(state) {
     tenantId: entry.tenantId,
     userId: entry.userId,
     embedPopup: Boolean(entry.embedPopup),
+    requestId: typeof entry.requestId === 'string' ? entry.requestId : '',
     createdAt: entry.createdAt,
   };
 }

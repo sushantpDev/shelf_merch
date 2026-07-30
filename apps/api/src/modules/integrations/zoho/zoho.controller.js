@@ -11,6 +11,12 @@ import { consumeOAuthState } from './zohoOAuthState.service.js';
 import { disconnectZoho } from './zohoToken.service.js';
 import { syncZohoEmployees } from './zohoSync.service.js';
 import { issueEmbedAuthCode, exchangeEmbedAuthCode, resolveEmbedSession } from './zohoEmbedAuth.service.js';
+import {
+  issueOAuthLaunchCode,
+  exchangeOAuthLaunchCode,
+  resolveOAuthLaunchSession,
+  consumeOAuthLaunchSession,
+} from './zohoOAuthLaunch.service.js';
 import { User } from '../../users/user.model.js';
 import { RoleAssignment } from '../../roles/roleAssignment.model.js';
 import { signAccessToken } from '../../auth/auth.service.js';
@@ -24,8 +30,11 @@ import {
   setOAuthPopupCookie,
   clearOAuthPopupCookie,
   isOAuthPopupRequest,
+  setOAuthLaunchSessionCookie,
+  clearOAuthLaunchSessionCookie,
   ZOHO_AUTH_BRIDGE_COOKIE,
   ZOHO_EMBED_SESSION_COOKIE,
+  ZOHO_OAUTH_LAUNCH_COOKIE,
   ZOHO_OAUTH_STATE_COOKIE,
 } from './zohoCookies.js';
 
@@ -109,10 +118,22 @@ export async function bridge(req, res) {
 
 export async function connect(req, res) {
   const embedPopup = req.query.popup === '1' || req.query.popup === 'true';
+  const requestId =
+    typeof req.query.requestId === 'string' && req.query.requestId.trim()
+      ? req.query.requestId.trim()
+      : '';
+
+  if (req.authSource === 'oauth_launch_session') {
+    const launchToken = extractOAuthLaunchSessionToken(req);
+    await consumeOAuthLaunchSession(launchToken);
+    clearOAuthLaunchSessionCookie(res);
+  }
+
   const { url, state } = await beginZohoConnect({
     tenantId: req.tenantId,
     userId: req.user.userId,
     embedPopup,
+    requestId: embedPopup ? requestId : '',
   });
   setOAuthStateCookie(res, state);
   if (embedPopup) setOAuthPopupCookie(res);
@@ -159,9 +180,17 @@ export async function callback(req, res) {
       code,
       zohoLocation: typeof zohoLocation === 'string' ? zohoLocation : '',
     });
-    return finish({ zoho: 'connected' });
+    const doneQuery = { zoho: 'connected' };
+    if (popupMode && oauthRecord.requestId) {
+      doneQuery.requestId = oauthRecord.requestId;
+    }
+    return finish(doneQuery);
   } catch {
-    return finish({ zoho: 'error' });
+    const doneQuery = { zoho: 'error' };
+    if (popupMode && oauthRecord.requestId) {
+      doneQuery.requestId = oauthRecord.requestId;
+    }
+    return finish(doneQuery);
   }
 }
 
@@ -176,6 +205,27 @@ export async function issueEmbedAuth(req, res) {
     requestId,
   });
   return res.json(result);
+}
+
+export async function issueOAuthLaunch(req, res) {
+  const requestId =
+    typeof req.body?.requestId === 'string' && req.body.requestId.trim()
+      ? req.body.requestId.trim()
+      : '';
+  const result = await issueOAuthLaunchCode({
+    tenantId: req.tenantId,
+    userId: req.user.userId,
+    requestId,
+  });
+  return res.json(result);
+}
+
+export async function exchangeOAuthLaunch(req, res) {
+  const code = typeof req.body?.code === 'string' ? req.body.code : '';
+  const requestId = typeof req.body?.requestId === 'string' ? req.body.requestId : '';
+  const { sessionToken, expiresInSec } = await exchangeOAuthLaunchCode({ code, requestId });
+  setOAuthLaunchSessionCookie(res, sessionToken, expiresInSec);
+  return res.json({ ok: true });
 }
 
 export async function exchangeEmbedAuth(req, res) {
@@ -220,6 +270,17 @@ export function extractZohoAccessToken(req) {
 export function extractEmbedSessionToken(req) {
   const cookies = readCookies(req);
   return cookies[ZOHO_EMBED_SESSION_COOKIE] || null;
+}
+
+export function extractOAuthLaunchSessionToken(req) {
+  const cookies = readCookies(req);
+  return cookies[ZOHO_OAUTH_LAUNCH_COOKIE] || null;
+}
+
+export async function resolveOAuthLaunchSessionUser(req) {
+  const token = extractOAuthLaunchSessionToken(req);
+  if (!token) return null;
+  return resolveOAuthLaunchSession(token);
 }
 
 export async function resolveEmbedSessionUser(req) {
