@@ -123,11 +123,7 @@ export async function completeZohoConnection({
   const encryptedAccessToken = encryptToken(tokens.accessToken);
   const encryptedRefreshToken = encryptToken(tokens.refreshToken);
   const connectedAt = new Date();
-  const status = !orgVerified
-    ? 'error'
-    : org.needsAttention
-      ? 'needs_attention'
-      : 'connected';
+  const status = orgVerified ? 'connected' : 'error';
 
   const doc = await ZohoIntegration.findOneAndUpdate(
     { tenantId },

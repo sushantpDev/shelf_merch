@@ -150,6 +150,7 @@ describe('Zoho People connect / callback / disconnect', () => {
     await ZohoIntegration.create({
       tenantId: tenant._id,
       connectedByUserId: admin._id,
+      zohoOrganizationId: '89740123',
       zohoOrganizationName: 'Rubix Org',
       encryptedAccessToken: encryptToken('access-plain'),
       encryptedRefreshToken: encryptToken('refresh-plain'),
@@ -201,6 +202,54 @@ describe('Zoho People connect / callback / disconnect', () => {
     expect(res.body.status).toBe('not_connected');
     expect(res.body.integration).toBeNull();
     expect(JSON.stringify(res.body)).not.toContain('Secret Other Org');
+  });
+
+  it('GET /status returns connected for legacy needs_attention rows with organisation id', async () => {
+    await ZohoIntegration.create({
+      tenantId: tenant._id,
+      connectedByUserId: admin._id,
+      zohoOrganizationId: '89740123',
+      zohoOrganizationName: 'Chitlu Innovations Private Limited',
+      encryptedAccessToken: encryptToken('access-plain'),
+      encryptedRefreshToken: encryptToken('refresh-plain'),
+      accessTokenExpiresAt: new Date(Date.now() + 3600_000),
+      apiDomain: 'https://www.zohoapis.in',
+      zohoLocation: 'in',
+      status: 'needs_attention',
+      connectedAt: new Date(),
+      lastError: '',
+    });
+
+    const res = await request(app)
+      .get('/api/integrations/zoho/status')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('connected');
+    expect(res.body.integration.zohoOrganizationName).toBe('Chitlu Innovations Private Limited');
+  });
+
+  it('GET /status returns needs_attention for refresh-token failure', async () => {
+    await ZohoIntegration.create({
+      tenantId: tenant._id,
+      connectedByUserId: admin._id,
+      zohoOrganizationId: '89740123',
+      encryptedAccessToken: encryptToken('access-plain'),
+      encryptedRefreshToken: encryptToken('refresh-plain'),
+      accessTokenExpiresAt: new Date(Date.now() - 3600_000),
+      apiDomain: 'https://www.zohoapis.in',
+      zohoLocation: 'in',
+      status: 'expired',
+      connectedAt: new Date(),
+      lastError: 'Token refresh failed',
+    });
+
+    const res = await request(app)
+      .get('/api/integrations/zoho/status')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('needs_attention');
   });
 });
 

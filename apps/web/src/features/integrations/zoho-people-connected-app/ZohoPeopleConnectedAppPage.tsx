@@ -16,35 +16,12 @@ import {
   useZohoPeopleConnectedAppController,
   type ZohoPeopleConnectedAppVm,
 } from "./useZohoPeopleConnectedAppController";
-
-function statusLabel(status: ZohoPeopleConnectedAppVm["status"]) {
-  switch (status) {
-    case "connected":
-      return "Connected";
-    case "needs_attention":
-      return "Needs attention";
-    case "expired":
-      return "Connection expired";
-    case "error":
-      return "Error";
-    default:
-      return "Not connected";
-  }
-}
-
-function statusClass(status: ZohoPeopleConnectedAppVm["status"]) {
-  switch (status) {
-    case "connected":
-      return "zoho-status zoho-status--connected";
-    case "needs_attention":
-    case "expired":
-      return "zoho-status zoho-status--expired";
-    case "error":
-      return "zoho-status zoho-status--error";
-    default:
-      return "zoho-status zoho-status--idle";
-  }
-}
+import {
+  isZohoPeopleIntegrationActive,
+  zohoPeopleConnectionSubtitle,
+  zohoPeopleStatusClass,
+  zohoPeopleStatusLabel,
+} from "./zoho-people-status";
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "—";
@@ -64,11 +41,7 @@ function ZohoPeopleConnectedAppView({ vm }: { vm: ZohoPeopleConnectedAppVm }) {
     icon: zohoPeopleIcon,
   };
 
-  const connected =
-    vm.status === "connected" ||
-    vm.status === "needs_attention" ||
-    vm.status === "expired" ||
-    vm.status === "error";
+  const connected = isZohoPeopleIntegrationActive(vm.status, vm.integration);
 
   const showSignedOut =
     vm.authPhase === "signed_out" ||
@@ -121,11 +94,11 @@ function ZohoPeopleConnectedAppView({ vm }: { vm: ZohoPeopleConnectedAppVm }) {
             <div className="zoho-integ-card-title">
               <div className="zoho-integ-card-title-row">
                 <h1 id="zoho-people-heading">Zoho People</h1>
-                <span className={statusClass(vm.status)} role="status">
-                  {vm.loading ? "Checking…" : statusLabel(vm.status)}
+                <span className={zohoPeopleStatusClass(vm.status)} role="status">
+                  {vm.loading ? "Checking…" : zohoPeopleStatusLabel(vm.status)}
                 </span>
               </div>
-              <p>Connect Zoho People to sync employees into ShelfMerch.</p>
+              <p>{zohoPeopleConnectionSubtitle(vm.status)}</p>
             </div>
           </div>
 
@@ -147,6 +120,12 @@ function ZohoPeopleConnectedAppView({ vm }: { vm: ZohoPeopleConnectedAppVm }) {
           )}
 
           <div className="zoho-integ-actions">
+            {vm.waitingForZohoAuth ? (
+              <p className="zoho-embed-auth-wait" role="status">
+                <Loader2 className="zoho-integ-spin" size={18} aria-hidden="true" />
+                Waiting for Zoho authorization…
+              </p>
+            ) : null}
             {!connected && (
               <button
                 type="button"
@@ -172,7 +151,7 @@ function ZohoPeopleConnectedAppView({ vm }: { vm: ZohoPeopleConnectedAppVm }) {
                   type="button"
                   className="zoho-integ-btn zoho-integ-btn--primary"
                   onClick={vm.onSync}
-                  disabled={!vm.canManage || vm.syncing || vm.status === "expired"}
+                  disabled={!vm.canManage || vm.syncing || vm.status === "expired" || vm.status === "needs_attention"}
                   aria-busy={vm.syncing}
                 >
                   {vm.syncing ? (
@@ -185,7 +164,7 @@ function ZohoPeopleConnectedAppView({ vm }: { vm: ZohoPeopleConnectedAppVm }) {
                   )}
                 </button>
 
-                {vm.status === "expired" && (
+                {(vm.status === "needs_attention" || vm.status === "expired") && (
                   <button
                     type="button"
                     className="zoho-integ-btn"

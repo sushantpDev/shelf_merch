@@ -311,7 +311,8 @@ export async function fetchZohoOrganization({ location, apiDomain, accessToken }
     );
     throw new ApiError(502, 'Zoho organisation response was unusable', 'ZOHO_ORG_UNUSABLE');
   }
-  return { id, name, peopleBaseUrl, needsAttention: Boolean(id && !name) };
+  // v3 /organization often returns Company id without a display name — that is not actionable.
+  return { id, name, peopleBaseUrl, needsAttention: false };
 }
 
 function zohoEnvelopeMeta(payload) {
