@@ -28,6 +28,7 @@ export function ZohoPeopleEmbedAuthPage() {
     isAuthenticated() ? "issuing" : "login",
   );
   const issuedRef = useRef(false);
+  const closedRef = useRef(false);
 
   const issueAndNotify = useCallback(async () => {
     if (issuedRef.current) return;
@@ -51,7 +52,10 @@ export function ZohoPeopleEmbedAuthPage() {
         targetOrigin: shelfmerchPostMessageOrigin(),
       });
       setPhase("done");
-      window.close();
+      if (!closedRef.current) {
+        closedRef.current = true;
+        window.close();
+      }
     } catch (err) {
       issuedRef.current = false;
       setPhase("login");

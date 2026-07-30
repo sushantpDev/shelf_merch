@@ -139,3 +139,68 @@ export function sendEmbedAuthAndAwaitAck({
 export function buildEmbedAuthAck(requestId: string): ZohoEmbedAuthAckMessage {
   return { type: SHELFMERCH_ZOHO_EMBED_AUTH_ACK, requestId };
 }
+
+export type EmbedAuthDedupState = {
+  inFlightRequestIds: Set<string>;
+  completedRequestIds: Set<string>;
+};
+
+export function createEmbedAuthDedupState(): EmbedAuthDedupState {
+  return {
+    inFlightRequestIds: new Set<string>(),
+    completedRequestIds: new Set<string>(),
+  };
+}
+
+export type HandleEmbedAuthMessageResult =
+  | "ignored_in_flight"
+  | "ack_only"
+  | "exchanged"
+  | "failed";
+
+/**
+ * Deduplicate embed auth postMessages by requestId before calling /embed/exchange.
+ */
+export async function handleEmbedAuthMessage(
+  state: EmbedAuthDedupState,
+  message: { code: string; requestId: string },
+  deps: {
+    exchange: (code: string, requestId: string) => Promise<void>;
+    sendAck: (requestId: string) => void;
+    onExchangeStart?: () => void;
+    onExchangeSuccess: () => void | Promise<void>;
+    onExchangeFailure: (error: unknown) => void;
+  },
+): Promise<HandleEmbedAuthMessageResult> {
+  const { requestId, code } = message;
+
+  if (state.completedRequestIds.has(requestId)) {
+    deps.sendAck(requestId);
+    return "ack_only";
+  }
+
+  if (state.inFlightRequestIds.has(requestId)) {
+    return "ignored_in_flight";
+  }
+
+  state.inFlightRequestIds.add(requestId);
+  deps.onExchangeStart?.();
+
+  try {
+    await deps.exchange(code, requestId);
+  } catch (error) {
+    state.inFlightRequestIds.delete(requestId);
+    if (state.completedRequestIds.has(requestId)) {
+      deps.sendAck(requestId);
+      return "ack_only";
+    }
+    deps.onExchangeFailure(error);
+    return "failed";
+  }
+
+  state.inFlightRequestIds.delete(requestId);
+  state.completedRequestIds.add(requestId);
+  deps.sendAck(requestId);
+  await deps.onExchangeSuccess();
+  return "exchanged";
+}

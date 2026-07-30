@@ -13,7 +13,9 @@ import { isAuthenticated } from "@/services/auth-store";
 import { ApiError } from "@/services/api";
 import {
   buildEmbedAuthAck,
+  createEmbedAuthDedupState,
   createEmbedRequestId,
+  handleEmbedAuthMessage,
   isZohoEmbedAuthMessage,
   isZohoEmbedOAuthMessage,
   shelfmerchPostMessageOrigin,
@@ -64,6 +66,7 @@ export function useZohoPeopleConnectedAppController(sandbox: boolean): ZohoPeopl
   const queryClient = useQueryClient();
   const popupRef = useRef<Window | null>(null);
   const pendingRequestIdRef = useRef<string | null>(null);
+  const embedAuthDedupRef = useRef(createEmbedAuthDedupState());
   const targetOrigin = shelfmerchPostMessageOrigin();
 
   const statusQuery = useQuery({
@@ -110,21 +113,35 @@ export function useZohoPeopleConnectedAppController(sandbox: boolean): ZohoPeopl
 
   const exchangeCode = useCallback(
     async (code: string, requestId: string, source: MessageEventSource | null) => {
-      setAuthPhase("exchanging");
-      try {
-        await exchangeZohoEmbedCode(code, requestId);
+      const sendAck = (ackRequestId: string) => {
         if (source && "postMessage" in source && typeof source.postMessage === "function") {
-          source.postMessage(buildEmbedAuthAck(requestId), targetOrigin);
+          source.postMessage(buildEmbedAuthAck(ackRequestId), targetOrigin);
         }
-        setAuthPhase("authenticated");
-        setPopupBlocked(false);
-        popupRef.current = null;
-        pendingRequestIdRef.current = null;
-        await queryClient.invalidateQueries({ queryKey: ZOHO_QUERY_KEY });
-      } catch (err) {
-        setAuthPhase("signed_out");
-        toast.error(err instanceof ApiError ? err.message : "Sign-in failed");
-      }
+      };
+
+      await handleEmbedAuthMessage(
+        embedAuthDedupRef.current,
+        { code, requestId },
+        {
+          exchange: exchangeZohoEmbedCode,
+          sendAck,
+          onExchangeStart: () => setAuthPhase("exchanging"),
+          onExchangeSuccess: async () => {
+            setAuthPhase("authenticated");
+            setPopupBlocked(false);
+            popupRef.current = null;
+            pendingRequestIdRef.current = null;
+            await queryClient.invalidateQueries({ queryKey: ZOHO_QUERY_KEY });
+          },
+          onExchangeFailure: (err) => {
+            if (embedAuthDedupRef.current.completedRequestIds.has(requestId)) {
+              return;
+            }
+            setAuthPhase("signed_out");
+            toast.error(err instanceof ApiError ? err.message : "Sign-in failed");
+          },
+        },
+      );
     },
     [queryClient, targetOrigin],
   );
