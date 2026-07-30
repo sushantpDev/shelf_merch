@@ -35,11 +35,11 @@ export function AuthLayout({ children, title, subtitle, footerLink }: AuthLayout
       </div>
 
       <footer className="auth-simple-footer">
-        <Link to="/login" className="auth-simple-footer-link">
-          Terms of use
+        <Link to="/legal/terms-of-service" className="auth-simple-footer-link">
+          Terms of Service
         </Link>
-        <Link to="/login" className="auth-simple-footer-link">
-          Privacy policy
+        <Link to="/legal/privacy-policy" className="auth-simple-footer-link">
+          Privacy Policy
         </Link>
       </footer>
     </div>

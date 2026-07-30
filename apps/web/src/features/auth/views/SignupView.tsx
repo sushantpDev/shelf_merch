@@ -1,4 +1,5 @@
 import { Eye, EyeOff } from "lucide-react";
+import { Link } from "react-router";
 import type { SignupVm } from "../controllers/useSignupController";
 import { AuthLabel, AuthLayout, authInputClassName } from "./AuthLayout";
 
@@ -88,13 +89,13 @@ export function SignupView(vm: SignupVm) {
 
         <p className="auth-simple-legal">
           By proceeding, you agree to Shelf Merch&apos;s{" "}
-          <button type="button" className="auth-simple-legal-link">
+          <Link to="/legal/privacy-policy" className="auth-simple-legal-link">
             Privacy Policy
-          </button>{" "}
+          </Link>{" "}
           and{" "}
-          <button type="button" className="auth-simple-legal-link">
-            Terms of Use
-          </button>
+          <Link to="/legal/terms-of-service" className="auth-simple-legal-link">
+            Terms of Service
+          </Link>
           .
         </p>
 

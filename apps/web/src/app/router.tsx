@@ -205,6 +205,14 @@ export const appRouter = createBrowserRouter([
       },
       { path: "signup", lazy: page(() => import("@/features/auth/SignupPage"), "SignupPage") },
       {
+        path: "legal/privacy-policy",
+        lazy: page(() => import("@/features/legal/PrivacyPolicyPage"), "PrivacyPolicyPage"),
+      },
+      {
+        path: "legal/terms-of-service",
+        lazy: page(() => import("@/features/legal/TermsOfServicePage"), "TermsOfServicePage"),
+      },
+      {
         path: "auth/google",
         lazy: page(() => import("@/features/auth/GoogleAuthCallbackPage"), "GoogleAuthCallbackPage"),
       },

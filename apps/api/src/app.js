@@ -67,6 +67,8 @@ import {
   zohoPeopleEmbedHeaderMiddleware,
   defaultShelfmerchCoopMiddleware,
 } from './middleware/zohoPeopleEmbed.middleware.js';
+import { sendPrivacyPolicy } from './modules/legal/privacyPolicy.controller.js';
+import { sendTermsOfService } from './modules/legal/termsOfService.controller.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIST = path.resolve(__dirname, '../../web/dist');
@@ -313,13 +315,17 @@ export function createApp() {
   app.get('/zoho/people/oauth-bridge', sendZohoEmbedPopupPage);
   app.get('/zoho/people/oauth-done', sendZohoEmbedPopupPage);
 
+  /** Public legal pages — full HTML (indexable without SPA bootstrap). */
+  app.get('/legal/privacy-policy', sendPrivacyPolicy);
+  app.get('/legal/terms-of-service', sendTermsOfService);
+
   // Production: serve the Vite SPA from the same origin as the API.
   if (env.NODE_ENV === 'production' && existsSync(WEB_DIST)) {
     app.use(express.static(WEB_DIST, { index: false, maxAge: '1d' }));
     app.get('*', (req, res, next) => {
       if (req.method !== 'GET' && req.method !== 'HEAD') return next();
       if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) return next();
-      // /zoho/people(*) is registered above with embed headers.
+      // /zoho/people(*) and /legal/* are registered above.
       res.sendFile('index.html', { root: WEB_DIST });
     });
   }

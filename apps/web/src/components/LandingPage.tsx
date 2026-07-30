@@ -146,23 +146,55 @@ const GIFTING_FEATURES = [
 const FOOTER_COLUMNS = [
   {
     title: "Products",
-    links: ["Shops", "Gifting", "Swag", "Snacks", "Gift Cards", "Send Points"],
+    links: [
+      { label: "Shops", href: "#products" },
+      { label: "Gifting", href: "#products" },
+      { label: "Swag", href: "#products" },
+      { label: "Snacks", href: "#products" },
+      { label: "Gift Cards", href: "#products" },
+      { label: "Send Points", href: "#products" },
+    ],
   },
   {
     title: "Platform",
-    links: ["Integrations", "API", "Kudos Program", "Custom Shops", "Analytics", "Wallet"],
+    links: [
+      { label: "Integrations", href: "#" },
+      { label: "API", href: "#" },
+      { label: "Kudos Program", href: "#" },
+      { label: "Custom Shops", href: "#" },
+      { label: "Analytics", href: "#" },
+      { label: "Wallet", href: "#" },
+    ],
   },
   {
     title: "Resources",
-    links: ["Help Center", "Blog", "Case Studies", "Partnerships", "Videos", "Contact Us"],
+    links: [
+      { label: "Help Center", href: "#" },
+      { label: "Blog", href: "#" },
+      { label: "Case Studies", href: "#" },
+      { label: "Partnerships", href: "#" },
+      { label: "Videos", href: "#" },
+      { label: "Contact Us", href: "mailto:support@shelfmerch.com" },
+    ],
   },
   {
     title: "Company",
-    links: ["About", "Careers", "Press", "Reviews", "Partner With Us"],
+    links: [
+      { label: "About", href: "#" },
+      { label: "Careers", href: "#" },
+      { label: "Press", href: "#" },
+      { label: "Reviews", href: "#" },
+      { label: "Partner With Us", href: "#" },
+    ],
   },
   {
     title: "Legal",
-    links: ["Privacy Policy", "Terms of Service", "Security", "Cookie Preferences"],
+    links: [
+      { label: "Privacy Policy", href: "/legal/privacy-policy" },
+      { label: "Terms of Service", href: "/legal/terms-of-service" },
+      { label: "Security", href: "#" },
+      { label: "Cookie Preferences", href: "#" },
+    ],
   },
 ] as const;
 
@@ -1160,8 +1192,8 @@ export default function LandingPage() {
                 <h4 className="lp-footer__col-title">{col.title}</h4>
                 <ul className="lp-footer__links">
                   {col.links.map((link) => (
-                    <li key={link}>
-                      <a href="#">{link}</a>
+                    <li key={link.label}>
+                      <a href={link.href}>{link.label}</a>
                     </li>
                   ))}
                 </ul>
@@ -1174,10 +1206,10 @@ export default function LandingPage() {
           <div className="lp-container lp-footer__bottom-inner">
             <span className="lp-footer__copy">© 2026 ShelfMerch. All rights reserved.</span>
             <div className="lp-footer__bottom-links">
-              <a href="#">Privacy Policy</a>
-              <a href="#">Terms of Service</a>
+              <a href="/legal/privacy-policy">Privacy Policy</a>
+              <a href="/legal/terms-of-service">Terms of Service</a>
               <a href="#">Security</a>
-              <a href="#">Need Help?</a>
+              <a href="mailto:support@shelfmerch.com">Need Help?</a>
             </div>
           </div>
         </div>
