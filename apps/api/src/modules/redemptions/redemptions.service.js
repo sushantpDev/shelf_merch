@@ -50,6 +50,93 @@ const KIT_PRODUCT_SELECT =
   'name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas';
 
 /** Active catalog rows for a kit — same list shown to recipients and validated on submit. */
+function parseCuratedMeta(designNotes) {
+  try {
+    if (!designNotes) return null;
+    const parsed = typeof designNotes === 'string' ? JSON.parse(designNotes) : designNotes;
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (parsed.curated || parsed.originalId) return parsed;
+    if (Array.isArray(parsed.itemImages) && parsed.itemImages.length) {
+      return { ...parsed, curated: true };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function curatedKitUnitPriceInr(kit, meta) {
+  return Math.round(Number(meta?.approxValueInr) || Number(kit?.kitPrice) || 0);
+}
+
+/** Display rows for curated kits that have no tenant catalog productRefs. */
+function buildCuratedRedemptionItems(kit, meta) {
+  const kitId = String(kit._id);
+  const itemImages = Array.isArray(meta?.itemImages) ? meta.itemImages : [];
+  if (itemImages.length) {
+    return itemImages.map((entry, index) => ({
+      productId: `curated:${kitId}:${index}`,
+      name: entry.label || kit.name || `Item ${index + 1}`,
+      brand: '',
+      group: '',
+      category: '',
+      isDrinkware: false,
+      imageUrl: entry.imageUrl || '',
+      artworkUrl: kit.artworkUrl || meta?.heroImage || '',
+      printAreas: [],
+      maskImageUrl: '',
+      baseImageUrl: '',
+      primaryImageUrl: entry.imageUrl || '',
+      imageUrls: entry.imageUrl ? [entry.imageUrl] : [],
+      requiresSize: false,
+      requiresColor: false,
+      sizes: [],
+      colors: [],
+      qty: 1,
+    }));
+  }
+
+  const hero = meta?.heroImage || kit.artworkUrl || meta?.imageUrls?.[0] || '';
+  return [
+    {
+      productId: `curated:${kitId}:0`,
+      name: kit.name || 'Kit',
+      brand: '',
+      group: '',
+      category: '',
+      isDrinkware: false,
+      imageUrl: hero,
+      artworkUrl: kit.artworkUrl || hero,
+      printAreas: [],
+      maskImageUrl: '',
+      baseImageUrl: '',
+      primaryImageUrl: hero,
+      imageUrls: hero ? [hero] : [],
+      requiresSize: false,
+      requiresColor: false,
+      sizes: [],
+      colors: [],
+      qty: 1,
+    },
+  ];
+}
+
+function buildCuratedOrderLineItem(kit, meta) {
+  const pricePerKit = curatedKitUnitPriceInr(kit, meta);
+  const hero = meta?.heroImage || kit.artworkUrl || meta?.imageUrls?.[0] || '';
+  return {
+    name: kit.name || 'Kit',
+    sku: '',
+    variant: {},
+    qty: 1,
+    unitPriceInr: pricePerKit,
+    costPriceInr: 0,
+    gstRate: 18,
+    hsnCode: '',
+    imageUrl: hero,
+  };
+}
+
 async function loadActiveKitEntries(kit) {
   const productIds = kit.productRefs.map((r) => r.catalogProductId).filter(Boolean);
   if (!productIds.length) return [];
@@ -497,11 +584,16 @@ export async function getKitContents(token) {
   if (!kit) throw new NotFoundError('Kit not found');
 
   const entries = await loadActiveKitEntries(kit);
-  const items = entries.map((entry) => mapKitEntryToItem(entry, kit));
+  const curatedMeta = parseCuratedMeta(kit.designNotes);
+  const curatedBundle = entries.length === 0 && Boolean(curatedMeta);
+  const items = curatedBundle
+    ? buildCuratedRedemptionItems(kit, curatedMeta)
+    : entries.map((entry) => mapKitEntryToItem(entry, kit));
 
   return {
-    kit: { name: kit.name, artworkUrl: kit.artworkUrl || '', packaging: kit.packaging || 'none' },
+    kit: { name: kit.name, artworkUrl: kit.artworkUrl || curatedMeta?.heroImage || '', packaging: kit.packaging || 'none' },
     items,
+    curatedBundle,
   };
 }
 
@@ -767,97 +859,127 @@ export async function submitRedemption(
   const kitFulfillment = isKitFulfillment(campaign);
   let kit = null;
   let kitEntries = [];
+  let curatedMeta = null;
   if (kitFulfillment) {
     kit = await Kit.findOne({ _id: campaign.kitId, tenantId: recipient.tenantId });
     if (!kit) throw new NotFoundError('Kit not found');
     kitEntries = await loadActiveKitEntries(kit);
-    const expectedIds = new Set(kitEntries.map((e) => String(e.product._id)));
-    const submittedIds = new Set(items.map((i) => String(i.productId)));
-    if (expectedIds.size !== submittedIds.size || [...expectedIds].some((id) => !submittedIds.has(id))) {
-      throw new ApiError(422, 'Order items must match the kit contents exactly', 'KIT_ITEMS_MISMATCH');
+    curatedMeta = parseCuratedMeta(kit.designNotes);
+    const curatedBundle = kitEntries.length === 0 && Boolean(curatedMeta);
+
+    if (!curatedBundle) {
+      if (!kitEntries.length) {
+        throw new ApiError(422, 'Kit has no active products', 'KIT_EMPTY');
+      }
+      const expectedIds = new Set(kitEntries.map((e) => String(e.product._id)));
+      const submittedIds = new Set(items.map((i) => String(i.productId)));
+      if (expectedIds.size !== submittedIds.size || [...expectedIds].some((id) => !submittedIds.has(id))) {
+        throw new ApiError(422, 'Order items must match the kit contents exactly', 'KIT_ITEMS_MISMATCH');
+      }
+      if (!items.length) {
+        throw new ApiError(422, 'Kit order must include at least one item', 'KIT_ITEMS_REQUIRED');
+      }
+    } else if (items.length > 0) {
+      throw new ApiError(422, 'This curated kit does not require item selection', 'KIT_ITEMS_NOT_ALLOWED');
     }
   }
 
-  // Baked design mockups for this shop's products, so the frozen order item
-  // image is the composited mockup that production should print against, not
-  // the bare mask. Store (non-kit) redemptions only.
-  let shopCollections = [];
-  const mockupByProductId = new Map();
-  if (!kitFulfillment && campaign.shopId) {
-    const shop = await Shop.findOne({ _id: campaign.shopId, tenantId: recipient.tenantId });
-    if (shop) {
-      shopCollections = await loadShopCollections(shop, { skipTenantGuard: false });
-      for (const col of shopCollections) {
-        for (const ref of col.productRefs || []) {
-          const pid = ref.catalogProductId ? String(ref.catalogProductId) : '';
-          if (pid && ref.mockupUrl && !mockupByProductId.has(pid)) mockupByProductId.set(pid, ref.mockupUrl);
+  const lineItems = [];
+  let breakdown;
+
+  if (kitFulfillment && kitEntries.length === 0 && curatedMeta) {
+    lineItems.push(buildCuratedOrderLineItem(kit, curatedMeta));
+    breakdown = amountBreakdownForKitCampaign(campaign, {
+      kitUnitPriceInr: curatedKitUnitPriceInr(kit, curatedMeta),
+      packaging: campaign.packaging,
+      orderKitCount: 1,
+    });
+  } else {
+    if (!kitFulfillment && !items.length) {
+      throw new ApiError(422, 'Order must include at least one item', 'ITEMS_REQUIRED');
+    }
+
+    // Baked design mockups for this shop's products, so the frozen order item
+    // image is the composited mockup that production should print against, not
+    // the bare mask. Store (non-kit) redemptions only.
+    let shopCollections = [];
+    const mockupByProductId = new Map();
+    if (!kitFulfillment && campaign.shopId) {
+      const shop = await Shop.findOne({ _id: campaign.shopId, tenantId: recipient.tenantId });
+      if (shop) {
+        shopCollections = await loadShopCollections(shop, { skipTenantGuard: false });
+        for (const col of shopCollections) {
+          for (const ref of col.productRefs || []) {
+            const pid = ref.catalogProductId ? String(ref.catalogProductId) : '';
+            if (pid && ref.mockupUrl && !mockupByProductId.has(pid)) mockupByProductId.set(pid, ref.mockupUrl);
+          }
         }
       }
     }
-  }
 
-  // Non-negotiable #4: every order item carries a full product snapshot
-  // (price, cost, GST, HSN, image) frozen at order time.
-  const lineItems = [];
-  for (const item of items) {
-    const listing = parseBrandedListingProductId(item.productId);
-    if (!listing) throw new ApiError(422, `Invalid product ${item.productId}`, 'INVALID_PRODUCT');
-    const product = await CatalogProduct.findById(listing.catalogProductId).select('+costPriceInr');
-    if (!product) throw new NotFoundError(`Product ${listing.catalogProductId} not found`);
-    const kitRef = kitFulfillment
-      ? kitEntries.find((e) => String(e.product._id) === String(listing.catalogProductId))?.ref ?? null
-      : null;
-    const listingSnap = resolveBrandedListingSnapshot(shopCollections, listing);
+    // Non-negotiable #4: every order item carries a full product snapshot
+    // (price, cost, GST, HSN, image) frozen at order time.
+    for (const item of items) {
+      const listing = parseBrandedListingProductId(item.productId);
+      if (!listing) throw new ApiError(422, `Invalid product ${item.productId}`, 'INVALID_PRODUCT');
+      const product = await CatalogProduct.findById(listing.catalogProductId).select('+costPriceInr');
+      if (!product) throw new NotFoundError(`Product ${listing.catalogProductId} not found`);
+      const kitRef = kitFulfillment
+        ? kitEntries.find((e) => String(e.product._id) === String(listing.catalogProductId))?.ref ?? null
+        : null;
+      const listingSnap = resolveBrandedListingSnapshot(shopCollections, listing);
 
-    if (kitFulfillment) {
-      const options = resolveKitItemOptions(product, kitRef || {});
-      if (item.qty !== 1) {
-        throw new ApiError(422, `Quantity must be 1 for kit item ${product.name}`, 'KIT_QTY_INVALID');
+      if (kitFulfillment) {
+        const options = resolveKitItemOptions(product, kitRef || {});
+        if (item.qty !== 1) {
+          throw new ApiError(422, `Quantity must be 1 for kit item ${product.name}`, 'KIT_QTY_INVALID');
+        }
+        if (options.requiresSize && !item.variant?.size) {
+          throw new ApiError(422, `Size is required for ${product.name}`, 'SIZE_REQUIRED');
+        }
+        if (options.requiresColor && !item.variant?.color) {
+          throw new ApiError(422, `Colour is required for ${product.name}`, 'COLOR_REQUIRED');
+        }
+        if (item.variant?.size && options.sizes.length && !options.sizes.includes(item.variant.size)) {
+          throw new ApiError(422, `Invalid size for ${product.name}`, 'SIZE_INVALID');
+        }
+        if (item.variant?.color && options.colors.length && !options.colors.includes(item.variant.color)) {
+          throw new ApiError(422, `Invalid colour for ${product.name}`, 'COLOR_INVALID');
+        }
       }
-      if (options.requiresSize && !item.variant?.size) {
-        throw new ApiError(422, `Size is required for ${product.name}`, 'SIZE_REQUIRED');
-      }
-      if (options.requiresColor && !item.variant?.color) {
-        throw new ApiError(422, `Colour is required for ${product.name}`, 'COLOR_REQUIRED');
-      }
-      if (item.variant?.size && options.sizes.length && !options.sizes.includes(item.variant.size)) {
-        throw new ApiError(422, `Invalid size for ${product.name}`, 'SIZE_INVALID');
-      }
-      if (item.variant?.color && options.colors.length && !options.colors.includes(item.variant.color)) {
-        throw new ApiError(422, `Invalid colour for ${product.name}`, 'COLOR_INVALID');
-      }
+
+      lineItems.push({
+        catalogProductId: product._id,
+        collectionId: listingSnap.collectionId || null,
+        name: listingSnap.name || product.name,
+        sku: product.sku,
+        variant: item.variant ?? {},
+        qty: item.qty,
+        unitPriceInr: product.basePriceInr,
+        costPriceInr: product.costPriceInr ?? 0,
+        gstRate: product.gstRate ?? 18,
+        hsnCode: product.hsnCode ?? '',
+        imageUrl:
+          listingSnap.mockupUrl ||
+          mockupUrlFromCollections(shopCollections, listing.collectionId, listing.catalogProductId) ||
+          mockupByProductId.get(String(product._id)) ||
+          kitProductImageUrl(product, kitRef || {}) ||
+          product.maskImageUrl ||
+          product.primaryImageUrl ||
+          product.imageUrls?.[0] ||
+          '',
+      });
     }
 
-    lineItems.push({
-      catalogProductId: product._id,
-      collectionId: listingSnap.collectionId || null,
-      name: listingSnap.name || product.name,
-      sku: product.sku,
-      variant: item.variant ?? {},
-      qty: item.qty,
-      unitPriceInr: product.basePriceInr,
-      costPriceInr: product.costPriceInr ?? 0,
-      gstRate: product.gstRate ?? 18,
-      hsnCode: product.hsnCode ?? '',
-      imageUrl:
-        listingSnap.mockupUrl ||
-        mockupUrlFromCollections(shopCollections, listing.collectionId, listing.catalogProductId) ||
-        mockupByProductId.get(String(product._id)) ||
-        kitProductImageUrl(product, kitRef || {}) ||
-        product.maskImageUrl ||
-        product.primaryImageUrl ||
-        product.imageUrls?.[0] ||
-        '',
-    });
+    breakdown = kitFulfillment
+      ? amountBreakdownForKitCampaign(campaign, {
+          kitUnitPriceInr: sumKitProductPrices(kitEntries.map((e) => e.product)),
+          packaging: campaign.packaging,
+          orderKitCount: 1,
+        })
+      : computeAmountBreakdown(lineItems);
   }
 
-  const breakdown = kitFulfillment
-    ? amountBreakdownForKitCampaign(campaign, {
-        kitUnitPriceInr: sumKitProductPrices(kitEntries.map((e) => e.product)),
-        packaging: campaign.packaging,
-        orderKitCount: 1,
-      })
-    : computeAmountBreakdown(lineItems);
   if (!kitFulfillment) {
     if (campaign.type === 'points') {
       if (paymentMode === 'upi') {

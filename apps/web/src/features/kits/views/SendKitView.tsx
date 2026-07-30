@@ -175,6 +175,7 @@ export function SendKitView(vm: SendKitVm) {
   const [emailDraft, setEmailDraft] = useState("");
   const [selectedCuratedVariant, setSelectedCuratedVariant] = useState<string | null>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const { data: platformKits } = usePlatformKits();
 
   if (vm.isLoading) return <LoadingState message="Loading kit…" fullScreen={false} />;
   if (vm.notFound || !vm.kit) {
@@ -191,7 +192,6 @@ export function SendKitView(vm: SendKitVm) {
   const customisedProductPerKit = totals.itemsSubtotal ?? totals.unitPrice ?? 0;
   const customisedKitsLineTotal = customisedProductPerKit * totals.qty;
   const customisedSubtotal = customisedKitsLineTotal + totals.pkgCost;
-  const { data: platformKits } = usePlatformKits();
 
   const curatedMeta = getCuratedKitMeta(kit);
   const isCurated = !!curatedMeta;
@@ -901,7 +901,10 @@ export function SendKitView(vm: SendKitVm) {
                 </>
               ) : (
                 <>
-                  <SumRow k="Price per kit (inc. GST)" v={inr(totals.costPerKit)} />
+                  <SumRow k="Price per kit (inc. GST)" v={inr(totals.unitPrice)} />
+                  {totals.pkgPerKit > 0 ? (
+                    <SumRow k="Packaging" v={inr(totals.pkgCost)} />
+                  ) : null}
                   <SumRow
                     k={`${totals.qty} kit${totals.qty === 1 ? "" : "s"} × ${inr(totals.costPerKit)}`}
                     v={inr(totals.costPerKit * totals.qty)}

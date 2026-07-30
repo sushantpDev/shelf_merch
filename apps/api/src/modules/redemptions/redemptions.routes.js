@@ -127,7 +127,7 @@ router.post(
             qty: z.number().int().positive(),
           }),
         )
-        .min(1),
+        .min(0),
       shippingAddress: z.object({
         name: z.string().min(1),
         phone: z.string().min(1),

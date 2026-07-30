@@ -13,6 +13,7 @@ export function gstProfileForCategory(category) {
 /** CGST/SGST rates for a line profile. */
 export function gstRatesForProfile(profile) {
   if (profile === 'apparel') return { cgst: 2.5, sgst: 2.5 };
+  // kit / other / packaging → 18% (9% + 9%)
   return { cgst: 9, sgst: 9 };
 }
 

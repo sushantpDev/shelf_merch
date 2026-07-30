@@ -377,7 +377,7 @@ export async function importRecipients({
               .lean();
             pricePerKit = sumKitProductPrices(products);
           }
-          computed = curatedKitSendTotals(campaign.recipientCount, pricePerKit);
+          computed = curatedKitSendTotals(campaign.recipientCount, pricePerKit, pkg);
         }
         // Checkout Grand Total is the source of truth when the client sends it;
         // otherwise recompute with the shared formula.

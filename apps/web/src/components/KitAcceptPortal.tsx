@@ -143,6 +143,10 @@ export default function KitAcceptPortal({
     [kitData.items, selections],
   );
 
+  const isCuratedAccept =
+    Boolean(kitData.curatedBundle) ||
+    kitData.items.every((i) => i.productId.startsWith("curated:"));
+
   async function acceptOrder() {
     setError("");
     if (missingSizes.length) {
@@ -163,17 +167,19 @@ export default function KitAcceptPortal({
 
     setPlacing(true);
     try {
-      const items = kitData.items.map((i) => {
-        const sel = selections[i.productId] || {};
-        const variant: { size?: string; color?: string } = {};
-        if (sel.size) variant.size = sel.size;
-        if (sel.color) variant.color = sel.color;
-        return {
-          productId: i.productId,
-          qty: 1,
-          ...(Object.keys(variant).length ? { variant } : {}),
-        };
-      });
+      const items = isCuratedAccept
+        ? []
+        : kitData.items.map((i) => {
+            const sel = selections[i.productId] || {};
+            const variant: { size?: string; color?: string } = {};
+            if (sel.size) variant.size = sel.size;
+            if (sel.color) variant.color = sel.color;
+            return {
+              productId: i.productId,
+              qty: 1,
+              ...(Object.keys(variant).length ? { variant } : {}),
+            };
+          });
       const result = (await submitRedemption(
         token,
         sessionToken,
@@ -197,7 +203,9 @@ export default function KitAcceptPortal({
         <h1 style={{ fontSize: 28, marginBottom: 8 }}>{kitData.kit.name || campaignName}</h1>
         <p className="muted" style={{ marginBottom: 20, maxWidth: 560 }}>
           {welcome ||
-            `Hi ${recipientName} — confirm your kit items${kitData.items.some((i) => i.requiresSize) ? ", choose sizes where needed" : ""}, then enter your shipping address to accept.`}
+            (isCuratedAccept
+              ? `Hi ${recipientName} — confirm your shipping address to accept your gift kit.`
+              : `Hi ${recipientName} — confirm your kit items${kitData.items.some((i) => i.requiresSize) ? ", choose sizes where needed" : ""}, then enter your shipping address to accept.`)}
         </p>
 
         {kitArt && (

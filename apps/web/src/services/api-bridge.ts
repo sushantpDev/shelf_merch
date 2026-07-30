@@ -739,6 +739,8 @@ export type KitRedemptionItem = {
 export type KitRedemptionData = {
   kit: { name: string; artworkUrl: string; packaging: string };
   items: KitRedemptionItem[];
+  /** Curated kit with no catalog products — recipient confirms address only. */
+  curatedBundle?: boolean;
 };
 
 export async function getRedemptionKit(token: string, sessionToken: string) {

@@ -320,7 +320,7 @@ export function useSendKitController(): SendKitVm {
     if (!isCuratedKit) {
       return customisedKitSendTotals(draft.selRecips.length, draft.pkg, pickedProducts);
     }
-    return curatedKitSendTotals(draft.selRecips.length, curatedPricePerKit);
+    return curatedKitSendTotals(draft.selRecips.length, curatedPricePerKit, draft.pkg);
   }, [isCuratedKit, draft.selRecips.length, draft.pkg, pickedProducts, curatedPricePerKit]);
 
   const checkoutWallets = useMemo(

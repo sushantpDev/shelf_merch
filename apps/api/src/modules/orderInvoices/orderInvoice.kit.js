@@ -1,6 +1,6 @@
 import { CatalogProduct } from '../catalog/catalogProduct.model.js';
 
-const KIT_PRODUCT_SELECT = 'name basePriceInr';
+const KIT_PRODUCT_SELECT = 'name basePriceInr category hsnCode';
 
 /** Active catalog rows for a kit — used for invoice line pricing only. */
 export async function loadActiveKitEntriesForInvoice(kit) {
