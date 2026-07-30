@@ -5,6 +5,23 @@ import type { UiKit } from "../model";
 
 const PREVIEW_LIMIT = 4;
 
+function isCuratedWorkspaceKit(kit: UiKit): boolean {
+  if (!kit.designNotes) return false;
+  try {
+    const parsed = JSON.parse(kit.designNotes);
+    return !!(parsed && parsed.curated);
+  } catch {
+    return false;
+  }
+}
+
+/** First-time dashboard until the user creates a custom kit or sends any kit. */
+function isFirstTimeKitsUser(kits: UiKit[]): boolean {
+  return !kits.some(
+    (k) => k.sent || Boolean(k.lastSentAt) || !isCuratedWorkspaceKit(k),
+  );
+}
+
 export type KitStats = { total: number; live: number; drafts: number };
 
 export type KitsVm = {
@@ -16,7 +33,7 @@ export type KitsVm = {
   contactCount: number;
   canCreateKits: boolean;
   canSendKits: boolean;
-  /** True when the workspace has not created any kits yet. */
+  /** True until the user creates a custom kit or sends a kit (curated clones alone don't count). */
   isEmpty: boolean;
   showAll: boolean;
   previewLimit: number;
@@ -51,7 +68,7 @@ export function useKitsController(): KitsVm {
     stats,
     canCreateKits: canWrite("kits"),
     canSendKits: canOperateCampaigns(),
-    isEmpty: kits.length === 0,
+    isEmpty: isFirstTimeKitsUser(kits),
     showAll,
     previewLimit: PREVIEW_LIMIT,
     hasMoreKits: kits.length > PREVIEW_LIMIT,

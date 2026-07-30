@@ -1,7 +1,7 @@
-import { Link } from "react-router";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import type { PlatformKitTemplate } from "../model";
 import type { PreDesignedKitsVm } from "../controllers/usePreDesignedKitsController";
+import { curatedPreviewBtnStyle, curatedSendBtnStyle } from "../curatedKitCardStyles";
 import noKitsYetImg from "../../../../assets/no-kits-yet.png";
 
 function templateImage(kit: PlatformKitTemplate): string {
@@ -17,7 +17,14 @@ function templateItemLabel(kit: PlatformKitTemplate): string {
   return itemCount ? `${itemCount} item${itemCount === 1 ? "" : "s"}` : "Curated bundle";
 }
 
-export function PreDesignedKitsView({ isLoading, kits, canCreateKits }: PreDesignedKitsVm) {
+export function PreDesignedKitsView({
+  isLoading,
+  kits,
+  canSendKits,
+  onPreview,
+  onSend,
+  sendPending,
+}: PreDesignedKitsVm) {
   if (isLoading) {
     return (
       <div className="muted" style={{ textAlign: "center", padding: "32px 12px", fontSize: 13 }}>
@@ -83,15 +90,27 @@ export function PreDesignedKitsView({ isLoading, kits, canCreateKits }: PreDesig
           <div className="muted" style={{ fontSize: 11.5, marginBottom: 10, textAlign: "center" }}>
             {templateItemLabel(kit)}
           </div>
-          {canCreateKits ? (
-            <Link
-              to={`/app/kits/new?template=${encodeURIComponent(kit._id)}`}
-              className="btn btn-ghost btn-sm btn-block"
-              style={{ border: "1px solid var(--line)", fontWeight: 600, fontSize: 12, height: 32 }}
+          <div style={{ display: "flex", gap: 8, width: "100%" }}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => onPreview(kit)}
+              style={curatedPreviewBtnStyle}
             >
-              Use this kit
-            </Link>
-          ) : null}
+              Preview
+            </button>
+            {canSendKits ? (
+              <button
+                type="button"
+                className="btn btn-brand btn-sm"
+                onClick={() => void onSend(kit)}
+                style={curatedSendBtnStyle}
+                disabled={sendPending}
+              >
+                Send
+              </button>
+            ) : null}
+          </div>
         </div>
       ))}
     </div>
