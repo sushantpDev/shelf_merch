@@ -121,6 +121,14 @@ export function exchangeZohoEmbedCode(code: string, requestId: string) {
   });
 }
 
+/** Report a safe embed client event (no secrets). */
+export function reportZohoEmbedEvent(event: string, requestId?: string) {
+  return zohoFetch<{ ok: boolean }>("/embed/event", {
+    method: "POST",
+    body: JSON.stringify({ event, requestId }),
+  });
+}
+
 /** Popup OAuth: bridge cookie then navigate to connect with popup=1. */
 export async function startZohoConnectPopup(): Promise<void> {
   await zohoFetch<{ ok: boolean }>("/bridge", { method: "POST" });

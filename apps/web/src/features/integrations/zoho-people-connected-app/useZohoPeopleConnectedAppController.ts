@@ -12,6 +12,7 @@ import {
 import { isAuthenticated } from "@/services/auth-store";
 import { ApiError } from "@/services/api";
 import {
+  buildEmbedAuthAck,
   createEmbedRequestId,
   isZohoEmbedAuthMessage,
   isZohoEmbedOAuthMessage,
@@ -49,6 +50,7 @@ function openCenteredPopup(url: string, name: string) {
   const height = 640;
   const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
   const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2);
+  // Do not pass noopener/noreferrer — opener must remain for postMessage.
   const features = `popup=yes,width=${width},height=${height},left=${left},top=${top}`;
   return window.open(url, name, features);
 }
@@ -78,7 +80,6 @@ export function useZohoPeopleConnectedAppController(sandbox: boolean): ZohoPeopl
     }
   }, [statusQuery.data?.canManage]);
 
-  // Probe for existing embed session cookie on load.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -108,19 +109,24 @@ export function useZohoPeopleConnectedAppController(sandbox: boolean): ZohoPeopl
   }, [statusQuery.error]);
 
   const exchangeCode = useCallback(
-    async (code: string, requestId: string) => {
+    async (code: string, requestId: string, source: MessageEventSource | null) => {
       setAuthPhase("exchanging");
       try {
         await exchangeZohoEmbedCode(code, requestId);
+        if (source && "postMessage" in source && typeof source.postMessage === "function") {
+          source.postMessage(buildEmbedAuthAck(requestId), targetOrigin);
+        }
         setAuthPhase("authenticated");
         setPopupBlocked(false);
+        popupRef.current = null;
+        pendingRequestIdRef.current = null;
         await queryClient.invalidateQueries({ queryKey: ZOHO_QUERY_KEY });
       } catch (err) {
         setAuthPhase("signed_out");
         toast.error(err instanceof ApiError ? err.message : "Sign-in failed");
       }
     },
-    [queryClient],
+    [queryClient, targetOrigin],
   );
 
   useEffect(() => {
@@ -135,9 +141,7 @@ export function useZohoPeopleConnectedAppController(sandbox: boolean): ZohoPeopl
         ) {
           return;
         }
-        void exchangeCode(event.data.code, event.data.requestId);
-        popupRef.current = null;
-        pendingRequestIdRef.current = null;
+        void exchangeCode(event.data.code, event.data.requestId, event.source);
         return;
       }
 

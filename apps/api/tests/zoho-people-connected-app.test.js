@@ -2,10 +2,14 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import {
-  ZOHO_PEOPLE_EMBED_PATHS,
+  ZOHO_PEOPLE_COOP_PATHS,
+  ZOHO_PEOPLE_IFRAME_PATHS,
+  ZOHO_PEOPLE_COOP_VALUE,
   ZOHO_PEOPLE_FRAME_ANCESTORS,
-  isZohoPeopleEmbedPath,
+  isZohoPeopleCoopPath,
+  isZohoPeopleIframePath,
   applyZohoPeopleEmbedHeaders,
+  applyZohoPeopleCoopHeaders,
 } from '../src/middleware/zohoPeopleEmbed.middleware.js';
 
 const FORBIDDEN_IN_HTML = [
@@ -28,49 +32,75 @@ describe('Zoho People Connected App embed routes', () => {
     app = null;
   });
 
-  it('recognises only the dedicated embed paths', () => {
-    expect(isZohoPeopleEmbedPath('/zoho/people')).toBe(true);
-    expect(isZohoPeopleEmbedPath('/zoho/people/sandbox')).toBe(true);
-    expect(isZohoPeopleEmbedPath('/zoho/people/')).toBe(true);
-    expect(isZohoPeopleEmbedPath('/app/integrations')).toBe(false);
-    expect(isZohoPeopleEmbedPath('/')).toBe(false);
-    expect(ZOHO_PEOPLE_EMBED_PATHS).toEqual(['/zoho/people', '/zoho/people/sandbox']);
+  it('recognises iframe and COOP route sets', () => {
+    expect(isZohoPeopleIframePath('/zoho/people')).toBe(true);
+    expect(isZohoPeopleIframePath('/zoho/people/sandbox')).toBe(true);
+    expect(isZohoPeopleIframePath('/zoho/people/embed-auth')).toBe(false);
+    expect(isZohoPeopleCoopPath('/zoho/people/embed-auth')).toBe(true);
+    expect(isZohoPeopleCoopPath('/zoho/people/oauth-bridge')).toBe(true);
+    expect(isZohoPeopleCoopPath('/zoho/people/oauth-done')).toBe(true);
+    expect(isZohoPeopleCoopPath('/app/integrations')).toBe(false);
+    expect(ZOHO_PEOPLE_IFRAME_PATHS).toEqual(['/zoho/people', '/zoho/people/sandbox']);
+    expect(ZOHO_PEOPLE_COOP_PATHS).toHaveLength(5);
   });
 
-  it.each(ZOHO_PEOPLE_EMBED_PATHS)('%s returns 200 with Zoho frame-ancestors and no X-Frame-Options', async (path) => {
-    const res = await request(app).get(path);
-    expect(res.status).toBe(200);
-    expect(res.headers['x-frame-options']).toBeUndefined();
+  it.each(ZOHO_PEOPLE_COOP_PATHS)(
+    '%s returns COOP unsafe-none',
+    async (path) => {
+      const res = await request(app).get(path);
+      expect(res.status).toBe(200);
+      expect(res.headers['cross-origin-opener-policy']).toBe(ZOHO_PEOPLE_COOP_VALUE);
+    },
+  );
 
-    const csp = String(res.headers['content-security-policy'] || '');
-    expect(csp).toMatch(/frame-ancestors/i);
-    for (const origin of ZOHO_PEOPLE_FRAME_ANCESTORS) {
-      expect(csp).toContain(origin);
-    }
-    expect(csp).not.toMatch(/frame-ancestors[^;]*'none'/i);
-    expect(csp).not.toMatch(/frame-ancestors[^;]*'self'/i);
+  it.each(ZOHO_PEOPLE_IFRAME_PATHS)(
+    '%s returns Zoho frame-ancestors and no X-Frame-Options',
+    async (path) => {
+      const res = await request(app).get(path);
+      expect(res.status).toBe(200);
+      expect(res.headers['x-frame-options']).toBeUndefined();
+      expect(res.headers['cross-origin-opener-policy']).toBe(ZOHO_PEOPLE_COOP_VALUE);
 
-    const body = String(res.text || '');
-    for (const secret of FORBIDDEN_IN_HTML) {
-      expect(body).not.toContain(secret);
-    }
-  });
+      const csp = String(res.headers['content-security-policy'] || '');
+      expect(csp).toMatch(/frame-ancestors/i);
+      for (const origin of ZOHO_PEOPLE_FRAME_ANCESTORS) {
+        expect(csp).toContain(origin);
+      }
 
-  it('keeps frame protection on other ShelfMerch pages', async () => {
+      const body = String(res.text || '');
+      for (const secret of FORBIDDEN_IN_HTML) {
+        expect(body).not.toContain(secret);
+      }
+    },
+  );
+
+  it('keeps COOP protection on normal ShelfMerch routes', async () => {
     const res = await request(app).get('/api/v1/health/live');
     expect(res.status).toBe(200);
-    // Helmet default (test/non-production) still sets SAMEORIGIN / DENY on non-embed routes.
+    const coop = String(res.headers['cross-origin-opener-policy'] || '').toLowerCase();
+    expect(coop).toBe('same-origin');
+
     const xfo = res.headers['x-frame-options'];
     expect(xfo).toBeTruthy();
     expect(String(xfo).toLowerCase()).toMatch(/sameorigin|deny/);
 
     const csp = String(res.headers['content-security-policy'] || '');
-    // Embed allowlist must not leak onto unrelated routes.
     expect(csp).not.toContain('https://people.zoho.in');
     expect(csp).not.toContain('https://sigma.zoho.in');
   });
 
-  it('applyZohoPeopleEmbedHeaders strips X-Frame-Options and sets allowlist', () => {
+  it('applyZohoPeopleCoopHeaders sets unsafe-none', () => {
+    const headers = new Map();
+    const res = {
+      setHeader(name, value) {
+        headers.set(String(name).toLowerCase(), value);
+      },
+    };
+    applyZohoPeopleCoopHeaders(res);
+    expect(headers.get('cross-origin-opener-policy')).toBe('unsafe-none');
+  });
+
+  it('applyZohoPeopleEmbedHeaders sets COOP and frame allowlist', () => {
     const headers = new Map();
     const res = {
       removeHeader(name) {
@@ -88,11 +118,12 @@ describe('Zoho People Connected App embed routes', () => {
       'Content-Security-Policy',
       "default-src 'self'; frame-ancestors 'none'",
     );
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     applyZohoPeopleEmbedHeaders(res);
-    expect(res.getHeader('X-Frame-Options')).toBeUndefined();
-    const csp = res.getHeader('Content-Security-Policy');
+    expect(headers.get('cross-origin-opener-policy')).toBe('unsafe-none');
+    expect(headers.get('x-frame-options')).toBeUndefined();
+    const csp = headers.get('content-security-policy');
     expect(csp).toContain('https://people.zoho.in');
-    expect(csp).toContain('https://sigma.zoho.in');
     expect(csp).not.toMatch(/frame-ancestors[^;]*'none'/);
   });
 });

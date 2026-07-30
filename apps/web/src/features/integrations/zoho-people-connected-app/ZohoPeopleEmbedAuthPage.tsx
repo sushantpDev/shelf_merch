@@ -3,13 +3,14 @@ import { useSearchParams } from "react-router";
 import { Loader2 } from "lucide-react";
 import { login } from "@/features/auth/model";
 import { isAuthenticated } from "@/services/auth-store";
-import { issueZohoEmbedCode } from "@/services/zoho-api";
+import { issueZohoEmbedCode, reportZohoEmbedEvent } from "@/services/zoho-api";
 import { ApiError } from "@/services/api";
 import {
   createEmbedRequestId,
+  EMBED_OPENER_MISSING,
+  sendEmbedAuthAndAwaitAck,
   shelfmerchPostMessageOrigin,
   SHELFMERCH_ZOHO_EMBED_OAUTH,
-  SHELFMERCH_ZOHO_EMBED_AUTH,
 } from "./zoho-embed-messaging";
 
 /**
@@ -23,29 +24,34 @@ export function ZohoPeopleEmbedAuthPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [phase, setPhase] = useState<"login" | "issuing" | "done">(() =>
+  const [phase, setPhase] = useState<"login" | "issuing" | "done" | "opener_missing">(() =>
     isAuthenticated() ? "issuing" : "login",
   );
   const issuedRef = useRef(false);
 
   const issueAndNotify = useCallback(async () => {
     if (issuedRef.current) return;
+
+    if (!window.opener) {
+      setPhase("opener_missing");
+      setError("Unable to communicate with Zoho People. Please close this window and try again.");
+      void reportZohoEmbedEvent(EMBED_OPENER_MISSING, requestId).catch(() => {});
+      return;
+    }
+
     issuedRef.current = true;
     setPhase("issuing");
     setError("");
     try {
       const { code } = await issueZohoEmbedCode(requestId);
-      const targetOrigin = shelfmerchPostMessageOrigin();
-      if (window.opener && !window.opener.closed) {
-      const message = {
-        type: SHELFMERCH_ZOHO_EMBED_AUTH,
+      await sendEmbedAuthAndAwaitAck({
+        opener: window.opener,
         code,
         requestId,
-      };
-        window.opener.postMessage(message, targetOrigin);
-      }
+        targetOrigin: shelfmerchPostMessageOrigin(),
+      });
       setPhase("done");
-      window.setTimeout(() => window.close(), 400);
+      window.close();
     } catch (err) {
       issuedRef.current = false;
       setPhase("login");
@@ -78,7 +84,11 @@ export function ZohoPeopleEmbedAuthPage() {
     <main className="zoho-connected-app zoho-embed-auth-popup">
       <section className="zoho-connected-app-signin">
         <h1>Sign in to ShelfMerch</h1>
-        {phase === "issuing" || phase === "done" ? (
+        {phase === "opener_missing" ? (
+          <p className="zoho-embed-auth-error" role="alert">
+            {error}
+          </p>
+        ) : phase === "issuing" || phase === "done" ? (
           <p className="zoho-embed-auth-wait">
             <Loader2 className="zoho-integ-spin" size={18} aria-hidden="true" />
             Completing sign-in…

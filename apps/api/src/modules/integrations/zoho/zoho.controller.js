@@ -1,4 +1,5 @@
 import { ApiError } from '../../../utils/errors.js';
+import { logger } from '../../../config/logger.js';
 import {
   env,
   zohoIntegrationsClientPath,
@@ -182,6 +183,19 @@ export async function exchangeEmbedAuth(req, res) {
   const requestId = typeof req.body?.requestId === 'string' ? req.body.requestId : '';
   const { sessionToken, expiresInSec } = await exchangeEmbedAuthCode({ code, requestId });
   setEmbedSessionCookie(res, sessionToken, expiresInSec);
+  return res.json({ ok: true });
+}
+
+const EMBED_SAFE_EVENT_CODES = new Set(['EMBED_OPENER_MISSING']);
+
+/** Log a whitelisted embed diagnostic code — never accepts secrets or PII. */
+export async function reportEmbedEvent(req, res) {
+  const event = typeof req.body?.event === 'string' ? req.body.event : '';
+  const requestId = typeof req.body?.requestId === 'string' ? req.body.requestId : '';
+  if (!EMBED_SAFE_EVENT_CODES.has(event)) {
+    return res.status(400).json({ ok: false });
+  }
+  logger.warn({ event, requestId: requestId || undefined }, 'Zoho embed client event');
   return res.json({ ok: true });
 }
 

@@ -63,7 +63,9 @@ import { platformReportsRouter } from './modules/reports/reports.routes.js';
 import zohoIntegrationsRoutes from './modules/integrations/zoho/zoho.routes.js';
 import {
   applyZohoPeopleEmbedHeaders,
+  applyZohoPeopleCoopHeaders,
   zohoPeopleEmbedHeaderMiddleware,
+  defaultShelfmerchCoopMiddleware,
 } from './middleware/zohoPeopleEmbed.middleware.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -121,8 +123,9 @@ function resolveCorsOptions(req) {
  * validated in staging.
  */
 function helmetOptions() {
-  if (env.NODE_ENV !== 'production') return undefined;
-  if (env.CSP_MODE === 'off') return { contentSecurityPolicy: false };
+  const coopDisabled = { crossOriginOpenerPolicy: false };
+  if (env.NODE_ENV !== 'production') return coopDisabled;
+  if (env.CSP_MODE === 'off') return { contentSecurityPolicy: false, ...coopDisabled };
 
   return {
     contentSecurityPolicy: {
@@ -144,6 +147,7 @@ function helmetOptions() {
       },
     },
     crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   };
 }
@@ -157,6 +161,8 @@ export function createApp() {
   app.use(helmet(helmetOptions()));
   // Zoho Connected App pages only — must run after helmet so we can override frame headers.
   app.use(zohoPeopleEmbedHeaderMiddleware);
+  // COOP same-origin everywhere except Zoho embed routes (Helmet COOP is disabled above).
+  app.use(defaultShelfmerchCoopMiddleware);
   app.use((req, res, next) => cors(resolveCorsOptions(req))(req, res, next));
 
   // §9.3 — Razorpay webhook must verify signature against the raw body.
@@ -293,8 +299,19 @@ export function createApp() {
     }
     return res.status(200).type('html').send(ZOHO_CONNECTED_APP_HTML_FALLBACK);
   };
+  const sendZohoEmbedPopupPage = (req, res) => {
+    applyZohoPeopleCoopHeaders(res);
+    const indexHtml = path.join(WEB_DIST, 'index.html');
+    if (existsSync(indexHtml)) {
+      return res.sendFile('index.html', { root: WEB_DIST });
+    }
+    return res.status(200).type('html').send(ZOHO_CONNECTED_APP_HTML_FALLBACK);
+  };
   app.get('/zoho/people', sendZohoConnectedAppPage);
   app.get('/zoho/people/sandbox', sendZohoConnectedAppPage);
+  app.get('/zoho/people/embed-auth', sendZohoEmbedPopupPage);
+  app.get('/zoho/people/oauth-bridge', sendZohoEmbedPopupPage);
+  app.get('/zoho/people/oauth-done', sendZohoEmbedPopupPage);
 
   // Production: serve the Vite SPA from the same origin as the API.
   if (env.NODE_ENV === 'production' && existsSync(WEB_DIST)) {

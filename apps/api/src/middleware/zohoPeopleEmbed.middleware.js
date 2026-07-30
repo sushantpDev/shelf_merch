@@ -1,25 +1,52 @@
 /**
- * Route-specific framing for Zoho People Connected App pages.
- * Only `/zoho/people` and `/zoho/people/sandbox` may be embedded by Zoho.
- * All other ShelfMerch pages keep global helmet frame protection.
+ * Route-specific framing and COOP for Zoho People Connected App pages.
+ * Iframe routes allow Zoho embedding; all listed routes use COOP unsafe-none so
+ * popups opened from the Zoho iframe retain window.opener for postMessage.
  */
 
-export const ZOHO_PEOPLE_EMBED_PATHS = Object.freeze([
+/** Routes that may be embedded inside Zoho People / Sigma. */
+export const ZOHO_PEOPLE_IFRAME_PATHS = Object.freeze([
   '/zoho/people',
   '/zoho/people/sandbox',
 ]);
+
+/** Routes that need COOP unsafe-none (iframe + popup helpers). */
+export const ZOHO_PEOPLE_COOP_PATHS = Object.freeze([
+  '/zoho/people',
+  '/zoho/people/sandbox',
+  '/zoho/people/embed-auth',
+  '/zoho/people/oauth-bridge',
+  '/zoho/people/oauth-done',
+]);
+
+/** @deprecated Use ZOHO_PEOPLE_IFRAME_PATHS */
+export const ZOHO_PEOPLE_EMBED_PATHS = ZOHO_PEOPLE_IFRAME_PATHS;
 
 export const ZOHO_PEOPLE_FRAME_ANCESTORS = Object.freeze([
   'https://people.zoho.in',
   'https://sigma.zoho.in',
 ]);
 
+export const ZOHO_PEOPLE_COOP_VALUE = 'unsafe-none';
+
 const FRAME_ANCESTORS_DIRECTIVE = `frame-ancestors ${ZOHO_PEOPLE_FRAME_ANCESTORS.join(' ')}`;
 
+function normalizePath(pathname) {
+  if (!pathname || typeof pathname !== 'string') return '/';
+  return pathname.replace(/\/+$/, '') || '/';
+}
+
+export function isZohoPeopleCoopPath(pathname) {
+  return ZOHO_PEOPLE_COOP_PATHS.includes(normalizePath(pathname));
+}
+
+export function isZohoPeopleIframePath(pathname) {
+  return ZOHO_PEOPLE_IFRAME_PATHS.includes(normalizePath(pathname));
+}
+
+/** @deprecated Use isZohoPeopleIframePath */
 export function isZohoPeopleEmbedPath(pathname) {
-  if (!pathname || typeof pathname !== 'string') return false;
-  const normalized = pathname.replace(/\/+$/, '') || '/';
-  return ZOHO_PEOPLE_EMBED_PATHS.includes(normalized);
+  return isZohoPeopleIframePath(pathname);
 }
 
 function replaceFrameAncestors(cspValue) {
@@ -31,17 +58,29 @@ function replaceFrameAncestors(cspValue) {
 }
 
 /**
- * Allow Zoho People / Sigma to iframe this response.
- * Removes X-Frame-Options and sets enforcing frame-ancestors for the allowlist only.
+ * Allow popup <-> iframe communication (overrides Helmet same-origin COOP).
  */
-export function applyZohoPeopleEmbedHeaders(res) {
+export function applyZohoPeopleCoopHeaders(res) {
+  res.setHeader('Cross-Origin-Opener-Policy', ZOHO_PEOPLE_COOP_VALUE);
+}
+
+/**
+ * Default COOP for all non-Zoho embed routes (Helmet COOP is disabled globally).
+ */
+export function defaultShelfmerchCoopMiddleware(req, res, next) {
+  if (!isZohoPeopleCoopPath(req.path)) {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  }
+  next();
+}
+
+function applyZohoPeopleIframeFrameHeaders(res) {
   res.removeHeader('X-Frame-Options');
 
   const csp = res.getHeader('Content-Security-Policy');
   if (typeof csp === 'string' && csp.length) {
     res.setHeader('Content-Security-Policy', replaceFrameAncestors(csp));
   } else {
-    // Enforce allowlist even when global CSP is report-only or disabled.
     res.setHeader('Content-Security-Policy', FRAME_ANCESTORS_DIRECTIVE);
   }
 
@@ -54,10 +93,24 @@ export function applyZohoPeopleEmbedHeaders(res) {
   }
 }
 
-/** After helmet — override frame headers for Connected App paths only. */
+/**
+ * Iframe routes: COOP unsafe-none + Zoho frame-ancestors allowlist.
+ */
+export function applyZohoPeopleEmbedHeaders(res) {
+  applyZohoPeopleCoopHeaders(res);
+  applyZohoPeopleIframeFrameHeaders(res);
+}
+
+/**
+ * After helmet — override security headers for Zoho Connected App routes only.
+ * Route handlers call applyZohoPeople* again immediately before sendFile.
+ */
 export function zohoPeopleEmbedHeaderMiddleware(req, res, next) {
-  if (isZohoPeopleEmbedPath(req.path)) {
-    applyZohoPeopleEmbedHeaders(res);
-  }
+  const coop = isZohoPeopleCoopPath(req.path);
+  const iframe = isZohoPeopleIframePath(req.path);
+  if (!coop && !iframe) return next();
+
+  if (coop) applyZohoPeopleCoopHeaders(res);
+  if (iframe) applyZohoPeopleIframeFrameHeaders(res);
   next();
 }

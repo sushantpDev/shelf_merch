@@ -168,6 +168,11 @@ router.post(
   asyncHandler(controller.exchangeEmbedAuth),
 );
 router.post(
+  '/embed/event',
+  zohoEmbedExchangeRateLimit,
+  asyncHandler(controller.reportEmbedEvent),
+);
+router.post(
   '/sync-employees',
   ...adminWrite,
   zohoSyncRateLimit,
