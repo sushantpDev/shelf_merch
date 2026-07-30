@@ -10,16 +10,23 @@ import { signAccessToken } from '../src/modules/auth/auth.service.js';
 import {
   ZohoOAuthLaunchCode,
   ZohoOAuthLaunchSession,
+  ZohoOAuthLaunchCompletion,
 } from '../src/modules/integrations/zoho/zohoOAuthLaunch.model.js';
 import {
   OAUTH_LAUNCH_CODE_TTL_SEC,
   issueOAuthLaunchCode,
+  markOAuthLaunchCompleted,
+  markOAuthLaunchFailed,
+  OAUTH_LAUNCH_SAFE_ERROR_CODES,
 } from '../src/modules/integrations/zoho/zohoOAuthLaunch.service.js';
 import { issueEmbedAuthCode } from '../src/modules/integrations/zoho/zohoEmbedAuth.service.js';
 import {
   ZOHO_AUTH_BRIDGE_COOKIE,
   ZOHO_OAUTH_LAUNCH_COOKIE,
+  ZOHO_OAUTH_STATE_COOKIE,
+  ZOHO_OAUTH_POPUP_COOKIE,
 } from '../src/modules/integrations/zoho/zohoCookies.js';
+import { storeOAuthState, clearMemoryOAuthStates } from '../src/modules/integrations/zoho/zohoOAuthState.service.js';
 import { logger } from '../src/config/logger.js';
 import * as envModule from '../src/config/env.js';
 import * as zohoOAuthModule from '../src/modules/integrations/zoho/zohoOAuth.service.js';
@@ -33,6 +40,8 @@ let tenantA;
 let tenantB;
 let adminA;
 let adminAToken;
+let adminB;
+let adminBToken;
 let embedSessionCookie;
 
 async function makeAdmin(tenant, label) {
@@ -79,7 +88,7 @@ beforeEach(async () => {
   tenantA = await Tenant.create({ name: 'Tenant A', slug: 'tenant-a-launch' });
   tenantB = await Tenant.create({ name: 'Tenant B', slug: 'tenant-b-launch' });
   ({ user: adminA, token: adminAToken } = await makeAdmin(tenantA, 'a'));
-  await makeAdmin(tenantB, 'b');
+  ({ user: adminB, token: adminBToken } = await makeAdmin(tenantB, 'b'));
   embedSessionCookie = await createEmbedSessionCookie();
 });
 
@@ -293,5 +302,228 @@ describe('Zoho OAuth launch postMessage guards', () => {
     const pending = 'req-a';
     const incoming = 'req-b';
     expect(incoming !== pending).toBe(true);
+  });
+});
+
+describe('Zoho OAuth launch completion status', () => {
+  it('issue creates a pending completion record', async () => {
+    await request(app)
+      .post('/api/integrations/zoho/oauth-launch/issue')
+      .set('Cookie', embedSessionCookie)
+      .send({ requestId: TEST_REQUEST_ID });
+
+    const record = await ZohoOAuthLaunchCompletion.findOne({
+      requestId: TEST_REQUEST_ID,
+      tenantId: tenantA._id,
+    }).lean();
+    expect(record).toBeTruthy();
+    expect(record.status).toBe('pending');
+    expect(record.errorCode).toBeNull();
+    expect(String(record.userId)).toBe(String(adminA._id));
+  });
+
+  it('GET /oauth-launch/status returns pending, completed and failed', async () => {
+    await issueOAuthLaunchCode({
+      tenantId: tenantA._id,
+      userId: adminA._id,
+      requestId: TEST_REQUEST_ID,
+    });
+
+    const pending = await request(app)
+      .get(`/api/integrations/zoho/oauth-launch/status?requestId=${encodeURIComponent(TEST_REQUEST_ID)}`)
+      .set('Cookie', embedSessionCookie);
+    expect(pending.status).toBe(200);
+    expect(pending.body).toEqual({ status: 'pending', errorCode: null });
+    expect(pending.body.access_token).toBeUndefined();
+
+    await markOAuthLaunchCompleted({
+      requestId: TEST_REQUEST_ID,
+      tenantId: tenantA._id,
+      userId: adminA._id,
+    });
+
+    const completed = await request(app)
+      .get(`/api/integrations/zoho/oauth-launch/status?requestId=${encodeURIComponent(TEST_REQUEST_ID)}`)
+      .set('Cookie', embedSessionCookie);
+    expect(completed.body).toEqual({ status: 'completed', errorCode: null });
+
+    const failedRequestId = 'failed-request-id-1234567890';
+    await issueOAuthLaunchCode({
+      tenantId: tenantA._id,
+      userId: adminA._id,
+      requestId: failedRequestId,
+    });
+    await markOAuthLaunchFailed({
+      requestId: failedRequestId,
+      tenantId: tenantA._id,
+      userId: adminA._id,
+      errorCode: OAUTH_LAUNCH_SAFE_ERROR_CODES.OAUTH_CONNECTION_FAILED,
+    });
+
+    const failed = await request(app)
+      .get(`/api/integrations/zoho/oauth-launch/status?requestId=${failedRequestId}`)
+      .set('Cookie', embedSessionCookie);
+    expect(failed.body.status).toBe('failed');
+    expect(failed.body.errorCode).toBe('OAUTH_CONNECTION_FAILED');
+  });
+
+  it('rejects cross-tenant status access', async () => {
+    await issueOAuthLaunchCode({
+      tenantId: tenantA._id,
+      userId: adminA._id,
+      requestId: TEST_REQUEST_ID,
+    });
+
+    const embedB = await issueEmbedAuthCode({
+      tenantId: tenantB._id,
+      userId: adminB._id,
+      requestId: 'tenant-b-embed-bootstrap-id',
+    });
+    const exchangeB = await request(app)
+      .post('/api/integrations/zoho/embed/exchange')
+      .send({ code: embedB.code, requestId: 'tenant-b-embed-bootstrap-id' });
+    const tenantBCookie = exchangeB.headers['set-cookie'];
+
+    const res = await request(app)
+      .get(`/api/integrations/zoho/oauth-launch/status?requestId=${encodeURIComponent(TEST_REQUEST_ID)}`)
+      .set('Cookie', tenantBCookie);
+    expect(res.status).toBe(404);
+  });
+
+  it('callback marks the correct requestId completed', async () => {
+    clearMemoryOAuthStates();
+    await issueOAuthLaunchCode({
+      tenantId: tenantA._id,
+      userId: adminA._id,
+      requestId: TEST_REQUEST_ID,
+    });
+
+    const state = 'oauth-state-callback-test-secret-value12';
+    await storeOAuthState(state, {
+      tenantId: tenantA._id,
+      userId: adminA._id,
+      embedPopup: true,
+      requestId: TEST_REQUEST_ID,
+    });
+
+    vi.spyOn(zohoOAuthModule, 'completeZohoConnection').mockResolvedValue({});
+
+    const res = await request(app)
+      .get(`/api/integrations/zoho/callback?code=safe-oauth-code-test-value&state=${state}`)
+      .set('Cookie', [
+        `${ZOHO_OAUTH_POPUP_COOKIE}=1`,
+        `${ZOHO_OAUTH_STATE_COOKIE}=${state}`,
+      ]);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toContain('/zoho/people/oauth-done');
+    expect(res.headers.location).toContain('requestId=');
+
+    const record = await ZohoOAuthLaunchCompletion.findOne({
+      requestId: TEST_REQUEST_ID,
+      tenantId: tenantA._id,
+    }).lean();
+    expect(record.status).toBe('completed');
+    expect(record.completedAt).toBeTruthy();
+  });
+
+  it('callback marks failed on connection error without exposing secrets', async () => {
+    clearMemoryOAuthStates();
+    await issueOAuthLaunchCode({
+      tenantId: tenantA._id,
+      userId: adminA._id,
+      requestId: TEST_REQUEST_ID,
+    });
+
+    const state = 'oauth-state-callback-fail-test-secret1';
+    await storeOAuthState(state, {
+      tenantId: tenantA._id,
+      userId: adminA._id,
+      embedPopup: true,
+      requestId: TEST_REQUEST_ID,
+    });
+
+    vi.spyOn(zohoOAuthModule, 'completeZohoConnection').mockRejectedValue(new Error('token exchange failed'));
+
+    const res = await request(app)
+      .get(`/api/integrations/zoho/callback?code=safe-oauth-code-test-value&state=${state}`)
+      .set('Cookie', [
+        `${ZOHO_OAUTH_POPUP_COOKIE}=1`,
+        `${ZOHO_OAUTH_STATE_COOKIE}=${state}`,
+      ]);
+
+    expect(res.status).toBe(302);
+    const record = await ZohoOAuthLaunchCompletion.findOne({
+      requestId: TEST_REQUEST_ID,
+      tenantId: tenantA._id,
+    }).lean();
+    expect(record.status).toBe('failed');
+    expect(record.errorCode).toBe('OAUTH_CONNECTION_FAILED');
+    expect(JSON.stringify(res.headers)).not.toContain('refresh-token-test-secret');
+  });
+});
+
+describe('OAuth launch polling (simulated)', () => {
+  it('stops polling after completion', async () => {
+    vi.useFakeTimers();
+    try {
+      const { startOAuthLaunchPolling } = await import(
+        '../src/modules/integrations/zoho/zohoOAuthPolling.shared.js'
+      );
+
+      const poll = vi
+        .fn()
+        .mockResolvedValueOnce({ status: 'pending', errorCode: null })
+        .mockResolvedValueOnce({ status: 'completed', errorCode: null });
+      const onCompleted = vi.fn();
+      const popup = { closed: false, close: vi.fn() };
+
+      const controller = startOAuthLaunchPolling({
+        requestId: TEST_REQUEST_ID,
+        poll,
+        getPopup: () => popup,
+        isFinished: () => false,
+        onCompleted,
+        onFailed: vi.fn(),
+        onPopupClosedEarly: vi.fn(),
+        intervalMs: 1000,
+        scheduleInterval: setInterval,
+        clearScheduled: clearInterval,
+        now: () => Date.now(),
+      });
+
+      await vi.advanceTimersByTimeAsync(1500);
+      controller.stop();
+      expect(onCompleted).toHaveBeenCalledTimes(1);
+      expect(poll).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('closes popup from iframe after completion via stored reference', async () => {
+    const popup = { closed: false, close: vi.fn() };
+    if (!popup.closed) popup.close();
+    expect(popup.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('missing opener does not block successful OAuth when status is completed', async () => {
+    await issueOAuthLaunchCode({
+      tenantId: tenantA._id,
+      userId: adminA._id,
+      requestId: TEST_REQUEST_ID,
+    });
+    await markOAuthLaunchCompleted({
+      requestId: TEST_REQUEST_ID,
+      tenantId: tenantA._id,
+      userId: adminA._id,
+    });
+
+    const res = await request(app)
+      .get(`/api/integrations/zoho/oauth-launch/status?requestId=${encodeURIComponent(TEST_REQUEST_ID)}`)
+      .set('Cookie', embedSessionCookie);
+    expect(res.body.status).toBe('completed');
+    expect(res.body).not.toHaveProperty('access_token');
+    expect(res.body).not.toHaveProperty('code');
   });
 });

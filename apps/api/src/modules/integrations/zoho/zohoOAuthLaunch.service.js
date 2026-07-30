@@ -2,10 +2,18 @@ import crypto from 'node:crypto';
 import { logger } from '../../../config/logger.js';
 import { ApiError } from '../../../utils/errors.js';
 import { RoleAssignment } from '../../roles/roleAssignment.model.js';
-import { ZohoOAuthLaunchCode, ZohoOAuthLaunchSession } from './zohoOAuthLaunch.model.js';
+import { ZohoOAuthLaunchCode, ZohoOAuthLaunchSession, ZohoOAuthLaunchCompletion } from './zohoOAuthLaunch.model.js';
 
 export const OAUTH_LAUNCH_CODE_TTL_SEC = 60;
 export const OAUTH_LAUNCH_SESSION_TTL_SEC = 5 * 60;
+export const OAUTH_LAUNCH_COMPLETION_TTL_SEC = 5 * 60;
+
+export const OAUTH_LAUNCH_SAFE_ERROR_CODES = Object.freeze({
+  OAUTH_DENIED: 'OAUTH_DENIED',
+  OAUTH_STATE_INVALID: 'OAUTH_STATE_INVALID',
+  OAUTH_CODE_MISSING: 'OAUTH_CODE_MISSING',
+  OAUTH_CONNECTION_FAILED: 'OAUTH_CONNECTION_FAILED',
+});
 
 const sha256 = (value) => crypto.createHash('sha256').update(String(value)).digest('hex');
 
@@ -33,6 +41,20 @@ export async function issueOAuthLaunchCode({ tenantId, userId, requestId }) {
     requestId,
     expiresAt,
   });
+
+  await ZohoOAuthLaunchCompletion.findOneAndUpdate(
+    { requestId, tenantId },
+    {
+      $set: {
+        userId,
+        status: 'pending',
+        errorCode: null,
+        completedAt: null,
+        expiresAt: new Date(Date.now() + OAUTH_LAUNCH_COMPLETION_TTL_SEC * 1000),
+      },
+    },
+    { upsert: true },
+  );
 
   logger.info(
     {
@@ -181,4 +203,67 @@ export async function consumeOAuthLaunchSession(sessionToken) {
   }
 
   return buildUserSnapshot(session);
+}
+
+/** Mark embed OAuth launch as completed after successful Zoho callback. */
+export async function markOAuthLaunchCompleted({ requestId, tenantId, userId }) {
+  if (!requestId) return;
+  const now = new Date();
+  await ZohoOAuthLaunchCompletion.findOneAndUpdate(
+    { requestId, tenantId, userId },
+    { $set: { status: 'completed', completedAt: now, errorCode: null } },
+  );
+  logger.info(
+    {
+      event: 'zoho_oauth_launch_completed',
+      requestId,
+      tenantId: String(tenantId),
+      userId: String(userId),
+      success: true,
+    },
+    'Zoho OAuth launch marked completed',
+  );
+}
+
+/** Mark embed OAuth launch as failed with a safe internal error code. */
+export async function markOAuthLaunchFailed({ requestId, tenantId, userId, errorCode }) {
+  if (!requestId) return;
+  const safeCode = Object.values(OAUTH_LAUNCH_SAFE_ERROR_CODES).includes(errorCode)
+    ? errorCode
+    : OAUTH_LAUNCH_SAFE_ERROR_CODES.OAUTH_CONNECTION_FAILED;
+  const now = new Date();
+  await ZohoOAuthLaunchCompletion.findOneAndUpdate(
+    { requestId, tenantId, userId },
+    { $set: { status: 'failed', completedAt: now, errorCode: safeCode } },
+  );
+  logger.warn(
+    {
+      event: 'zoho_oauth_launch_failed',
+      requestId,
+      tenantId: String(tenantId),
+      userId: String(userId),
+      errorCode: safeCode,
+    },
+    'Zoho OAuth launch marked failed',
+  );
+}
+
+/**
+ * Poll completion status for an embed OAuth launch (tenant-scoped).
+ * Returns null when no record exists for this tenant.
+ */
+export async function getOAuthLaunchCompletionStatus({ requestId, tenantId }) {
+  if (!requestId || typeof requestId !== 'string') {
+    throw new ApiError(400, 'requestId is required', 'INVALID_REQUEST_ID');
+  }
+
+  const record = await ZohoOAuthLaunchCompletion.findOne({ requestId, tenantId }).lean();
+  if (!record) {
+    throw new ApiError(404, 'OAuth launch not found', 'OAUTH_LAUNCH_NOT_FOUND');
+  }
+
+  return {
+    status: record.status,
+    errorCode: record.errorCode ?? null,
+  };
 }

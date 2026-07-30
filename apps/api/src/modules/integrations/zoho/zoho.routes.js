@@ -54,6 +54,16 @@ const zohoOAuthLaunchExchangeRateLimit = rateLimit([
   },
 ]);
 
+const zohoOAuthLaunchStatusRateLimit = rateLimit([
+  {
+    prefix: 'zoho:oauth-launch:status:ip',
+    limit: 180,
+    windowSec: 2 * 60,
+    key: clientIp,
+    critical: true,
+  },
+]);
+
 const zohoEmbedExchangeRateLimit = rateLimit([
   { prefix: 'zoho:embed:exchange:ip', limit: 30, windowSec: 15 * 60, key: clientIp, critical: true },
 ]);
@@ -234,6 +244,12 @@ router.post(
   '/oauth-launch/exchange',
   zohoOAuthLaunchExchangeRateLimit,
   asyncHandler(controller.exchangeOAuthLaunch),
+);
+router.get(
+  '/oauth-launch/status',
+  ...adminRead,
+  zohoOAuthLaunchStatusRateLimit,
+  asyncHandler(controller.getOAuthLaunchStatus),
 );
 router.post(
   '/embed/issue',

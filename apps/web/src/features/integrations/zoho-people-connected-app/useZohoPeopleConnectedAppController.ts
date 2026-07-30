@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
   disconnectZoho,
   exchangeZohoEmbedCode,
+  fetchOAuthLaunchStatus,
   fetchZohoStatus,
   issueZohoOAuthLaunch,
   syncZohoEmployees,
@@ -24,6 +25,7 @@ import {
   SHELFMERCH_ZOHO_OAUTH_LAUNCH,
   shelfmerchPostMessageOrigin,
 } from "./zoho-embed-messaging";
+import { oauthLaunchSafeErrorMessage, startOAuthLaunchPolling } from "./zoho-oauth-polling";
 
 const ZOHO_QUERY_KEY = ["zoho-people-connected-app", "status"] as const;
 
@@ -67,12 +69,14 @@ export function useZohoPeopleConnectedAppController(sandbox: boolean): ZohoPeopl
   const [popupBlocked, setPopupBlocked] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [canManage, setCanManage] = useState(false);
+  const [oauthPollingRequestId, setOauthPollingRequestId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const popupRef = useRef<Window | null>(null);
   const pendingRequestIdRef = useRef<string | null>(null);
   const oauthRequestIdRef = useRef<string | null>(null);
   const oauthLaunchIssuedRef = useRef(new Set<string>());
   const oauthDoneCompletedRef = useRef(new Set<string>());
+  const oauthPollingStopRef = useRef<(() => void) | null>(null);
   const embedAuthDedupRef = useRef(createEmbedAuthDedupState());
   const targetOrigin = shelfmerchPostMessageOrigin();
 
@@ -174,6 +178,64 @@ export function useZohoPeopleConnectedAppController(sandbox: boolean): ZohoPeopl
     [targetOrigin],
   );
 
+  const finishOAuthSuccess = useCallback(
+    async (requestId: string) => {
+      if (oauthDoneCompletedRef.current.has(requestId)) return;
+      oauthDoneCompletedRef.current.add(requestId);
+      oauthPollingStopRef.current?.();
+      oauthPollingStopRef.current = null;
+      setOauthPollingRequestId(null);
+      setConnecting(false);
+      const popup = popupRef.current;
+      popupRef.current = null;
+      oauthRequestIdRef.current = null;
+      if (popup && !popup.closed) popup.close();
+      toast.success("Zoho People connected");
+      await queryClient.invalidateQueries({ queryKey: ZOHO_QUERY_KEY });
+    },
+    [queryClient],
+  );
+
+  const finishOAuthFailure = useCallback((requestId: string, message: string) => {
+    if (oauthDoneCompletedRef.current.has(requestId)) return;
+    oauthDoneCompletedRef.current.add(requestId);
+    oauthPollingStopRef.current?.();
+    oauthPollingStopRef.current = null;
+    setOauthPollingRequestId(null);
+    setConnecting(false);
+    const popup = popupRef.current;
+    popupRef.current = null;
+    oauthRequestIdRef.current = null;
+    if (popup && !popup.closed) popup.close();
+    toast.error(message);
+  }, []);
+
+  useEffect(() => {
+    if (!oauthPollingRequestId) return;
+
+    const controller = startOAuthLaunchPolling({
+      requestId: oauthPollingRequestId,
+      poll: fetchOAuthLaunchStatus,
+      getPopup: () => popupRef.current,
+      isFinished: (requestId) => oauthDoneCompletedRef.current.has(requestId),
+      onCompleted: () => {
+        void finishOAuthSuccess(oauthPollingRequestId);
+      },
+      onFailed: (message) => {
+        finishOAuthFailure(oauthPollingRequestId, message);
+      },
+      onPopupClosedEarly: () => {
+        finishOAuthFailure(oauthPollingRequestId, "Zoho authorization was not completed.");
+      },
+    });
+
+    oauthPollingStopRef.current = controller.stop;
+    return () => {
+      controller.stop();
+      oauthPollingStopRef.current = null;
+    };
+  }, [oauthPollingRequestId, finishOAuthFailure, finishOAuthSuccess]);
+
   useEffect(() => {
     function onMessage(event: MessageEvent) {
       if (event.origin !== targetOrigin) return;
@@ -215,16 +277,11 @@ export function useZohoPeopleConnectedAppController(sandbox: boolean): ZohoPeopl
           }
           return;
         }
-        oauthDoneCompletedRef.current.add(requestId);
-        setConnecting(false);
-        popupRef.current = null;
-        oauthRequestIdRef.current = null;
         if (event.data.status === "connected") {
-          toast.success("Zoho People connected");
+          void finishOAuthSuccess(requestId);
         } else {
-          toast.error("Could not connect Zoho People");
+          finishOAuthFailure(requestId, oauthLaunchSafeErrorMessage(event.data.reason));
         }
-        void queryClient.invalidateQueries({ queryKey: ZOHO_QUERY_KEY });
         if (event.source && "postMessage" in event.source && typeof event.source.postMessage === "function") {
           event.source.postMessage(buildOAuthDoneAck(requestId), targetOrigin);
         }
@@ -233,7 +290,7 @@ export function useZohoPeopleConnectedAppController(sandbox: boolean): ZohoPeopl
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [exchangeCode, queryClient, sendOAuthLaunch, targetOrigin]);
+  }, [exchangeCode, finishOAuthFailure, finishOAuthSuccess, queryClient, sendOAuthLaunch, targetOrigin]);
 
   const onSignIn = useCallback(() => {
     const requestId = createEmbedRequestId();
@@ -269,6 +326,7 @@ export function useZohoPeopleConnectedAppController(sandbox: boolean): ZohoPeopl
     }
     popupRef.current = popup;
     setPopupBlocked(false);
+    setOauthPollingRequestId(requestId);
   }, [canManage]);
 
   const syncMutation = useMutation({

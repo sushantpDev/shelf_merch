@@ -150,12 +150,23 @@ export function ZohoPeopleOAuthDonePage() {
   const requestId = params.get("requestId") || "";
   const reason = params.get("reason") || undefined;
   const closedRef = useRef(false);
+  const [message, setMessage] = useState("Finishing Zoho connection…");
 
   useEffect(() => {
     const status = zoho === "connected" ? "connected" : "error";
     const targetOrigin = shelfmerchPostMessageOrigin();
 
-    if (!window.opener || !requestId) {
+    if (!requestId) {
+      setMessage("Invalid OAuth completion request.");
+      return;
+    }
+
+    if (!window.opener) {
+      setMessage(
+        status === "connected"
+          ? "Zoho People connected successfully. You may close this window."
+          : "Could not connect Zoho People. You may close this window.",
+      );
       return;
     }
 
@@ -174,7 +185,13 @@ export function ZohoPeopleOAuthDonePage() {
           window.close();
         }
       } catch {
-        // Leave popup open if ACK never arrives.
+        if (!cancelled) {
+          setMessage(
+            status === "connected"
+              ? "Zoho People connected successfully. You may close this window."
+              : "Could not connect Zoho People. You may close this window.",
+          );
+        }
       }
     })();
 
@@ -186,7 +203,7 @@ export function ZohoPeopleOAuthDonePage() {
   return (
     <main className="zoho-connected-app zoho-embed-auth-popup">
       <section className="zoho-connected-app-signin">
-        <p>Finishing Zoho connection…</p>
+        <p>{message}</p>
       </section>
     </main>
   );

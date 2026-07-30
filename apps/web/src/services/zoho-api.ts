@@ -157,6 +157,21 @@ export function exchangeZohoOAuthLaunch(code: string, requestId: string) {
   });
 }
 
+export type OAuthLaunchCompletionStatus = "pending" | "completed" | "failed";
+
+export type OAuthLaunchStatusResponse = {
+  status: OAuthLaunchCompletionStatus;
+  errorCode: string | null;
+};
+
+/** Iframe polls OAuth completion status (embed session cookie auth). */
+export function fetchOAuthLaunchStatus(requestId: string) {
+  const qs = new URLSearchParams({ requestId });
+  return zohoEmbedSessionFetch<OAuthLaunchStatusResponse>(
+    `/oauth-launch/status?${qs.toString()}`,
+  );
+}
+
 export const ZOHO_CONNECT_URL = `${ZOHO_API_BASE}/connect`;
 
 /** Report a safe embed client event (no secrets). */

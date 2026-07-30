@@ -16,6 +16,10 @@ import {
   exchangeOAuthLaunchCode,
   resolveOAuthLaunchSession,
   consumeOAuthLaunchSession,
+  markOAuthLaunchCompleted,
+  markOAuthLaunchFailed,
+  getOAuthLaunchCompletionStatus,
+  OAUTH_LAUNCH_SAFE_ERROR_CODES,
 } from './zohoOAuthLaunch.service.js';
 import { User } from '../../users/user.model.js';
 import { RoleAssignment } from '../../roles/roleAssignment.model.js';
@@ -152,6 +156,25 @@ export async function callback(req, res) {
     return res.redirect(302, popupMode ? embedPopupRedirect(query) : clientRedirect(query));
   };
 
+  const markLaunchFailed = async (oauthRecord, errorCode) => {
+    if (!popupMode || !oauthRecord?.requestId) return;
+    await markOAuthLaunchFailed({
+      requestId: oauthRecord.requestId,
+      tenantId: oauthRecord.tenantId,
+      userId: oauthRecord.userId,
+      errorCode,
+    });
+  };
+
+  const markLaunchCompleted = async (oauthRecord) => {
+    if (!popupMode || !oauthRecord?.requestId) return;
+    await markOAuthLaunchCompleted({
+      requestId: oauthRecord.requestId,
+      tenantId: oauthRecord.tenantId,
+      userId: oauthRecord.userId,
+    });
+  };
+
   if (error) {
     return finish({ zoho: 'error', reason: 'denied' });
   }
@@ -170,7 +193,12 @@ export async function callback(req, res) {
   }
 
   if (!code || typeof code !== 'string') {
-    return finish({ zoho: 'error', reason: 'code' });
+    await markLaunchFailed(oauthRecord, OAUTH_LAUNCH_SAFE_ERROR_CODES.OAUTH_CODE_MISSING);
+    const doneQuery = { zoho: 'error', reason: 'code' };
+    if (popupMode && oauthRecord.requestId) {
+      doneQuery.requestId = oauthRecord.requestId;
+    }
+    return finish(doneQuery);
   }
 
   try {
@@ -180,12 +208,14 @@ export async function callback(req, res) {
       code,
       zohoLocation: typeof zohoLocation === 'string' ? zohoLocation : '',
     });
+    await markLaunchCompleted(oauthRecord);
     const doneQuery = { zoho: 'connected' };
     if (popupMode && oauthRecord.requestId) {
       doneQuery.requestId = oauthRecord.requestId;
     }
     return finish(doneQuery);
   } catch {
+    await markLaunchFailed(oauthRecord, OAUTH_LAUNCH_SAFE_ERROR_CODES.OAUTH_CONNECTION_FAILED);
     const doneQuery = { zoho: 'error' };
     if (popupMode && oauthRecord.requestId) {
       doneQuery.requestId = oauthRecord.requestId;
@@ -226,6 +256,18 @@ export async function exchangeOAuthLaunch(req, res) {
   const { sessionToken, expiresInSec } = await exchangeOAuthLaunchCode({ code, requestId });
   setOAuthLaunchSessionCookie(res, sessionToken, expiresInSec);
   return res.json({ ok: true });
+}
+
+export async function getOAuthLaunchStatus(req, res) {
+  const requestId =
+    typeof req.query?.requestId === 'string' && req.query.requestId.trim()
+      ? req.query.requestId.trim()
+      : '';
+  const result = await getOAuthLaunchCompletionStatus({
+    requestId,
+    tenantId: req.tenantId,
+  });
+  return res.json(result);
 }
 
 export async function exchangeEmbedAuth(req, res) {
