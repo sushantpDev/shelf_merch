@@ -161,39 +161,45 @@ export function ZohoPeopleOAuthDonePage() {
       return;
     }
 
+    if (status === "connected") {
+      setMessage("Zoho People connected successfully. You may close this window.");
+    }
+
     if (!window.opener) {
-      setMessage(
-        status === "connected"
-          ? "Zoho People connected successfully. You may close this window."
-          : "Could not connect Zoho People. You may close this window.",
-      );
+      if (status !== "connected") {
+        setMessage("Could not connect Zoho People. You may close this window.");
+      }
       return;
     }
 
-    let cancelled = false;
-    (async () => {
+    if (status === "connected" && !closedRef.current) {
+      closedRef.current = true;
       try {
-        await sendOAuthDoneAndAwaitAck({
-          opener: window.opener as Window,
-          status,
-          requestId,
-          reason,
-          targetOrigin,
-        });
+        window.close();
+      } catch {
+        // Popup may remain open when the browser blocks programmatic close.
+      }
+    }
+
+    let cancelled = false;
+    void sendOAuthDoneAndAwaitAck({
+      opener: window.opener as Window,
+      status,
+      requestId,
+      reason,
+      targetOrigin,
+    })
+      .then(() => {
         if (!cancelled && !closedRef.current) {
           closedRef.current = true;
           window.close();
         }
-      } catch {
-        if (!cancelled) {
-          setMessage(
-            status === "connected"
-              ? "Zoho People connected successfully. You may close this window."
-              : "Could not connect Zoho People. You may close this window.",
-          );
+      })
+      .catch(() => {
+        if (!cancelled && status !== "connected") {
+          setMessage("Could not connect Zoho People. You may close this window.");
         }
-      }
-    })();
+      });
 
     return () => {
       cancelled = true;

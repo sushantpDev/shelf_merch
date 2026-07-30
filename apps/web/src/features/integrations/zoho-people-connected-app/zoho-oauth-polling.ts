@@ -1,5 +1,8 @@
 import type { OAuthLaunchCompletionStatus } from "@/services/zoho-api";
 
+export const OAUTH_LAUNCH_NOT_COMPLETED_MESSAGE =
+  "Zoho authorization was not completed.";
+
 const OAUTH_LAUNCH_ERROR_MESSAGES: Record<string, string> = {
   OAUTH_DENIED: "Zoho authorization was denied.",
   OAUTH_STATE_INVALID: "Zoho authorization could not be verified. Please try again.",
@@ -19,24 +22,25 @@ export type OAuthPollingController = {
 type StartOAuthPollingOptions = {
   requestId: string;
   poll: (requestId: string) => Promise<{ status: OAuthLaunchCompletionStatus; errorCode: string | null }>;
-  getPopup: () => Window | null;
   isFinished: (requestId: string) => boolean;
   onCompleted: () => void;
   onFailed: (message: string) => void;
-  onPopupClosedEarly: () => void;
+  onTimeout: () => void;
   intervalMs?: number;
   timeoutMs?: number;
 };
 
-/** Poll OAuth launch completion — used by tests and the iframe controller. */
+/**
+ * Poll server-side OAuth launch completion — the only source of truth.
+ * Never infers cancellation from popup.closed or inaccessible WindowProxy.
+ */
 export function startOAuthLaunchPolling({
   requestId,
   poll,
-  getPopup,
   isFinished,
   onCompleted,
   onFailed,
-  onPopupClosedEarly,
+  onTimeout,
   intervalMs = 1000,
   timeoutMs = 2 * 60 * 1000,
 }: StartOAuthPollingOptions): OAuthPollingController {
@@ -54,38 +58,29 @@ export function startOAuthLaunchPolling({
       return;
     }
 
-    const popup = getPopup();
-    if (popup?.closed) {
-      stop();
-      try {
-        const result = await poll(requestId);
-        if (result.status === "completed") {
-          onCompleted();
-          return;
-        }
-      } catch {
-        // fall through to early-close message
-      }
-      onPopupClosedEarly();
-      return;
-    }
-
-    if (Date.now() - started >= timeoutMs) {
-      stop();
-      return;
-    }
+    const timedOut = Date.now() - started >= timeoutMs;
 
     try {
       const result = await poll(requestId);
       if (result.status === "completed") {
         stop();
         onCompleted();
-      } else if (result.status === "failed") {
+        return;
+      }
+      if (result.status === "failed") {
         stop();
         onFailed(oauthLaunchSafeErrorMessage(result.errorCode));
+        return;
+      }
+      if (timedOut) {
+        stop();
+        onTimeout();
       }
     } catch {
-      // keep polling until timeout
+      if (timedOut) {
+        stop();
+        onTimeout();
+      }
     }
   };
 
@@ -95,4 +90,14 @@ export function startOAuthLaunchPolling({
   void tick();
 
   return { stop };
+}
+
+/** Best-effort popup close — COOP may make closed checks throw. */
+export function safeClosePopup(popup: Window | null | undefined): void {
+  if (!popup) return;
+  try {
+    popup.close();
+  } catch {
+    // WindowProxy may be inaccessible during cross-origin navigation.
+  }
 }

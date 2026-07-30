@@ -1,5 +1,8 @@
 /** Testable OAuth polling helper (mirrors web zoho-oauth-polling.ts). */
 
+export const OAUTH_LAUNCH_NOT_COMPLETED_MESSAGE =
+  'Zoho authorization was not completed.';
+
 export function oauthLaunchSafeErrorMessage(errorCode) {
   const messages = {
     OAUTH_DENIED: 'Zoho authorization was denied.',
@@ -14,11 +17,10 @@ export function oauthLaunchSafeErrorMessage(errorCode) {
 export function startOAuthLaunchPolling({
   requestId,
   poll,
-  getPopup,
   isFinished,
   onCompleted,
   onFailed,
-  onPopupClosedEarly,
+  onTimeout,
   intervalMs = 1000,
   timeoutMs = 2 * 60 * 1000,
   scheduleInterval = setInterval,
@@ -39,38 +41,29 @@ export function startOAuthLaunchPolling({
       return;
     }
 
-    const popup = getPopup();
-    if (popup?.closed) {
-      stop();
-      try {
-        const result = await poll(requestId);
-        if (result.status === 'completed') {
-          onCompleted();
-          return;
-        }
-      } catch {
-        // fall through
-      }
-      onPopupClosedEarly();
-      return;
-    }
-
-    if (now() - started >= timeoutMs) {
-      stop();
-      return;
-    }
+    const timedOut = now() - started >= timeoutMs;
 
     try {
       const result = await poll(requestId);
       if (result.status === 'completed') {
         stop();
         onCompleted();
-      } else if (result.status === 'failed') {
+        return;
+      }
+      if (result.status === 'failed') {
         stop();
         onFailed(oauthLaunchSafeErrorMessage(result.errorCode));
+        return;
+      }
+      if (timedOut) {
+        stop();
+        onTimeout();
       }
     } catch {
-      // keep polling
+      if (timedOut) {
+        stop();
+        onTimeout();
+      }
     }
   };
 
@@ -80,4 +73,13 @@ export function startOAuthLaunchPolling({
   void tick();
 
   return { stop };
+}
+
+export function safeClosePopup(popup) {
+  if (!popup) return;
+  try {
+    popup.close();
+  } catch {
+    // WindowProxy may be inaccessible during cross-origin navigation.
+  }
 }

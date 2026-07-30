@@ -6,6 +6,7 @@ import {
   zohoPeopleConfigured,
 } from '../../../config/env.js';
 import { ZohoIntegration, ZOHO_PUBLIC_STATUSES } from './zohoIntegration.model.js';
+import { resolveZohoIntegrationPublicStatus } from './zohoIntegrationStatus.service.js';
 import { beginZohoConnect, completeZohoConnection } from './zohoOAuth.service.js';
 import { consumeOAuthState } from './zohoOAuthState.service.js';
 import { disconnectZoho } from './zohoToken.service.js';
@@ -62,11 +63,7 @@ function integrationsWriteAllowed(user) {
 }
 
 function publicStatus(doc) {
-  if (!doc || doc.status === 'disconnected') return ZOHO_PUBLIC_STATUSES.not_connected;
-  if (doc.status === 'connected') return ZOHO_PUBLIC_STATUSES.connected;
-  if (doc.status === 'needs_attention') return ZOHO_PUBLIC_STATUSES.needs_attention;
-  if (doc.status === 'expired') return ZOHO_PUBLIC_STATUSES.expired;
-  return ZOHO_PUBLIC_STATUSES.error;
+  return resolveZohoIntegrationPublicStatus(doc);
 }
 
 export async function getStatus(req, res) {

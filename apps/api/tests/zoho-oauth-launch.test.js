@@ -464,7 +464,41 @@ describe('Zoho OAuth launch completion status', () => {
 });
 
 describe('OAuth launch polling (simulated)', () => {
-  it('stops polling after completion', async () => {
+  it('consent popup still open does not trigger cancellation when popup.closed is true', async () => {
+    vi.useFakeTimers();
+    try {
+      const { startOAuthLaunchPolling } = await import(
+        '../src/modules/integrations/zoho/zohoOAuthPolling.shared.js'
+      );
+
+      const poll = vi.fn().mockResolvedValue({ status: 'pending', errorCode: null });
+      const onTimeout = vi.fn();
+      const onCompleted = vi.fn();
+
+      startOAuthLaunchPolling({
+        requestId: TEST_REQUEST_ID,
+        poll,
+        isFinished: () => false,
+        onCompleted,
+        onFailed: vi.fn(),
+        onTimeout,
+        intervalMs: 1000,
+        timeoutMs: 120_000,
+        scheduleInterval: setInterval,
+        clearScheduled: clearInterval,
+        now: () => Date.now(),
+      });
+
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(onTimeout).not.toHaveBeenCalled();
+      expect(onCompleted).not.toHaveBeenCalled();
+      expect(poll).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('COOP-severed popup reference does not trigger cancellation', async () => {
     vi.useFakeTimers();
     try {
       const { startOAuthLaunchPolling } = await import(
@@ -476,54 +510,206 @@ describe('OAuth launch polling (simulated)', () => {
         .mockResolvedValueOnce({ status: 'pending', errorCode: null })
         .mockResolvedValueOnce({ status: 'completed', errorCode: null });
       const onCompleted = vi.fn();
-      const popup = { closed: false, close: vi.fn() };
+      const onTimeout = vi.fn();
 
-      const controller = startOAuthLaunchPolling({
+      startOAuthLaunchPolling({
         requestId: TEST_REQUEST_ID,
         poll,
-        getPopup: () => popup,
         isFinished: () => false,
         onCompleted,
         onFailed: vi.fn(),
-        onPopupClosedEarly: vi.fn(),
+        onTimeout,
         intervalMs: 1000,
+        timeoutMs: 120_000,
         scheduleInterval: setInterval,
         clearScheduled: clearInterval,
         now: () => Date.now(),
       });
 
       await vi.advanceTimersByTimeAsync(1500);
-      controller.stop();
       expect(onCompleted).toHaveBeenCalledTimes(1);
-      expect(poll).toHaveBeenCalled();
+      expect(onTimeout).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('closes popup from iframe after completion via stored reference', async () => {
-    const popup = { closed: false, close: vi.fn() };
-    if (!popup.closed) popup.close();
-    expect(popup.close).toHaveBeenCalledTimes(1);
+  it('completed polling result wins over inaccessible popup.closed', async () => {
+    vi.useFakeTimers();
+    try {
+      const { startOAuthLaunchPolling } = await import(
+        '../src/modules/integrations/zoho/zohoOAuthPolling.shared.js'
+      );
+
+      const poll = vi
+        .fn()
+        .mockResolvedValueOnce({ status: 'pending', errorCode: null })
+        .mockResolvedValueOnce({ status: 'completed', errorCode: null });
+      const onCompleted = vi.fn();
+      const onTimeout = vi.fn();
+
+      startOAuthLaunchPolling({
+        requestId: TEST_REQUEST_ID,
+        poll,
+        isFinished: () => false,
+        onCompleted,
+        onFailed: vi.fn(),
+        onTimeout,
+        intervalMs: 1000,
+        timeoutMs: 120_000,
+        scheduleInterval: setInterval,
+        clearScheduled: clearInterval,
+        now: () => Date.now(),
+      });
+
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(onCompleted).toHaveBeenCalledTimes(1);
+      expect(onTimeout).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it('missing opener does not block successful OAuth when status is completed', async () => {
+  it('pending timeout displays not-completed', async () => {
+    vi.useFakeTimers();
+    try {
+      const { startOAuthLaunchPolling, OAUTH_LAUNCH_NOT_COMPLETED_MESSAGE } = await import(
+        '../src/modules/integrations/zoho/zohoOAuthPolling.shared.js'
+      );
+
+      const poll = vi.fn().mockResolvedValue({ status: 'pending', errorCode: null });
+      const onTimeout = vi.fn();
+      let now = 0;
+
+      startOAuthLaunchPolling({
+        requestId: TEST_REQUEST_ID,
+        poll,
+        isFinished: () => false,
+        onCompleted: vi.fn(),
+        onFailed: vi.fn(),
+        onTimeout,
+        intervalMs: 1000,
+        timeoutMs: 5000,
+        scheduleInterval: setInterval,
+        clearScheduled: clearInterval,
+        now: () => now,
+      });
+
+      now = 6000;
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(onTimeout).toHaveBeenCalledTimes(1);
+      expect(OAUTH_LAUNCH_NOT_COMPLETED_MESSAGE).toBe('Zoho authorization was not completed.');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('completed polling result closes immediately on first completed response', async () => {
+    vi.useFakeTimers();
+    try {
+      const { startOAuthLaunchPolling } = await import(
+        '../src/modules/integrations/zoho/zohoOAuthPolling.shared.js'
+      );
+
+      const poll = vi.fn().mockResolvedValue({ status: 'completed', errorCode: null });
+      const onCompleted = vi.fn();
+      const onTimeout = vi.fn();
+
+      startOAuthLaunchPolling({
+        requestId: TEST_REQUEST_ID,
+        poll,
+        isFinished: () => false,
+        onCompleted,
+        onFailed: vi.fn(),
+        onTimeout,
+        intervalMs: 1000,
+        timeoutMs: 120_000,
+        scheduleInterval: setInterval,
+        clearScheduled: clearInterval,
+        now: () => Date.now(),
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(onCompleted).toHaveBeenCalledTimes(1);
+      expect(onTimeout).not.toHaveBeenCalled();
+      expect(poll).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('failed status displays the safe error', async () => {
+    vi.useFakeTimers();
+    try {
+      const { startOAuthLaunchPolling } = await import(
+        '../src/modules/integrations/zoho/zohoOAuthPolling.shared.js'
+      );
+
+      const poll = vi.fn().mockResolvedValue({
+        status: 'failed',
+        errorCode: 'OAUTH_CONNECTION_FAILED',
+      });
+      const onFailed = vi.fn();
+
+      startOAuthLaunchPolling({
+        requestId: TEST_REQUEST_ID,
+        poll,
+        isFinished: () => false,
+        onCompleted: vi.fn(),
+        onFailed,
+        onTimeout: vi.fn(),
+        intervalMs: 1000,
+        timeoutMs: 120_000,
+        scheduleInterval: setInterval,
+        clearScheduled: clearInterval,
+        now: () => Date.now(),
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(onFailed).toHaveBeenCalledWith('Could not connect Zoho People. Please try again.');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('success guard prevents timeout from overwriting completed outcome', async () => {
+    const successFinal = new Set();
+    const requestId = TEST_REQUEST_ID;
+    let failureCalled = false;
+    let successCalled = false;
+
+    const finishSuccess = () => {
+      if (successFinal.has(requestId)) return;
+      successFinal.add(requestId);
+      successCalled = true;
+    };
+    const finishFailure = () => {
+      if (successFinal.has(requestId)) return;
+      failureCalled = true;
+    };
+
+    finishSuccess();
+    finishFailure();
+    expect(successCalled).toBe(true);
+    expect(failureCalled).toBe(false);
+  });
+
+  it('status endpoint response contains no secrets', async () => {
     await issueOAuthLaunchCode({
       tenantId: tenantA._id,
       userId: adminA._id,
       requestId: TEST_REQUEST_ID,
     });
-    await markOAuthLaunchCompleted({
-      requestId: TEST_REQUEST_ID,
-      tenantId: tenantA._id,
-      userId: adminA._id,
-    });
 
     const res = await request(app)
       .get(`/api/integrations/zoho/oauth-launch/status?requestId=${encodeURIComponent(TEST_REQUEST_ID)}`)
       .set('Cookie', embedSessionCookie);
-    expect(res.body.status).toBe('completed');
-    expect(res.body).not.toHaveProperty('access_token');
-    expect(res.body).not.toHaveProperty('code');
+
+    expect(res.body).toEqual({ status: 'pending', errorCode: null });
+    const body = JSON.stringify(res.body);
+    expect(body).not.toContain('access_token');
+    expect(body).not.toContain('refresh_token');
+    expect(body).not.toContain('client_secret');
+    expect(body).not.toContain(adminAToken);
   });
 });
