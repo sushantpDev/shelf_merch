@@ -15,13 +15,50 @@ export function CampaignsEmptyStateView({
   onSendGift,
   onSendPointsCampaign,
   onSendKitCampaign,
+  embedded = false,
 }: {
   canSend: boolean;
   onSendGift: () => void;
   onSendPointsCampaign: () => void;
   onSendKitCampaign: () => void;
+  /** When true, render only the empty card (used under type tabs). */
+  embedded?: boolean;
 }) {
   const [guideOpen, setGuideOpen] = useState(false);
+
+  const emptyCard = (
+    <div className="card camp-empty-card">
+      <img
+        src={megaphoneBox}
+        alt="No campaigns yet"
+        className="megaphone-illustration"
+        style={{ width: "20%", height: "auto", display: "block" }}
+      />
+      <h3 className="camp-empty-title">No campaigns yet</h3>
+      <p className="camp-empty-desc">
+        Create a campaign from a shop or set a budget to send redemption invites.
+      </p>
+      {canSend ? (
+        <button
+          type="button"
+          className="btn btn-brand"
+          style={{ marginTop: 14 }}
+          onClick={onSendGift}
+        >
+          Create your first campaign
+        </button>
+      ) : (
+        <p className="muted" style={{ marginTop: 14 }}>
+          Your company admin sets up shops and kits; you can launch campaigns from here once
+          assigned as a department manager.
+        </p>
+      )}
+    </div>
+  );
+
+  if (embedded) {
+    return emptyCard;
+  }
 
   return (
     <>
@@ -37,33 +74,7 @@ export function CampaignsEmptyStateView({
         ) : null}
       </div>
 
-      <div className="card camp-empty-card">
-        <img
-          src={megaphoneBox}
-          alt="No campaigns yet"
-          className="megaphone-illustration"
-          style={{ width: "20%", height: "auto", display: "block" }}
-        />
-        <h3 className="camp-empty-title">No campaigns yet</h3>
-        <p className="camp-empty-desc">
-          Create a campaign from a shop or set a budget to send redemption invites.
-        </p>
-        {canSend ? (
-          <button
-            type="button"
-            className="btn btn-brand"
-            style={{ marginTop: 14 }}
-            onClick={onSendGift}
-          >
-            Create your first campaign
-          </button>
-        ) : (
-          <p className="muted" style={{ marginTop: 14 }}>
-            Your company admin sets up shops and kits; you can launch campaigns from here once
-            assigned as a department manager.
-          </p>
-        )}
-      </div>
+      {emptyCard}
 
       {canSend ? (
         <div className="camp-ways">

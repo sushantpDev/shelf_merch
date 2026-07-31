@@ -3,25 +3,32 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import {
   ArrowRight,
+  Backpack,
   BarChart3,
   Box,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Coffee,
   CreditCard,
   Gift,
+  GlassWater,
   Headphones,
   Lightbulb,
   LockKeyhole,
+  Megaphone,
+  NotebookPen,
   PackageCheck,
   Play,
   Settings,
   ShieldCheck,
+  Shirt,
   ShoppingBag,
   Sparkles,
   Store,
   Users,
   Landmark,
+  type LucideIcon,
 } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
 import { ShopBanner } from "@/features/shops/banner";
@@ -30,7 +37,6 @@ import { useTenantAccess } from "@/hooks/useTenantAccess";
 import { getStoredUser } from "@/services/api-bridge";
 import { entityManagerBudgetRemaining } from "@/services/workspace-api";
 import { walletUnallocated } from "@/lib/walletFormat";
-import startDesigningImg from "../../../assets/dashb-start-designing.png";
 import workspaceSettingsImg from "../../../assets/workspace-setting-tab.png";
 import setupHeroImg from "../../../assets/dash-setup-hero.png";
 import metricGiftsIcon from "../../../assets/dash-metric-gifts.png";
@@ -46,6 +52,8 @@ import bottleImg from "../../../assets/bottle.png";
 import toteImg from "../../../assets/tote.png";
 import diaryImg from "../../../assets/diary.png";
 import capImg from "../../../assets/cap.png";
+import swagProductsImg from "../../../assets/dash-swag-products.png";
+import campaignArtImg from "../../../assets/dash-campaign-art.png";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import type { UiProduct } from "@/services/mappers";
 import { EntityManagerKitsSection } from "./EntityManagerKitsSection";
@@ -461,17 +469,159 @@ function MetricCard({
   );
 }
 
-function StartDesigningCard() {
+type SwagStripCategory = {
+  label: string;
+  icon: LucideIcon;
+  count: number;
+};
+
+function productHaystack(p: UiProduct) {
+  return `${p.category || ""} ${p.nm || ""} ${p.g || ""}`.toLowerCase();
+}
+
+function buildSwagStripCategories(products: UiProduct[]): SwagStripCategory[] {
+  const defs: { label: string; icon: LucideIcon; match: (p: UiProduct) => boolean }[] = [
+    {
+      label: "Hoodies",
+      icon: Shirt,
+      match: (p) =>
+        p.category === "Apparel" || /hoodie|sweatshirt|apparel|tee|shirt/.test(productHaystack(p)),
+    },
+    {
+      label: "Drinkware",
+      icon: GlassWater,
+      match: (p) =>
+        (p.category === "Drinkware" || /bottle|tumbler|flask|drinkware/.test(productHaystack(p))) &&
+        !/mug|cup/.test(productHaystack(p)),
+    },
+    {
+      label: "Stationery",
+      icon: NotebookPen,
+      match: (p) =>
+        p.category === "Office" || /note|pen|diary|journal|stationery|office/.test(productHaystack(p)),
+    },
+    {
+      label: "Bags",
+      icon: Backpack,
+      match: (p) => p.category === "Bags" || /bag|tote|backpack/.test(productHaystack(p)),
+    },
+    {
+      label: "Mugs",
+      icon: Coffee,
+      match: (p) => /mug|cup/.test(productHaystack(p)) || p.g === "mug",
+    },
+  ];
+
+  return defs.map((def) => ({
+    label: def.label,
+    icon: def.icon,
+    count: products.filter(def.match).length,
+  }));
+}
+
+function CampaignPromoCard() {
   return (
-    <Link to="/app/swag" className="dash-design-card card">
-      {/* <div className="dash-design-card__copy">
-        <span className="dash-design-card__icon"><Brush size={28} aria-hidden="true" /></span>
-        <h3>Start designing</h3>
-        <p>Create custom swag that represents your brand.</p>
-        <span className="dash-design-card__button">Go to Swag <ArrowRight size={24} /></span>
-      </div> */}
-      <img className="dash-design-card__image" src={startDesigningImg} alt="Custom swag preview" />
-    </Link>
+    <section className="dash-campaign-card card" aria-labelledby="dash-campaign-title">
+      <div className="dash-campaign-card__copy">
+        <span className="dash-campaign-card__icon" aria-hidden="true">
+          <Megaphone size={19} strokeWidth={2} />
+        </span>
+        <h3 id="dash-campaign-title">Campaigns</h3>
+        <p>Track points campaigns and kit-send history.</p>
+        <Link to="/app/campaigns" className="dash-campaign-card__cta">
+          View All Campaigns
+          <ArrowRight size={15} strokeWidth={2.4} aria-hidden="true" />
+        </Link>
+      </div>
+      <div className="dash-campaign-card__art" aria-hidden="true">
+        <img src={campaignArtImg} alt="" />
+      </div>
+    </section>
+  );
+}
+function SwagPromoCard({ products }: { products: UiProduct[] }) {
+  const stripRef = useRef<HTMLDivElement>(null);
+  const categories = buildSwagStripCategories(products);
+
+  function scrollCategories() {
+    stripRef.current?.scrollBy({ left: 168, behavior: "smooth" });
+  }
+
+  return (
+    <section className="dash-swag-card card" aria-labelledby="dash-swag-title">
+      <div className="dash-swag-card__main">
+        <div className="dash-swag-card__copy">
+          <span className="dash-swag-card__icon" aria-hidden="true">
+            <ShoppingBag size={18} strokeWidth={2} />
+          </span>
+          <h3 id="dash-swag-title">Swag</h3>
+          <p>Explore branded swag and merchandise for your team and recipients.</p>
+          <Link to="/app/swag" className="dash-swag-card__cta">
+            Browse Swag
+            <ArrowRight size={16} strokeWidth={2.4} aria-hidden="true" />
+          </Link>
+        </div>
+
+        <div className="dash-swag-card__showcase" aria-hidden="true">
+          <span className="dash-swag-card__glow" />
+          <span className="dash-swag-card__dots" />
+          <span className="dash-swag-card__leaf">
+            <svg viewBox="0 0 64 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M32 68C32 68 8 52 8 28C8 14 18 4 32 4C46 4 56 14 56 28C56 52 32 68 32 68Z"
+                fill="url(#swagLeafGrad)"
+                opacity="0.55"
+              />
+              <path d="M32 66V10" stroke="#e8a078" strokeWidth="1.6" strokeLinecap="round" opacity="0.7" />
+              <path
+                d="M32 24C24 28 18 34 14 42M32 36C38 40 44 46 48 54"
+                stroke="#f0b892"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                opacity="0.65"
+              />
+              <defs>
+                <linearGradient id="swagLeafGrad" x1="8" y1="4" x2="56" y2="68" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#ffd4b8" />
+                  <stop offset="1" stopColor="#f4a574" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </span>
+          <span className="dash-swag-card__podium" />
+          <img className="dash-swag-card__showcase-img" src={swagProductsImg} alt="" />
+        </div>
+      </div>
+
+      <div className="dash-swag-card__strip">
+        <div className="dash-swag-card__cats" ref={stripRef} role="list">
+          {categories.map((cat) => {
+            const Icon = cat.icon;
+            return (
+              <div key={cat.label} className="dash-swag-card__cat" role="listitem">
+                <span className="dash-swag-card__cat-icon" aria-hidden="true">
+                  <Icon size={16} strokeWidth={2} />
+                </span>
+                <span className="dash-swag-card__cat-copy">
+                  <strong>{cat.label}</strong>
+                  <small>
+                    {cat.count} {cat.count === 1 ? "Item" : "Items"}
+                  </small>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          className="dash-swag-card__scroll"
+          aria-label="Scroll categories"
+          onClick={scrollCategories}
+        >
+          <ChevronRight size={16} strokeWidth={2.4} aria-hidden="true" />
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -550,6 +700,7 @@ function ExistingDashboard({
   pinnedShop,
   canCreateShop,
   isEntityManager,
+  catalogProducts,
 }: {
   account: string;
   memberCount: number;
@@ -560,6 +711,7 @@ function ExistingDashboard({
   pinnedShop: DashboardShop | null;
   canCreateShop: boolean;
   isEntityManager: boolean;
+  catalogProducts: UiProduct[];
 }) {
   return (
     <>
@@ -577,12 +729,12 @@ function ExistingDashboard({
 
       <section className="dash-existing-main">
         <div className="dash-existing-main__wallets"><BudgetSection account={account} mainBalance={mainBalance} hasBudget={hasBudget} /></div>
-        <div className="dash-existing-main__video"><VideoCard wide /></div>
+        <div className="dash-existing-main__video"><div className="dash-promo-pair"><CampaignPromoCard /><SwagPromoCard products={catalogProducts} /></div></div>
       </section>
 
       <section className="dash-existing-grid dash-existing-grid--balanced">
         <div className="dash-existing-grid__shop"><PinnedShopCard pinnedShop={pinnedShop} canCreateShop={canCreateShop} /></div>
-        <div className="dash-existing-grid__settings"><StartDesigningCard /></div>
+        <div className="dash-existing-grid__settings"><VideoCard wide /></div>
         <div className="dash-existing-grid__help"><HelpCenter /></div>
       </section>
       <ShortcutGrid />
@@ -660,6 +812,7 @@ export function DashboardPage() {
           pinnedShop={pinnedShop}
           canCreateShop={canCreateShop}
           isEntityManager={isEntityManager}
+          catalogProducts={workspace.catalogProducts ?? []}
         />
       )}
     </div>

@@ -10492,6 +10492,19 @@ a.shop-collection-cell:hover{background:var(--gray-100)}
   color: var(--ink-2);
 }
 
+/* type tabs (reuse kits-tab styles) */
+.camp-type-tabs {
+  display: flex;
+  align-items: center;
+  margin: 4px 0 18px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+.camp-type-tabs .kits-tabs {
+  gap: 26px;
+}
+
 /* toolbar */
 .camp-toolbar {
   display: flex;
@@ -14133,6 +14146,21 @@ tr:hover .camp-avatar {
 }
 
 .swag-col-list{display:flex;flex-direction:column;gap:18px}
+.swag-toolbar{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin:0 0 18px;min-height:36px;
+}
+.swag-toolbar__title{
+  display:inline-flex;align-items:center;gap:8px;margin:0;
+  font-family:var(--disp);font-size:20px;font-weight:800;letter-spacing:-.01em;color:var(--ink);
+}
+.swag-toolbar__menu{
+  width:34px;height:34px;border-radius:8px;border:1px solid var(--line);
+  background:#fff;color:var(--ink-2);display:grid;place-items:center;cursor:pointer;flex:none;
+  transition:background .15s ease,border-color .15s ease,color .15s ease;
+}
+.swag-toolbar__menu:hover{background:var(--surface-2);color:var(--ink);border-color:var(--line-2)}
+.swag-toolbar__menu[data-state="open"]{background:var(--surface-2);color:var(--ink);border-color:var(--line-2)}
 .swag-col-card{padding:0;overflow:hidden}
 .swag-col-card-head{
   display:flex;align-items:flex-start;justify-content:space-between;gap:14px;

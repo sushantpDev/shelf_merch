@@ -22,6 +22,9 @@ export function CampaignsView(vm: CampaignsVm) {
       {vm.hasCampaigns ? (
         <CampaignsTableView
           stats={vm.stats}
+          typeTab={vm.typeTab}
+          typeCounts={vm.typeCounts}
+          typeTabEmpty={vm.typeTabEmpty}
           filter={vm.filter}
           search={vm.search}
           pageItems={vm.pageItems}
@@ -31,10 +34,13 @@ export function CampaignsView(vm: CampaignsVm) {
           showingStart={vm.showingStart}
           showingEnd={vm.showingEnd}
           canSend={vm.canSend}
+          onTypeTab={vm.onTypeTab}
           onFilter={vm.onFilter}
           onSearch={vm.onSearch}
           onPage={vm.onPage}
           onSendGift={vm.onSendGift}
+          onSendPointsCampaign={vm.onSendPointsCampaign}
+          onSendKitCampaign={vm.onSendKitCampaign}
         />
       ) : (
         <CampaignsEmptyStateView

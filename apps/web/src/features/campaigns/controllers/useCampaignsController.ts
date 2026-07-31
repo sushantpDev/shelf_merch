@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useTenantAccess } from "@/hooks/useTenantAccess";
-import { COMPLETE_STATUSES, isLiveCampaign } from "../model";
+import { COMPLETE_STATUSES, isLiveCampaign, isPointsCampaign } from "../model";
 import type { UiCampaign, UiKit, UiShop } from "../model";
 
 const PER_PAGE = 5;
@@ -10,11 +10,20 @@ const PER_PAGE = 5;
 export const CAMPAIGN_FILTERS = ["all", "live", "draft", "completed"] as const;
 export type CampaignFilter = (typeof CAMPAIGN_FILTERS)[number];
 
+export const CAMPAIGN_TYPE_TABS = ["recent", "kits", "points"] as const;
+export type CampaignTypeTab = (typeof CAMPAIGN_TYPE_TABS)[number];
+
 export type CampaignStats = {
   total: number;
   live: number;
   draft: number;
   recipients: number;
+};
+
+export type CampaignTypeCounts = {
+  recent: number;
+  kits: number;
+  points: number;
 };
 
 export type SendGiftView = "choose" | "points" | "kit";
@@ -42,6 +51,9 @@ export type CampaignsVm = {
   hasCampaigns: boolean;
   canSend: boolean;
   stats: CampaignStats;
+  typeTab: CampaignTypeTab;
+  typeCounts: CampaignTypeCounts;
+  typeTabEmpty: boolean;
   filter: CampaignFilter;
   search: string;
   pageItems: UiCampaign[];
@@ -50,6 +62,7 @@ export type CampaignsVm = {
   totalFiltered: number;
   showingStart: number;
   showingEnd: number;
+  onTypeTab: (tab: CampaignTypeTab) => void;
   onFilter: (filter: CampaignFilter) => void;
   onSearch: (search: string) => void;
   onPage: (page: number) => void;
@@ -59,6 +72,16 @@ export type CampaignsVm = {
   gift: SendGiftVm;
 };
 
+function isKitCampaign(c: UiCampaign) {
+  return !isPointsCampaign(c);
+}
+
+function campaignsForTypeTab(campaigns: UiCampaign[], tab: CampaignTypeTab) {
+  if (tab === "kits") return campaigns.filter(isKitCampaign);
+  if (tab === "points") return campaigns.filter(isPointsCampaign);
+  return campaigns;
+}
+
 /** Controller for the campaigns list screen: workspace slice, table state, Send Gift dialog. */
 export function useCampaignsController(): CampaignsVm {
   const { data: workspace, isLoading, isError, error } = useWorkspace();
@@ -67,6 +90,7 @@ export function useCampaignsController(): CampaignsVm {
 
   const [giftOpen, setGiftOpen] = useState(false);
   const [giftView, setGiftView] = useState<SendGiftView>("choose");
+  const [typeTab, setTypeTab] = useState<CampaignTypeTab>("recent");
   const [filter, setFilter] = useState<CampaignFilter>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -80,7 +104,16 @@ export function useCampaignsController(): CampaignsVm {
     recipients: campaigns.reduce((s, c) => s + (c.recipientCount || 0), 0),
   };
 
-  let filtered = campaigns;
+  const typeCounts: CampaignTypeCounts = {
+    recent: campaigns.length,
+    kits: campaigns.filter(isKitCampaign).length,
+    points: campaigns.filter(isPointsCampaign).length,
+  };
+
+  const typed = campaignsForTypeTab(campaigns, typeTab);
+  const typeTabEmpty = typed.length === 0;
+
+  let filtered = typed;
   if (filter === "live") filtered = filtered.filter(isLiveCampaign);
   else if (filter === "draft") filtered = filtered.filter((c) => c.status === "draft");
   else if (filter === "completed")
@@ -117,6 +150,9 @@ export function useCampaignsController(): CampaignsVm {
     hasCampaigns: campaigns.length > 0,
     canSend: canOperateCampaigns(),
     stats,
+    typeTab,
+    typeCounts,
+    typeTabEmpty,
     filter,
     search,
     pageItems,
@@ -125,6 +161,10 @@ export function useCampaignsController(): CampaignsVm {
     totalFiltered,
     showingStart: totalFiltered ? start + 1 : 0,
     showingEnd: Math.min(start + PER_PAGE, totalFiltered),
+    onTypeTab: (tab) => {
+      setTypeTab(tab);
+      setPage(1);
+    },
     onFilter: (f) => {
       setFilter(f);
       setPage(1);
