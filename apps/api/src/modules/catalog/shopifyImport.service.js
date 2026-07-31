@@ -288,6 +288,56 @@ export async function fetchShopifyProductMetafields({ domain, token, productId }
   return body.metafields ?? [];
 }
 
+/**
+ * Prefer an India-specific HSN when present, else the general HS code.
+ * Shopify stores these on InventoryItem, not on the Product resource.
+ */
+export function resolveHsnFromInventoryItems(items = []) {
+  for (const item of items) {
+    const countryCodes = item?.country_harmonized_system_codes ?? [];
+    const india = countryCodes.find(
+      (entry) => String(entry?.country_code || '').toUpperCase() === 'IN' && entry?.harmonized_system_code,
+    );
+    if (india?.harmonized_system_code) return String(india.harmonized_system_code);
+  }
+  for (const item of items) {
+    if (item?.harmonized_system_code != null && String(item.harmonized_system_code).trim()) {
+      return String(item.harmonized_system_code).trim();
+    }
+  }
+  return '';
+}
+
+/** Batch-read InventoryItems for HS/HSN codes (REST `ids` filter, chunks of 50). */
+export async function fetchShopifyInventoryItems({ domain, token, ids }) {
+  const unique = [...new Set((ids ?? []).map(String).filter((id) => /^\d+$/.test(id)))];
+  if (!unique.length) return [];
+
+  const items = [];
+  const chunkSize = 50;
+  for (let i = 0; i < unique.length; i += chunkSize) {
+    const chunk = unique.slice(i, i + chunkSize);
+    const params = new URLSearchParams({ ids: chunk.join(',') });
+    let res;
+    try {
+      res = await fetch(
+        `https://${domain}/admin/api/${SHOPIFY_API_VERSION}/inventory_items.json?${params}`,
+        { headers: { 'X-Shopify-Access-Token': token, Accept: 'application/json' } },
+      );
+    } catch {
+      // HSN enrichment is optional — product import should still succeed.
+      return items;
+    }
+    if (res.status === 401 || res.status === 403) {
+      throw new ApiError(401, 'Shopify token cannot read inventory items', 'SHOPIFY_UNAUTHORIZED');
+    }
+    if (!res.ok) return items;
+    const body = await res.json().catch(() => ({}));
+    items.push(...(body.inventory_items ?? []));
+  }
+  return items;
+}
+
 /** Fetch Shopify's standard taxonomy category and merchant classification. */
 export async function fetchShopifyProductCategory({ domain, token, productId }) {
   const query = `
@@ -373,7 +423,7 @@ export async function fetchShopifyStorefrontTabs({ domain, handle }) {
 }
 
 /** Map a Shopify product into CatalogProduct fields (status draft). */
-export function mapShopifyProduct(p, domain, metafields = [], categoryData = null) {
+export function mapShopifyProduct(p, domain, metafields = [], categoryData = null, hsnCode = '') {
   const optionNames = (p.options ?? []).map((o) => String(o.name || '').toLowerCase());
   const optKey = (i) =>
     optionNames[i]?.includes('size') ? 'size'
@@ -405,6 +455,7 @@ export function mapShopifyProduct(p, domain, metafields = [], categoryData = nul
     brand: p.vendor || '',
     category: resolveShopifyCategory(p, categoryData),
     basePriceInr,
+    hsnCode: hsnCode || '',
     variants,
     primaryImageUrl: p.image?.src || images[0] || '',
     imageUrls: images,
@@ -517,7 +568,15 @@ export async function importFromShopify({ domain, token, only = 'all' }) {
         token,
         productId: externalId,
       });
-      const mapped = mapShopifyProduct(p, host, metafields, categoryData);
+      // HSN/HS lives on InventoryItem (via variant.inventory_item_id), not Product.
+      const inventoryItemIds = (p.variants ?? []).map((v) => v.inventory_item_id);
+      const inventoryItems = await fetchShopifyInventoryItems({
+        domain: host,
+        token,
+        ids: inventoryItemIds,
+      });
+      const hsnCode = resolveHsnFromInventoryItems(inventoryItems);
+      const mapped = mapShopifyProduct(p, host, metafields, categoryData, hsnCode);
       if (!mapped.keyFeatures || mapped.description === stripHtml(p.body_html)) {
         const storefrontTabs = await fetchShopifyStorefrontTabs({
           domain: host,
@@ -582,7 +641,9 @@ export async function importFromShopify({ domain, token, only = 'all' }) {
         const legacyShopifyMask = [mapped.primaryImageUrl, ...mapped.imageUrls]
           .filter(Boolean)
           .includes(exists.maskImageUrl);
-        if (contentChanged || imagesChanged || legacyShopifyMask) {
+        // Fill HSN from Shopify when the draft still has none; never overwrite a set value.
+        const hsnFilled = !String(exists.hsnCode || '').trim() && Boolean(mapped.hsnCode);
+        if (contentChanged || imagesChanged || legacyShopifyMask || hsnFilled) {
           exists.description = mapped.description;
           exists.keyFeatures = mapped.keyFeatures;
           exists.sizeGuide = mapped.sizeGuide;
@@ -594,6 +655,7 @@ export async function importFromShopify({ domain, token, only = 'all' }) {
           if (legacyShopifyMask) exists.maskImageUrl = '';
 
           exists.category = mapped.category;
+          if (hsnFilled) exists.hsnCode = mapped.hsnCode;
           await exists.save();
           product.updated += 1;
           items.push({ title: p.title, status: 'updated', kind: 'product' });

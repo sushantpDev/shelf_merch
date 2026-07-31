@@ -59,7 +59,7 @@ export function ShopifyImportView({
             Used once for this import and never stored.{" "}
             {kits
               ? "Only kit bundles are imported, as curated active kits."
-              : "Only active Shopify products are pulled, and they land as drafts — set cost, GST and HSN before publishing."}
+              : "Only active Shopify products are pulled, and they land as drafts — HSN is copied from Shopify inventory items when set; still set cost and GST before publishing."}
           </p>
         </div>
         <button type="button" className="btn btn-brand" disabled={busy || !domain || !token} onClick={onRun}>

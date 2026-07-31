@@ -39,7 +39,7 @@ async function wipe() {
   const cols = [
     'tenants', 'users', 'roleassignments', 'refreshtokens', 'wallets', 'wallettransactions',
     'entities', 'auditlogs', 'catalogproducts', 'shops', 'collections', 'kits', 'contacts',
-    'campaigns', 'recipients', 'orders', 'importjobs', 'importmappings', 'notifications',
+    'campaigns', 'recipients', 'orders', 'importjobs', 'notifications',
     'idempotencykeys', 'shipments', 'supporttickets', 'vendors', 'productiontasks',
     'platformsettings', 'categories', 'inventorytransactions', 'platformkits',
     'invoices', 'payments', 'creditnotes', 'chatnodes', 'chatsessions',

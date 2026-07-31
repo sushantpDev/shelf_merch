@@ -8,7 +8,6 @@ import { tenantArea } from '../../middleware/tenantAccess.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { objectId } from '../users/users.validation.js';
 import { Kit } from './kit.model.js';
-import { CustomisedKit } from './customisedKit.model.js';
 import { PlatformKit } from './platformKit.model.js';
 import { CatalogProduct } from '../catalog/catalogProduct.model.js';
 import { uploadFile } from '../../services/storage.service.js';
@@ -55,26 +54,6 @@ async function resolveKitPrice(productRefs, clientKitPrice) {
   const fromCatalog = sumKitProductPrices(products);
   if (fromCatalog > 0) return fromCatalog;
   return Math.round(Number(clientKitPrice) || 0);
-}
-
-async function upsertCustomisedKit(kit) {
-  const payload = {
-    tenantId: kit.tenantId,
-    kitId: kit._id,
-    name: kit.name,
-    description: kit.description || '',
-    productRefs: kit.productRefs || [],
-    artworkUrl: kit.artworkUrl || '',
-    designNotes: kit.designNotes || '',
-    packaging: kit.packaging === 'none' ? 'none' : 'box',
-    kitPrice: Math.round(Number(kit.kitPrice) || 0),
-    status: kit.status || 'live',
-  };
-  await CustomisedKit.findOneAndUpdate(
-    { tenantId: kit.tenantId, kitId: kit._id },
-    { $set: payload },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
-  );
 }
 
 function parseCuratedMeta(designNotes) {
@@ -208,8 +187,6 @@ router.post(
       kitPrice: curatedPrice > 0 ? curatedPrice : await resolveKitPrice(productRefs, 0),
     });
 
-    await upsertCustomisedKit(kit);
-
     writeAudit({
       req,
       action: 'kit.clone_curated',
@@ -232,7 +209,6 @@ router.post(
       ...req.body,
       kitPrice,
     });
-    await upsertCustomisedKit(kit);
     writeAudit({ req, action: 'kit.create', entityType: 'Kit', entityId: kit._id, after: kit.toObject() });
     res.status(201).json(kit);
   }),
@@ -251,7 +227,6 @@ router.patch(
       kit.kitPrice = await resolveKitPrice(kit.productRefs, req.body.kitPrice ?? kit.kitPrice);
     }
     await kit.save();
-    await upsertCustomisedKit(kit);
     writeAudit({ req, action: 'kit.update', entityType: 'Kit', entityId: kit._id, before, after: kit.toObject() });
     res.json(kit);
   }),
@@ -269,7 +244,6 @@ router.post(
     const { url } = await uploadFile({ tenantId: req.tenantId, kind: 'artwork', file: req.file });
     kit.artworkUrl = url;
     await kit.save();
-    await upsertCustomisedKit(kit);
     writeAudit({ req, action: 'kit.artwork', entityType: 'Kit', entityId: kit._id, after: { artworkUrl: url } });
     res.json(kit);
   }),
@@ -307,7 +281,6 @@ router.post(
     }
     kit.markModified('productRefs');
     await kit.save();
-    await upsertCustomisedKit(kit);
     writeAudit({
       req,
       action: 'kit.mockups',

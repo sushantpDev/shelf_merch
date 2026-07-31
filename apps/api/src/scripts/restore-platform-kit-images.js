@@ -53,12 +53,6 @@ async function main() {
 
   const platformKits = await db.collection('platformkits').find({}).toArray();
   const workspaceKits = await db.collection('kits').find({ designNotes: { $regex: 'curated' } }).toArray();
-  let customisedKits = [];
-  try {
-    customisedKits = await db.collection('customisedkits').find({ designNotes: { $regex: 'curated' } }).toArray();
-  } catch {
-    customisedKits = [];
-  }
 
   const byOriginal = new Map();
   const byName = new Map();
@@ -89,7 +83,7 @@ async function main() {
     }
   }
 
-  for (const wk of [...workspaceKits, ...customisedKits]) {
+  for (const wk of workspaceKits) {
     consider(parseMeta(wk.designNotes), wk.artworkUrl, String(wk._id), wk.name);
   }
 

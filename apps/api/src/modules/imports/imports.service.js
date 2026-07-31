@@ -2,7 +2,6 @@ import { parse } from 'csv-parse/sync';
 import * as XLSX from 'xlsx';
 import { Contact } from '../contacts/contact.model.js';
 import { ImportJob } from './importJob.model.js';
-import { ImportMapping, DEFAULT_MAPPING } from './importMapping.model.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -19,6 +18,8 @@ const FIELD_ALIASES = {
   pincode: ['pincode', 'pin code', 'zip', 'zip code', 'postal code', 'postcode'],
   country: ['country', 'nation'],
 };
+
+const IMPORT_FIELDS = Object.keys(FIELD_ALIASES);
 
 function normalizeKey(value) {
   return String(value ?? '')
@@ -46,18 +47,13 @@ function parseImportRows(buffer, fileName) {
   });
 }
 
-function resolveColumns(headers, mapping) {
+function resolveColumns(headers) {
   const byKey = new Map(headers.map((h) => [normalizeKey(h), h]));
   const resolved = {};
 
-  for (const field of Object.keys(mapping)) {
-    const preferred = mapping[field];
-    if (preferred && byKey.has(normalizeKey(preferred))) {
-      resolved[field] = byKey.get(normalizeKey(preferred));
-      continue;
-    }
+  for (const field of IMPORT_FIELDS) {
     for (const alias of FIELD_ALIASES[field] ?? []) {
-      const col = byKey.get(alias);
+      const col = byKey.get(normalizeKey(alias));
       if (col) {
         resolved[field] = col;
         break;
@@ -106,11 +102,9 @@ export async function processCsvImport({ tenantId, jobId }) {
   await job.save();
 
   try {
-    const mappingDoc = await ImportMapping.findOne({ tenantId, source: 'csv' });
-    const mapping = mappingDoc?.mapping ?? DEFAULT_MAPPING;
     const rows = parseImportRows(job.csv, job.fileName);
     const headers = rows.length ? Object.keys(rows[0]) : [];
-    const cols = resolveColumns(headers, mapping);
+    const cols = resolveColumns(headers);
 
     const errors = [];
     const seenEmails = new Set();
@@ -164,10 +158,6 @@ export async function processCsvImport({ tenantId, jobId }) {
     job.csv = undefined;
     await job.save();
 
-    if (mappingDoc) {
-      mappingDoc.lastImportAt = new Date();
-      await mappingDoc.save();
-    }
     return job;
   } catch (err) {
     job.status = 'failed';

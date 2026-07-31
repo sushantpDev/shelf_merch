@@ -10,6 +10,7 @@ import { signAccessToken } from '../src/modules/auth/auth.service.js';
 import {
   mapShopifyContent,
   parseShopifyStorefrontTabs,
+  resolveHsnFromInventoryItems,
 } from '../src/modules/catalog/shopifyImport.service.js';
 
 let app;
@@ -45,8 +46,22 @@ const SHOPIFY_PAYLOAD = {
       image: { src: 'https://cdn.shopify.com/tee.jpg' },
       images: [{ src: 'https://cdn.shopify.com/tee.jpg' }],
       variants: [
-        { sku: 'TEE-BLK-M', price: '499.00', inventory_quantity: 10, option1: 'Black', option2: 'M' },
-        { sku: 'TEE-BLK-L', price: '549.00', inventory_quantity: 5, option1: 'Black', option2: 'L' },
+        {
+          sku: 'TEE-BLK-M',
+          price: '499.00',
+          inventory_quantity: 10,
+          inventory_item_id: 9001,
+          option1: 'Black',
+          option2: 'M',
+        },
+        {
+          sku: 'TEE-BLK-L',
+          price: '549.00',
+          inventory_quantity: 5,
+          inventory_item_id: 9002,
+          option1: 'Black',
+          option2: 'L',
+        },
       ],
     },
     {
@@ -58,10 +73,90 @@ const SHOPIFY_PAYLOAD = {
       body_html: 'Insulated bottle',
       options: [{ name: 'Title' }],
       images: [],
-      variants: [{ sku: 'BTL-750', price: '689', inventory_quantity: 20, option1: 'Default' }],
+      variants: [
+        {
+          sku: 'BTL-750',
+          price: '689',
+          inventory_quantity: 20,
+          inventory_item_id: 9003,
+          option1: 'Default',
+        },
+      ],
     },
   ],
 };
+
+const INVENTORY_ITEMS = {
+  9001: {
+    id: 9001,
+    sku: 'TEE-BLK-M',
+    harmonized_system_code: '610520',
+    country_harmonized_system_codes: [],
+  },
+  9002: {
+    id: 9002,
+    sku: 'TEE-BLK-L',
+    harmonized_system_code: '610520',
+    country_harmonized_system_codes: [],
+  },
+  9003: {
+    id: 9003,
+    sku: 'BTL-750',
+    harmonized_system_code: null,
+    country_harmonized_system_codes: [
+      { country_code: 'IN', harmonized_system_code: '73239390' },
+    ],
+  },
+};
+
+/** Route Shopify list / metafield / inventory / GraphQL stubs by URL. */
+function stubShopifyFetch(productsPayload = SHOPIFY_PAYLOAD) {
+  return vi.fn(async (url) => {
+    const u = String(url);
+    if (u.includes('/inventory_items.json')) {
+      const ids = new URL(u).searchParams.get('ids')?.split(',') ?? [];
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          inventory_items: ids.map((id) => INVENTORY_ITEMS[id]).filter(Boolean),
+        }),
+        headers: { get: () => null },
+      };
+    }
+    if (u.includes('/metafields')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ metafields: [] }),
+        headers: { get: () => null },
+      };
+    }
+    if (u.includes('/graphql.json')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { product: null } }),
+        headers: { get: () => null },
+      };
+    }
+    if (u.includes('/products.json')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => productsPayload,
+        headers: { get: () => null },
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+      text: async () => '',
+      headers: { get: () => null },
+    };
+  });
+}
 
 function stubFetch(status, payload, linkHeader = null) {
   return vi.fn().mockResolvedValue({
@@ -147,8 +242,23 @@ describe('Shopify catalog import', () => {
     expect(JSON.stringify(tabs)).not.toContain('Do not import this');
   });
 
+  it('prefers India country HSN over the general HS code', () => {
+    expect(
+      resolveHsnFromInventoryItems([
+        {
+          harmonized_system_code: '610520',
+          country_harmonized_system_codes: [
+            { country_code: 'IN', harmonized_system_code: '61052010' },
+          ],
+        },
+      ]),
+    ).toBe('61052010');
+    expect(resolveHsnFromInventoryItems([{ harmonized_system_code: '610520' }])).toBe('610520');
+    expect(resolveHsnFromInventoryItems([])).toBe('');
+  });
+
   it('imports products as drafts with mapped fields and source id', async () => {
-    const fetchMock = stubFetch(200, SHOPIFY_PAYLOAD);
+    const fetchMock = stubShopifyFetch();
     vi.stubGlobal('fetch', fetchMock);
     const res = await importReq(catalogToken);
     expect(res.status).toBe(200);
@@ -161,11 +271,16 @@ describe('Shopify catalog import', () => {
     expect(productListCall).toBeTruthy();
     expect(String(productListCall[0])).toContain('status=active');
 
+    // HSN is read from InventoryItem, not products.json.
+    const inventoryCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/inventory_items.json'));
+    expect(inventoryCall).toBeTruthy();
+
     const tee = await CatalogProduct.findOne({ 'source.externalId': '111' });
     expect(tee.status).toBe('draft');
     expect(tee.brand).toBe('Acme');
     expect(tee.category).toBe('Apparel');
     expect(tee.basePriceInr).toBe(499); // min variant price
+    expect(tee.hsnCode).toBe('610520');
     expect(tee.variants).toHaveLength(2);
     expect(tee.variants[0]).toMatchObject({ color: 'Black', size: 'M', sku: 'TEE-BLK-M' });
     expect(tee.primaryImageUrl).toBe('https://cdn.shopify.com/tee.jpg');
@@ -174,6 +289,9 @@ describe('Shopify catalog import', () => {
     expect(tee.source.provider).toBe('shopify');
     // Imported products are made-to-order so they don't read as "out of stock".
     expect(tee.inventory.mode).toBe('made_to_order');
+
+    const bottle = await CatalogProduct.findOne({ 'source.externalId': '222' });
+    expect(bottle.hsnCode).toBe('73239390');
   });
 
   it('ignores draft and archived Shopify products even if returned', async () => {
@@ -195,7 +313,7 @@ describe('Shopify catalog import', () => {
         },
       ],
     };
-    vi.stubGlobal('fetch', stubFetch(200, mixed));
+    vi.stubGlobal('fetch', stubShopifyFetch(mixed));
     const res = await importReq(catalogToken);
     expect(res.status).toBe(200);
     expect(res.body.imported).toBe(1);
@@ -206,9 +324,9 @@ describe('Shopify catalog import', () => {
   });
 
   it('skips products already imported on re-import (idempotent)', async () => {
-    vi.stubGlobal('fetch', stubFetch(200, SHOPIFY_PAYLOAD));
+    vi.stubGlobal('fetch', stubShopifyFetch());
     await importReq(catalogToken);
-    vi.stubGlobal('fetch', stubFetch(200, SHOPIFY_PAYLOAD));
+    vi.stubGlobal('fetch', stubShopifyFetch());
     const res = await importReq(catalogToken);
     expect(res.status).toBe(200);
     expect(res.body.imported).toBe(0);
@@ -224,8 +342,29 @@ describe('Shopify catalog import', () => {
   });
 
   it('forbids a tenant role from importing (403)', async () => {
-    vi.stubGlobal('fetch', stubFetch(200, SHOPIFY_PAYLOAD));
+    vi.stubGlobal('fetch', stubShopifyFetch());
     const res = await importReq(tenantToken);
     expect(res.status).toBe(403);
+  });
+
+  it('backfills empty hsnCode on re-import without overwriting a set value', async () => {
+    vi.stubGlobal('fetch', stubShopifyFetch());
+    await importReq(catalogToken);
+
+    const tee = await CatalogProduct.findOne({ 'source.externalId': '111' });
+    tee.hsnCode = '';
+    await tee.save();
+    const bottle = await CatalogProduct.findOne({ 'source.externalId': '222' });
+    bottle.hsnCode = '999999';
+    await bottle.save();
+
+    vi.stubGlobal('fetch', stubShopifyFetch());
+    const res = await importReq(catalogToken);
+    expect(res.status).toBe(200);
+    expect(res.body.updated).toBe(1);
+    expect(res.body.skipped).toBe(1);
+
+    expect((await CatalogProduct.findOne({ 'source.externalId': '111' })).hsnCode).toBe('610520');
+    expect((await CatalogProduct.findOne({ 'source.externalId': '222' })).hsnCode).toBe('999999');
   });
 });
