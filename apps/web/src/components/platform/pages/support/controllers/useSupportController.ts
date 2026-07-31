@@ -5,6 +5,7 @@ import { usePlatformSupport, type SupportQueueFilter } from "../model";
 
 export type SupportVm = ReturnType<typeof usePlatformSupport> & {
   canWrite: boolean;
+  myUserId: string;
   filter: SupportQueueFilter;
   onFilter: (filter: SupportQueueFilter) => void;
   managing: Record<string, unknown> | null;
@@ -15,17 +16,21 @@ export type SupportVm = ReturnType<typeof usePlatformSupport> & {
 
 /** Controller for the platform support page. */
 export function useSupportController(): SupportVm {
-  const [reloadKey, setReloadKey] = useState(0);
-  const [filter, setFilter] = useState<SupportQueueFilter>("all");
-  const [managing, setManaging] = useState<Record<string, unknown> | null>(null);
   const me = getStoredUser();
-  const load = usePlatformSupport(reloadKey, filter, me?.id ?? "");
+  const myUserId = me?.id ?? "";
   const canWrite = canAccessArea(me?.role, "support", "write");
+  // Department handlers only see their assigned tickets — lock filter to "mine".
+  const [reloadKey, setReloadKey] = useState(0);
+  const [filter, setFilter] = useState<SupportQueueFilter>(canWrite ? "all" : "mine");
+  const [managing, setManaging] = useState<Record<string, unknown> | null>(null);
+  const effectiveFilter: SupportQueueFilter = canWrite ? filter : "mine";
+  const load = usePlatformSupport(reloadKey, effectiveFilter, myUserId);
 
   return {
     ...load,
     canWrite,
-    filter,
+    myUserId,
+    filter: effectiveFilter,
     onFilter: setFilter,
     managing,
     onManage: setManaging,

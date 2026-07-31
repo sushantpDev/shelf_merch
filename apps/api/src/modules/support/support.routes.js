@@ -2,9 +2,11 @@ import { Router } from 'express';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { resolveTenant, requireTenantContext } from '../../middleware/tenant.middleware.js';
-import { platformArea } from '../../middleware/platformAccess.middleware.js';
+import { platformArea, rolesForArea } from '../../middleware/platformAccess.middleware.js';
 import { uploader, DOCUMENT_TYPES } from '../../middleware/upload.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
+import { ForbiddenError, NotFoundError } from '../../utils/errors.js';
+import { SupportTicket } from './supportTicket.model.js';
 import * as controller from './support.controller.js';
 import {
   listSupportTicketsQuery,
@@ -20,6 +22,40 @@ import {
   tenantListTicketsQuery,
   tenantAddMessageSchema,
 } from './support.validation.js';
+
+function isSupportWriter(role) {
+  return rolesForArea('support', 'write').includes(role);
+}
+
+/**
+ * Admit help-desk writers, or the ticket's current assignee (department handoff).
+ * Sets req.isSupportWriter for the controller/service.
+ */
+async function supportWriteOrAssignee(req, _res, next) {
+  if (isSupportWriter(req.user?.role)) {
+    req.isSupportWriter = true;
+    return next();
+  }
+  if (!rolesForArea('support', 'read').includes(req.user?.role)) {
+    return next(
+      new ForbiddenError(
+        `This support write requires one of roles: ${rolesForArea('support', 'write').join(', ')}`,
+      ),
+    );
+  }
+  const ticket = await SupportTicket.findOne({ _id: req.params.id })
+    .setOptions({ skipTenantGuard: true })
+    .select('assignedToUserId')
+    .lean();
+  if (!ticket) return next(new NotFoundError('Support ticket not found'));
+  if (String(ticket.assignedToUserId ?? '') !== String(req.user.userId)) {
+    return next(
+      new ForbiddenError('Only support staff or the ticket assignee can update this ticket'),
+    );
+  }
+  req.isSupportWriter = false;
+  return next();
+}
 
 export const tenantSupportRouter = Router();
 tenantSupportRouter.use(authenticate, resolveTenant, requireTenantContext);
@@ -87,7 +123,7 @@ platformSupportRouter.post(
 );
 platformSupportRouter.post(
   '/:id/messages',
-  supportWrite,
+  asyncHandler(supportWriteOrAssignee),
   validate({ params: supportTicketIdParam, body: addMessageSchema }),
   asyncHandler(controller.addMessage),
 );

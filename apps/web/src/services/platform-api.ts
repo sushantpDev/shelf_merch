@@ -359,9 +359,21 @@ export function createCreditNote(body: { invoiceId: string; amount: number; reas
 }
 
 export async function fetchPlatformTeam() {
-  return apiFetch<
-    Array<{ userId: string; name: string; email: string; role: string; status: string }>
+  const rows = await apiFetch<
+    Array<{
+      id?: string;
+      userId?: string;
+      name: string;
+      email: string;
+      role: string;
+      status: string;
+    }>
   >("/platform/team");
+  // API historically returned `id`; normalize so assign/manage UIs always get userId.
+  return rows.map((m) => ({
+    ...m,
+    userId: String(m.userId ?? m.id ?? ""),
+  }));
 }
 
 // ---- Tenant lifecycle controls ----

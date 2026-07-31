@@ -9,13 +9,16 @@ import {
 } from "@/components/ui/dialog";
 import { LoadingState } from "@/components/LoadingState";
 import { PageHeader } from "@/components/tenant/PageHeader";
-import { StatusTag } from "@/components/platform/platform-ui";
+import { StatusTag, PlatformSelect } from "@/components/platform/platform-ui";
 import {
   SUPPORT_TICKET_TYPES,
   TYPE_LABELS,
   type SupportAttachment,
   type SupportMessage,
 } from "../model";
+import type { SupportTicketsVm } from "../controllers/useSupportTicketsController";
+
+const SUBTITLE = "Raise an issue with the ShelfMerch team and track replies here.";
 
 function fmtBytes(size = 0) {
   if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
@@ -23,10 +26,26 @@ function fmtBytes(size = 0) {
   return `${size} B`;
 }
 
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function formatMsgTime(at: string) {
+  return new Date(at).toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
 function AttachmentLinks({ attachments }: { attachments?: SupportAttachment[] }) {
   if (!attachments?.length) return null;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
       {attachments.map((a, i) => (
         <a
           key={a._id ?? i}
@@ -36,7 +55,7 @@ function AttachmentLinks({ attachments }: { attachments?: SupportAttachment[] })
           className="lnk"
           style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13 }}
         >
-          <Paperclip size={14} aria-hidden="true" />
+          <Paperclip size={14} strokeWidth={2.25} aria-hidden="true" />
           {a.name || "Attachment"}
           {a.size ? (
             <span className="muted" style={{ fontSize: 12 }}>
@@ -48,34 +67,30 @@ function AttachmentLinks({ attachments }: { attachments?: SupportAttachment[] })
     </div>
   );
 }
-import type { SupportTicketsVm } from "../controllers/useSupportTicketsController";
 
-const SUBTITLE = "Raise an issue with the ShelfMerch team and track replies here.";
-
+/** Tenant conversation: Support on the left, you on the right. */
 function MessageBubble({ message }: { message: SupportMessage }) {
   const fromSupport = message.fromPlatform !== false;
+  const author = fromSupport
+    ? message.authorName || "Support team"
+    : message.authorName || "You";
+  // Reuse platform chat styles: customer = left, agent = right (your messages).
+  const kind = fromSupport ? "customer" : "agent";
+
   return (
-    <div
-      style={{
-        border: "1px solid var(--line)",
-        borderRadius: "var(--r-sm)",
-        padding: "10px 12px",
-        marginBottom: 8,
-        background: fromSupport ? "var(--bg-2, transparent)" : "transparent",
-      }}
-    >
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 4 }}>
-        <span style={{ fontWeight: 600, fontSize: 13 }}>
-          {fromSupport ? message.authorName || "Support team" : message.authorName || "You"}
-        </span>
-        <span className="muted" style={{ fontSize: 12 }}>
-          {new Date(message.at).toLocaleString("en-IN", {
-            dateStyle: "medium",
-            timeStyle: "short",
-          })}
-        </span>
+    <div className={`st-msg st-msg--${kind}`}>
+      <div className="st-msg-avatar" aria-hidden="true">
+        {initials(author)}
       </div>
-      <div style={{ fontSize: 14, whiteSpace: "pre-wrap" }}>{message.body}</div>
+      <div className="st-msg-bubble">
+        <div className="st-msg-meta">
+          <span className="st-msg-author">{author}</span>
+          <time className="st-msg-time" dateTime={message.at}>
+            {formatMsgTime(message.at)}
+          </time>
+        </div>
+        <div className="st-msg-body">{message.body}</div>
+      </div>
     </div>
   );
 }
@@ -188,21 +203,17 @@ export function SupportTicketsView(vm: SupportTicketsVm) {
                 />
               </div>
               <div className="field">
-                <label className="lbl" htmlFor="support-type">
-                  Category
-                </label>
-                <select
-                  id="support-type"
-                  className="inp"
+                <label className="lbl">Category</label>
+                <PlatformSelect
+                  className="platform-select"
                   value={vm.type}
-                  onChange={(e) => vm.onType(e.target.value as typeof vm.type)}
-                >
-                  {SUPPORT_TICKET_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {TYPE_LABELS[t]}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => vm.onType(v as typeof vm.type)}
+                  options={SUPPORT_TICKET_TYPES.map((t) => ({
+                    value: t,
+                    label: TYPE_LABELS[t],
+                  }))}
+                  placeholder="Select a category…"
+                />
               </div>
               <div className="field">
                 <label className="lbl" htmlFor="support-description">
@@ -287,15 +298,15 @@ export function SupportTicketsView(vm: SupportTicketsVm) {
 
       {/* Ticket detail / conversation dialog */}
       <Dialog open={vm.selected !== null} onOpenChange={vm.onDetailOpenChange}>
-        <DialogContent className="sm-modal">
+        <DialogContent className="sm-modal sm-support-detail-modal">
           {vm.selected && (
-            <div className="modal-pad">
+            <div className="modal-pad sm-support-detail">
               <DialogHeader>
                 <div className="eyebrow">
                   {TYPE_LABELS[vm.selected.type] ?? vm.selected.type} ·{" "}
                   {new Date(vm.selected.createdAt).toLocaleDateString("en-IN")}
                 </div>
-                <DialogTitle style={{ fontSize: 18 }}>{vm.selected.subject}</DialogTitle>
+                <DialogTitle style={{ fontSize: 20 }}>{vm.selected.subject}</DialogTitle>
                 <DialogDescription className="sr-only">
                   Conversation for ticket {vm.selected.subject}
                 </DialogDescription>
@@ -316,25 +327,25 @@ export function SupportTicketsView(vm: SupportTicketsVm) {
 
               <AttachmentLinks attachments={vm.selected.attachments} />
 
-              <div className="lbl" style={{ marginBottom: 8 }}>
-                Conversation
-              </div>
-              <div style={{ maxHeight: 320, overflowY: "auto" }}>
-                {(vm.selected.messages ?? []).length === 0 ? (
-                  <p className="muted" style={{ fontSize: 13 }}>
-                    No replies yet — the team has been notified.
-                  </p>
-                ) : (
-                  vm.selected.messages.map((m, i) => (
-                    <MessageBubble key={m._id ?? i} message={m} />
-                  ))
-                )}
+              <div className="support-ticket-thread sm-support-detail-thread">
+                <label className="lbl">Conversation</label>
+                <div className="support-ticket-thread-scroll">
+                  {(vm.selected.messages ?? []).length === 0 ? (
+                    <p className="support-ticket-thread-empty">
+                      No replies yet — the team has been notified.
+                    </p>
+                  ) : (
+                    vm.selected.messages.map((m, i) => (
+                      <MessageBubble key={m._id ?? i} message={m} />
+                    ))
+                  )}
+                </div>
               </div>
 
               {vm.selected.status === "resolved" ? (
                 <div
                   className="card"
-                  style={{ padding: 14, marginTop: 12, background: "var(--surface-2)" }}
+                  style={{ padding: 14, marginTop: 14, background: "var(--surface-2)" }}
                 >
                   <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
                     Did we solve your issue?
@@ -355,7 +366,7 @@ export function SupportTicketsView(vm: SupportTicketsVm) {
               ) : null}
 
               {vm.canReply ? (
-                <div style={{ marginTop: 12 }}>
+                <div className="sm-support-detail-composer">
                   <textarea
                     className="inp"
                     rows={3}
@@ -363,7 +374,7 @@ export function SupportTicketsView(vm: SupportTicketsVm) {
                     value={vm.reply}
                     onChange={(e) => vm.onReply(e.target.value)}
                   />
-                  <div className="row" style={{ justifyContent: "flex-end", marginTop: 8 }}>
+                  <div className="row" style={{ justifyContent: "flex-end", marginTop: 10 }}>
                     <button
                       type="button"
                       className="btn btn-brand btn-sm"
@@ -375,7 +386,7 @@ export function SupportTicketsView(vm: SupportTicketsVm) {
                   </div>
                 </div>
               ) : (
-                <p className="muted" style={{ fontSize: 13, marginTop: 12 }}>
+                <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>
                   This ticket is closed. Raise a new ticket if you need more help.
                 </p>
               )}

@@ -1,6 +1,8 @@
 import * as supportService from './support.service.js';
 import { writeAudit } from '../../services/audit.service.js';
 import { uploadFile } from '../../services/storage.service.js';
+import { rolesForArea } from '../../middleware/platformAccess.middleware.js';
+import { ForbiddenError } from '../../utils/errors.js';
 
 /** Store an optional multer file in hardened storage; returns attachment metadata. */
 async function storeAttachment(req) {
@@ -18,11 +20,25 @@ async function storeAttachment(req) {
 }
 
 export async function listPlatform(req, res) {
-  res.json(await supportService.listSupportTicketsWithTenants({ query: req.query }));
+  const isWriter = rolesForArea('support', 'write').includes(req.user?.role);
+  const query = { ...req.query };
+  // Department handlers (production, logistics, …) only see tickets assigned to them.
+  if (!isWriter) {
+    query.assignedToUserId = String(req.user.userId);
+    delete query.unassigned;
+  }
+  res.json(await supportService.listSupportTicketsWithTenants({ query }));
 }
 
 export async function getOne(req, res) {
-  res.json(await supportService.getSupportTicketDetail(req.params.id));
+  const isWriter = rolesForArea('support', 'write').includes(req.user?.role);
+  const ticket = await supportService.getSupportTicketDetail(req.params.id, {
+    isSupportWriter: isWriter,
+  });
+  if (!isWriter && String(ticket.assignedToUserId ?? '') !== String(req.user.userId)) {
+    throw new ForbiddenError('You can only open tickets assigned to you');
+  }
+  res.json(ticket);
 }
 
 export async function listMine(req, res) {
@@ -108,20 +124,29 @@ export async function search(req, res) {
 }
 
 export async function addMessage(req, res) {
+  const isSupportWriter = req.isSupportWriter !== false;
   const ticket = await supportService.addMessage({
     ticketId: req.params.id,
     authorUserId: req.user.userId,
     body: req.body.body,
     internal: req.body.internal,
+    isSupportWriter,
   });
   writeAudit({
     req,
     action: 'support_ticket.message',
     entityType: 'SupportTicket',
     entityId: ticket._id,
-    after: { messagesCount: ticket.messages.length, internal: req.body.internal ?? false },
+    after: {
+      messagesCount: ticket.messages.length,
+      internal: isSupportWriter ? (req.body.internal ?? false) : true,
+    },
   });
-  res.json(ticket);
+  res.json(
+    isSupportWriter
+      ? ticket
+      : supportService.toInternalThreadView(ticket),
+  );
 }
 
 export async function updateStatus(req, res) {

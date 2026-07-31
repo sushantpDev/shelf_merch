@@ -4,8 +4,6 @@ import {
   assignTicket,
   fetchPlatformTeam,
   fetchPlatformTicket,
-  resendRedemptionLink,
-  resendTicketTracking,
   setTicketStatus,
 } from "../model";
 
@@ -24,10 +22,14 @@ export type SupportManageVm = {
   ticket: Record<string, unknown> | null;
   messages: TicketMessage[];
   status: string;
-  team: { userId: string; name: string }[];
+  team: { userId: string; name: string; role?: string }[];
   assignee: string;
   reply: string;
   internal: boolean;
+  /** Full help-desk powers (assign + public replies). */
+  canWrite: boolean;
+  /** Assignee-only: internal notes with Support (no status / assign / customer thread). */
+  assigneeOnly: boolean;
   busy: boolean;
   err: string;
   okNote: string;
@@ -39,8 +41,6 @@ export type SupportManageVm = {
   onSaveStatus: () => void;
   onAssign: () => void;
   onSendReply: () => void;
-  onResendRedemption: () => void;
-  onResendTracking: () => void;
 };
 
 /** Controller for the support ticket manage modal. */
@@ -48,14 +48,16 @@ export function useSupportManageController(
   row: Record<string, unknown>,
   onClose: () => void,
   onChanged: () => void,
+  canWrite = true,
 ): SupportManageVm {
   const ticketId = String(row._id);
+  const assigneeOnly = !canWrite;
   const [ticket, setTicket] = useState<Record<string, unknown> | null>(null);
   const [status, setStatus] = useState(String(row.status ?? "open"));
-  const [team, setTeam] = useState<{ userId: string; name: string }[]>([]);
+  const [team, setTeam] = useState<{ userId: string; name: string; role?: string }[]>([]);
   const [assignee, setAssignee] = useState("");
   const [reply, setReply] = useState("");
-  const [internal, setInternal] = useState(false);
+  const [internal, setInternal] = useState(assigneeOnly);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [okNote, setOkNote] = useState("");
@@ -64,6 +66,7 @@ export function useSupportManageController(
     fetchPlatformTicket(ticketId)
       .then((t) => {
         setTicket(t);
+        setStatus(String(t.status ?? "open"));
         // Pre-select the current assignee so "Assign" reads as reassignment.
         setAssignee((prev) => prev || String(t.assignedToUserId ?? ""));
       })
@@ -72,10 +75,23 @@ export function useSupportManageController(
 
   useEffect(() => {
     reloadTicket();
+    if (assigneeOnly) {
+      setTeam([]);
+      return;
+    }
     fetchPlatformTeam()
-      .then((t) => setTeam(t.filter((m) => m.status === "active")))
-      .catch(() => setTeam([]));
-  }, [reloadTicket]);
+      .then((t) =>
+        setTeam(
+          t
+            .filter((m) => m.status === "active" && m.userId)
+            .map((m) => ({ userId: m.userId, name: m.name, role: m.role })),
+        ),
+      )
+      .catch((e) => {
+        setTeam([]);
+        setErr(e instanceof Error ? e.message : "Could not load team members");
+      });
+  }, [reloadTicket, assigneeOnly]);
 
   async function run(fn: () => Promise<unknown>, ok: string) {
     setBusy(true);
@@ -102,7 +118,9 @@ export function useSupportManageController(
     team,
     assignee,
     reply,
-    internal,
+    internal: assigneeOnly ? true : internal,
+    canWrite,
+    assigneeOnly,
     busy,
     err,
     okNote,
@@ -115,10 +133,8 @@ export function useSupportManageController(
     onAssign: () => run(() => assignTicket(ticketId, assignee), "Ticket assigned."),
     onSendReply: () =>
       run(async () => {
-        await addTicketMessage(ticketId, reply.trim(), internal);
+        await addTicketMessage(ticketId, reply.trim(), assigneeOnly ? true : internal);
         setReply("");
-      }, "Reply added."),
-    onResendRedemption: () => run(() => resendRedemptionLink(ticketId), "Redemption link resent."),
-    onResendTracking: () => run(() => resendTicketTracking(ticketId), "Tracking link resent."),
+      }, assigneeOnly ? "Note sent to Support." : "Reply added."),
   };
 }
