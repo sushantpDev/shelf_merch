@@ -35,9 +35,12 @@ async function assertOrderAccess({ tenantId, user, order }) {
 /**
  * Ensure kit order totals match the campaign checkout / wallet debit.
  * Repairs legacy orders that stored item+fee+GST only (missing packaging/shipping).
+ * When an invoice exists, leave amountBreakdown.total alone — invoice ceil is source of truth.
  */
-function alignKitOrderBreakdown(order, campaign) {
+function alignKitOrderBreakdown(order, campaign, { hasInvoice = false } = {}) {
   if (!campaign || campaign.type !== 'kit') return order.amountBreakdown;
+  if (hasInvoice) return order.amountBreakdown;
+
   const paid = Math.round(Number(campaign.totalBudget) || 0);
   if (paid <= 0) return order.amountBreakdown;
 
@@ -112,8 +115,8 @@ export async function listOrders({ tenantId, user, query }) {
 
   const enriched = items.map((o) => {
     const campaign = campaignById[String(o.campaignId)];
-    const amountBreakdown = alignKitOrderBreakdown(o, campaign);
     const invoice = invoiceByOrderId[String(o._id)];
+    const amountBreakdown = alignKitOrderBreakdown(o, campaign, { hasInvoice: Boolean(invoice) });
     return withMeta(o, {
       campaignName: campaign?.name ?? '',
       amountBreakdown,
@@ -139,7 +142,9 @@ export async function getOrder({ tenantId, user, orderId }) {
   ]);
 
   const lean = order.toObject();
-  const amountBreakdown = alignKitOrderBreakdown(lean, campaign);
+  const amountBreakdown = alignKitOrderBreakdown(lean, campaign, {
+    hasInvoice: Boolean(invoice),
+  });
 
   return withMeta(order, {
     campaignName: campaign?.name ?? '',

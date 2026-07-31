@@ -1,5 +1,9 @@
 import { CatalogProduct } from '../catalog/catalogProduct.model.js';
-import { sumKitProductPrices } from '../kits/kitPricing.js';
+import {
+  customisedKitGstRate,
+  sumCustomisedKitNetPrices,
+  sumKitProductPrices,
+} from '../kits/kitPricing.js';
 import {
   gstProfileForCategory,
   lineTaxAmounts,
@@ -62,8 +66,56 @@ function kitUnitPriceInclGst(order, campaign, kitEntries) {
 }
 
 /**
+ * Ex-GST kit unit rate + GST profile for a kit campaign invoice line.
+ * Customised kits: net product sum (same as checkout), never per-product lines.
+ * Curated kits: strip 18% from GST-inclusive approxValue / kit price.
+ */
+async function kitInvoiceUnit(order, campaign, kit, kitEntries, qty) {
+  const name = kit?.name || campaign?.name || order.items?.[0]?.name || 'Kit';
+
+  if (kitEntries.length > 0) {
+    const products = kitEntries.map((e) => e.product);
+    const rate = sumCustomisedKitNetPrices(products);
+    const profile = customisedKitGstRate(products) <= 0.05 ? 'apparel' : 'kit';
+    return { name, rate, profile };
+  }
+
+  // Curated (or no active catalog refs): order items store GST-inclusive kit price.
+  if (Array.isArray(order.items) && order.items.length > 0) {
+    const hasCatalogLines = order.items.some((i) => i.catalogProductId);
+    if (hasCatalogLines) {
+      // Fallback when kitEntries empty but order froze catalog products.
+      const catalogMeta = await catalogMetaByProductId(order.items.map((i) => i.catalogProductId));
+      let totalNet = 0;
+      const products = [];
+      for (const item of order.items) {
+        const meta = catalogMeta.get(String(item.catalogProductId)) || {};
+        const category = meta.category || '';
+        products.push({ basePriceInr: item.unitPriceInr, category });
+        const profile = gstProfileForCategory(category);
+        totalNet += priceWithoutGst(item.unitPriceInr, profile) * (Number(item.qty) || 0);
+      }
+      const rate = qty > 0 ? Math.round(totalNet / qty) : totalNet;
+      const profile = customisedKitGstRate(products) <= 0.05 ? 'apparel' : 'kit';
+      return { name, rate, profile };
+    }
+
+    const unitIncl = kitUnitPriceInclGst(order, campaign, []);
+    return {
+      name: order.items[0]?.name || name,
+      rate: priceWithoutGst(unitIncl, 'kit'),
+      profile: 'kit',
+    };
+  }
+
+  const unitIncl = Math.round(Number(kit?.kitPrice) || 0);
+  return { name, rate: priceWithoutGst(unitIncl, 'kit'), profile: 'kit' };
+}
+
+/**
  * Build invoice line items for PDF + tax summary.
- * Kit packaging (₹49/recipient ex-GST) is always a separate line with 18% GST.
+ * Kit campaigns (curated + customised): one kit line + optional packaging — same as checkout.
+ * Non-kit orders: per-product lines.
  * @returns {Promise<Array<{name, hsn, qty, rate, amount, profile}>>}
  */
 export async function buildOrderInvoiceLines({ order, campaign, kit, kitEntries = [] }) {
@@ -72,58 +124,19 @@ export async function buildOrderInvoiceLines({ order, campaign, kit, kitEntries 
   const lines = [];
   const isKitOrder = campaign?.type === 'kit' && Boolean(campaign?.kitId);
 
-  if (Array.isArray(order.items) && order.items.length > 0) {
-    const merged = mergeItemsByName(order.items);
-    const catalogMeta = await catalogMetaByProductId(merged.map((m) => m.catalogProductId));
-    for (const item of merged) {
-      const meta = catalogMeta.get(String(item.catalogProductId)) || {};
-      const category = meta.category || '';
-      const profile = gstProfileForCategory(category);
-      // Curated kit single-line orders store approxValue as GST-inclusive unit price.
-      // Catalog product lines are also GST-inclusive.
-      const rate = priceWithoutGst(item.unitPriceInr, profile);
-      lines.push({
-        name: item.name,
-        hsn: String(item.hsnCode || meta.hsnCode || '').trim(),
-        qty: item.qty,
-        rate,
-        amount: rate * item.qty,
-        profile,
-      });
-    }
-  } else if (isKitOrder && kit) {
+  if (isKitOrder) {
     const qty = kitQuantity(order, campaign);
-
-    if (kitEntries.length > 0) {
-      for (const { ref, product } of kitEntries) {
-        const category = product.category || '';
-        const profile = gstProfileForCategory(category);
-        const unitIncl = Math.round(Number(product.basePriceInr) || 0);
-        const rate = priceWithoutGst(unitIncl, profile);
-        lines.push({
-          name: ref.name || product.name || 'Item',
-          hsn: String(product.hsnCode || '').trim(),
-          qty,
-          rate,
-          amount: rate * qty,
-          profile,
-        });
-      }
-    } else {
-      // Curated kit with no catalog products — kit price only (packaging is separate).
-      const unitIncl = kitUnitPriceInclGst(order, campaign, kitEntries);
-      const rate = priceWithoutGst(unitIncl, 'kit');
-      lines.push({
-        name: kit.name || campaign.name || 'Kit',
-        hsn: '',
-        qty,
-        rate,
-        amount: rate * qty,
-        profile: 'kit',
-      });
-    }
+    const { name, rate, profile } = await kitInvoiceUnit(order, campaign, kit, kitEntries, qty);
+    lines.push({
+      name,
+      hsn: '',
+      qty,
+      rate,
+      amount: rate * qty,
+      profile,
+    });
   } else {
-    const merged = mergeItemsByName(order.items);
+    const merged = mergeItemsByName(order.items || []);
     const catalogMeta = await catalogMetaByProductId(merged.map((m) => m.catalogProductId));
     for (const item of merged) {
       const meta = catalogMeta.get(String(item.catalogProductId)) || {};

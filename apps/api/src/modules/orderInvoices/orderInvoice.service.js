@@ -1,4 +1,5 @@
 import { OrderInvoice } from './orderInvoice.model.js';
+import { Order } from '../orders/order.model.js';
 import { Campaign } from '../campaigns/campaign.model.js';
 import { Kit } from '../kits/kit.model.js';
 import { Wallet } from '../wallets/wallet.model.js';
@@ -133,6 +134,12 @@ export async function generateAndStoreOrderInvoice(orderDoc, { force = false, sk
       $setOnInsert: { orderId: order._id, tenantId },
     },
     { upsert: true, new: true },
+  );
+
+  // Invoice grand total (ceil) is the source of truth for order amount display.
+  await Order.updateOne(
+    { _id: order._id, tenantId },
+    { $set: { 'amountBreakdown.total': totals.grandTotal } },
   );
 
   if (!skipEmail && !existing && !isShopOrder(campaign)) {

@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import { summarizeBodyGst } from './orderInvoice.lines.js';
+import { ceilRupee } from '../../services/pricing.service.js';
 
 const COMPANY = {
   name: 'Chitlu Innovations Private Limited',
@@ -512,7 +513,7 @@ export function computeInvoiceTotals(lines) {
   const rawTotal = taxableTotal + gstTotal;
   // Round up to the next rupee when there are paise — never reduce the total.
   const paise = Math.round(rawTotal * 100);
-  const grandTotal = Math.ceil(paise / 100);
+  const grandTotal = ceilRupee(rawTotal);
   const roundOff = Math.round(grandTotal * 100 - paise) / 100;
   return { taxableTotal, bodyGst, gstTotal, grandTotal, roundOff };
 }

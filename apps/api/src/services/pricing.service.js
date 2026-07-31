@@ -13,6 +13,12 @@ export const GST_RATE = 0.18;
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
+/** Match invoice grand-total: ceil to the next rupee when any paise remain. */
+export function ceilRupee(n) {
+  const paise = Math.round(Number(n) * 100);
+  return Math.ceil(paise / 100);
+}
+
 function breakdownFromTotals(t) {
   return {
     subtotal: round2(t.sub),
@@ -20,7 +26,7 @@ function breakdownFromTotals(t) {
     shipping: round2(t.ship),
     serviceFee: round2(t.fee),
     gst: round2(t.tax),
-    total: Math.round(t.total),
+    total: ceilRupee(t.total),
   };
 }
 
@@ -92,8 +98,8 @@ export function amountBreakdownForKitCampaign(campaign, opts = {}) {
       // Order covers the whole campaign (single-location or 1 recipient).
       breakdown.total = paid;
     } else if (orderKitCount === 1) {
-      // Per-recipient order: equal share of the charged grand total.
-      breakdown.total = Math.round(paid / campaignRecipients);
+      // Per-recipient order: equal share of the charged grand total (invoice-style ceil).
+      breakdown.total = ceilRupee(paid / campaignRecipients);
     }
   }
 
