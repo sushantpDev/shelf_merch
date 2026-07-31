@@ -11,8 +11,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type { IntegrationsVm } from "../controllers/useIntegrationsController";
-import { IntegrationMark } from "./IntegrationDetailView";
-import zohoPeopleIcon from "../../../../assets/integrations/zoho-people.svg";
+import zohoPeopleIcon from "../../../../assets/integrations/zoho-people.png";
 
 function statusLabel(status: IntegrationsVm["zoho"]["status"]) {
   switch (status) {
@@ -61,11 +60,6 @@ type ZohoCardProps = {
 
 /** Production Zoho People integration card on the integrations page. */
 export function ZohoPeopleCard({ zoho }: ZohoCardProps) {
-  const tile = {
-    id: "zoho-people",
-    name: "Zoho People",
-    icon: zohoPeopleIcon,
-  };
   const connected =
     zoho.status === "connected" ||
     zoho.status === "needs_attention" ||
@@ -75,10 +69,17 @@ export function ZohoPeopleCard({ zoho }: ZohoCardProps) {
   return (
     <section className="zoho-integ-card" aria-labelledby="zoho-people-heading">
       <div className="zoho-integ-card-head">
-        <IntegrationMark tile={tile} size="large" />
+        <img
+          src={zohoPeopleIcon}
+          alt=""
+          className="zoho-integ-brand-logo"
+          aria-hidden="true"
+        />
         <div className="zoho-integ-card-title">
           <div className="zoho-integ-card-title-row">
-            <h2 id="zoho-people-heading">Zoho People</h2>
+            <h2 id="zoho-people-heading" className="zoho-integ-card-heading-sr">
+              Zoho People
+            </h2>
             <span className={statusClass(zoho.status)} role="status">
               {zoho.loading ? "Checking…" : statusLabel(zoho.status)}
             </span>
