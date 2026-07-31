@@ -901,19 +901,19 @@ export function SendKitView(vm: SendKitVm) {
                 </>
               ) : (
                 <>
-                  <SumRow k="Price per kit (inc. GST)" v={inr(totals.unitPrice)} />
+                  <SumRow k="Price per kit" v={inr(totals.unitPrice)} />
+                  <SumRow
+                    k={`${totals.qty} kit${totals.qty === 1 ? "" : "s"} × ${inr(totals.unitPrice)}`}
+                    v={inr(totals.unitPrice * totals.qty)}
+                  />
                   {totals.pkgPerKit > 0 ? (
                     <SumRow k="Packaging" v={inr(totals.pkgCost)} />
                   ) : null}
+                  <SumRow k="Subtotal" v={inr(totals.sub)} large />
                   <SumRow
-                    k={`${totals.qty} kit${totals.qty === 1 ? "" : "s"} × ${inr(totals.costPerKit)}`}
-                    v={inr(totals.costPerKit * totals.qty)}
-                    emphasis
+                    k={`GST (${Math.round((totals.kitGstRate ?? 0.18) * 100)}%)`}
+                    v={inr(totals.tax)}
                   />
-                  <p className="muted" style={{ margin: "4px 0 0", fontSize: 12 }}>
-                    (incl. GST at 18%) 
-                  </p>
-                  <SumRow k="Shipping" v="Free" />
                   <div className="divider" />
                   <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
                     <div>

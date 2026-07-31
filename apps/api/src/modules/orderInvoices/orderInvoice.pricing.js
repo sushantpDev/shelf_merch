@@ -1,9 +1,12 @@
-/** GST-inclusive catalog price → ex-GST rate (rounded to nearest integer). */
+/**
+ * GST-inclusive catalog/kit price → ex-GST taxable rate.
+ * Base Price = Inclusive Price / (1 + GST Rate)
+ */
 export function priceWithoutGst(priceWithGst, profile) {
   const incl = Math.round(Number(priceWithGst) || 0);
   if (!incl) return 0;
   const rate = profile === 'apparel' ? 0.05 : 0.18;
-  return Math.round(incl - incl * rate);
+  return Math.round(incl / (1 + rate));
 }
 
 export function gstProfileForCategory(category) {

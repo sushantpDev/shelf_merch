@@ -21,13 +21,14 @@ export function productGstRate(category) {
 }
 
 /**
- * Strip GST from a GST-inclusive basePriceInr, then round UP.
- * Apparel: ceil(price - price × 0.05); other: ceil(price - price × 0.18).
+ * Strip GST from a GST-inclusive basePriceInr.
+ * Base Price = Inclusive Price / (1 + GST Rate)
  */
 export function netPriceExGst(basePriceInr, category) {
   const inclusive = Math.max(0, Number(basePriceInr) || 0);
+  if (!inclusive) return 0;
   const rate = productGstRate(category);
-  return Math.ceil(inclusive - inclusive * rate);
+  return Math.round(inclusive / (1 + rate));
 }
 
 /** Kit GST is 5% only when every product is Apparel; otherwise 18%. */
@@ -38,7 +39,7 @@ export function customisedKitGstRate(products = []) {
     : GST_RATE;
 }
 
-/** Sum of net (ex-GST, ceil) product prices for a customised kit. */
+/** Sum of net (ex-GST) product prices for a customised kit. */
 export function sumCustomisedKitNetPrices(products = []) {
   return products.reduce(
     (sum, p) => sum + netPriceExGst(Number(p?.basePriceInr) || 0, p?.category),
@@ -48,28 +49,31 @@ export function sumCustomisedKitNetPrices(products = []) {
 
 /**
  * Curated kit checkout — approxValueInr is GST-inclusive (18%).
- * When packaging is included, add premium box (ex-GST) + 18% GST per kit.
+ * Base = inclusive / 1.18; packaging is ex-GST; GST applied on (base + packaging).
  */
 export function curatedKitSendTotals(recipientCount, pricePerKitInr, packaging = 'none') {
   const qty = Math.max(0, Number(recipientCount) || 0);
   const kitIncl = Math.max(0, Math.round(Number(pricePerKitInr) || 0));
+  const kitBase = kitIncl > 0 ? Math.round(kitIncl / (1 + GST_RATE)) : 0;
   const pkgPerKit = packaging === 'box' ? PREMIUM_BOX_PER_RECIP : 0;
-  const pkgInclPerKit = pkgPerKit > 0 ? Math.round(pkgPerKit * (1 + GST_RATE)) : 0;
-  const costPerKit = kitIncl + pkgInclPerKit;
+  const taxablePerKit = kitBase + pkgPerKit;
+  const taxPerKit = Math.ceil(taxablePerKit * GST_RATE);
+  const costPerKit = taxablePerKit + taxPerKit;
   const total = costPerKit * qty;
-  const tax = Math.ceil(total - total / (1 + GST_RATE));
   return {
     qty,
-    unitPrice: kitIncl,
+    unitPrice: kitBase,
     pkgPerKit,
     costPerKit,
-    sub: total,
-    pkgCost: pkgInclPerKit * qty,
+    sub: taxablePerKit * qty,
+    pkgCost: pkgPerKit * qty,
     fee: 0,
     ship: 0,
-    tax,
+    tax: taxPerKit * qty,
     total,
     kitGstRate: GST_RATE,
+    itemsSubtotal: kitBase,
+    taxablePerKit,
   };
 }
 

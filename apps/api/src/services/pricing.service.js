@@ -1,13 +1,28 @@
 /**
  * §4 pricing.service — service fee + GST (+ kit packaging/shipping).
- * Kit send math must stay in sync with apps/web money.ts via kitPricing.kitSendTotals.
+ * Kit send math must stay in sync with apps/web money.ts via kitPricing.
  */
-import { kitSendTotals } from '../modules/kits/kitPricing.js';
+import {
+  curatedKitSendTotals,
+  customisedKitSendTotals,
+  kitSendTotals,
+} from '../modules/kits/kitPricing.js';
 
 export const SERVICE_FEE_RATE = 0.12;
 export const GST_RATE = 0.18;
 
 const round2 = (n) => Math.round(n * 100) / 100;
+
+function breakdownFromTotals(t) {
+  return {
+    subtotal: round2(t.sub),
+    packaging: round2(t.pkgCost),
+    shipping: round2(t.ship),
+    serviceFee: round2(t.fee),
+    gst: round2(t.tax),
+    total: Math.round(t.total),
+  };
+}
 
 /**
  * Points / storefront cart: catalog prices are GST-inclusive.
@@ -20,22 +35,16 @@ export function computeAmountBreakdown(items) {
 
 /**
  * Kit checkout breakdown for `recipientCount` kits.
- * Same formula as Checkout Grand Total / wallet debit.
+ * `kitUnitPriceInr` is GST-inclusive (curated approxValue / catalog sum).
+ * Base = inclusive / (1 + GST); packaging ex-GST; GST on (base + packaging).
  */
 export function computeKitSendAmountBreakdown(kitUnitPriceInr, packaging = 'none', recipientCount = 1) {
-  const t = kitSendTotals(
+  const t = curatedKitSendTotals(
     recipientCount,
-    packaging === 'box' ? 'box' : 'none',
     Math.round(Number(kitUnitPriceInr) || 0),
+    packaging === 'box' ? 'box' : 'none',
   );
-  return {
-    subtotal: round2(t.sub),
-    packaging: round2(t.pkgCost),
-    shipping: round2(t.ship),
-    serviceFee: round2(t.fee),
-    gst: round2(t.tax),
-    total: Math.round(t.total),
-  };
+  return breakdownFromTotals(t);
 }
 
 /**
@@ -44,9 +53,16 @@ export function computeKitSendAmountBreakdown(kitUnitPriceInr, packaging = 'none
  * always matches Checkout / Wallet.
  *
  * @param {object} campaign
- * @param {{ kitUnitPriceInr?: number, packaging?: 'none'|'box', orderKitCount?: number }} opts
+ * @param {{
+ *   kitUnitPriceInr?: number,
+ *   packaging?: 'none'|'box',
+ *   orderKitCount?: number,
+ *   products?: Array<{ basePriceInr?: number, category?: string }>,
+ *   gstInclusive?: boolean,
+ * }} opts
  *   orderKitCount — kits represented by this order (1 for per-recipient surprise/redeem;
  *   recipientCount for single-location).
+ *   products — when set, uses customised kit math (per-category GST strip).
  */
 export function amountBreakdownForKitCampaign(campaign, opts = {}) {
   const campaignRecipients = Math.max(1, Number(campaign?.recipientCount) || 1);
@@ -59,7 +75,16 @@ export function amountBreakdownForKitCampaign(campaign, opts = {}) {
         : 'none';
   const unitPrice = Math.round(Number(opts.kitUnitPriceInr) || 0);
 
-  const breakdown = computeKitSendAmountBreakdown(unitPrice, pkg, orderKitCount);
+  let breakdown;
+  if (Array.isArray(opts.products) && opts.products.length) {
+    breakdown = breakdownFromTotals(customisedKitSendTotals(orderKitCount, pkg, opts.products));
+  } else if (opts.gstInclusive === false) {
+    breakdown = breakdownFromTotals(
+      kitSendTotals(orderKitCount, pkg === 'box' ? 'box' : 'none', unitPrice),
+    );
+  } else {
+    breakdown = computeKitSendAmountBreakdown(unitPrice, pkg, orderKitCount);
+  }
 
   const paid = Math.round(Number(campaign?.totalBudget) || 0);
   if (paid > 0) {

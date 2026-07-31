@@ -709,6 +709,7 @@ export async function createSurpriseOrdersForCampaign({ tenantId, campaign }) {
         kitUnitPriceInr: sumKitProductPrices(kitEntries.map((e) => e.product)),
         packaging: campaign.packaging,
         orderKitCount: 1,
+        products: kitEntries.map((e) => e.product),
       }),
       status: 'created',
       statusHistory: [
@@ -819,6 +820,7 @@ export async function createSingleLocationOrderForCampaign({ tenantId, campaign 
       kitUnitPriceInr: sumKitProductPrices(kitEntries.map((e) => e.product)),
       packaging: campaign.packaging,
       orderKitCount: recipients.length,
+      products: kitEntries.map((e) => e.product),
     }),
     status: 'created',
     statusHistory: [
@@ -976,6 +978,7 @@ export async function submitRedemption(
           kitUnitPriceInr: sumKitProductPrices(kitEntries.map((e) => e.product)),
           packaging: campaign.packaging,
           orderKitCount: 1,
+          products: kitEntries.map((e) => e.product),
         })
       : computeAmountBreakdown(lineItems);
   }
