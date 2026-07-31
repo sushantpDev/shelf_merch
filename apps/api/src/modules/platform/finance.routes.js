@@ -155,6 +155,22 @@ router.post(
   }),
 );
 
+router.get(
+  '/credit-notes',
+  financeRead,
+  validate({
+    query: z.object({
+      page: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().positive().optional(),
+      tenantId: objectId.optional(),
+      invoiceId: objectId.optional(),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    res.json(await financeService.listCreditNotes({ query: req.query }));
+  }),
+);
+
 router.post(
   '/credit-notes',
   ...financeWrite,

@@ -194,7 +194,55 @@ export async function listPlatformInvoices({ query }) {
     Invoice.find(filter).setOptions({ skipTenantGuard: true }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     Invoice.countDocuments(filter).setOptions({ skipTenantGuard: true }),
   ]);
-  return paginatedResponse(items, total, { page, limit });
+
+  const tenantIds = [...new Set(items.map((i) => String(i.tenantId)))];
+  const tenants = await Tenant.find({ _id: { $in: tenantIds } }).select('name').lean();
+  const tenantBy = Object.fromEntries(tenants.map((t) => [String(t._id), t.name]));
+
+  return paginatedResponse(
+    items.map((inv) => ({ ...inv, tenantName: tenantBy[String(inv.tenantId)] ?? '' })),
+    total,
+    { page, limit },
+  );
+}
+
+export async function listCreditNotes({ query }) {
+  const { page, limit, skip } = getPagination(query);
+  const filter = {};
+  if (query.tenantId) filter.tenantId = query.tenantId;
+  if (query.invoiceId) filter.invoiceId = query.invoiceId;
+
+  const [items, total] = await Promise.all([
+    CreditNote.find(filter)
+      .setOptions({ skipTenantGuard: true })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    CreditNote.countDocuments(filter).setOptions({ skipTenantGuard: true }),
+  ]);
+
+  const invoiceIds = [...new Set(items.map((c) => String(c.invoiceId)))];
+  const tenantIds = [...new Set(items.map((c) => String(c.tenantId)))];
+  const [invoices, tenants] = await Promise.all([
+    Invoice.find({ _id: { $in: invoiceIds } })
+      .setOptions({ skipTenantGuard: true })
+      .select('invoiceNumber')
+      .lean(),
+    Tenant.find({ _id: { $in: tenantIds } }).select('name').lean(),
+  ]);
+  const invoiceBy = Object.fromEntries(invoices.map((i) => [String(i._id), i.invoiceNumber]));
+  const tenantBy = Object.fromEntries(tenants.map((t) => [String(t._id), t.name]));
+
+  return paginatedResponse(
+    items.map((cn) => ({
+      ...cn,
+      invoiceNumber: invoiceBy[String(cn.invoiceId)] ?? '',
+      tenantName: tenantBy[String(cn.tenantId)] ?? '',
+    })),
+    total,
+    { page, limit },
+  );
 }
 
 export async function createProformaInvoice({ tenantId, lineItems, dueAt = null, relatedOrderId = null }) {

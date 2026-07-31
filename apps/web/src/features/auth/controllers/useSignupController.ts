@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { register, isPlatformUser } from "../model";
-import { isWorkEmail, WORK_EMAIL_ERROR } from "../workEmail";
 
 export type SignupVm = {
   email: string;
@@ -41,10 +40,6 @@ export function useSignupController(): SignupVm {
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password || !name || !company) {
       toast.error("Fill in all fields");
-      return;
-    }
-    if (!isWorkEmail(trimmedEmail)) {
-      toast.error(WORK_EMAIL_ERROR);
       return;
     }
     if (password.length < 8) {

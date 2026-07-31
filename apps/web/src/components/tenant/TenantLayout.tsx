@@ -3,6 +3,7 @@ import { Outlet, useLocation, useSearchParams } from "react-router";
 import { CollapsibleSidebar } from "@/components/tenant/CollapsibleSidebar";
 import { UserMenu } from "@/components/tenant/UserMenu";
 import { WalletBalanceMenu } from "@/components/tenant/WalletBalanceMenu";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ShelfMerchLogo } from "@/components/brand/ShelfMerchLogo";
 import { getStoredUser, isAuthenticated } from "@/services/api-bridge";
 import { useWorkspace } from "@/hooks/useWorkspace";
@@ -97,6 +98,7 @@ export default function TenantLayout() {
             balanceCaption={isEntityManager ? "Available department budget" : "Available balance"}
             canRequestTopup={canRequestTopup}
           />
+          <NotificationBell />
           <UserMenu
             userName={userName}
             userEmail={userEmail}

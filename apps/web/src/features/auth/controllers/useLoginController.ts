@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { login, isPlatformUser, ApiError } from "../model";
-import { isWorkEmail, WORK_EMAIL_ERROR } from "../workEmail";
 
 export type LoginVm = {
   email: string;
@@ -48,11 +47,6 @@ export function useLoginController(): LoginVm {
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
       toast.error("Enter email and password");
-      return;
-    }
-    if (!isWorkEmail(trimmedEmail)) {
-      setError(WORK_EMAIL_ERROR);
-      toast.error(WORK_EMAIL_ERROR);
       return;
     }
 

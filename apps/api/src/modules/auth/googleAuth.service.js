@@ -14,6 +14,7 @@ import {
 } from './auth.service.js';
 import { User } from '../users/user.model.js';
 import { Tenant } from '../tenants/tenant.model.js';
+import { assertAllowedAuthEmail } from './workEmail.js';
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -127,6 +128,7 @@ async function loginExistingGoogleUser(user, { ip, userAgent }) {
 export async function completeGoogleOAuth({ code, mode, ip, userAgent }) {
   assertGoogleConfigured();
   const profile = await exchangeCodeForProfile(code);
+  await assertAllowedAuthEmail(profile.email);
 
   let user =
     (await User.findOne({ googleId: profile.googleId })) ||

@@ -17,6 +17,7 @@ import {
   revokeSession,
 } from '../../services/session.service.js';
 import { ApiError, ConflictError, UnauthorizedError } from '../../utils/errors.js';
+import { assertAllowedAuthEmail } from './workEmail.js';
 
 const BCRYPT_ROUNDS = 12;
 const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -143,6 +144,8 @@ async function uniqueTenantSlug(companyName) {
  * until a super admin activates it; closed → signup refused.
  */
 export async function register({ name, email, password, companyName, ip, userAgent, googleId = null }) {
+  await assertAllowedAuthEmail(email);
+
   const { getSetting } = await import('../platform/platformSettings.service.js');
   const signupMode = await getSetting('signup.mode');
   if (signupMode === 'closed') {
@@ -205,6 +208,8 @@ export async function register({ name, email, password, companyName, ip, userAge
 }
 
 export async function login({ email, password, ip, userAgent }) {
+  await assertAllowedAuthEmail(email);
+
   const user = await User.findOne({ email: email.toLowerCase() }).select('+passwordHash');
   if (!user || !user.passwordHash) throw new UnauthorizedError('Invalid email or password');
   if (user.status === 'suspended') throw new UnauthorizedError('Account suspended');

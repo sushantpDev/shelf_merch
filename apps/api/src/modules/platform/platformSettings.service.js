@@ -13,9 +13,14 @@ export async function getAllSettings() {
 }
 
 export async function setSetting(key, value, userId = null) {
+  let nextValue = value;
+  if (key === 'auth.emailAllowlist') {
+    const { normalizeEmailAllowlist } = await import('../auth/workEmail.js');
+    nextValue = normalizeEmailAllowlist(value);
+  }
   const doc = await PlatformSetting.findOneAndUpdate(
     { key },
-    { value, updatedByUserId: userId },
+    { value: nextValue, updatedByUserId: userId },
     { new: true, upsert: true },
   );
   return doc;

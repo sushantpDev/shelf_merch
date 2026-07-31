@@ -561,6 +561,15 @@ describe('finance (§3.8)', () => {
     expect(cn.status).toBe(201);
     expect(cn.body.creditNoteNumber).toMatch(/^CN-/);
 
+    const listed = await request(app)
+      .get('/api/v1/platform/finance/credit-notes')
+      .set(auth(tokens.platform_finance_admin));
+    expect(listed.status).toBe(200);
+    expect(listed.body.items.some((row) => row.creditNoteNumber === cn.body.creditNoteNumber)).toBe(true);
+    expect(listed.body.items.find((row) => row.creditNoteNumber === cn.body.creditNoteNumber).invoiceNumber).toBe(
+      taxInvoice.invoiceNumber,
+    );
+
     await makeOrder({ status: 'delivered' }); // items: 2 × (500 sell / 200 cost)
     const margin = await request(app)
       .get('/api/v1/platform/finance/reports/margin')
@@ -693,12 +702,57 @@ describe('settings & signup gating (§3.4, §6)', () => {
     // defaults visible; non-super cannot write
     const all = await request(app).get('/api/v1/platform/settings').set(auth(tokens.platform_readonly_auditor));
     expect(all.body['gst.defaultRate']).toBe(18);
+    expect(all.body['auth.emailAllowlist']).toEqual([]);
     expect(
       (await request(app)
         .put('/api/v1/platform/settings/signup.mode')
         .set(auth(tokens.platform_finance_admin))
         .send({ value: 'open' })).status,
     ).toBe(403);
+  });
+
+  it('auth.emailAllowlist lets specific Gmail addresses past the work-email gate', async () => {
+    const gmail = `tester-${Date.now()}@gmail.com`;
+    const password = 'securepass1';
+
+    const blocked = await request(app)
+      .post('/api/v1/auth/register')
+      .send({ name: 'Gmail Tester', email: gmail, password, companyName: 'Test Co' });
+    expect(blocked.status).toBe(400);
+    expect(blocked.body.error.code).toBe('WORK_EMAIL_REQUIRED');
+
+    const saved = await request(app)
+      .put('/api/v1/platform/settings/auth.emailAllowlist')
+      .set(auth(tokens.platform_super_admin))
+      .send({ value: [gmail.toUpperCase(), 'not-an-email'] });
+    expect(saved.status).toBe(400);
+    expect(saved.body.error.code).toBe('INVALID_ALLOWLIST');
+
+    await request(app)
+      .put('/api/v1/platform/settings/auth.emailAllowlist')
+      .set(auth(tokens.platform_super_admin))
+      .send({ value: [gmail.toUpperCase()] })
+      .expect(200);
+
+    const settings = await request(app)
+      .get('/api/v1/platform/settings')
+      .set(auth(tokens.platform_super_admin));
+    expect(settings.body['auth.emailAllowlist']).toEqual([gmail]);
+
+    await request(app)
+      .put('/api/v1/platform/settings/signup.mode')
+      .set(auth(tokens.platform_super_admin))
+      .send({ value: 'open' })
+      .expect(200);
+
+    const registered = await request(app)
+      .post('/api/v1/auth/register')
+      .send({ name: 'Gmail Tester', email: gmail, password, companyName: 'Test Co' });
+    expect(registered.status).toBe(201);
+
+    const login = await request(app).post('/api/v1/auth/login').send({ email: gmail, password });
+    expect(login.status).toBe(200);
+    expect(login.body.user.email).toBe(gmail);
   });
 });
 

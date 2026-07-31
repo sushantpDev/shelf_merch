@@ -8,6 +8,7 @@ import {
 } from "@/services/api-bridge";
 import { navItemsForRole } from "@/services/platform-access";
 import { ShelfMerchLogo } from "@/components/brand/ShelfMerchLogo";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 export default function PlatformLayout() {
   const user = getStoredUser();
@@ -40,6 +41,7 @@ export default function PlatformLayout() {
           </div>
         </div>
         <div className="spacer" />
+        <NotificationBell />
         <div className="acct">
           <div>
             <div className="k">Signed in</div>

@@ -288,6 +288,76 @@ export function rejectFunding(walletId: string, reason: string) {
   });
 }
 
+export type PlatformInvoice = {
+  _id: string;
+  invoiceNumber: string;
+  type: "proforma" | "tax";
+  status: string;
+  totalAmount: number;
+  gstAmount: number;
+  tenantId: string;
+  tenantName?: string;
+  createdAt?: string;
+};
+
+export type PlatformCreditNote = {
+  _id: string;
+  creditNoteNumber: string;
+  invoiceId: string;
+  invoiceNumber?: string;
+  amount: number;
+  gstAmount?: number;
+  reason: string;
+  tenantId: string;
+  tenantName?: string;
+  createdAt?: string;
+};
+
+export async function fetchPlatformInvoices(params?: {
+  type?: "proforma" | "tax";
+  status?: string;
+  tenantId?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const q = new URLSearchParams();
+  if (params?.type) q.set("type", params.type);
+  if (params?.status) q.set("status", params.status);
+  if (params?.tenantId) q.set("tenantId", params.tenantId);
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
+  const qs = q.toString();
+  return apiFetch<{
+    items: PlatformInvoice[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }>(`/platform/finance/invoices${qs ? `?${qs}` : ""}`);
+}
+
+export async function fetchCreditNotes(params?: {
+  tenantId?: string;
+  invoiceId?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const q = new URLSearchParams();
+  if (params?.tenantId) q.set("tenantId", params.tenantId);
+  if (params?.invoiceId) q.set("invoiceId", params.invoiceId);
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
+  const qs = q.toString();
+  return apiFetch<{
+    items: PlatformCreditNote[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }>(`/platform/finance/credit-notes${qs ? `?${qs}` : ""}`);
+}
+
+export function createCreditNote(body: { invoiceId: string; amount: number; reason: string }) {
+  return apiFetch<PlatformCreditNote>("/platform/finance/credit-notes", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export async function fetchPlatformTeam() {
   return apiFetch<
     Array<{ userId: string; name: string; email: string; role: string; status: string }>

@@ -12,45 +12,17 @@ export const strongPassword = z
     message: 'Password must include at least one letter and one number',
   });
 
-/** Personal / consumer inbox domains — work emails only for auth. */
-const PERSONAL_EMAIL_DOMAINS = new Set([
-  'gmail.com',
-  'googlemail.com',
-  'yahoo.com',
-  'yahoo.co.uk',
-  'hotmail.com',
-  'outlook.com',
-  'live.com',
-  'msn.com',
-  'icloud.com',
-  'me.com',
-  'mac.com',
-  'aol.com',
-  'protonmail.com',
-  'proton.me',
-  'mail.com',
-  'gmx.com',
-  'yandex.com',
-]);
-
-const workEmail = z
-  .string()
-  .email()
-  .refine((value) => {
-    const domain = value.trim().toLowerCase().split('@')[1];
-    return Boolean(domain) && !PERSONAL_EMAIL_DOMAINS.has(domain);
-  }, {
-    message: 'Use a work email address. Personal emails like Gmail are not allowed.',
-  });
+/** Format-only — personal-domain policy is enforced in auth.service via allowlist. */
+const authEmail = z.string().email();
 
 export const loginSchema = z.object({
-  email: workEmail,
+  email: authEmail,
   password: z.string().min(1),
 });
 
 export const registerSchema = z.object({
   name: z.string().min(1),
-  email: workEmail,
+  email: authEmail,
   password: strongPassword,
   companyName: z.string().min(1),
 });

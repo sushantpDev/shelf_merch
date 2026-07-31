@@ -17,6 +17,8 @@ export const PLATFORM_SETTING_DEFAULTS = {
   'alerts.lowWalletPct': 20,
   'alerts.lowStockDefault': 10,
   'sla.productionDays.default': 7,
+  // Exact emails (e.g. Gmail) allowed past the work-email-only auth gate — for testing.
+  'auth.emailAllowlist': [],
 };
 
 export const PlatformSetting = mongoose.model('PlatformSetting', platformSettingSchema);
