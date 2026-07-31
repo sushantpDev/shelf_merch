@@ -11165,6 +11165,26 @@ tr:hover .camp-avatar {
   gap: 16px;
   align-items: flex-start;
 }
+.zoho-integ-brand-logo {
+  display: block;
+  flex: 0 0 auto;
+  height: 64px;
+  width: auto;
+  max-width: min(280px, 70vw);
+  object-fit: contain;
+  object-position: left center;
+}
+.zoho-integ-card-heading-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .zoho-integ-card-title {
   flex: 1;
   min-width: 0;

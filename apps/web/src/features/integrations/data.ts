@@ -1,4 +1,4 @@
-import zohoPeopleIcon from "../../../assets/integrations/zoho-people.svg";
+import zohoPeopleIcon from "../../../assets/integrations/zoho-people.png";
 import googleChatIcon from "../../../assets/integrations/google-chat.svg";
 import microsoftTeamsIcon from "../../../assets/integrations/microsoft-teams.svg";
 import zapierIcon from "../../../assets/integrations/zapier.png";

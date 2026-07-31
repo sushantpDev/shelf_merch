@@ -10,8 +10,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { IntegrationMark } from "../views/IntegrationDetailView";
-import zohoPeopleIcon from "../../../../assets/integrations/zoho-people.svg";
+import zohoPeopleIcon from "../../../../assets/integrations/zoho-people.png";
 import {
   useZohoPeopleConnectedAppController,
   type ZohoPeopleConnectedAppVm,
@@ -35,12 +34,6 @@ function formatDate(value: string | null | undefined) {
 }
 
 function ZohoPeopleConnectedAppView({ vm }: { vm: ZohoPeopleConnectedAppVm }) {
-  const tile = {
-    id: "zoho-people",
-    name: "Zoho People",
-    icon: zohoPeopleIcon,
-  };
-
   const connected = isZohoPeopleIntegrationActive(vm.status, vm.integration);
 
   const showSignedOut =
@@ -90,10 +83,17 @@ function ZohoPeopleConnectedAppView({ vm }: { vm: ZohoPeopleConnectedAppVm }) {
       ) : (
         <section className="zoho-integ-card zoho-connected-app-card" aria-labelledby="zoho-people-heading">
           <div className="zoho-integ-card-head">
-            <IntegrationMark tile={tile} size="large" />
+            <img
+              src={zohoPeopleIcon}
+              alt=""
+              className="zoho-integ-brand-logo"
+              aria-hidden="true"
+            />
             <div className="zoho-integ-card-title">
               <div className="zoho-integ-card-title-row">
-                <h1 id="zoho-people-heading">Zoho People</h1>
+                <h1 id="zoho-people-heading" className="zoho-integ-card-heading-sr">
+                  Zoho People
+                </h1>
                 <span className={zohoPeopleStatusClass(vm.status)} role="status">
                   {vm.loading ? "Checking…" : zohoPeopleStatusLabel(vm.status)}
                 </span>
