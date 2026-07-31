@@ -17,8 +17,10 @@ export async function listTeam() {
     .map((a) => {
       const user = byId.get(String(a.userId));
       if (!user) return null;
+      const userId = String(user._id);
       return {
-        id: String(user._id),
+        id: userId,
+        userId,
         name: user.name,
         email: user.email,
         status: user.status,

@@ -46,7 +46,9 @@ const MATRIX: Record<PlatformArea, { write: string[]; read: string[] }> = {
   shipments: { write: [OPS, LOGISTICS], read: PLATFORM_ROLES },
   finance: { write: [FINANCE], read: [FINANCE] },
   support: { write: [OPS, SUPPORT], read: PLATFORM_ROLES },
-  team: { write: [], read: [] },
+  // Ops + support need a read-only roster to assign tickets; invite/role
+  // changes stay super-admin-only (write: []).
+  team: { write: [], read: [OPS, SUPPORT] },
   settings: { write: [], read: [] },
   auditLogs: { write: [], read: [] },
 };

@@ -14,8 +14,9 @@ const AUDITOR = 'platform_readonly_auditor';
  * SUPER_ADMIN_FLOW §0 — role × area matrix. `write` lists the roles that may
  * mutate an area; `read` additionally always includes the super admin and the
  * read-only auditor. Operational areas are readable by every platform role
- * (the dashboard links across all of them); finance, team, settings and audit
- * logs are restricted even for reads.
+ * (the dashboard links across all of them); finance, settings and audit logs
+ * are restricted even for reads. Team is readable by ops + support (ticket
+ * assignment roster) but writable only by the super admin.
  */
 const MATRIX = {
   dashboard: { write: [], read: PLATFORM_ROLES },
@@ -28,7 +29,9 @@ const MATRIX = {
   shipments: { write: [OPS, LOGISTICS], read: PLATFORM_ROLES },
   finance: { write: [FINANCE], read: [FINANCE] },
   support: { write: [OPS, SUPPORT], read: PLATFORM_ROLES },
-  team: { write: [], read: [] },
+  // Ops + support need a read-only roster to assign tickets; invite/role
+  // changes stay super-admin-only (write: []).
+  team: { write: [], read: [OPS, SUPPORT] },
   settings: { write: [], read: [] },
   auditLogs: { write: [], read: [] },
 };

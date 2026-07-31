@@ -10,7 +10,7 @@ import { notify } from '../notifications/notifications.service.js';
 import { transitionState, canTransition } from '../../services/stateMachine.service.js';
 import { sendNotificationEmail, appUrl } from '../../services/email.service.js';
 import { logger } from '../../config/logger.js';
-import { ApiError, NotFoundError } from '../../utils/errors.js';
+import { ApiError, ForbiddenError, NotFoundError } from '../../utils/errors.js';
 import { getPagination, paginatedResponse } from '../../utils/pagination.js';
 
 /** Roles that staff the help desk (see platformAccess MATRIX support.write + super). */
@@ -98,6 +98,12 @@ export function toTenantView(ticket) {
   return { ...obj, messages: (obj.messages ?? []).filter((m) => !m.internal) };
 }
 
+/** Department assignee view: only the internal Support ↔ department thread. */
+export function toInternalThreadView(ticket) {
+  const obj = ticket.toObject ? ticket.toObject() : ticket;
+  return { ...obj, messages: (obj.messages ?? []).filter((m) => m.internal) };
+}
+
 function buildFilter(query) {
   const filter = {};
   if (query.status) filter.status = query.status;
@@ -149,7 +155,7 @@ export async function listSupportTicketsWithTenants({ query }) {
 }
 
 /** Full ticket for the platform manage modal: tenant + raiser names resolved. */
-export async function getSupportTicketDetail(ticketId) {
+export async function getSupportTicketDetail(ticketId, { isSupportWriter = true } = {}) {
   const ticket = await getSupportTicket(ticketId);
   const [tenant, raiser, recipient, assignee] = await Promise.all([
     ticket.tenantId ? Tenant.findById(ticket.tenantId).select('name').lean() : null,
@@ -167,8 +173,9 @@ export async function getSupportTicketDetail(ticketId) {
       ? User.findOne({ _id: ticket.assignedToUserId }).select('name').lean()
       : null,
   ]);
+  const base = isSupportWriter ? ticket.toObject() : toInternalThreadView(ticket);
   return {
-    ...ticket.toObject(),
+    ...base,
     tenantName: tenant?.name ?? '',
     raisedByName: raiser?.name ?? recipient?.name ?? '',
     raisedByEmail: raiser?.email ?? recipient?.email ?? '',
@@ -191,7 +198,7 @@ export async function getTenantTicket({ ticketId, tenantId }) {
 
 /**
  * Tenant reply: never internal, reopens a waiting/resolved ticket, pings the
- * assigned agent (or the whole desk when unassigned).
+ * support desk (admin ↔ support is 1:1 — department handlers are not notified).
  */
 export async function addTenantMessage({ ticketId, tenantId, userId, body }) {
   const ticket = await getSupportTicket(ticketId, { tenantId });
@@ -216,23 +223,17 @@ export async function addTenantMessage({ ticketId, tenantId, userId, body }) {
   return toTenantView(ticket);
 }
 
-/** Ping the assigned agent — or the whole desk when unassigned — about a customer reply. */
+/**
+ * Admin/customer replies always notify the support desk — never the department
+ * handler on assignedToUserId. Assignment is support → departments (internal);
+ * the customer channel stays admin ↔ support.
+ */
 async function notifyAgentsOfReply(ticket, body) {
-  const ping = {
+  await notifySupportStaff({
+    ticket,
     title: `Customer replied: ${ticket.subject}`,
     body: body.slice(0, 200),
-  };
-  if (ticket.assignedToUserId) {
-    notifyAsync({
-      type: 'support_ticket_update',
-      tenantId: ticket.tenantId,
-      userId: ticket.assignedToUserId,
-      ...ping,
-      link: '/platform/support',
-    });
-  } else {
-    await notifySupportStaff({ ticket, ...ping });
-  }
+  });
 }
 
 /** Employee help center: the recipient's own tickets (internal notes stripped). */
@@ -263,7 +264,7 @@ export async function createRecipientTicket({ recipient, subject, description, t
 
 /**
  * Employee reply: never internal, reopens a waiting/resolved ticket, pings the
- * assigned agent (or the whole desk when unassigned).
+ * support desk (same admin/customer ↔ support channel as tenant replies).
  */
 export async function addRecipientMessage({ ticketId, tenantId, recipientId, authorName, body }) {
   const ticket = await SupportTicket.findOne({
@@ -335,8 +336,27 @@ export async function createSupportTicket({
   return ticket;
 }
 
-export async function addMessage({ ticketId, authorUserId, body, internal = false, tenantId = null }) {
+export async function addMessage({
+  ticketId,
+  authorUserId,
+  body,
+  internal = false,
+  tenantId = null,
+  isSupportWriter = true,
+}) {
   const ticket = await getSupportTicket(ticketId, { tenantId });
+
+  // Department assignees may only post internal notes on tickets assigned to them.
+  if (!isSupportWriter) {
+    if (String(ticket.assignedToUserId ?? '') !== String(authorUserId)) {
+      throw new ForbiddenError('Only support staff or the ticket assignee can update this ticket');
+    }
+    if (internal === false) {
+      throw new ForbiddenError('Assignees can only post internal notes — customer replies stay with Support');
+    }
+    internal = true;
+  }
+
   const authorName = await userName(authorUserId);
   ticket.messages.push({
     authorUserId,
@@ -365,25 +385,33 @@ export async function addMessage({ ticketId, authorUserId, body, internal = fals
   await ticket.save();
 
   if (internal) {
-    // Internal notes are team collaboration — ping the assignee (unless they
-    // wrote it); on unassigned tickets, ping the desk.
+    // Two-way internal collaboration: support ↔ department assignee.
     const assigneeId = ticket.assignedToUserId ? String(ticket.assignedToUserId) : null;
-    const ping = {
-      title: `Internal note on: ${ticket.subject}`,
-      body: `${authorName || 'A teammate'}: ${body.slice(0, 200)}`,
-    };
-    if (assigneeId && assigneeId !== String(authorUserId)) {
+    const authorId = String(authorUserId);
+    if (assigneeId && assigneeId === authorId) {
+      await notifySupportStaff({
+        ticket,
+        title: `Department replied: ${ticket.subject}`,
+        body: `${authorName || 'Assignee'}: ${body.slice(0, 200)}`,
+      });
+    } else if (assigneeId && assigneeId !== authorId) {
       notifyAsync({
         type: 'support_ticket_update',
         tenantId: ticket.tenantId,
         userId: ticket.assignedToUserId,
-        ...ping,
+        title: `Internal note on: ${ticket.subject}`,
+        body: `${authorName || 'A teammate'}: ${body.slice(0, 200)}`,
         link: '/platform/support',
       });
-    } else if (!assigneeId) {
-      await notifySupportStaff({ ticket, ...ping });
+    } else {
+      await notifySupportStaff({
+        ticket,
+        title: `Internal note on: ${ticket.subject}`,
+        body: `${authorName || 'A teammate'}: ${body.slice(0, 200)}`,
+      });
     }
   } else {
+    // Public reply = support talking to the admin/customer only.
     await notifyRaiser(ticket, {
       title: `Support replied: ${ticket.subject}`,
       body: body.slice(0, 200),
@@ -395,6 +423,8 @@ export async function addMessage({ ticketId, authorUserId, body, internal = fals
 
 export async function updateSupportTicketStatus({ ticketId, status, actor, tenantId = null }) {
   const ticket = await getSupportTicket(ticketId, { tenantId });
+  // Idempotent: saving the current status is a no-op (UI can race after assign).
+  if (ticket.status === status) return ticket;
   transitionState('supportTicket', ticket, status, actor);
   await ticket.save();
   await notifyRaiser(ticket, {
@@ -473,17 +503,9 @@ async function confirmResolution(ticket, { confirmedBy }) {
     title: `Resolution confirmed: ${ticket.subject}`,
     body: `${confirmedBy || 'The customer'} confirmed the issue is resolved.`,
   };
-  if (ticket.assignedToUserId) {
-    notifyAsync({
-      type: 'support_ticket_update',
-      tenantId: ticket.tenantId,
-      userId: ticket.assignedToUserId,
-      ...ping,
-      link: '/platform/support',
-    });
-  } else {
-    await notifySupportStaff({ ticket, ...ping });
-  }
+  // Confirmation is on the admin ↔ support channel — notify the desk, not the
+  // department handler who may be on assignedToUserId.
+  await notifySupportStaff({ ticket, ...ping });
   return ticket;
 }
 

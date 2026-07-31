@@ -163,7 +163,7 @@ describe('support feature end to end', () => {
     });
   });
 
-  it('tenant reply reopens a waiting ticket and pings the assigned agent', async () => {
+  it('tenant reply reopens a waiting ticket and pings the support desk', async () => {
     const ticket = await raiseTicket();
 
     // open → in_progress → waiting_on_customer
@@ -190,11 +190,57 @@ describe('support feature end to end', () => {
     await eventually(async () => {
       const pings = await Notification.find({
         userId: agent.user._id,
-        type: 'support_ticket_update',
+        type: 'support_ticket',
+        title: { $regex: 'Customer replied' },
       });
       expect(pings.length).toBeGreaterThanOrEqual(1);
-      expect(pings.at(-1).title).toContain('Customer replied');
     });
+  });
+
+  it('admin replies notify support only — not the department handler', async () => {
+    const ticket = await raiseTicket();
+    const production = await makeUser({
+      tenantId: null,
+      name: 'ProdMgr',
+      role: 'platform_production_manager',
+      scopeType: 'platform',
+    });
+
+    await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticket._id}/assign`)
+      .set(auth(agent.token))
+      .send({ userId: String(production.user._id) })
+      .expect(200);
+    await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticket._id}/status`)
+      .set(auth(agent.token))
+      .send({ status: 'waiting_on_customer' })
+      .expect(200);
+
+    // Clear assign noise so we only assert on the reply ping.
+    await Notification.deleteMany({});
+
+    await request(app)
+      .post(`/api/v1/support-tickets/${ticket._id}/messages`)
+      .set(auth(adminA.token))
+      .send({ body: 'Any update on the replacement?' })
+      .expect(200);
+
+    await eventually(async () => {
+      const supportPings = await Notification.find({
+        userId: agent.user._id,
+        type: 'support_ticket',
+        title: { $regex: 'Customer replied' },
+      });
+      expect(supportPings.length).toBe(1);
+    });
+
+    const handlerPings = await Notification.find({
+      userId: production.user._id,
+      type: 'support_ticket',
+      title: { $regex: 'Customer replied' },
+    });
+    expect(handlerPings).toHaveLength(0);
   });
 
   it('closed tickets refuse tenant replies', async () => {
@@ -400,7 +446,7 @@ describe('support feature end to end', () => {
     await eventually(async () => {
       const pings = await Notification.find({
         userId: agent.user._id,
-        type: 'support_ticket_update',
+        type: 'support_ticket',
         title: { $regex: 'Resolution confirmed' },
       });
       expect(pings.length).toBe(1);
@@ -420,5 +466,204 @@ describe('support feature end to end', () => {
       .get(`/api/v1/platform/support-tickets?tenantId=${tenantB._id}`)
       .set(auth(agent.token));
     expect(filtered.body.items).toHaveLength(0);
+  });
+
+  it('assigned production manager can post internal notes and Support is notified', async () => {
+    const ticket = await raiseTicket('Damage Product');
+    const production = await makeUser({
+      tenantId: null,
+      name: 'ProdMgr',
+      role: 'platform_production_manager',
+      scopeType: 'platform',
+    });
+
+    await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticket._id}/assign`)
+      .set(auth(agent.token))
+      .send({ userId: String(production.user._id) })
+      .expect(200);
+
+    await Notification.deleteMany({});
+
+    const res = await request(app)
+      .post(`/api/v1/platform/support-tickets/${ticket._id}/messages`)
+      .set(auth(production.token))
+      .send({ body: 'Replacement kit is ready to ship', internal: true });
+    expect(res.status).toBe(200);
+    const last = res.body.messages.at(-1);
+    expect(last.internal).toBe(true);
+    expect(last.body).toContain('Replacement kit');
+
+    await eventually(async () => {
+      const pings = await Notification.find({
+        userId: agent.user._id,
+        type: 'support_ticket',
+        title: { $regex: 'Department replied' },
+      });
+      expect(pings.length).toBe(1);
+      expect(pings[0].body).toContain('Replacement kit');
+    });
+  });
+
+  it('assignee cannot post a public (customer-visible) reply', async () => {
+    const ticket = await raiseTicket();
+    const production = await makeUser({
+      tenantId: null,
+      name: 'ProdMgr',
+      role: 'platform_production_manager',
+      scopeType: 'platform',
+    });
+    await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticket._id}/assign`)
+      .set(auth(agent.token))
+      .send({ userId: String(production.user._id) })
+      .expect(200);
+
+    const res = await request(app)
+      .post(`/api/v1/platform/support-tickets/${ticket._id}/messages`)
+      .set(auth(production.token))
+      .send({ body: 'Hello customer', internal: false });
+    expect(res.status).toBe(403);
+  });
+
+  it('assignee cannot update status — status stays with Support', async () => {
+    const ticket = await raiseTicket();
+    const production = await makeUser({
+      tenantId: null,
+      name: 'ProdMgr',
+      role: 'platform_production_manager',
+      scopeType: 'platform',
+    });
+    await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticket._id}/assign`)
+      .set(auth(agent.token))
+      .send({ userId: String(production.user._id) })
+      .expect(200);
+
+    const res = await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticket._id}/status`)
+      .set(auth(production.token))
+      .send({ status: 'resolved' });
+    expect(res.status).toBe(403);
+  });
+
+  it('assignee ticket detail shows only the internal Support thread', async () => {
+    const ticket = await raiseTicket();
+    const production = await makeUser({
+      tenantId: null,
+      name: 'ProdMgr',
+      role: 'platform_production_manager',
+      scopeType: 'platform',
+    });
+    await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticket._id}/assign`)
+      .set(auth(agent.token))
+      .send({ userId: String(production.user._id) })
+      .expect(200);
+    await request(app)
+      .post(`/api/v1/platform/support-tickets/${ticket._id}/messages`)
+      .set(auth(agent.token))
+      .send({ body: 'public reply to customer' })
+      .expect(200);
+    await request(app)
+      .post(`/api/v1/platform/support-tickets/${ticket._id}/messages`)
+      .set(auth(agent.token))
+      .send({ body: 'please pick this up', internal: true })
+      .expect(200);
+
+    const detail = await request(app)
+      .get(`/api/v1/platform/support-tickets/${ticket._id}`)
+      .set(auth(production.token));
+    expect(detail.status).toBe(200);
+    expect(detail.body.messages.every((m) => m.internal)).toBe(true);
+    expect(detail.body.messages.some((m) => m.body.includes('please pick this up'))).toBe(true);
+    expect(detail.body.messages.some((m) => m.body.includes('public reply'))).toBe(false);
+  });
+
+  it('non-assignee department user cannot message or change status', async () => {
+    const ticket = await raiseTicket();
+    const production = await makeUser({
+      tenantId: null,
+      name: 'ProdMgr',
+      role: 'platform_production_manager',
+      scopeType: 'platform',
+    });
+    const other = await makeUser({
+      tenantId: null,
+      name: 'Logistics',
+      role: 'platform_logistics_manager',
+      scopeType: 'platform',
+    });
+    await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticket._id}/assign`)
+      .set(auth(agent.token))
+      .send({ userId: String(production.user._id) })
+      .expect(200);
+
+    const msg = await request(app)
+      .post(`/api/v1/platform/support-tickets/${ticket._id}/messages`)
+      .set(auth(other.token))
+      .send({ body: 'not my ticket', internal: true });
+    expect(msg.status).toBe(403);
+
+    const status = await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticket._id}/status`)
+      .set(auth(other.token))
+      .send({ status: 'resolved' });
+    expect(status.status).toBe(403);
+  });
+
+  it('production and logistics only see tickets assigned to them', async () => {
+    const ticketA = await raiseTicket('Prod handoff');
+    const ticketB = await raiseTicket('Logistics handoff');
+    const production = await makeUser({
+      tenantId: null,
+      name: 'ProdMgr',
+      role: 'platform_production_manager',
+      scopeType: 'platform',
+    });
+    const logistics = await makeUser({
+      tenantId: null,
+      name: 'LogMgr',
+      role: 'platform_logistics_manager',
+      scopeType: 'platform',
+    });
+
+    await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticketA._id}/assign`)
+      .set(auth(agent.token))
+      .send({ userId: String(production.user._id) })
+      .expect(200);
+    await request(app)
+      .patch(`/api/v1/platform/support-tickets/${ticketB._id}/assign`)
+      .set(auth(agent.token))
+      .send({ userId: String(logistics.user._id) })
+      .expect(200);
+
+    const prodQueue = await request(app)
+      .get('/api/v1/platform/support-tickets')
+      .set(auth(production.token));
+    expect(prodQueue.status).toBe(200);
+    expect(prodQueue.body.items).toHaveLength(1);
+    expect(prodQueue.body.items[0].subject).toBe('Prod handoff');
+
+    const logQueue = await request(app)
+      .get('/api/v1/platform/support-tickets')
+      .set(auth(logistics.token));
+    expect(logQueue.status).toBe(200);
+    expect(logQueue.body.items).toHaveLength(1);
+    expect(logQueue.body.items[0].subject).toBe('Logistics handoff');
+
+    // Even with query params, department users cannot broaden the queue.
+    const sneak = await request(app)
+      .get('/api/v1/platform/support-tickets?unassigned=true')
+      .set(auth(production.token));
+    expect(sneak.body.items).toHaveLength(1);
+    expect(sneak.body.items[0].subject).toBe('Prod handoff');
+
+    const otherDetail = await request(app)
+      .get(`/api/v1/platform/support-tickets/${ticketB._id}`)
+      .set(auth(production.token));
+    expect(otherDetail.status).toBe(403);
   });
 });
