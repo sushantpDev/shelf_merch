@@ -328,7 +328,7 @@ export function createApp() {
   // Production: serve the Vite SPA from the same origin as the API.
   if (env.NODE_ENV === 'production' && existsSync(WEB_DIST)) {
     app.use(express.static(WEB_DIST, { index: false, maxAge: '1d' }));
-    app.get('*', (req, res, next) => {
+    app.get('/{*path}', (req, res, next) => {
       if (req.method !== 'GET' && req.method !== 'HEAD') return next();
       if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) return next();
       // /zoho/people(*), /legal/*, /docs/*, and /case-studies/* are registered above.
