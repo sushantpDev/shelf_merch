@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Plus, Shirt } from "lucide-react";
+import { Archive, MoreVertical, Plus, Shirt } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -12,17 +12,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { LoadingState } from "@/components/LoadingState";
 import { PageHeader } from "@/components/tenant/PageHeader";
-import type { SwagTab, SwagVm } from "../controllers/useSwagController";
+import type { SwagVm } from "../controllers/useSwagController";
 import { swagEditDraftPath, swagProductPath } from "../paths";
 import { PublishCollectionDialog } from "../PublishCollectionDialog";
 import { SwagCollectionCard } from "../SwagCollectionCard";
 import { useArchiveCollection, useDeleteCollection, useRestoreCollection } from "../model";
 import type { UiCollection } from "@/services/mappers";
 import startDesigningImg from "../../../../assets/start_designing.png";
-
-const TABS: SwagTab[] = ["Collections", "Archived"];
 
 export function SwagView(vm: SwagVm) {
   const navigate = useNavigate();
@@ -77,6 +81,22 @@ export function SwagView(vm: SwagVm) {
     }
   }
 
+  const overflowActions = isArchivedTab
+    ? [
+        {
+          id: "collections",
+          label: "Collections",
+          onSelect: () => vm.onSelectTab("Collections"),
+        },
+      ]
+    : [
+        {
+          id: "archived",
+          label: "Archived",
+          onSelect: () => vm.onSelectTab("Archived"),
+        },
+      ];
+
   return (
     <>
       <PageHeader
@@ -98,21 +118,31 @@ export function SwagView(vm: SwagVm) {
 
       <div className="swag-hero-banner" role="img" aria-label="Build your swag collection" />
 
-      <div className="tabs" style={{ marginBottom: 22 }} role="tablist" aria-label="Swag filter">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            aria-selected={t === vm.tab}
-            className={t === vm.tab ? "on" : ""}
-            onClick={() => vm.onSelectTab(t)}
-          >
-            {t === "Collections" && vm.tab === "Collections"
-              ? `Collections (${vm.collections.length})`
-              : t}
-          </button>
-        ))}
+      <div className="swag-toolbar">
+        <h2 className="swag-toolbar__title">
+          {isArchivedTab ? (
+            <>
+              <Archive size={16} strokeWidth={2.2} aria-hidden="true" />
+              Archived
+            </>
+          ) : (
+            <>Collections{vm.empty ? "" : ` (${vm.collections.length})`}</>
+          )}
+        </h2>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" className="swag-toolbar__menu" aria-label="More options">
+              <MoreVertical size={18} strokeWidth={2.2} aria-hidden="true" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" side="bottom" className="shop-card-menu">
+            {overflowActions.map((action) => (
+              <DropdownMenuItem key={action.id} onSelect={action.onSelect}>
+                {action.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {vm.empty ? (

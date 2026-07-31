@@ -1,8 +1,15 @@
 import { Box, CalendarDays, Search, Settings2, Users } from "lucide-react";
 import { COMPLETE_STATUSES, isLiveCampaign, isPointsCampaign, isSentKitCampaign } from "../model";
 import type { UiCampaign } from "../model";
-import type { CampaignFilter, CampaignStats } from "../controllers/useCampaignsController";
+import type {
+  CampaignFilter,
+  CampaignStats,
+  CampaignTypeCounts,
+  CampaignTypeTab,
+} from "../controllers/useCampaignsController";
 import { CAMPAIGN_FILTERS } from "../controllers/useCampaignsController";
+import { CampaignsEmptyStateView } from "./CampaignsEmptyStateView";
+import "@/features/kits/kits-page.css";
 
 const TAB_LABELS: Record<CampaignFilter, string> = {
   all: "All",
@@ -10,6 +17,12 @@ const TAB_LABELS: Record<CampaignFilter, string> = {
   draft: "Draft",
   completed: "Completed",
 };
+
+const TYPE_TABS: { id: CampaignTypeTab; label: string }[] = [
+  { id: "recent", label: "Recent Activity" },
+  { id: "kits", label: "Kit Sends" },
+  { id: "points", label: "Points" },
+];
 
 function statusTag(c: UiCampaign) {
   if (isSentKitCampaign(c))
@@ -101,9 +114,12 @@ function StatCard({
   );
 }
 
-/** Campaigns table with stats, filter tabs, search and pagination — all state via props. */
+/** Campaigns table with stats, type tabs, status filters, search and pagination. */
 export function CampaignsTableView({
   stats,
+  typeTab,
+  typeCounts,
+  typeTabEmpty,
   filter,
   search,
   pageItems,
@@ -113,12 +129,18 @@ export function CampaignsTableView({
   showingStart,
   showingEnd,
   canSend,
+  onTypeTab,
   onFilter,
   onSearch,
   onPage,
   onSendGift,
+  onSendPointsCampaign,
+  onSendKitCampaign,
 }: {
   stats: CampaignStats;
+  typeTab: CampaignTypeTab;
+  typeCounts: CampaignTypeCounts;
+  typeTabEmpty: boolean;
   filter: CampaignFilter;
   search: string;
   pageItems: UiCampaign[];
@@ -128,10 +150,13 @@ export function CampaignsTableView({
   showingStart: number;
   showingEnd: number;
   canSend: boolean;
+  onTypeTab: (tab: CampaignTypeTab) => void;
   onFilter: (filter: CampaignFilter) => void;
   onSearch: (search: string) => void;
   onPage: (page: number) => void;
   onSendGift: () => void;
+  onSendPointsCampaign: () => void;
+  onSendKitCampaign: () => void;
 }) {
   return (
     <>
@@ -163,118 +188,146 @@ export function CampaignsTableView({
         />
       </div>
 
-      <div className="camp-toolbar">
-        <div className="search camp-search">
-          <Search size={16} aria-hidden="true" />
-          <input
-            placeholder="Search campaigns"
-            value={search}
-            onChange={(e) => onSearch(e.target.value)}
-          />
-        </div>
-        <div className="camp-filter-tabs">
-          {CAMPAIGN_FILTERS.map((t) => (
+      <div className="camp-type-tabs">
+        <div className="kits-tabs" aria-label="Campaign type filters">
+          {TYPE_TABS.map((tab) => (
             <button
-              key={t}
+              key={tab.id}
               type="button"
-              className={`camp-filter-btn${filter === t ? " on" : ""}`}
-              onClick={() => onFilter(t)}
+              className={`kits-tab${typeTab === tab.id ? " kits-tab--active" : ""}`}
+              onClick={() => onTypeTab(tab.id)}
             >
-              {TAB_LABELS[t]}
+              {tab.label}
+              <span>{typeCounts[tab.id]}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        <table className="tbl camp-table">
-          <thead>
-            <tr>
-              <th>Campaign</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Recipients</th>
-              <th>Redemptions</th>
-              <th>Launch date</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {pageItems.length ? (
-              pageItems.map((c) => (
-                <tr key={c.id}>
-                  <td>
-                    <div className="camp-name-cell">
-                      <CampaignAvatar c={c} />
-                      <span>
-                        <span style={{ display: "block", fontWeight: 600 }}>
-                          {campaignTitle(c)}
-                        </span>
-                        {campaignSubtext(c) ? (
-                          <span
-                            className="muted"
-                            style={{ display: "block", fontSize: 12, marginTop: 2 }}
-                          >
-                            {campaignSubtext(c)}
-                          </span>
-                        ) : null}
-                      </span>
-                    </div>
-                  </td>
-                  <td>{typeLabel(c.type)}</td>
-                  <td>{statusTag(c)}</td>
-                  <td className="num">{c.recipientCount.toLocaleString("en-IN")}</td>
-                  <td className="num">—</td>
-                  <td className="num">—</td>
-                  <td />
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={7} style={{ textAlign: "center", padding: 32, color: "var(--ink-2)" }}>
-                  No campaigns match your filters.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="camp-pagination">
-        <span className="camp-page-info">
-          Showing {showingStart} to {showingEnd} of {totalFiltered} campaigns
-        </span>
-        {totalPages > 1 && (
-          <div className="camp-page-btns">
-            <button
-              type="button"
-              className={`camp-page-btn${page <= 1 ? " disabled" : ""}`}
-              disabled={page <= 1}
-              onClick={() => onPage(page - 1)}
-            >
-              &lt;
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-              <button
-                key={n}
-                type="button"
-                className={`camp-page-btn${n === page ? " on" : ""}`}
-                onClick={() => onPage(n)}
-              >
-                {n}
-              </button>
-            ))}
-            <button
-              type="button"
-              className={`camp-page-btn${page >= totalPages ? " disabled" : ""}`}
-              disabled={page >= totalPages}
-              onClick={() => onPage(page + 1)}
-            >
-              &gt;
-            </button>
+      {typeTabEmpty ? (
+        <CampaignsEmptyStateView
+          embedded
+          canSend={canSend}
+          onSendGift={onSendGift}
+          onSendPointsCampaign={onSendPointsCampaign}
+          onSendKitCampaign={onSendKitCampaign}
+        />
+      ) : (
+        <>
+          <div className="camp-toolbar">
+            <div className="search camp-search">
+              <Search size={16} aria-hidden="true" />
+              <input
+                placeholder="Search campaigns"
+                value={search}
+                onChange={(e) => onSearch(e.target.value)}
+              />
+            </div>
+            <div className="camp-filter-tabs">
+              {CAMPAIGN_FILTERS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={`camp-filter-btn${filter === t ? " on" : ""}`}
+                  onClick={() => onFilter(t)}
+                >
+                  {TAB_LABELS[t]}
+                </button>
+              ))}
+            </div>
           </div>
-        )}
-      </div>
+
+          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+            <table className="tbl camp-table">
+              <thead>
+                <tr>
+                  <th>Campaign</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Recipients</th>
+                  <th>Redemptions</th>
+                  <th>Launch date</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {pageItems.length ? (
+                  pageItems.map((c) => (
+                    <tr key={c.id}>
+                      <td>
+                        <div className="camp-name-cell">
+                          <CampaignAvatar c={c} />
+                          <span>
+                            <span style={{ display: "block", fontWeight: 600 }}>
+                              {campaignTitle(c)}
+                            </span>
+                            {campaignSubtext(c) ? (
+                              <span
+                                className="muted"
+                                style={{ display: "block", fontSize: 12, marginTop: 2 }}
+                              >
+                                {campaignSubtext(c)}
+                              </span>
+                            ) : null}
+                          </span>
+                        </div>
+                      </td>
+                      <td>{typeLabel(c.type)}</td>
+                      <td>{statusTag(c)}</td>
+                      <td className="num">{c.recipientCount.toLocaleString("en-IN")}</td>
+                      <td className="num">—</td>
+                      <td className="num">—</td>
+                      <td />
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: "center", padding: 32, color: "var(--ink-2)" }}>
+                      No campaigns match your filters.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="camp-pagination">
+            <span className="camp-page-info">
+              Showing {showingStart} to {showingEnd} of {totalFiltered} campaigns
+            </span>
+            {totalPages > 1 && (
+              <div className="camp-page-btns">
+                <button
+                  type="button"
+                  className={`camp-page-btn${page <= 1 ? " disabled" : ""}`}
+                  disabled={page <= 1}
+                  onClick={() => onPage(page - 1)}
+                >
+                  &lt;
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    className={`camp-page-btn${n === page ? " on" : ""}`}
+                    onClick={() => onPage(n)}
+                  >
+                    {n}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className={`camp-page-btn${page >= totalPages ? " disabled" : ""}`}
+                  disabled={page >= totalPages}
+                  onClick={() => onPage(page + 1)}
+                >
+                  &gt;
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </>
   );
 }

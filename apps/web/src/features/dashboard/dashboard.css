@@ -22,7 +22,7 @@
 .dash-setup__trust,
 .dash-help-list__item,
 .dash-open-shop,
-.dash-design-card__button {
+.dash-swag-card__cta {
   display: flex;
   align-items: center;
 }
@@ -667,7 +667,7 @@
 }
 
 .dash-video-center .dash-video {
-  min-height: 390px;
+  min-height: 250px;
 }
 
 .dash-help-list { list-style: none; display: flex; flex-direction: column; gap: 2px; }
@@ -897,31 +897,229 @@
 .dash-metric--green .dash-metric__icon { background: rgba(46, 172, 42, 0.14); color: #28a622; }
 .dash-metric--amber .dash-metric__icon { background: rgba(240, 160, 0, 0.16); color: #e89400; }
 
-.dash-design-card {
+.dash-swag-card {
+  --swag-peach: #fff3ea;
+  --swag-peach-2: #ffe4d2;
+  --swag-orange: #ff6a2b;
+  --swag-orange-d: #e85a1f;
+  --swag-ink: #1c2434;
   position: relative;
-  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  min-height: 390px;
+  height: 100%;
   padding: 0;
-  color: var(--ink);
-  text-decoration: none;
   overflow: hidden;
-  display: block;
-  background: #eee6ff;
+  color: var(--swag-ink);
+  background:
+    radial-gradient(circle at 69% 40%, rgba(255, 255, 255, 0.88) 0 22%, rgba(255, 222, 200, 0.34) 42%, transparent 63%),
+    radial-gradient(ellipse 42% 48% at 15% 88%, rgba(255, 187, 143, 0.2) 0%, transparent 70%),
+    linear-gradient(125deg, #fffaf6 0%, var(--swag-peach) 43%, var(--swag-peach-2) 100%);
   transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
-.dash-design-card:hover { transform: translateY(-2px); box-shadow: var(--sh-2); }
-.dash-design-card::after,
-.dash-design-card::before { content: none; }
-.dash-design-card__image {
+.dash-swag-card:hover { transform: translateY(-2px); box-shadow: var(--sh-2); }
+.dash-swag-card__main {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(210px, 38%) minmax(0, 62%);
+  gap: 0;
+  min-height: 0;
+  padding: 28px 24px 8px 30px;
+}
+.dash-swag-card__copy {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 15px;
+  max-width: 280px;
+  padding: 4px 22px 8px 0;
+}
+.dash-swag-card__icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  color: var(--swag-orange);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(255, 140, 80, 0.35);
+  box-shadow: 0 6px 16px rgba(232, 110, 50, 0.1);
+}
+.dash-swag-card__copy h3 {
+  margin: 2px 0 0;
+  font-family: var(--disp);
+  font-size: clamp(30px, 3vw, 42px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--swag-ink);
+  line-height: 1.05;
+}
+.dash-swag-card__copy p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #4f5d72;
+  max-width: 265px;
+}
+.dash-swag-card__cta {
+  margin-top: 5px;
+  gap: 12px;
+  height: 48px;
+  padding: 0 22px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ff712f 0%, #f64b22 100%);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 10px 22px rgba(255, 106, 43, 0.28);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.dash-swag-card__cta:hover {
+  background: var(--swag-orange-d);
+  color: #fff;
+  transform: translateY(-1px);
+}
+.dash-swag-card__showcase {
+  position: relative;
+  min-width: 0;
+  min-height: 274px;
+  overflow: visible;
+}
+.dash-swag-card__glow {
+  position: absolute;
+  inset: 2% 7% 10% 4%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 214, 180, 0.18) 48%, transparent 72%);
+  pointer-events: none;
+  z-index: 1;
+}
+.dash-swag-card__dots {
+  position: absolute;
+  top: 2px;
+  right: 72px;
+  width: 54px;
+  height: 54px;
+  background-image: radial-gradient(circle, rgba(210, 170, 140, 0.45) 1.1px, transparent 1.25px);
+  background-size: 9px 9px;
+  pointer-events: none;
+  z-index: 2;
+}
+.dash-swag-card__leaf {
+  position: absolute;
+  top: -18px;
+  right: -16px;
+  width: 86px;
+  height: 98px;
+  pointer-events: none;
+  opacity: 0.8;
+  z-index: 2;
+}
+.dash-swag-card__leaf svg { width: 100%; height: 100%; display: block; }
+.dash-swag-card__podium {
+  position: absolute;
+  left: 2%;
+  right: -2%;
+  bottom: 2%;
+  height: 30%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(255, 170, 120, 0.22) 0%, rgba(255, 200, 160, 0.1) 55%, transparent 72%);
+  pointer-events: none;
+  z-index: 1;
+}
+.dash-swag-card__showcase-img {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: 2;
   width: 100%;
   height: 100%;
   object-fit: contain;
-  object-position: center;
-  display: block;
+  object-position: center bottom;
+  pointer-events: none;
+  user-select: none;
 }
-.dash-design-card__copy { display: none; }
+.dash-swag-card__strip {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px 18px;
+  min-width: 0;
+}
+.dash-swag-card__cats {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.dash-swag-card__cats::-webkit-scrollbar { display: none; }
+.dash-swag-card__cat {
+  flex: 1 0 112px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 62px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 200, 170, 0.65);
+  box-shadow: 0 6px 14px rgba(180, 100, 50, 0.08);
+}
+.dash-swag-card__cat-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--swag-orange);
+  background: #fff4ec;
+  flex: none;
+}
+.dash-swag-card__cat-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.dash-swag-card__cat-copy strong {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--swag-ink);
+  line-height: 1.2;
+}
+.dash-swag-card__cat-copy small {
+  font-size: 11px;
+  color: #b07a5a;
+  font-weight: 600;
+}
+.dash-swag-card__scroll {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 190, 150, 0.7);
+  background: #fff;
+  color: var(--swag-orange);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(180, 100, 50, 0.1);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.dash-swag-card__scroll:hover {
+  transform: scale(1.05);
+  background: #fff8f3;
+}
 
 .dash-settings-card--preview {
   position: relative;
@@ -946,13 +1144,14 @@
 .dash-existing-main { grid-template-columns: minmax(360px, 0.92fr) minmax(560px, 1.35fr); align-items: stretch; }
 .dash-existing-main__wallets,
 .dash-existing-main__video { min-width: 0; }
-.dash-existing-main__video .dash-video { height: 100%; min-height: 250px; }
+.dash-existing-main__video .dash-swag-card { height: 100%; min-height: 390px; }
 .dash-existing-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
 .dash-existing-grid__shop { grid-column: auto; }
 .dash-existing-grid__settings { grid-column: auto; }
 .dash-existing-grid__help { grid-column: auto; }
 .dash-existing-grid > div { min-width: 0; }
 .dash-existing-grid > div > .card { height: 100%; min-height: 280px; }
+.dash-existing-grid__settings .dash-video { height: 100%; min-height: 280px; }
 .dash-pinned-shop { display: flex; flex-direction: column; }
 .dash-pinned-shop .dash-section-head { margin-bottom: 14px; }
 
@@ -1029,6 +1228,8 @@
   .dash-existing-grid { grid-template-columns: 1fr; }
   .dash-metrics-grid { grid-template-columns: repeat(2, 1fr); }
   .dash-shortcut-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dash-swag-card { min-height: 420px; }
+  .dash-swag-card__main { min-height: 310px; }
 }
 
 @media (max-width: 760px) {
@@ -1052,7 +1253,24 @@
   .dash-shortcut-grid { grid-template-columns: 1fr; }
   .dash-settings-card { min-height: auto; }
   .dash-settings-card--preview { min-height: 220px; }
-  .dash-design-card { min-height: 180px; }
+  .dash-swag-card { min-height: 0; }
+  .dash-swag-card__main {
+    grid-template-columns: 1fr;
+    padding: 22px 18px 8px;
+    gap: 12px;
+  }
+  .dash-swag-card__copy {
+    max-width: none;
+    padding-bottom: 0;
+  }
+  .dash-swag-card__copy p { max-width: none; }
+  .dash-swag-card__showcase {
+    min-height: 250px;
+    margin: 0 -4px;
+  }
+  .dash-swag-card__cats { overflow-x: auto; }
+  .dash-swag-card__cat { flex: 0 0 132px; }
+  .dash-swag-card__strip { padding: 4px 12px 14px; }
   .dash-video-center .dash-video,
   .dash-onboard-video .dash-video { min-height: 260px; }
   .dash-welcome__actions { width: 100%; }
@@ -1205,4 +1423,302 @@
   .dash-em-kits__grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Compact paired Campaigns + Swag promos */
+.dash-existing-main__video .dash-promo-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+  gap: 14px;
+  height: 100%;
+  min-height: 250px;
+}
+.dash-existing-main__video:has(.dash-promo-pair) {
+  min-height: 250px;
+}
+.dash-existing-main__video .dash-promo-pair > .card {
+  min-width: 0;
+  min-height: 250px;
+  height: 100%;
+  border-radius: 22px;
+}
+.dash-campaign-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 42% 58%;
+  overflow: hidden;
+  padding: 22px 18px 20px 22px;
+  background:
+    radial-gradient(circle at 72% 42%, rgba(255,255,255,.82) 0 20%, transparent 58%),
+    linear-gradient(135deg, #fcfaff 0%, #f0ebff 100%);
+  border-color: #e4dcff;
+  color: #142044;
+}
+.dash-campaign-card__copy {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+}
+.dash-campaign-card__icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d6c8ff;
+  border-radius: 13px;
+  color: #6840df;
+  background: rgba(255,255,255,.72);
+}
+.dash-campaign-card h3 {
+  margin: 2px 0 0;
+  font-family: var(--disp);
+  font-size: clamp(23px, 2vw, 31px);
+  line-height: 1;
+  letter-spacing: -.035em;
+}
+.dash-campaign-card p {
+  max-width: 170px;
+  margin: 0;
+  color: #58637e;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.dash-campaign-card__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  margin-top: 2px;
+  padding: 0 15px;
+  border-radius: 10px;
+  color: #fff;
+  background: linear-gradient(135deg, #6948e9, #4b2ed2);
+  box-shadow: 0 8px 18px rgba(83,52,205,.22);
+  font-size: 11.5px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.dash-campaign-card__art {
+  position: relative;
+  min-width: 0;
+}
+.dash-campaign-card__target {
+  position: absolute;
+  z-index: 1;
+  width: 128px;
+  height: 128px;
+  left: 15%;
+  top: 18%;
+  border: 19px solid #8a64ed;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 17px #f5f1ff, inset 0 0 0 34px #7550dd;
+}
+.dash-campaign-card__target::after {
+  content: "";
+  position: absolute;
+  width: 56px;
+  height: 6px;
+  left: 52px;
+  top: 39px;
+  border-radius: 999px;
+  background: #5c36cf;
+  transform: rotate(-24deg);
+  transform-origin: left center;
+}
+.dash-campaign-card__target i,
+.dash-campaign-card__target b {
+  position: absolute;
+  right: -1px;
+  top: 16px;
+  width: 28px;
+  height: 14px;
+  background: #6340d8;
+  transform: rotate(-24deg) skewX(-24deg);
+}
+.dash-campaign-card__target b { top: 30px; right: -6px; }
+.dash-campaign-card__art > img {
+  position: absolute;
+  z-index: 2;
+  width: 116px;
+  height: 108px;
+  left: -12px;
+  bottom: 4px;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+}
+.dash-campaign-card__calendar {
+  position: absolute;
+  z-index: 3;
+  right: -4px;
+  bottom: 7px;
+  width: 82px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: #704bdc;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(75,46,170,.18);
+}
+.dash-campaign-card__calendar i {
+  position: absolute;
+  right: 5px;
+  bottom: 3px;
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #6945dc;
+  font-size: 13px;
+  font-style: normal;
+}
+.dash-campaign-card__dots {
+  position: absolute;
+  right: -4px;
+  top: 0;
+  width: 46px;
+  height: 40px;
+  background-image: radial-gradient(circle, #9a7af0 1.5px, transparent 1.8px);
+  background-size: 10px 10px;
+}
+.dash-promo-pair .dash-swag-card {
+  min-height: 250px;
+  border-radius: 22px;
+}
+.dash-promo-pair .dash-swag-card__main {
+  grid-template-columns: 38% 62%;
+  min-height: 250px;
+  padding: 20px 14px 18px 20px;
+}
+.dash-promo-pair .dash-swag-card__copy {
+  gap: 9px;
+  max-width: 190px;
+  padding: 0 10px 0 0;
+}
+.dash-promo-pair .dash-swag-card__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+}
+.dash-promo-pair .dash-swag-card__copy h3 {
+  font-size: clamp(23px, 2vw, 31px);
+}
+.dash-promo-pair .dash-swag-card__copy p {
+  max-width: 170px;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.dash-promo-pair .dash-swag-card__cta {
+  height: 38px;
+  margin-top: 2px;
+  padding: 0 15px;
+  font-size: 11.5px;
+}
+.dash-promo-pair .dash-swag-card__showcase {
+  min-height: 210px;
+}
+.dash-promo-pair .dash-swag-card__strip {
+  display: none;
+}
+
+@media (max-width: 920px) {
+  .dash-existing-main__video .dash-promo-pair {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .dash-existing-main__video .dash-promo-pair > .card {
+    min-height: 260px;
+  }
+}
+
+@media (max-width: 520px) {
+  .dash-campaign-card {
+    grid-template-columns: 1fr;
+    min-height: 390px !important;
+  }
+  .dash-campaign-card__copy { max-width: 240px; }
+  .dash-campaign-card__art { min-height: 190px; }
+  .dash-promo-pair .dash-swag-card__main {
+    grid-template-columns: 1fr;
+    min-height: 430px;
+  }
+}
+/* Single-image Campaigns artwork: background matches the card for a seamless edge. */
+.dash-campaign-card {
+  background: linear-gradient(135deg, #fbfaff 0%, #f0ebff 100%);
+}
+.dash-campaign-card__art {
+  position: relative;
+  min-width: 0;
+  margin: -22px -18px -20px -32px;
+  overflow: hidden;
+}
+.dash-campaign-card__art > img {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 52% center;
+  mix-blend-mode: normal;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,.78) 14%, #000 26%);
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,.78) 14%, #000 26%);
+}
+/* Readability and artwork scale refinement for compact promos. */
+.dash-campaign-card h3,
+.dash-promo-pair .dash-swag-card__copy h3 {
+  font-size: clamp(27px, 2.2vw, 34px);
+}
+.dash-campaign-card p,
+.dash-promo-pair .dash-swag-card__copy p {
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.dash-campaign-card__cta,
+.dash-promo-pair .dash-swag-card__cta {
+  min-height: 42px;
+  padding-inline: 17px;
+  font-size: 13px;
+}
+.dash-campaign-card__art {
+  margin: -12px -8px -10px -8px;
+}
+.dash-campaign-card__art > img {
+  inset: 8% 2% 8% 6%;
+  width: 92%;
+  height: 84%;
+  object-fit: contain;
+  object-position: center;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,.92) 10%, #000 18%);
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,.92) 10%, #000 18%);
+}
+.dash-promo-pair .dash-swag-card__showcase-img {
+  inset: 6% 5% 4%;
+  width: 90%;
+  height: 90%;
+  object-fit: contain;
+  object-position: center bottom;
+}
+/* Feather artwork into each card so raster backgrounds do not read as tiles. */
+.dash-campaign-card__art > img {
+  inset: 4% 0 3% 2%;
+  width: 96%;
+  height: 93%;
+  -webkit-mask-image: radial-gradient(ellipse 74% 72% at 53% 53%, #000 0%, #000 58%, rgba(0,0,0,.92) 68%, rgba(0,0,0,.45) 84%, transparent 100%);
+  mask-image: radial-gradient(ellipse 74% 72% at 53% 53%, #000 0%, #000 58%, rgba(0,0,0,.92) 68%, rgba(0,0,0,.45) 84%, transparent 100%);
+}
+.dash-promo-pair .dash-swag-card__showcase-img {
+  inset: 2% 2% 1%;
+  width: 96%;
+  height: 97%;
+  -webkit-mask-image: radial-gradient(ellipse 76% 75% at 52% 53%, #000 0%, #000 57%, rgba(0,0,0,.9) 69%, rgba(0,0,0,.42) 85%, transparent 100%);
+  mask-image: radial-gradient(ellipse 76% 75% at 52% 53%, #000 0%, #000 57%, rgba(0,0,0,.9) 69%, rgba(0,0,0,.42) 85%, transparent 100%);
 }
