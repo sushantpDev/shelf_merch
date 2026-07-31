@@ -258,7 +258,7 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
     description: p.description || "",
     keyFeatures: p.keyFeatures || "",
     sizeGuide: p.sizeGuide || "",
-    // Display excludes category GST; basePriceInr stays GST-inclusive from DB.
+    // Display excludes category GST: base = inclusive / (1 + rate). basePriceInr stays GST-inclusive from DB.
     price: formatInr(netPriceExGst(Number(p.basePriceInr) || 0, p.category)),
     basePriceInr: Math.round(Number(p.basePriceInr) || 0),
     sw: Array.isArray(p.variants) ? Math.max(p.variants.length, 2) : 4,
