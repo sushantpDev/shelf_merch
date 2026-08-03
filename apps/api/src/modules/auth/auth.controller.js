@@ -17,19 +17,69 @@ export async function register(req, res) {
   res.status(201).json(result);
 }
 
-export async function login(req, res) {
-  const result = await authService.login({
+export async function startSignup(req, res) {
+  const result = await authService.startSignup({ ...req.body, ip: req.ip });
+  writeAudit({
+    req,
+    action: 'auth.signup_otp_sent',
+    entityType: 'SignupPending',
+    after: { email: result.email },
+  });
+  res.status(200).json(result);
+}
+
+export async function resendSignupOtp(req, res) {
+  const result = await authService.resendSignupOtp(req.body);
+  writeAudit({
+    req,
+    action: 'auth.signup_otp_resent',
+    entityType: 'SignupPending',
+    after: { email: result.email },
+  });
+  res.json(result);
+}
+
+export async function verifySignupOtp(req, res) {
+  const result = await authService.verifySignupOtp({
     ...req.body,
     ip: req.ip,
     userAgent: req.headers['user-agent'] ?? '',
   });
   writeAudit({
     req: { ...req, user: { userId: result.user.id, role: result.user.role }, tenantId: result.user.tenantId },
-    action: 'auth.login',
+    action: 'auth.signup_verified',
     entityType: 'User',
     entityId: result.user.id,
   });
-  res.json(result);
+  res.status(201).json(result);
+}
+
+export async function login(req, res) {
+  try {
+    const result = await authService.login({
+      ...req.body,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'] ?? '',
+    });
+    writeAudit({
+      req: { ...req, user: { userId: result.user.id, role: result.user.role }, tenantId: result.user.tenantId },
+      action: 'auth.login',
+      entityType: 'User',
+      entityId: result.user.id,
+    });
+    res.json(result);
+  } catch (err) {
+    const code = err?.code;
+    if (code === 'INVALID_CREDENTIALS') {
+      writeAudit({
+        req,
+        action: 'auth.login_failed',
+        entityType: 'User',
+        after: { email: req.body?.email },
+      });
+    }
+    throw err;
+  }
 }
 
 export async function refresh(req, res) {
@@ -47,12 +97,44 @@ export async function logout(req, res) {
 }
 
 export async function forgotPassword(req, res) {
-  await authService.forgotPassword(req.body);
-  res.json({ success: true, message: 'If that email exists, a reset link has been sent' });
+  const result = await authService.forgotPassword({ ...req.body, ip: req.ip });
+  if (result?.sent) {
+    writeAudit({
+      req,
+      action: 'auth.password_reset_requested',
+      entityType: 'User',
+      entityId: result.userId,
+      after: { email: req.body?.email },
+    });
+  }
+  // Never reveal whether the account exists.
+  res.json({
+    success: true,
+    message: 'If an account exists with this email, a password reset link has been sent.',
+  });
+}
+
+export async function validateResetToken(req, res) {
+  const result = await authService.validateResetToken({ token: req.query.token });
+  if (!result.valid) {
+    writeAudit({
+      req,
+      action: 'auth.password_reset_token_invalid',
+      entityType: 'PasswordResetToken',
+      after: { reason: result.reason },
+    });
+  }
+  res.json(result);
 }
 
 export async function resetPassword(req, res) {
-  await authService.resetPassword(req.body);
+  const result = await authService.resetPassword(req.body);
+  writeAudit({
+    req,
+    action: 'auth.password_reset_completed',
+    entityType: 'User',
+    entityId: result.userId,
+  });
   res.json({ success: true });
 }
 

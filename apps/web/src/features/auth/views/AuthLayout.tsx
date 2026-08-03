@@ -6,7 +6,7 @@ type AuthLayoutProps = {
   children: ReactNode;
   title: string;
   subtitle?: string;
-  footerLink?: { hint: string; label: string; to: "/login" | "/signup" };
+  footerLink?: { hint: string; label: string; to: "/login" | "/signup" | "/forgot-password" };
 };
 
 export function AuthLayout({ children, title, subtitle, footerLink }: AuthLayoutProps) {
@@ -25,7 +25,7 @@ export function AuthLayout({ children, title, subtitle, footerLink }: AuthLayout
 
           {footerLink ? (
             <p className="auth-simple-switch">
-              {footerLink.hint}{" "}
+              {footerLink.hint ? <>{footerLink.hint} </> : null}
               <Link to={footerLink.to} className="auth-simple-switch-link">
                 {footerLink.label}
               </Link>

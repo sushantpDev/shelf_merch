@@ -17,6 +17,7 @@ import {
   Landmark,
   LayoutGrid,
   LifeBuoy,
+  LogOut,
   Megaphone,
   Settings,
   Shirt,
@@ -26,11 +27,11 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { getStoredUser } from "@/services/api-bridge";
+import { getStoredUser, logout } from "@/services/api-bridge";
 import { navItemsForTenantRole } from "@/services/tenant-access";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import "./collapsible-sidebar.css";
-import NavFooterImage from "../../../assets/nav_footer_img.png";
+// import NavFooterImage from "../../../assets/nav_footer_img.png";
 
 const STORAGE_KEY = "shelfmerch.sidebar.expanded";
 
@@ -178,6 +179,21 @@ export function CollapsibleSidebar() {
     });
   };
 
+  const onLogout = () => {
+    hideFlyout();
+    void logout();
+  };
+
+  const logoutHoverHandlers = expanded
+    ? {}
+    : {
+        onMouseEnter: (event: MouseEvent<HTMLElement>) =>
+          showFlyout("Log Out", event.currentTarget),
+        onMouseLeave: hideFlyout,
+        onFocus: (event: FocusEvent<HTMLElement>) => showFlyout("Log Out", event.currentTarget),
+        onBlur: hideFlyout,
+      };
+
   const toggleButton =
     togglePos &&
     createPortal(
@@ -225,12 +241,19 @@ export function CollapsibleSidebar() {
           })}
         </div>
 
-        <div className="sidebar-rail__footer" style={{ marginTop: 0, paddingTop: 0 }}>
-          {showFooterImage && (
-            <Link to="/app/settings" aria-label="Workspace settings">
-              <img src={NavFooterImage} alt="Nav Footer" />
-            </Link>
-          )}
+        <div className="sidebar-rail__footer">
+          <button
+            type="button"
+            className="sidebar-rail__item sidebar-rail__logout"
+            aria-label={expanded ? undefined : "Log Out"}
+            onClick={onLogout}
+            {...logoutHoverHandlers}
+          >
+            <span className="sidebar-rail__item-icon">
+              <LogOut size={20} strokeWidth={1.75} aria-hidden="true" />
+            </span>
+            {expanded ? <span className="sidebar-rail__item-label">Log Out</span> : null}
+          </button>
         </div>
       </nav>
 

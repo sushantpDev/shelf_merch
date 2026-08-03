@@ -1,4 +1,4 @@
-import { Eye, EyeOff } from "lucide-react";
+import { PasswordField } from "../components/PasswordField";
 import type { LoginVm } from "../controllers/useLoginController";
 import { AuthLabel, AuthLayout, authInputClassName } from "./AuthLayout";
 
@@ -9,65 +9,53 @@ export function LoginView(vm: LoginVm) {
       footerLink={{ hint: "Don't have an account?", label: "Sign up", to: "/signup" }}
     >
       <form className="auth-simple-form" onSubmit={vm.onSubmit} aria-busy={vm.busy}>
-        <fieldset className="auth-simple-fieldset" disabled={vm.busy}>
-        <div className="auth-simple-field">
-          <AuthLabel htmlFor="login-email">Work email</AuthLabel>
-          <input
-            id="login-email"
-            type="email"
-            autoComplete="email"
-            placeholder="you@company.com"
-            value={vm.email}
-            onChange={(e) => vm.onEmail(e.target.value)}
-            className={authInputClassName}
-            autoFocus
-          />
-        </div>
-
-        <div className="auth-simple-field">
-          <AuthLabel
-            htmlFor="login-password"
-            action={
-              <button
-                type="button"
-                className="auth-simple-label-action"
-                onClick={vm.onForgotPassword}
-              >
-                Reset password
-              </button>
-            }
-          >
-            Password
-          </AuthLabel>
-          <div className="auth-simple-input-wrap">
+        <fieldset className="auth-simple-fieldset" disabled={vm.loginDisabled}>
+          <div className="auth-simple-field">
+            <AuthLabel htmlFor="login-email">Work email</AuthLabel>
             <input
-              id="login-password"
-              type={vm.showPassword ? "text" : "password"}
-              autoComplete="current-password"
-              value={vm.password}
-              onChange={(e) => vm.onPassword(e.target.value)}
-              className={`${authInputClassName} auth-simple-input--toggle`}
+              id="login-email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@company.com"
+              value={vm.email}
+              onChange={(e) => vm.onEmail(e.target.value)}
+              className={authInputClassName}
+              autoFocus
             />
-            <button
-              type="button"
-              className="auth-simple-toggle"
-              onClick={vm.onToggleShowPassword}
-              aria-label={vm.showPassword ? "Hide password" : "Show password"}
-            >
-              {vm.showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
           </div>
-        </div>
 
-        {vm.error ? (
-          <p className="auth-simple-error" role="alert">
-            {vm.error}
-          </p>
-        ) : null}
+          <div className="auth-simple-field">
+            <AuthLabel
+              htmlFor="login-password"
+              action={
+                <button
+                  type="button"
+                  className="auth-simple-label-action"
+                  onClick={vm.onForgotPassword}
+                >
+                  Reset password
+                </button>
+              }
+            >
+              Password
+            </AuthLabel>
+            <PasswordField
+              id="login-password"
+              value={vm.password}
+              onValueChange={vm.onPassword}
+              autoComplete="current-password"
+            />
+          </div>
 
-        <button type="submit" className="auth-simple-submit">
-          {vm.busy ? "Signing in…" : "Log in"}
-        </button>
+          {vm.error ? (
+            <p className="auth-simple-error auth-simple-error--shake" role="alert">
+              {vm.error}
+            </p>
+          ) : null}
+
+          <button type="submit" className="auth-simple-submit" disabled={vm.loginDisabled}>
+            {vm.busy ? "Signing in…" : "Log in"}
+          </button>
         </fieldset>
       </form>
     </AuthLayout>

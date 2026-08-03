@@ -15,11 +15,9 @@ const TABS: [Tab, string][] = [
 /** Read-only catalog product detail (description / key features / size guide). */
 export function ProductDetail({ product, index }: { product: UiProduct; index: number }) {
   const [tab, setTab] = useState<Tab>("description");
-  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     setTab("description");
-    setExpanded(false);
   }, [product.id]);
 
   const title = product.brand ? `${product.brand} ${product.nm}` : product.nm;
@@ -28,7 +26,6 @@ export function ProductDetail({ product, index }: { product: UiProduct; index: n
     resolveMediaUrl(product.photoUrl) ||
     resolveMediaUrl(product.imgUrl);
   const desc = String(product.description || "");
-  const short = desc.length > 180 && !expanded ? `${desc.slice(0, 180).trim()}…` : desc;
   const featureRows = detailRows(product.keyFeatures);
   const swatches = productSwatches(product);
 
@@ -72,13 +69,14 @@ export function ProductDetail({ product, index }: { product: UiProduct; index: n
               <div className="lbl" style={{ marginBottom: 6 }}>
                 Colors
               </div>
-              <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+              <div className="row cat-swatch-row" style={{ gap: 8, flexWrap: "wrap" }}>
                 {swatches.map((s) => (
                   <span
                     key={s.name}
-                    title={s.name}
-                    className="sw"
-                    style={{ background: s.hex, width: 20, height: 20, borderRadius: 5 }}
+                    className="cat-swatch"
+                    data-label={s.name}
+                    aria-label={s.name}
+                    style={{ background: s.hex }}
                   />
                 ))}
               </div>
@@ -102,17 +100,7 @@ export function ProductDetail({ product, index }: { product: UiProduct; index: n
 
           {tab === "description" && (
             <div className="pd-tab-panel pd-description-panel on" role="tabpanel">
-              <p style={{ whiteSpace: "pre-line" }}>{short || "No description available."}</p>
-              {desc.length > 180 && (
-                <button
-                  type="button"
-                  className="lnk"
-                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
-                  onClick={() => setExpanded(!expanded)}
-                >
-                  {expanded ? "See less" : "See more"}
-                </button>
-              )}
+              <p style={{ whiteSpace: "pre-line" }}>{desc || "No description available."}</p>
             </div>
           )}
 

@@ -157,6 +157,17 @@ async function loadActiveKitEntries(kit) {
   return entries;
 }
 
+function colorHexByNameFromVariants(variants) {
+  const map = {};
+  for (const v of variants || []) {
+    const name = String(v?.color || '').trim();
+    const hex = String(v?.colorHex || '').trim();
+    if (!name || !hex || map[name]) continue;
+    map[name] = hex;
+  }
+  return map;
+}
+
 function mapKitEntryToItem({ ref, product }, kit) {
   const options = resolveKitItemOptions(product, ref);
   const drinkware = isDrinkwareProduct(product, ref);
@@ -179,6 +190,7 @@ function mapKitEntryToItem({ ref, product }, kit) {
     requiresColor: options.requiresColor,
     sizes: options.sizes,
     colors: options.colors,
+    colorHexByName: colorHexByNameFromVariants(product.variants),
     qty: 1,
   };
 }

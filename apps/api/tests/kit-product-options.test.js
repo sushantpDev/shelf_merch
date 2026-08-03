@@ -51,10 +51,11 @@ describe('kitProductOptions', () => {
     const opts = resolveKitItemOptions(product, { group: 'hoodie' });
     expect(opts.requiresSize).toBe(true);
     expect(opts.sizes).toEqual(['XS', 'S', 'M', 'L', 'XL', 'XXL']);
-    expect(opts.requiresColor).toBe(false);
+    expect(opts.requiresColor).toBe(true);
+    expect(opts.colors).toEqual(['#d33636']);
   });
 
-  it('apparel with multiple variant colours only asks for size in kit redemption', () => {
+  it('apparel with multiple variant colours asks for colour in kit redemption', () => {
     const product = {
       group: 'tee',
       category: 'Apparel',
@@ -66,7 +67,7 @@ describe('kitProductOptions', () => {
     };
     const opts = resolveKitItemOptions(product, { group: 'tee' });
     expect(opts.requiresSize).toBe(true);
-    expect(opts.requiresColor).toBe(false);
-    expect(opts.colors).toEqual([]);
+    expect(opts.requiresColor).toBe(true);
+    expect(opts.colors).toEqual(['#0d68c9', '#df58d4', '#e1944c']);
   });
 });

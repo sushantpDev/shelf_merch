@@ -1,5 +1,5 @@
-import { Eye, EyeOff } from "lucide-react";
 import { Link } from "react-router";
+import { PasswordField } from "../components/PasswordField";
 import type { SignupVm } from "../controllers/useSignupController";
 import { AuthLabel, AuthLayout, authInputClassName } from "./AuthLayout";
 
@@ -9,100 +9,116 @@ export function SignupView(vm: SignupVm) {
       title="Create your account"
       footerLink={{ hint: "Already have an account?", label: "Log in", to: "/login" }}
     >
-      <form className="auth-simple-form" onSubmit={vm.onSubmit}>
-        <div className="auth-simple-name-row">
+      {vm.accountExists ? (
+        <div className="auth-exists-panel" role="alert">
+          <p className="auth-exists-copy">Account already exists. Please sign in.</p>
+          <button type="button" className="auth-simple-submit" onClick={vm.onSignIn}>
+            Sign In
+          </button>
+          <button
+            type="button"
+            className="auth-simple-secondary"
+            style={{ marginTop: 12 }}
+            onClick={vm.onDismissExists}
+          >
+            Use a different email
+          </button>
+        </div>
+      ) : (
+        <form className="auth-simple-form" onSubmit={vm.onSubmit}>
+          <div className="auth-simple-name-row">
+            <div className="auth-simple-field">
+              <AuthLabel htmlFor="signup-first">First name</AuthLabel>
+              <input
+                id="signup-first"
+                type="text"
+                autoComplete="given-name"
+                placeholder="First name"
+                value={vm.firstName}
+                onChange={(e) => vm.onFirstName(e.target.value)}
+                className={authInputClassName}
+                autoFocus
+              />
+            </div>
+            <div className="auth-simple-field">
+              <AuthLabel htmlFor="signup-last">Last name</AuthLabel>
+              <input
+                id="signup-last"
+                type="text"
+                autoComplete="family-name"
+                placeholder="Last name"
+                value={vm.lastName}
+                onChange={(e) => vm.onLastName(e.target.value)}
+                className={authInputClassName}
+              />
+            </div>
+          </div>
+
           <div className="auth-simple-field">
-            <AuthLabel htmlFor="signup-first">First name</AuthLabel>
+            <AuthLabel htmlFor="signup-email">Work email</AuthLabel>
             <input
-              id="signup-first"
-              type="text"
-              autoComplete="given-name"
-              placeholder="First name"
-              value={vm.firstName}
-              onChange={(e) => vm.onFirstName(e.target.value)}
+              id="signup-email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@company.com"
+              value={vm.email}
+              onChange={(e) => vm.onEmail(e.target.value)}
               className={authInputClassName}
-              autoFocus
             />
           </div>
+
           <div className="auth-simple-field">
-            <AuthLabel htmlFor="signup-last">Last name</AuthLabel>
+            <AuthLabel htmlFor="signup-company">Company</AuthLabel>
             <input
-              id="signup-last"
+              id="signup-company"
               type="text"
-              autoComplete="family-name"
-              placeholder="Last name"
-              value={vm.lastName}
-              onChange={(e) => vm.onLastName(e.target.value)}
+              autoComplete="organization"
+              placeholder="Company name"
+              value={vm.company}
+              onChange={(e) => vm.onCompany(e.target.value)}
               className={authInputClassName}
             />
           </div>
-        </div>
 
-        <div className="auth-simple-field">
-          <AuthLabel htmlFor="signup-email">Work email</AuthLabel>
-          <input
-            id="signup-email"
-            type="email"
-            autoComplete="email"
-            placeholder="you@company.com"
-            value={vm.email}
-            onChange={(e) => vm.onEmail(e.target.value)}
-            className={authInputClassName}
-          />
-        </div>
-
-        <div className="auth-simple-field">
-          <AuthLabel htmlFor="signup-company">Company</AuthLabel>
-          <input
-            id="signup-company"
-            type="text"
-            autoComplete="organization"
-            placeholder="Company name"
-            value={vm.company}
-            onChange={(e) => vm.onCompany(e.target.value)}
-            className={authInputClassName}
-          />
-        </div>
-
-        <div className="auth-simple-field">
-          <AuthLabel htmlFor="signup-password">Password</AuthLabel>
-          <div className="auth-simple-input-wrap">
-            <input
+          <div className="auth-simple-field">
+            <AuthLabel htmlFor="signup-password">Password</AuthLabel>
+            <PasswordField
               id="signup-password"
-              type={vm.showPassword ? "text" : "password"}
+              value={vm.password}
+              onValueChange={vm.onPassword}
               autoComplete="new-password"
               placeholder="At least 8 characters"
-              value={vm.password}
-              onChange={(e) => vm.onPassword(e.target.value)}
-              className={`${authInputClassName} auth-simple-input--toggle`}
             />
-            <button
-              type="button"
-              className="auth-simple-toggle"
-              onClick={vm.onToggleShowPassword}
-              aria-label={vm.showPassword ? "Hide password" : "Show password"}
-            >
-              {vm.showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
           </div>
-        </div>
 
-        <p className="auth-simple-legal">
-          By proceeding, you agree to Shelf Merch&apos;s{" "}
-          <Link to="/legal/privacy-policy" className="auth-simple-legal-link">
-            Privacy Policy
-          </Link>{" "}
-          and{" "}
-          <Link to="/legal/terms-of-service" className="auth-simple-legal-link">
-            Terms of Service
-          </Link>
-          .
-        </p>
+          <div className="auth-simple-field">
+            <AuthLabel htmlFor="signup-confirm">Confirm Password</AuthLabel>
+            <PasswordField
+              id="signup-confirm"
+              value={vm.confirmPassword}
+              onValueChange={vm.onConfirmPassword}
+              autoComplete="new-password"
+              placeholder="Re-enter password"
+            />
+          </div>
 
-        <button type="submit" disabled={vm.busy} className="auth-simple-submit">
-          {vm.busy ? "Creating account…" : "Create account"}
-        </button>
-      </form>
+          <p className="auth-simple-legal">
+            By proceeding, you agree to Shelf Merch&apos;s{" "}
+            <Link to="/legal/privacy-policy" className="auth-simple-legal-link">
+              Privacy Policy
+            </Link>{" "}
+            and{" "}
+            <Link to="/legal/terms-of-service" className="auth-simple-legal-link">
+              Terms of Service
+            </Link>
+            .
+          </p>
+
+          <button type="submit" disabled={vm.busy} className="auth-simple-submit">
+            {vm.busy ? "Sending code…" : "Create account"}
+          </button>
+        </form>
+      )}
     </AuthLayout>
   );
 }

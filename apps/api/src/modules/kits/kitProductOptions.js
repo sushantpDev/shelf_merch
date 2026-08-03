@@ -104,17 +104,17 @@ export function resolveKitItemOptions(product, ref = {}) {
     if (!sizes.length) sizes = DEFAULT_APPAREL_SIZES;
     return {
       sizes,
-      colors: [],
+      colors: rawColors,
       requiresSize: sizes.length > 0,
-      requiresColor: false,
+      requiresColor: rawColors.length > 0,
     };
   }
 
   return {
     sizes: rawSizes,
-    colors: rawColors.length > 1 ? rawColors : [],
+    colors: rawColors,
     requiresSize: rawSizes.length > 0,
-    requiresColor: rawColors.length > 1,
+    requiresColor: rawColors.length > 0,
   };
 }
 

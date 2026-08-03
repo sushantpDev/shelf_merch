@@ -14572,3 +14572,63 @@ tr:hover .camp-avatar {
 .swag-publish-shop-row.on{border-color:var(--brand);background:rgba(26,127,55,.06)}
 .swag-publish-shop-row input{flex:none;width:16px;height:16px;cursor:pointer}
 .swag-publish-shop-name{flex:1;font-weight:600;font-size:13.5px;color:var(--ink)}
+
+/* Kit redeem colour circles */
+.kit-redeem-swatches{margin-top:4px}
+.kit-redeem-swatches .pd-sw{
+  width:22px;height:22px;border-radius:50%;
+  border:1px solid rgba(0,0,0,.18);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.2);
+  cursor:pointer;padding:0;
+  transition:border-color .14s ease,transform .14s ease,box-shadow .14s ease;
+}
+.kit-redeem-swatches .pd-sw:hover{transform:scale(1.06);border-color:rgba(0,0,0,.35)}
+.kit-redeem-swatches .pd-sw.on{
+  border:2px solid var(--ink);
+  box-shadow:0 0 0 2px #fff inset;
+  transform:none;
+}
+
+/* Catalog product colour swatches + hover name tip */
+.cat-swatch-row{align-items:center}
+.cat-swatch{
+  position:relative;
+  display:inline-block;
+  width:20px;height:20px;border-radius:50%;
+  border:1px solid rgba(0,0,0,.18);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.2);
+  flex:none;
+}
+.cat-swatch::after{
+  content:attr(data-label);
+  position:absolute;
+  left:50%;bottom:calc(100% + 8px);
+  transform:translateX(-50%) translateY(2px);
+  padding:5px 8px;border-radius:6px;
+  background:var(--ink);color:#fff;
+  font-size:11px;font-weight:600;line-height:1.2;
+  white-space:nowrap;
+  opacity:0;visibility:hidden;
+  pointer-events:none;
+  transition:opacity .12s ease,visibility .12s ease,transform .12s ease;
+  z-index:5;
+}
+.cat-swatch::before{
+  content:"";
+  position:absolute;
+  left:50%;bottom:calc(100% + 2px);
+  transform:translateX(-50%);
+  border:5px solid transparent;border-top-color:var(--ink);
+  opacity:0;visibility:hidden;
+  pointer-events:none;
+  transition:opacity .12s ease,visibility .12s ease;
+  z-index:5;
+}
+.cat-swatch:hover::after,
+.cat-swatch:focus-visible::after{
+  opacity:1;visibility:visible;transform:translateX(-50%) translateY(0);
+}
+.cat-swatch:hover::before,
+.cat-swatch:focus-visible::before{
+  opacity:1;visibility:visible;
+}

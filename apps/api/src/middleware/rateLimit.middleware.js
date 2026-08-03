@@ -53,9 +53,28 @@ export const registerRateLimit = rateLimit([
   { prefix: 'register:ip', limit: 10, windowSec: 60 * 60, key: clientIp, critical: true },
 ]);
 
+export const signupStartRateLimit = rateLimit([
+  { prefix: 'signup:start:ip', limit: 10, windowSec: 60 * 60, key: clientIp, critical: true },
+  {
+    prefix: 'signup:start:email',
+    limit: 5,
+    windowSec: 60 * 60,
+    key: (req) => normalizeEmail(req.body?.email),
+    critical: true,
+  },
+]);
+
+export const signupVerifyRateLimit = rateLimit([
+  { prefix: 'signup:verify:ip', limit: 30, windowSec: 15 * 60, key: clientIp, critical: true },
+]);
+
+export const signupResendRateLimit = rateLimit([
+  { prefix: 'signup:resend:ip', limit: 20, windowSec: 60 * 60, key: clientIp, critical: true },
+]);
+
 export const forgotPasswordRateLimit = rateLimit([
   { prefix: 'forgot:ip', limit: 10, windowSec: 60 * 60, key: clientIp, critical: true },
-  { prefix: 'forgot:email', limit: 3, windowSec: 60 * 60, key: (req) => normalizeEmail(req.body?.email), critical: true },
+  { prefix: 'forgot:email', limit: 5, windowSec: 60 * 60, key: (req) => normalizeEmail(req.body?.email), critical: true },
 ]);
 
 export const resetPasswordRateLimit = rateLimit([

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * §security hardening B2 — shared credential policy for set-password flows
- * (register, reset, invite acceptance). Login itself keeps min(1) so existing
+ * (register, invite acceptance). Login itself keeps min(1) so existing
  * accounts can still authenticate.
  */
 export const strongPassword = z
@@ -10,6 +10,20 @@ export const strongPassword = z
   .min(10, 'Password must be at least 10 characters')
   .refine((v) => /[A-Za-z]/.test(v) && /\d/.test(v), {
     message: 'Password must include at least one letter and one number',
+  });
+
+/**
+ * Reset-password checklist. Min 8 + upper + lower + number + special.
+ * Kept separate from register strongPassword so signup policy stays unchanged.
+ */
+export const resetPasswordPolicy = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .refine((v) => /[A-Z]/.test(v), { message: 'Password must include an uppercase letter' })
+  .refine((v) => /[a-z]/.test(v), { message: 'Password must include a lowercase letter' })
+  .refine((v) => /\d/.test(v), { message: 'Password must include a number' })
+  .refine((v) => /[^A-Za-z0-9]/.test(v), {
+    message: 'Password must include a special character',
   });
 
 /** Format-only — personal-domain policy is enforced in auth.service via allowlist. */
@@ -42,5 +56,21 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   token: z.string().min(1),
-  newPassword: strongPassword,
+  newPassword: resetPasswordPolicy,
+});
+
+export const validateResetTokenSchema = z.object({
+  token: z.string().min(1),
+});
+
+/** Email/password signup start (OTP) — same credential rules as register. */
+export const startSignupSchema = registerSchema;
+
+export const resendSignupOtpSchema = z.object({
+  pendingId: z.string().uuid(),
+});
+
+export const verifySignupOtpSchema = z.object({
+  pendingId: z.string().uuid(),
+  otp: z.string().regex(/^\d{6}$/, 'Enter the 6-digit verification code'),
 });

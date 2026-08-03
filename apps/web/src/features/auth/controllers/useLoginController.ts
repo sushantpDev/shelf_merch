@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { login, isPlatformUser, ApiError } from "../model";
 
@@ -8,6 +9,7 @@ export type LoginVm = {
   showPassword: boolean;
   busy: boolean;
   error: string;
+  loginDisabled: boolean;
   onEmail: (email: string) => void;
   onPassword: (password: string) => void;
   onToggleShowPassword: () => void;
@@ -23,6 +25,9 @@ function loginErrorMessage(err: unknown): string {
     if (err.status === 502 || err.status === 503) {
       return "Cannot reach the server. Start the API with npm run dev:api.";
     }
+    if (err.code === "INVALID_CREDENTIALS" || err.status === 401) {
+      return "Incorrect password.";
+    }
     return err.message;
   }
   if (err instanceof TypeError) {
@@ -33,6 +38,7 @@ function loginErrorMessage(err: unknown): string {
 
 /** Controller for the login screen: form state, submit flow, redirect by role. */
 export function useLoginController(): LoginVm {
+  const navigate = useNavigate();
   const submitInFlight = useRef(false);
   const [email, setEmail] = useState("hr@rubix.net");
   const [password, setPassword] = useState("demo1234");
@@ -73,10 +79,11 @@ export function useLoginController(): LoginVm {
     showPassword,
     busy,
     error,
+    loginDisabled: busy,
     onEmail: setEmail,
     onPassword: setPassword,
     onToggleShowPassword: () => setShowPassword((s) => !s),
     onSubmit: submit,
-    onForgotPassword: () => toast("Reset link sent"),
+    onForgotPassword: () => navigate("/forgot-password"),
   };
 }

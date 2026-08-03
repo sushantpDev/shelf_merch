@@ -199,6 +199,44 @@
   text-overflow: ellipsis;
 }
 
+.sidebar-rail__footer {
+  flex: none;
+  margin-top: auto;
+  padding: 8px 0 16px;
+  border-top: 1px solid var(--brand-100);
+}
+
+.sidebar-rail--expanded .sidebar-rail__footer {
+  padding: 10px 10px 16px;
+}
+
+.sidebar-rail:not(.sidebar-rail--expanded) .sidebar-rail__footer {
+  display: flex;
+  justify-content: center;
+}
+
+.sidebar-rail__logout {
+  color: var(--danger) !important;
+}
+
+.sidebar-rail:not(.sidebar-rail--expanded) .sidebar-rail__logout:hover .sidebar-rail__item-icon,
+.sidebar-rail:not(.sidebar-rail--expanded) .sidebar-rail__logout:focus-visible .sidebar-rail__item-icon {
+  background: #fff;
+  color: var(--danger);
+}
+
+.sidebar-rail--expanded .sidebar-rail__logout:hover,
+.sidebar-rail--expanded .sidebar-rail__logout:focus-visible {
+  background: #fff;
+  color: var(--danger);
+}
+
+.sidebar-rail--expanded .sidebar-rail__logout .sidebar-rail__item-label,
+.sidebar-rail--expanded .sidebar-rail__logout:hover .sidebar-rail__item-label {
+  color: var(--danger);
+  font-weight: 700;
+}
+
 @media (max-width: 760px) {
   .sidebar-mount,
   .sidebar-rail,

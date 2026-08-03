@@ -75,11 +75,34 @@ export async function sendOtpEmail(to, otp) {
   }
 }
 
+/**
+ * Signup email verification — never logs OTP plaintext (including stub mode).
+ */
+export async function sendSignupVerificationEmail(to, otp) {
+  const subject = 'Verify your ShelfMerch email';
+  const text = `Your ShelfMerch verification code is ${otp}. It expires in 2 minutes. If you did not sign up, ignore this email.`;
+  const html = `<p>Your verification code is <strong style="letter-spacing:2px;font-size:18px;">${otp}</strong>.</p><p>It expires in <strong>2 minutes</strong>.</p><p style="color:#6B7280;font-size:13px;">If you did not create a ShelfMerch account, you can ignore this email.</p>`;
+
+  try {
+    if (!emailConfigured()) {
+      // Deliberately omit OTP / body from logs.
+      logger.info({ to, subject }, 'EMAIL (stub) — signup verification dispatched (OTP redacted)');
+      return { success: true, provider: 'stub' };
+    }
+    const from = env.EMAIL_FROM || env.EMAIL_USER;
+    const info = await getTransporter().sendMail({ from, to, subject, text, html });
+    logger.info({ to, subject, messageId: info.messageId }, 'Signup verification email sent');
+    return { success: true, provider: 'smtp', messageId: info.messageId };
+  } catch (err) {
+    logger.error({ err, to }, 'Signup verification email send failed');
+    throw new ApiError(502, 'Failed to send verification email', 'EMAIL_SEND_FAILED');
+  }
+}
+
 export async function sendPasswordResetEmail(to, token) {
-  const link = appUrl(`/reset-password?token=${token}`);
-  const subject = 'Reset your ShelfMerch password';
-  const text = `Reset your password using this link (valid for 1 hour): ${link}`;
-  const html = `<p>Reset your password using the link below (valid for 1 hour):</p><p><a href="${link}">${link}</a></p>`;
+  const link = appUrl(`/reset-password?token=${encodeURIComponent(token)}`);
+  const { buildPasswordResetEmail } = await import('./email-templates/passwordReset.template.js');
+  const { subject, text, html } = buildPasswordResetEmail({ link, minutes: 30 });
 
   try {
     return await sendEmail({ to, subject, text, html });

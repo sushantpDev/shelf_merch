@@ -112,6 +112,30 @@ export async function login(email: string, password: string) {
   return establishSession(result);
 }
 
+export async function requestPasswordReset(email: string) {
+  return apiFetch<{ success: boolean; message: string }>("/auth/forgot-password", {
+    method: "POST",
+    auth: false,
+    body: JSON.stringify({ email: email.trim().toLowerCase() }),
+  });
+}
+
+export async function validatePasswordResetToken(token: string) {
+  const params = new URLSearchParams({ token });
+  return apiFetch<{ valid: boolean; email?: string; reason?: string | null }>(
+    `/auth/reset-password/validate?${params.toString()}`,
+    { auth: false },
+  );
+}
+
+export async function resetPasswordWithToken(token: string, newPassword: string) {
+  return apiFetch<{ success: boolean }>("/auth/reset-password", {
+    method: "POST",
+    auth: false,
+    body: JSON.stringify({ token, newPassword }),
+  });
+}
+
 export async function register(payload: {
   name: string;
   email: string;
@@ -122,6 +146,48 @@ export async function register(payload: {
     method: "POST",
     auth: false,
     body: JSON.stringify(payload),
+  });
+  return establishSession(result);
+}
+
+export type SignupStartResult = {
+  pendingId: string;
+  email: string;
+  emailMasked: string;
+  otpExpiresInSec: number;
+  resendAvailableInSec: number;
+};
+
+/** Begin email/password signup — sends OTP; does not create the user yet. */
+export async function startSignup(payload: {
+  name: string;
+  email: string;
+  password: string;
+  companyName: string;
+}) {
+  return apiFetch<SignupStartResult>("/auth/signup/start", {
+    method: "POST",
+    auth: false,
+    body: JSON.stringify({
+      ...payload,
+      email: payload.email.trim().toLowerCase(),
+    }),
+  });
+}
+
+export async function resendSignupOtp(pendingId: string) {
+  return apiFetch<SignupStartResult>("/auth/signup/resend", {
+    method: "POST",
+    auth: false,
+    body: JSON.stringify({ pendingId }),
+  });
+}
+
+export async function verifySignupOtp(pendingId: string, otp: string) {
+  const result = await apiFetch<AuthResult>("/auth/signup/verify", {
+    method: "POST",
+    auth: false,
+    body: JSON.stringify({ pendingId, otp }),
   });
   return establishSession(result);
 }
@@ -733,6 +799,8 @@ export type KitRedemptionItem = {
   requiresColor: boolean;
   sizes: string[];
   colors: string[];
+  /** Variant colour name → hex when catalog rows include colorHex. */
+  colorHexByName?: Record<string, string>;
   qty: number;
 };
 

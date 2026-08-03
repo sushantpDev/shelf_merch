@@ -203,7 +203,20 @@ export const appRouter = createBrowserRouter([
         loader: redirectIfAuthed,
         lazy: page(() => import("@/features/auth/LoginPage"), "LoginPage"),
       },
+      {
+        path: "forgot-password",
+        loader: redirectIfAuthed,
+        lazy: page(() => import("@/features/auth/ForgotPasswordPage"), "ForgotPasswordPage"),
+      },
+      {
+        path: "reset-password",
+        lazy: page(() => import("@/features/auth/ResetPasswordPage"), "ResetPasswordPage"),
+      },
       { path: "signup", lazy: page(() => import("@/features/auth/SignupPage"), "SignupPage") },
+      {
+        path: "signup/verify",
+        lazy: page(() => import("@/features/auth/VerifyEmailPage"), "VerifyEmailPage"),
+      },
       {
         path: "legal/privacy-policy",
         lazy: page(() => import("@/features/legal/PrivacyPolicyPage"), "PrivacyPolicyPage"),

@@ -6,6 +6,7 @@ import {
 } from "@/services/api-bridge";
 import ProductArtworkMockup from "./store/ProductArtworkMockup";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { productVariantSwatches } from "@/lib/variantColors";
 import type { ShippingAddress } from "./store/StoreShell";
 
 type Selection = { size?: string; color?: string };
@@ -24,6 +25,11 @@ function KitItemCard({
       ? [item.imageUrl, item.primaryImageUrl, ...(item.imageUrls || []), item.baseImageUrl]
       : [item.maskImageUrl, item.imageUrl, item.primaryImageUrl, ...(item.imageUrls || []), item.baseImageUrl]
   ).filter((u): u is string => Boolean(u));
+
+  const colorSwatches = productVariantSwatches({
+    colors: item.colors,
+    colorHexByName: item.colorHexByName,
+  });
 
   const mockupProduct = {
     name: item.name,
@@ -60,19 +66,21 @@ function KitItemCard({
       )}
       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>{item.name}</div>
 
-      {item.requiresColor && item.colors.length > 0 && (
+      {item.requiresColor && colorSwatches.length > 0 && (
         <div className="field" style={{ marginBottom: 10 }}>
-          <label className="lbl">Colour</label>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {item.colors.map((c) => (
+          <label className="lbl">Colour *</label>
+          <div className="pd-swatches kit-redeem-swatches">
+            {colorSwatches.map((c) => (
               <button
-                key={c}
+                key={c.name}
                 type="button"
-                className={selection.color === c ? "btn btn-dark btn-sm" : "btn btn-ghost btn-sm"}
-                onClick={() => onChange({ ...selection, color: c })}
-              >
-                {c}
-              </button>
+                className={`pd-sw${selection.color === c.name ? " on" : ""}`}
+                style={{ background: c.hex }}
+                onClick={() => onChange({ ...selection, color: c.name })}
+                title={c.name}
+                aria-label={c.name}
+                aria-pressed={selection.color === c.name}
+              />
             ))}
           </div>
         </div>
