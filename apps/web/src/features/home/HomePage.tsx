@@ -135,6 +135,7 @@ export function HomePage() {
           : 0;
 
   const pinnedShop = getLastShop(workspace.shops);
+  const isEntityManager = workspace.userPatch.role === "entity_manager";
 
   return (
     <div className="home-page fade-in">
@@ -247,11 +248,13 @@ export function HomePage() {
         <div className="home-layout__span-9">
           <div className="home-card card">
             <h2 className="home-card__title">
-              Budget
+              {isEntityManager ? "My budget" : "Budget"}
             </h2>
             <div className="home-wallet-grid">
               <div className="home-wallet-tile">
-                <div className="home-wallet-tile__label">{account} budget</div>
+                <div className="home-wallet-tile__label">
+                  {isEntityManager ? "My allocated budget" : `${account} budget`}
+                </div>
                 <div className="home-wallet-tile__balance">{formatInr(remainingBalance)}</div>
                 <div className="home-wallet-tile__sub">Available to spend</div>
               </div>
