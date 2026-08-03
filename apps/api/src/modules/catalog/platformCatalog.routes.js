@@ -40,6 +40,14 @@ const createProductSchema = z.object({
   printableAreas: z.array(z.string()).optional().default([]),
   customizationMethods: z.array(z.string()).optional().default([]),
   productionDays: z.number().int().positive().optional().default(7),
+  physicalDimensions: z
+    .object({
+      width: z.number().positive().optional(),
+      height: z.number().positive().optional(),
+      length: z.number().positive().optional(),
+    })
+    .optional(),
+  dpi: z.number().int().positive().optional(),
 });
 
 const updateProductSchema = createProductSchema
@@ -67,24 +75,51 @@ const customizationSchema = z.object({
 });
 
 const pct = z.number().min(0).max(100);
+const inch = z.number().finite();
 const printAreasSchema = z.object({
+  physicalDimensions: z
+    .object({
+      width: z.number().positive().optional(),
+      height: z.number().positive().optional(),
+      length: z.number().positive().optional(),
+    })
+    .optional(),
+  dpi: z.number().int().positive().optional(),
   printAreas: z.array(
-    z.object({
-      key: z.string().optional().default(''),
-      label: z.string().min(1),
-      mockupImageUrl: z.string().optional().default(''),
-      box: z.object({
-        xPct: pct,
-        yPct: pct,
-        widthPct: pct.refine((n) => n > 0, 'widthPct must be > 0'),
-        heightPct: pct.refine((n) => n > 0, 'heightPct must be > 0'),
-      }),
-      rotationDeg: z.number().optional().default(0),
-      maxWidthCm: z.number().nonnegative().optional().default(0),
-      maxHeightCm: z.number().nonnegative().optional().default(0),
-      dpi: z.number().int().positive().optional().default(300),
-      methods: z.array(z.enum(CUSTOMIZATION_METHODS)).optional().default([]),
-    }),
+    z
+      .object({
+        key: z.string().optional().default(''),
+        label: z.string().min(1),
+        mockupImageUrl: z.string().optional().default(''),
+        xIn: inch.optional(),
+        yIn: inch.optional(),
+        widthIn: inch.positive().optional(),
+        heightIn: inch.positive().optional(),
+        rotationDeg: z.number().optional().default(0),
+        scale: z.number().positive().optional().default(1),
+        lockSize: z.boolean().optional().default(false),
+        shapeType: z.enum(['rect', 'polygon']).optional().default('rect'),
+        polygonPoints: z.array(z.object({ xIn: inch, yIn: inch })).optional(),
+        box: z
+          .object({
+            xPct: pct,
+            yPct: pct,
+            widthPct: pct,
+            heightPct: pct,
+          })
+          .optional(),
+        maxWidthCm: z.number().nonnegative().optional().default(0),
+        maxHeightCm: z.number().nonnegative().optional().default(0),
+        dpi: z.number().int().positive().optional().default(300),
+        methods: z.array(z.enum(CUSTOMIZATION_METHODS)).optional().default([]),
+      })
+      .refine(
+        (a) =>
+          (typeof a.widthIn === 'number' && a.widthIn > 0 && typeof a.heightIn === 'number' && a.heightIn > 0)
+          || (a.box && a.box.widthPct > 0 && a.box.heightPct > 0)
+          || (a.maxWidthCm > 0 && a.maxHeightCm > 0),
+        'print area needs inches, box %, or max cm size',
+      ),
   ),
 });
 
@@ -325,9 +360,16 @@ platformProductsRouter.put(
   catalogWrite,
   validate({ params: idParam, body: printAreasSchema }),
   asyncHandler(async (req, res) => {
-    const product = await catalogService.setPrintAreas(req.params.id, req.body.printAreas);
+    const product = await catalogService.setPrintAreas(req.params.id, req.body.printAreas, {
+      physicalDimensions: req.body.physicalDimensions,
+      dpi: req.body.dpi,
+    });
     writeAudit({ req, action: 'product.print_areas_set', entityType: 'CatalogProduct', entityId: product._id, after: { count: product.printAreas.length } });
-    res.json(product.printAreas);
+    res.json({
+      printAreas: product.printAreas,
+      physicalDimensions: product.physicalDimensions,
+      dpi: product.dpi,
+    });
   }),
 );
 

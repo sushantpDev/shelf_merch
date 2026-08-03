@@ -1,14 +1,21 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type Konva from "konva";
 import type { UiProduct } from "@/services/mappers";
 import {
+  CANVAS_HEIGHT,
+  CANVAS_WIDTH,
+  MIN_EFFECTIVE_DPI,
+  effectiveArtworkDpi,
+  placementToStagePixels,
+  stagePixelsToArtworkPlacement,
+} from "@/lib/printCoords";
+import {
   buildRealisticArtwork,
-  DEFAULT_BOX,
   designImgUrl,
   loadImageEl,
-  pickPrintArea,
   productHasPrintArea,
   resolveMediaSrc,
+  resolvePrintAreaStage,
   type Placement,
 } from "./mockup-bake";
 
@@ -62,9 +69,8 @@ function clampCenter(
 }
 
 /**
- * One product's live, editable mockup: the production mask as a DOM image with
- * a Konva stage layered on top for the draggable / scalable / rotatable artwork.
- * Ported from the legacy vanilla-Konva `mountOneMockup`.
+ * One product's live, editable mockup: production mask as a DOM image with a
+ * Konva stage for draggable artwork. Placement is stored relative to the print area.
  */
 export function MockupCanvas({
   product,
@@ -76,46 +82,62 @@ export function MockupCanvas({
   product: UiProduct;
   artUrl: string;
   placement: Placement | undefined;
-  /** Bumps when placements are reset so Konva remounts at default positions. */
   resetEpoch?: number;
   onChange: (placement: Placement) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
-  // Keep the latest placement/onChange without re-running the mount effect.
+  const wrapRef = useRef<HTMLDivElement>(null);
   const placementRef = useRef(placement);
   const onChangeRef = useRef(onChange);
   placementRef.current = placement;
   onChangeRef.current = onChange;
+  const [dpiWarn, setDpiWarn] = useState<number | null>(null);
 
   const maskSrc = resolveMediaSrc(designImgUrl(product));
   const branded = productHasPrintArea(product);
 
   useEffect(() => {
     const host = hostRef.current;
-    if (!host || !artUrl) return;
+    const wrap = wrapRef.current;
+    if (!host || !wrap || !artUrl) return;
     let stage: Konva.Stage | null = null;
     let cancelled = false;
 
     (async () => {
       const Konva = (await import("konva")).default;
       if (cancelled || !host.isConnected) return;
-      const size = host.clientWidth || host.offsetWidth;
-      if (!size) return;
       const artImg = await loadImageEl(artUrl).catch(() => null);
       if (cancelled || !artImg || !host.isConnected) return;
+      const maskImg = maskSrc
+        ? await loadImageEl(maskSrc, true).catch(() => null)
+        : null;
 
+      const fit = Math.min(wrap.clientWidth / CANVAS_WIDTH, wrap.clientHeight / CANVAS_HEIGHT) || 1;
       host.innerHTML = "";
-      stage = new Konva.Stage({ container: host, width: size, height: size });
+      host.style.width = `${CANVAS_WIDTH}px`;
+      host.style.height = `${CANVAS_HEIGHT}px`;
+      host.style.transform = `scale(${fit})`;
+      host.style.transformOrigin = "top left";
+
+      stage = new Konva.Stage({ container: host, width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
       const layer = new Konva.Layer();
       stage.add(layer);
 
-      const area = pickPrintArea(product);
-      const box = area && area.box && area.box.widthPct ? area.box : DEFAULT_BOX;
-      const bx = (box.xPct / 100) * size;
-      const by = (box.yPct / 100) * size;
-      const bw = (box.widthPct / 100) * size;
-      const bh = (box.heightPct / 100) * size;
+      const canvasOpts =
+        maskImg && maskImg.naturalWidth > 0 && maskImg.naturalHeight > 0
+          ? {
+              imageNaturalWidth: maskImg.naturalWidth,
+              imageNaturalHeight: maskImg.naturalHeight,
+            }
+          : {};
+      const { stage: printStage, ph } = resolvePrintAreaStage(product, canvasOpts);
+      const bx = printStage.x;
+      const by = printStage.y;
+      const bw = printStage.w;
+      const bh = printStage.h;
       const printBox: PrintBoxPx = { bx, by, bw, bh };
+      const ppi = printStage.pxPerInch;
+
       layer.add(
         new Konva.Rect({
           x: bx,
@@ -128,48 +150,51 @@ export function MockupCanvas({
           listening: false,
         }),
       );
+      layer.add(
+        new Konva.Text({
+          x: bx,
+          y: Math.max(0, by - 16),
+          text: `${ph.widthIn.toFixed(2)}×${ph.heightIn.toFixed(2)} in`,
+          fontSize: 11,
+          fill: "#3D5FD9",
+          listening: false,
+        }),
+      );
 
-      const aspect = (artImg.naturalHeight || 1) / (artImg.naturalWidth || 1);
+      const artNaturalWidth = artImg.naturalWidth || 0;
+      const aspect = (artImg.naturalHeight || 1) / Math.max(artNaturalWidth, 1);
       let pl = placementRef.current;
       if (!pl) {
         const fitW = Math.min(bw * 0.92, (bh * 0.92) / aspect);
-        pl = {
-          xPct: box.xPct + box.widthPct / 2,
-          yPct: box.yPct + box.heightPct / 2,
-          wPct: (fitW / size) * 100,
-          rot: 0,
-        };
+        pl = stagePixelsToArtworkPlacement(bx + bw / 2, by + bh / 2, fitW, 0, printStage);
         onChangeRef.current(pl);
       }
 
-      const rot0 = pl.rot || 0;
-      let w0 = (pl.wPct / 100) * size;
+      const stagePx = placementToStagePixels(pl, printStage);
+      const rot0 = stagePx.rot || 0;
+      let w0 = stagePx.w;
       const maxW0 = maxFitWidth(aspect, rot0, bw, bh);
       if (w0 > maxW0) w0 = maxW0;
       let h0 = w0 * aspect;
-      const center0 = clampCenter(
-        (pl.xPct / 100) * size,
-        (pl.yPct / 100) * size,
-        w0,
-        h0,
-        rot0,
-        printBox,
-      );
+      const center0 = clampCenter(stagePx.cx, stagePx.cy, w0, h0, rot0, printBox);
       if (
-        Math.abs(center0.x - (pl.xPct / 100) * size) > 0.5 ||
-        Math.abs(center0.y - (pl.yPct / 100) * size) > 0.5 ||
-        Math.abs(w0 - (pl.wPct / 100) * size) > 0.5
+        Math.abs(center0.x - stagePx.cx) > 0.5 ||
+        Math.abs(center0.y - stagePx.cy) > 0.5 ||
+        Math.abs(w0 - stagePx.w) > 0.5
       ) {
-        pl = {
-          xPct: (center0.x / size) * 100,
-          yPct: (center0.y / size) * 100,
-          wPct: (w0 / size) * 100,
-          rot: rot0,
-        };
+        pl = stagePixelsToArtworkPlacement(center0.x, center0.y, w0, rot0, printStage);
         onChangeRef.current(pl);
       }
 
+      const effDpi = effectiveArtworkDpi(artNaturalWidth, w0, ppi);
+      setDpiWarn(effDpi > 0 && effDpi < MIN_EFFECTIVE_DPI ? Math.round(effDpi) : null);
+
       const realArt = buildRealisticArtwork(artImg, product?.g);
+      const clipGroup = new Konva.Group({
+        clipFunc: (ctx) => {
+          ctx.rect(bx, by, bw, bh);
+        },
+      });
       const node: Konva.Image = new Konva.Image({
         image: realArt,
         x: center0.x,
@@ -188,7 +213,8 @@ export function MockupCanvas({
           return clampCenter(pos.x, pos.y, w, h, node.rotation(), printBox);
         },
       });
-      layer.add(node);
+      clipGroup.add(node);
+      layer.add(clipGroup);
 
       function confineNode() {
         const rot = node.rotation();
@@ -248,12 +274,11 @@ export function MockupCanvas({
         node.offsetY(nh / 2);
         const pos = clampCenter(node.x(), node.y(), nw, nh, node.rotation(), printBox);
         node.position(pos);
-        onChangeRef.current({
-          xPct: (pos.x / size) * 100,
-          yPct: (pos.y / size) * 100,
-          wPct: (nw / size) * 100,
-          rot: Math.round(node.rotation()),
-        });
+        const nextEff = effectiveArtworkDpi(artNaturalWidth, nw, ppi);
+        setDpiWarn(nextEff > 0 && nextEff < MIN_EFFECTIVE_DPI ? Math.round(nextEff) : null);
+        onChangeRef.current(
+          stagePixelsToArtworkPlacement(pos.x, pos.y, nw, Math.round(node.rotation()), printStage),
+        );
         tr.forceUpdate();
         layer.batchDraw();
       }
@@ -279,28 +304,52 @@ export function MockupCanvas({
         /* noop */
       }
     };
-    // Remount when the product, artwork, or placement reset epoch changes.
-  }, [product, artUrl, resetEpoch]);
+  }, [product, artUrl, resetEpoch, maskSrc]);
 
   return (
     <div
       className={`img${branded ? " img-mockup" : ""}`}
-      style={{ position: "relative", display: "block", background: "#fff", touchAction: "none" }}
+      ref={wrapRef}
+      style={{
+        position: "relative",
+        width: "100%",
+        aspectRatio: `${CANVAS_WIDTH} / ${CANVAS_HEIGHT}`,
+        overflow: "hidden",
+        background: "var(--surface-2)",
+      }}
     >
-      {maskSrc ? (
+      {maskSrc && (
         <img
           src={maskSrc}
-          alt={product.nm}
-          style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
-        />
-      ) : (
-        <div
-          className="sm-skeleton-img"
-          aria-hidden="true"
-          style={{ width: "100%", height: "100%" }}
+          alt=""
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            pointerEvents: "none",
+          }}
         />
       )}
-      <div ref={hostRef} data-konva-mockup style={{ position: "absolute", inset: 0 }} />
+      <div ref={hostRef} style={{ position: "absolute", top: 0, left: 0 }} />
+      {dpiWarn != null && (
+        <div
+          style={{
+            position: "absolute",
+            left: 8,
+            bottom: 8,
+            zIndex: 2,
+            fontSize: 11,
+            background: "rgba(180,83,9,.92)",
+            color: "#fff",
+            padding: "4px 8px",
+            borderRadius: 4,
+          }}
+        >
+          Artwork ~{dpiWarn} DPI — aim for {MIN_EFFECTIVE_DPI}+
+        </div>
+      )}
     </div>
   );
 }

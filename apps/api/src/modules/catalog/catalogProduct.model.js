@@ -50,21 +50,42 @@ const catalogProductSchema = new mongoose.Schema(
         extraCostInr: { type: Number, default: 0 },
       },
     ],
-    // POD design-placeholder geometry: where artwork can be placed on a mockup.
-    // box values are percentages (0–100) of the mockup image, so they are
-    // resolution-independent. `printableAreas` (names) is derived from these.
+    // Physical product frame in inches — source of truth for the editor grid.
+    physicalDimensions: {
+      width: { type: Number, default: 20 },
+      height: { type: Number, default: 24 },
+      length: { type: Number, default: 18 },
+    },
+    // Product-level print DPI (production assets = inches × dpi).
+    dpi: { type: Number, default: 300 },
+    // POD design-placeholder geometry. Inches (xIn/yIn/widthIn/heightIn) are
+    // the source of truth; box % and max*Cm are derived for legacy readers.
+    // `printableAreas` (names) is derived from labels.
     printAreas: [
       {
         key: { type: String, default: '' },
         label: { type: String, default: '' },
         mockupImageUrl: { type: String, default: '' },
+        xIn: { type: Number, default: 0 },
+        yIn: { type: Number, default: 0 },
+        widthIn: { type: Number, default: 0 },
+        heightIn: { type: Number, default: 0 },
+        rotationDeg: { type: Number, default: 0 },
+        scale: { type: Number, default: 1 },
+        lockSize: { type: Boolean, default: false },
+        shapeType: { type: String, enum: ['rect', 'polygon'], default: 'rect' },
+        polygonPoints: [
+          {
+            xIn: { type: Number, default: 0 },
+            yIn: { type: Number, default: 0 },
+          },
+        ],
         box: {
           xPct: { type: Number, default: 0 },
           yPct: { type: Number, default: 0 },
           widthPct: { type: Number, default: 0 },
           heightPct: { type: Number, default: 0 },
         },
-        rotationDeg: { type: Number, default: 0 },
         maxWidthCm: { type: Number, default: 0 },
         maxHeightCm: { type: Number, default: 0 },
         dpi: { type: Number, default: 300 },

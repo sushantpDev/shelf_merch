@@ -31,6 +31,27 @@ const productRef = z.object({
   name: z.string().min(1),
   group: z.string().optional().default(''),
   mockupUrl: z.string().optional().default(''),
+  designOnlyImageUrl: z.string().optional().default(''),
+  printSpec: z
+    .object({
+      widthIn: z.number().positive(),
+      heightIn: z.number().positive(),
+      dpi: z.number().int().positive(),
+      widthPx: z.number().int().positive(),
+      heightPx: z.number().int().positive(),
+    })
+    .nullish(),
+  placement: z
+    .object({
+      printCxPct: z.number().finite().optional(),
+      printCyPct: z.number().finite().optional(),
+      printWPct: z.number().finite().optional(),
+      xPct: z.number(),
+      yPct: z.number(),
+      wPct: z.number(),
+      rot: z.number(),
+    })
+    .nullish(),
 });
 
 const createSchema = z.object({
@@ -251,17 +272,42 @@ router.post(
 
 const mockupMetaItem = z.object({
   catalogProductId: objectId,
+  placement: z
+    .object({
+      printCxPct: z.number().finite().optional(),
+      printCyPct: z.number().finite().optional(),
+      printWPct: z.number().finite().optional(),
+      xPct: z.number().finite(),
+      yPct: z.number().finite(),
+      wPct: z.number().finite(),
+      rot: z.number().finite(),
+    })
+    .optional(),
+  printSpec: z
+    .object({
+      widthIn: z.number().positive(),
+      heightIn: z.number().positive(),
+      dpi: z.number().int().positive(),
+      widthPx: z.number().int().positive(),
+      heightPx: z.number().int().positive(),
+    })
+    .optional(),
+  hasDesignOnly: z.boolean().optional(),
 });
 
 router.post(
   '/:id/mockups',
   canWrite,
   validate({ params: z.object({ id: objectId }) }),
-  upload.array('mockups', 50),
+  upload.fields([
+    { name: 'mockups', maxCount: 50 },
+    { name: 'designOnly', maxCount: 50 },
+  ]),
   asyncHandler(async (req, res) => {
     const kit = await Kit.findOne({ _id: req.params.id, tenantId: req.tenantId });
     if (!kit) throw new NotFoundError('Kit not found');
-    const files = req.files || [];
+    const files = req.files?.mockups || [];
+    const designFiles = req.files?.designOnly || [];
     let meta;
     try {
       meta = mockupMetaItem.array().parse(JSON.parse(req.body.meta || '[]'));
@@ -271,13 +317,27 @@ router.post(
     if (meta.length !== files.length) {
       throw new ApiError(400, 'Mockup file count does not match metadata', 'MOCKUP_COUNT_MISMATCH');
     }
+    let designIdx = 0;
     for (let i = 0; i < files.length; i++) {
-      const { catalogProductId } = meta[i];
+      const { catalogProductId, placement, printSpec, hasDesignOnly } = meta[i];
       const { url } = await uploadFile({ tenantId: req.tenantId, kind: 'mockup', file: files[i] });
       const ref = kit.productRefs.find(
         (r) => String(r.catalogProductId) === String(catalogProductId),
       );
-      if (ref) ref.mockupUrl = url;
+      if (ref) {
+        ref.mockupUrl = url;
+        if (placement) ref.placement = placement;
+        if (printSpec) ref.printSpec = printSpec;
+        if (hasDesignOnly && designFiles[designIdx]) {
+          const design = await uploadFile({
+            tenantId: req.tenantId,
+            kind: 'production',
+            file: designFiles[designIdx],
+          });
+          ref.designOnlyImageUrl = design.url;
+          designIdx += 1;
+        }
+      }
     }
     kit.markModified('productRefs');
     await kit.save();
@@ -286,7 +346,7 @@ router.post(
       action: 'kit.mockups',
       entityType: 'Kit',
       entityId: kit._id,
-      after: { mockupCount: files.length },
+      after: { mockupCount: files.length, designOnlyCount: designIdx },
     });
     res.json(kit);
   }),

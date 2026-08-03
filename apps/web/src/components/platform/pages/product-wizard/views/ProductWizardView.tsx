@@ -19,6 +19,8 @@ export function ProductWizardView({
   variant,
   product,
   printAreas,
+  physicalDimensions,
+  dpi,
   previewColor,
   categoryOptions,
   colorSwatches,
@@ -32,6 +34,8 @@ export function ProductWizardView({
   onSet,
   onVariant,
   onPrintAreas,
+  onPhysicalDimensions,
+  onDpi,
   onPreviewColor,
   onSaveDetails,
   onAddVariant,
@@ -456,6 +460,10 @@ export function ProductWizardView({
               colors={colorSwatches}
               value={printAreas}
               onChange={onPrintAreas}
+              physicalDimensions={physicalDimensions}
+              onPhysicalDimensionsChange={onPhysicalDimensions}
+              dpi={dpi}
+              onDpiChange={onDpi}
             />
             <div className="row" style={{ gap: 8, marginTop: 18 }}>
               <button type="button" className="btn btn-ghost" onClick={() => onGoToStep(2)}>

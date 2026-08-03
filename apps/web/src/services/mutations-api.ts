@@ -391,10 +391,37 @@ export async function uploadKitArtworkApi(kitId: string, file: File) {
   return mapKit(kit);
 }
 
-type KitMockupUploadItem = { catalogProductId: string; dataUrl: string };
+type MockupPlacement = {
+  printCxPct?: number;
+  printCyPct?: number;
+  printWPct?: number;
+  xPct: number;
+  yPct: number;
+  wPct: number;
+  rot: number;
+};
+
+type KitMockupUploadItem = {
+  catalogProductId: string;
+  dataUrl: string;
+  placement?: MockupPlacement;
+  designOnlyDataUrl?: string;
+  printSpec?: {
+    widthIn: number;
+    heightIn: number;
+    dpi: number;
+    widthPx: number;
+    heightPx: number;
+  };
+};
 
 export async function uploadKitMockupsApi(kitId: string, items: KitMockupUploadItem[]) {
-  const meta: Array<{ catalogProductId: string }> = [];
+  const meta: Array<{
+    catalogProductId: string;
+    placement?: MockupPlacement;
+    printSpec?: KitMockupUploadItem["printSpec"];
+    hasDesignOnly?: boolean;
+  }> = [];
   const form = new FormData();
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
@@ -402,7 +429,18 @@ export async function uploadKitMockupsApi(kitId: string, items: KitMockupUploadI
     const res = await fetch(item.dataUrl);
     const blob = await res.blob();
     form.append("mockups", new File([blob], `kit-mockup-${i}.png`, { type: blob.type || "image/png" }));
-    meta.push({ catalogProductId: item.catalogProductId });
+    const hasDesignOnly = Boolean(item.designOnlyDataUrl?.startsWith("data:"));
+    if (hasDesignOnly && item.designOnlyDataUrl) {
+      const dRes = await fetch(item.designOnlyDataUrl);
+      const dBlob = await dRes.blob();
+      form.append("designOnly", new File([dBlob], `kit-design-${i}.png`, { type: dBlob.type || "image/png" }));
+    }
+    meta.push({
+      catalogProductId: item.catalogProductId,
+      ...(item.placement ? { placement: item.placement } : {}),
+      ...(item.printSpec ? { printSpec: item.printSpec } : {}),
+      ...(hasDesignOnly ? { hasDesignOnly: true } : {}),
+    });
   }
   if (!meta.length) return null;
   form.append("meta", JSON.stringify(meta));
@@ -531,15 +569,31 @@ export async function uploadCollectionArtworkApi(collectionId: string, file: Fil
   return mapCollection(col);
 }
 
-type MockupPlacement = { xPct: number; yPct: number; wPct: number; rot: number };
-type MockupUploadItem = { catalogProductId: string; dataUrl: string; placement?: MockupPlacement };
+type MockupUploadItem = {
+  catalogProductId: string;
+  dataUrl: string;
+  placement?: MockupPlacement;
+  designOnlyDataUrl?: string;
+  printSpec?: {
+    widthIn: number;
+    heightIn: number;
+    dpi: number;
+    widthPx: number;
+    heightPx: number;
+  };
+};
 
 export async function uploadCollectionMockupsApi(
   collectionId: string,
   items: MockupUploadItem[],
   catalogById?: Map<string, UiProduct>,
 ) {
-  const meta: Array<{ catalogProductId: string; placement?: MockupPlacement }> = [];
+  const meta: Array<{
+    catalogProductId: string;
+    placement?: MockupPlacement;
+    printSpec?: MockupUploadItem["printSpec"];
+    hasDesignOnly?: boolean;
+  }> = [];
   const form = new FormData();
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
@@ -547,9 +601,17 @@ export async function uploadCollectionMockupsApi(
     const res = await fetch(item.dataUrl);
     const blob = await res.blob();
     form.append("mockups", new File([blob], `mockup-${i}.png`, { type: blob.type || "image/png" }));
+    const hasDesignOnly = Boolean(item.designOnlyDataUrl?.startsWith("data:"));
+    if (hasDesignOnly && item.designOnlyDataUrl) {
+      const dRes = await fetch(item.designOnlyDataUrl);
+      const dBlob = await dRes.blob();
+      form.append("designOnly", new File([dBlob], `design-${i}.png`, { type: dBlob.type || "image/png" }));
+    }
     meta.push({
       catalogProductId: item.catalogProductId,
       ...(item.placement ? { placement: item.placement } : {}),
+      ...(item.printSpec ? { printSpec: item.printSpec } : {}),
+      ...(hasDesignOnly ? { hasDesignOnly: true } : {}),
     });
   }
   if (!meta.length) return null;

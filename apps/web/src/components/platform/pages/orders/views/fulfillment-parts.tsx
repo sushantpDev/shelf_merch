@@ -76,6 +76,10 @@ function toUiProduct(product: OrderItemProduct | null | undefined, areas: PrintA
       key: a.key,
       label: a.label,
       mockupImageUrl: a.mockupImageUrl,
+      xIn: a.xIn,
+      yIn: a.yIn,
+      widthIn: a.widthIn,
+      heightIn: a.heightIn,
       box: a.box,
       maxWidthCm: a.maxWidthCm,
       maxHeightCm: a.maxHeightCm,
@@ -614,27 +618,39 @@ export function PrintSpecTable({ areas }: { areas: PrintArea[] }) {
           <tr>
             <th>Print area</th>
             <th>Method</th>
-            <th>Max size</th>
+            <th>Print size</th>
+            <th>Export px</th>
             <th>DPI</th>
           </tr>
         </thead>
         <tbody>
-          {areas.map((a, i) => (
-            <tr key={a.key ?? i}>
-              <td style={{ fontWeight: 600 }}>{a.label}</td>
-              <td style={{ textTransform: "uppercase", letterSpacing: ".03em" }}>
-                {a.methods?.length ? a.methods.join(", ") : "—"}
-              </td>
-              <td style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                {a.maxWidthCm || a.maxHeightCm
-                  ? `${a.maxWidthCm ?? "—"}×${a.maxHeightCm ?? "—"} cm`
-                  : "—"}
-              </td>
-              <td style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                {a.dpi ?? "—"}
-              </td>
-            </tr>
-          ))}
+          {areas.map((a, i) => {
+            const wIn = Number(a.widthIn) || 0;
+            const hIn = Number(a.heightIn) || 0;
+            const dpi = Number(a.dpi) || 300;
+            const hasIn = wIn > 0 && hIn > 0;
+            return (
+              <tr key={a.key ?? i}>
+                <td style={{ fontWeight: 600 }}>{a.label}</td>
+                <td style={{ textTransform: "uppercase", letterSpacing: ".03em" }}>
+                  {a.methods?.length ? a.methods.join(", ") : "—"}
+                </td>
+                <td style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                  {hasIn
+                    ? `${wIn}×${hIn} in`
+                    : a.maxWidthCm || a.maxHeightCm
+                      ? `${a.maxWidthCm ?? "—"}×${a.maxHeightCm ?? "—"} cm`
+                      : "—"}
+                </td>
+                <td style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                  {hasIn ? `${Math.round(wIn * dpi)}×${Math.round(hIn * dpi)}` : "—"}
+                </td>
+                <td style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                  {a.dpi ?? "—"}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

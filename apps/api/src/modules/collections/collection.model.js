@@ -10,10 +10,31 @@ const productRefSchema = new mongoose.Schema(
     group: String,
     /** Pre-baked design mockup (mask + artwork) — served to shop/storefront as-is. */
     mockupUrl: { type: String, default: '' },
-    /** Konva artwork placement (% of the square stage) — lets live colour
-     *  previews match the baked mockup exactly. */
+    /** Transparent print-DPI design asset (inches × dpi) — production file, not mockup. */
+    designOnlyImageUrl: { type: String, default: '' },
+    /** Physical print size persisted with the design so production does not need EXIF. */
+    printSpec: {
+      type: {
+        widthIn: Number,
+        heightIn: Number,
+        dpi: Number,
+        widthPx: Number,
+        heightPx: Number,
+      },
+      default: null,
+      _id: false,
+    },
+    /** Artwork placement — print-area % preferred; canvas % mirrored for legacy thumbs. */
     placement: {
-      type: { xPct: Number, yPct: Number, wPct: Number, rot: Number },
+      type: {
+        printCxPct: Number,
+        printCyPct: Number,
+        printWPct: Number,
+        xPct: Number,
+        yPct: Number,
+        wPct: Number,
+        rot: Number,
+      },
       default: null,
       _id: false,
     },

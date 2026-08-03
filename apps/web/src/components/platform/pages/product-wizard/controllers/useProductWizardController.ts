@@ -13,6 +13,7 @@ import {
   PRODUCT_WIZARD_STEPS,
   publishProduct,
   setPrintAreas,
+  type PhysicalDimensions,
   type PlatformProduct,
   type PrintArea,
   type ProductInput,
@@ -20,6 +21,7 @@ import {
   updateProduct,
   uploadProductImage,
 } from "../model";
+import { DEFAULT_DPI, DEFAULT_PHYSICAL, resolvePhysical } from "@/lib/printCoords";
 
 export type ProductWizardVm = ReturnType<typeof useProductWizardController>;
 
@@ -36,6 +38,10 @@ export function useProductWizardController(mode: "create" | "edit", productId?: 
   const [variant, setVariant] = useState<ProductVariant>(emptyVariant);
   const [product, setProduct] = useState<PlatformProduct | null>(null);
   const [printAreas, setAreas] = useState<PrintArea[]>([]);
+  const [physicalDimensions, setPhysicalDimensions] = useState<PhysicalDimensions>({
+    ...DEFAULT_PHYSICAL,
+  });
+  const [dpi, setDpi] = useState(DEFAULT_DPI);
   const [previewColor, setPreviewColor] = useState<string>("");
 
   const categoryOptions = useMemo(
@@ -52,6 +58,8 @@ export function useProductWizardController(mode: "create" | "edit", productId?: 
       .then((p) => {
         setProduct(p);
         setAreas(p.printAreas ?? []);
+        setPhysicalDimensions(resolvePhysical(p.physicalDimensions));
+        setDpi(p.dpi && p.dpi > 0 ? p.dpi : DEFAULT_DPI);
         setDetails({
           name: p.name,
           category: p.category,
@@ -204,14 +212,20 @@ export function useProductWizardController(mode: "create" | "edit", productId?: 
     }
   }
 
+  async function applyPrintAreasSave() {
+    const res = await setPrintAreas(id!, printAreas, { physicalDimensions, dpi });
+    setAreas(res.printAreas ?? []);
+    if (res.physicalDimensions) setPhysicalDimensions(resolvePhysical(res.physicalDimensions));
+    if (res.dpi != null) setDpi(res.dpi);
+    await refresh();
+  }
+
   async function saveAreas() {
     if (!id) return;
     setBusy(true);
     setError("");
     try {
-      await setPrintAreas(id, printAreas);
-      const p = await refresh();
-      if (p?.printAreas) setAreas(p.printAreas);
+      await applyPrintAreasSave();
       setStep(4);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save print areas");
@@ -226,9 +240,7 @@ export function useProductWizardController(mode: "create" | "edit", productId?: 
       setBusy(true);
       setError("");
       try {
-        await setPrintAreas(id, printAreas);
-        const p = await refresh();
-        if (p?.printAreas) setAreas(p.printAreas);
+        await applyPrintAreasSave();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to save print areas");
         setBusy(false);
@@ -272,8 +284,7 @@ export function useProductWizardController(mode: "create" | "edit", productId?: 
     try {
       await updateProduct(id, { ...details, reason: "save details before publish" });
       if (printAreas.length) {
-        await setPrintAreas(id, printAreas);
-        await refresh();
+        await applyPrintAreasSave();
       }
       await publishProduct(id);
       navigate("/platform/catalog");
@@ -299,6 +310,8 @@ export function useProductWizardController(mode: "create" | "edit", productId?: 
     variant,
     product,
     printAreas,
+    physicalDimensions,
+    dpi,
     previewColor,
     categoryOptions,
     colorSwatches,
@@ -312,6 +325,8 @@ export function useProductWizardController(mode: "create" | "edit", productId?: 
     onSet: set,
     onVariant: setVariant,
     onPrintAreas: setAreas,
+    onPhysicalDimensions: setPhysicalDimensions,
+    onDpi: setDpi,
     onPreviewColor: setPreviewColor,
     onSaveDetails: saveDetails,
     onAddVariant: addOneVariant,

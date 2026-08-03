@@ -1,8 +1,27 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Konva from "konva";
 import { Stage, Layer, Rect, Transformer, Label, Tag, Text } from "react-konva";
-import type { PrintArea } from "@/services/platform-api";
+import type { PhysicalDimensions, PrintArea } from "@/services/platform-api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import {
+  CANVAS_HEIGHT,
+  CANVAS_PADDING,
+  CANVAS_WIDTH,
+  DEFAULT_DPI,
+  DEFAULT_PHYSICAL,
+  LIFESTYLE_PHYSICAL,
+  TYPICAL_CHEST_WIDTH_IN,
+  defaultCenteredPlaceholder,
+  inchesToPrintPixels,
+  normalizePlaceholder,
+  physicalFrameForView,
+  physicalFrameStageRect,
+  placeholderToStagePixels,
+  resolvePhysical,
+  stagePixelsToPlaceholderInches,
+  type CanvasOpts,
+  type PlaceholderInches,
+} from "@/lib/printCoords";
 import { TintedGarment } from "../store/TintedGarment";
 
 export const CUSTOMIZATION_METHODS = [
@@ -17,18 +36,60 @@ export const CUSTOMIZATION_METHODS = [
 const slug = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 
-const DEFAULT_BOX = { xPct: 30, yPct: 30, widthPct: 40, heightPct: 30 };
-const SNAP = 6; // px snap distance to the centre lines
-const MIN_PX = 16; // minimum print-area size in px
-
+const SNAP = 6;
+const MIN_PX = 16;
 const BRAND = "#3D5FD9";
 
+function areaToInches(a: PrintArea, phys: PhysicalDimensions): PlaceholderInches {
+  const n = normalizePlaceholder(a as unknown as Record<string, unknown>, physicalFrameForView(phys, a.key));
+  return {
+    xIn: n.xIn,
+    yIn: n.yIn,
+    widthIn: n.widthIn,
+    heightIn: n.heightIn,
+    rotationDeg: a.rotationDeg ?? 0,
+    scale: a.scale && a.scale > 0 ? a.scale : 1,
+    lockSize: Boolean(a.lockSize),
+  };
+}
+
+function patchFromInches(
+  a: PrintArea,
+  inches: PlaceholderInches,
+  phys: PhysicalDimensions,
+): PrintArea {
+  const frame = physicalFrameForView(phys, a.key);
+  const n = normalizePlaceholder(
+    {
+      ...a,
+      xIn: inches.xIn,
+      yIn: inches.yIn,
+      widthIn: inches.widthIn,
+      heightIn: inches.heightIn,
+      scale: inches.scale ?? 1,
+      lockSize: inches.lockSize,
+      rotationDeg: inches.rotationDeg ?? a.rotationDeg ?? 0,
+    },
+    frame,
+  );
+  return {
+    ...a,
+    xIn: n.xIn,
+    yIn: n.yIn,
+    widthIn: n.widthIn,
+    heightIn: n.heightIn,
+    scale: n.scale,
+    lockSize: n.lockSize,
+    rotationDeg: n.rotationDeg,
+    box: n.box,
+    maxWidthCm: n.maxWidthCm,
+    maxHeightCm: n.maxHeightCm,
+  };
+}
+
 /**
- * POD-style design-placeholder editor. The recoloured garment is an HTML layer;
- * a transparent Konva stage overlays it so each print area is a Rect with a
- * shared Transformer — drag, resize and ROTATE, with centre snapping and
- * keyboard nudge/delete. Geometry is stored as % (+ rotationDeg) so it stays
- * resolution-independent and matches the backend printAreas schema.
+ * POD design-placeholder editor. Geometry is stored in inches; the Konva
+ * stage is a fixed 800×600 logical canvas with uniform inch→px mapping.
  */
 export function PrintAreaEditor({
   images,
@@ -36,173 +97,459 @@ export function PrintAreaEditor({
   colors = [],
   value,
   onChange,
+  physicalDimensions,
+  onPhysicalDimensionsChange,
+  dpi = DEFAULT_DPI,
+  onDpiChange,
 }: {
   images: string[];
-  /** Garment mask PNG — colour preview always tints this, not the base photo. */
   maskImageUrl?: string;
   colors?: { name: string; hex: string }[];
   value: PrintArea[];
   onChange: (areas: PrintArea[]) => void;
+  physicalDimensions?: PhysicalDimensions;
+  onPhysicalDimensionsChange?: (d: PhysicalDimensions) => void;
+  dpi?: number;
+  onDpiChange?: (dpi: number) => void;
 }) {
+  const phys = resolvePhysical(physicalDimensions);
+  const productDpi = dpi > 0 ? dpi : DEFAULT_DPI;
+
   const resolvedImages = images.map((u) => resolveMediaUrl(u)).filter(Boolean);
-  const resolvedMask = maskImageUrl ? resolveMediaUrl(maskImageUrl) : resolvedImages[resolvedImages.length - 1] ?? "";
+  const resolvedMask = maskImageUrl
+    ? resolveMediaUrl(maskImageUrl)
+    : resolvedImages[resolvedImages.length - 1] ?? "";
   const [mockup, setMockup] = useState(resolvedImages[resolvedImages.length - 1] ?? "");
   const [tintHex, setTintHex] = useState("");
   const [selected, setSelected] = useState(0);
-  const [size, setSize] = useState(0);
+  const [fitScale, setFitScale] = useState(1);
+  const [imageNatural, setImageNatural] = useState<{ w: number; h: number } | null>(null);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const trRef = useRef<Konva.Transformer>(null);
   const rectRefs = useRef<(Konva.Rect | null)[]>([]);
 
-  // Track the rendered (square) pixel size so we can map px <-> %.
   useLayoutEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    const measure = () => setSize(el.clientWidth);
+    const measure = () => {
+      const w = el.clientWidth;
+      if (w > 0) setFitScale(w / CANVAS_WIDTH);
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  // Prefer the mask image (last in wizard order) for colour preview.
   useEffect(() => {
     if (!resolvedImages.length) return;
     setMockup((cur) => (resolvedImages.includes(cur) ? cur : resolvedImages[resolvedImages.length - 1]));
   }, [resolvedImages.join("|")]);
 
-  const update = (index: number, patch: Partial<PrintArea>) =>
-    onChange(value.map((a, i) => (i === index ? { ...a, ...patch } : a)));
+  const displaySrc = mockup || resolvedMask;
+
+  useEffect(() => {
+    if (!displaySrc) {
+      setImageNatural(null);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      setImageNatural({
+        w: img.naturalWidth || img.width,
+        h: img.naturalHeight || img.height,
+      });
+    };
+    img.onerror = () => {
+      if (!cancelled) setImageNatural(null);
+    };
+    img.src = displaySrc;
+    return () => {
+      cancelled = true;
+    };
+  }, [displaySrc]);
+
+  const canvasOpts: CanvasOpts = useMemo(
+    () =>
+      imageNatural?.w && imageNatural?.h
+        ? { imageNaturalWidth: imageNatural.w, imageNaturalHeight: imageNatural.h }
+        : {},
+    [imageNatural?.w, imageNatural?.h],
+  );
+
+  const update = (index: number, patch: Partial<PrintArea>) => {
+    const next = value.map((a, i) => {
+      if (i !== index) return a;
+      const merged = { ...a, ...patch };
+      return patchFromInches(merged, areaToInches(merged, phys), phys);
+    });
+    onChange(next);
+  };
+
+  const updateInches = (index: number, inchesPatch: Partial<PlaceholderInches>) => {
+    const a = value[index];
+    if (!a) return;
+    const cur = areaToInches(a, phys);
+    onChange(
+      value.map((row, i) =>
+        i === index ? patchFromInches(row, { ...cur, ...inchesPatch }, phys) : row,
+      ),
+    );
+  };
 
   const isVisible = (a: PrintArea) => !a.mockupImageUrl || resolveMediaUrl(a.mockupImageUrl) === mockup;
 
-  // Attach the transformer to the selected, visible rect.
   useEffect(() => {
     const tr = trRef.current;
     if (!tr) return;
     const node = rectRefs.current[selected];
-    if (node && value[selected] && isVisible(value[selected])) {
+    const a = value[selected];
+    if (node && a && isVisible(a)) {
       tr.nodes([node]);
     } else {
       tr.nodes([]);
     }
     tr.getLayer()?.batchDraw();
-  }, [selected, value, size, mockup]);
+  }, [selected, value, mockup, phys.width, phys.height, phys.length, imageNatural?.w, imageNatural?.h]);
 
   function addArea() {
     const n = value.length + 1;
-    onChange([
-      ...value,
-      {
-        key: `area_${n}`,
-        label: `Area ${n}`,
-        mockupImageUrl: mockup,
-        box: { ...DEFAULT_BOX },
-        rotationDeg: 0,
-        maxWidthCm: 28,
-        maxHeightCm: 35,
-        dpi: 300,
-        methods: ["dtf"],
-      },
-    ]);
+    const frame = physicalFrameForView(phys, `area_${n}`);
+    const centered = defaultCenteredPlaceholder(frame);
+    const draft: PrintArea = {
+      key: `area_${n}`,
+      label: `Area ${n}`,
+      mockupImageUrl: mockup,
+      xIn: centered.xIn,
+      yIn: centered.yIn,
+      widthIn: centered.widthIn,
+      heightIn: centered.heightIn,
+      rotationDeg: 0,
+      scale: 1,
+      lockSize: false,
+      box: { xPct: 0, yPct: 0, widthPct: 1, heightPct: 1 },
+      dpi: productDpi,
+      methods: ["dtf"],
+    };
+    onChange([...value, patchFromInches(draft, { ...centered, scale: 1, lockSize: false, rotationDeg: 0 }, phys)]);
     setSelected(value.length);
   }
 
-  // px geometry of an area's box on the current stage.
-  const pxBox = (a: PrintArea) => ({
-    x: (a.box.xPct / 100) * size,
-    y: (a.box.yPct / 100) * size,
-    w: (a.box.widthPct / 100) * size,
-    h: (a.box.heightPct / 100) * size,
-  });
+  const pxBox = (a: PrintArea) => {
+    const inches = areaToInches(a, phys);
+    const frame = physicalFrameForView(phys, a.key);
+    return placeholderToStagePixels(inches, frame, canvasOpts);
+  };
 
   function commitNode(i: number, node: Konva.Rect) {
-    const w = Math.max(MIN_PX, node.width() * node.scaleX());
-    const h = Math.max(MIN_PX, node.height() * node.scaleY());
+    const a = value[i];
+    if (!a) return;
+    const cur = areaToInches(a, phys);
+    const locked = Boolean(cur.lockSize);
+    const sx = node.scaleX();
+    const sy = node.scaleY();
+    const rawW = Math.max(MIN_PX, node.width() * sx);
+    const rawH = Math.max(MIN_PX, node.height() * sy);
     node.scaleX(1);
     node.scaleY(1);
-    node.width(w);
-    node.height(h);
-    update(i, {
-      box: {
-        xPct: (node.x() / size) * 100,
-        yPct: (node.y() / size) * 100,
-        widthPct: (w / size) * 100,
-        heightPct: (h / size) * 100,
-      },
+    const frame = physicalFrameForView(phys, a.key);
+
+    if (locked) {
+      const base = placeholderToStagePixels({ ...cur, scale: 1 }, frame, canvasOpts);
+      const nextScale = Math.max(0.05, rawW / Math.max(base.w, 1e-6));
+      node.width(base.w * nextScale);
+      node.height(base.h * nextScale);
+      const inches = stagePixelsToPlaceholderInches(
+        { x: node.x(), y: node.y(), w: base.w, h: base.h },
+        frame,
+        canvasOpts,
+        { scale: 1 },
+      );
+      updateInches(i, {
+        xIn: inches.xIn,
+        yIn: inches.yIn,
+        widthIn: cur.widthIn,
+        heightIn: cur.heightIn,
+        scale: Math.round(nextScale * 1000) / 1000,
+        rotationDeg: Math.round(node.rotation()),
+      });
+      return;
+    }
+
+    node.width(rawW);
+    node.height(rawH);
+    const inches = stagePixelsToPlaceholderInches(
+      { x: node.x(), y: node.y(), w: rawW, h: rawH },
+      frame,
+      canvasOpts,
+      { scale: 1 },
+    );
+    updateInches(i, {
+      ...inches,
+      scale: 1,
       rotationDeg: Math.round(node.rotation()),
     });
   }
 
-  // Snap the (unrotated) rect's centre to the stage centre lines while dragging.
   function snapDrag(node: Konva.Rect) {
-    if (node.rotation() !== 0) return; // skip snapping when rotated
+    if (node.rotation() !== 0) return;
     const cx = node.x() + node.width() / 2;
     const cy = node.y() + node.height() / 2;
-    if (Math.abs(cx - size / 2) < SNAP) node.x(size / 2 - node.width() / 2);
-    if (Math.abs(cy - size / 2) < SNAP) node.y(size / 2 - node.height() / 2);
+    if (Math.abs(cx - CANVAS_WIDTH / 2) < SNAP) node.x(CANVAS_WIDTH / 2 - node.width() / 2);
+    if (Math.abs(cy - CANVAS_HEIGHT / 2) < SNAP) node.y(CANVAS_HEIGHT / 2 - node.height() / 2);
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
     const a = value[selected];
-    if (!a || !isVisible(a)) return;
+    if (!a) return;
     if (e.key === "Delete" || e.key === "Backspace") {
       e.preventDefault();
       onChange(value.filter((_, i) => i !== selected));
       setSelected(0);
       return;
     }
-    const stepPct = (e.shiftKey ? 5 : 1);
+    const stepIn = e.shiftKey ? 0.5 : 0.1;
     const moves: Record<string, [number, number]> = {
-      ArrowLeft: [-stepPct, 0], ArrowRight: [stepPct, 0], ArrowUp: [0, -stepPct], ArrowDown: [0, stepPct],
+      ArrowLeft: [-stepIn, 0],
+      ArrowRight: [stepIn, 0],
+      ArrowUp: [0, -stepIn],
+      ArrowDown: [0, stepIn],
     };
     const m = moves[e.key];
     if (m) {
       e.preventDefault();
-      update(selected, {
-        box: {
-          ...a.box,
-          xPct: Math.min(100 - a.box.widthPct, Math.max(0, a.box.xPct + m[0])),
-          yPct: Math.min(100 - a.box.heightPct, Math.max(0, a.box.yPct + m[1])),
-        },
+      const cur = areaToInches(a, phys);
+      const frame = physicalFrameForView(phys, a.key);
+      updateInches(selected, {
+        xIn: Math.min(frame.width - cur.widthIn, Math.max(0, cur.xIn + m[0])),
+        yIn: Math.min(frame.height - cur.heightIn, Math.max(0, cur.yIn + m[1])),
       });
     }
   }
 
   const area = value[selected];
-  const displaySrc = mockup || resolvedMask;
+  const areaIn = area ? areaToInches(area, phys) : null;
+  const exportPreview = useMemo(() => {
+    if (!areaIn) return null;
+    return {
+      w: inchesToPrintPixels(areaIn.widthIn, area?.dpi || productDpi),
+      h: inchesToPrintPixels(areaIn.heightIn, area?.dpi || productDpi),
+    };
+  }, [areaIn, area?.dpi, productDpi]);
+  const frameLooksLikePrintSize =
+    areaIn != null &&
+    phys.width <= areaIn.widthIn + 0.05 &&
+    phys.height <= areaIn.heightIn + 0.05;
+  const printPctOfMockup =
+    areaIn != null && phys.width > 0 ? (areaIn.widthIn / phys.width) * 100 : 0;
+  /** On a real adult chest (~18″), a 4.5″ print is ~25% of chest — not of the photo. */
+  const expectedPctOfChest =
+    areaIn != null ? (areaIn.widthIn / TYPICAL_CHEST_WIDTH_IN) * 100 : 0;
+  const looksOversizedOnGarment =
+    areaIn != null &&
+    !frameLooksLikePrintSize &&
+    printPctOfMockup > expectedPctOfChest * 1.35;
+  const scaleFrame = physicalFrameStageRect(phys, canvasOpts);
+  const inchTickPx = scaleFrame.pxPerInchX;
 
   return (
     <div className="row" style={{ gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
       <div style={{ flex: "1 1 360px", minWidth: 320 }}>
+        <p className="muted" style={{ fontSize: 12, margin: "0 0 8px" }}>
+          <strong style={{ color: "var(--ink)", fontWeight: 600 }}>Mockup image size (inches)</strong>{" "}
+          is the real-world size of the <em>entire photo</em> (including background), not the print
+          plate. Print areas are mapped as a fraction of that width.
+        </p>
+        <div className="row" style={{ gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+          <div className="field" style={{ flex: "1 1 90px" }}>
+            <label className="lbl">Mockup W (in)</label>
+            <input
+              className="inp"
+              type="number"
+              min={1}
+              step={0.1}
+              value={phys.width}
+              onChange={(e) =>
+                onPhysicalDimensionsChange?.({
+                  ...phys,
+                  width: Number(e.target.value) || DEFAULT_PHYSICAL.width,
+                })
+              }
+              disabled={!onPhysicalDimensionsChange}
+            />
+          </div>
+          <div className="field" style={{ flex: "1 1 90px" }}>
+            <label className="lbl">Mockup H (in)</label>
+            <input
+              className="inp"
+              type="number"
+              min={1}
+              step={0.1}
+              value={phys.height}
+              onChange={(e) =>
+                onPhysicalDimensionsChange?.({
+                  ...phys,
+                  height: Number(e.target.value) || DEFAULT_PHYSICAL.height,
+                })
+              }
+              disabled={!onPhysicalDimensionsChange}
+            />
+          </div>
+          <div className="field" style={{ flex: "1 1 90px" }}>
+            <label className="lbl">Length (in)</label>
+            <input
+              className="inp"
+              type="number"
+              min={1}
+              step={0.1}
+              value={phys.length ?? DEFAULT_PHYSICAL.length}
+              onChange={(e) =>
+                onPhysicalDimensionsChange?.({
+                  ...phys,
+                  length: Number(e.target.value) || DEFAULT_PHYSICAL.length,
+                })
+              }
+              disabled={!onPhysicalDimensionsChange}
+            />
+          </div>
+          <div className="field" style={{ flex: "1 1 90px" }}>
+            <label className="lbl">Print DPI</label>
+            <input
+              className="inp"
+              type="number"
+              min={72}
+              step={1}
+              value={productDpi}
+              onChange={(e) => onDpiChange?.(Number(e.target.value) || DEFAULT_DPI)}
+              disabled={!onDpiChange}
+            />
+          </div>
+        </div>
+        {onPhysicalDimensionsChange && (
+          <div className="row" style={{ gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() =>
+                onPhysicalDimensionsChange({
+                  width: DEFAULT_PHYSICAL.width,
+                  height: DEFAULT_PHYSICAL.height,
+                  length: DEFAULT_PHYSICAL.length,
+                })
+              }
+            >
+              Flat mockup {DEFAULT_PHYSICAL.width}×{DEFAULT_PHYSICAL.height}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() =>
+                onPhysicalDimensionsChange({
+                  width: LIFESTYLE_PHYSICAL.width,
+                  height: LIFESTYLE_PHYSICAL.height,
+                  length: LIFESTYLE_PHYSICAL.length,
+                })
+              }
+            >
+              Lifestyle / model {LIFESTYLE_PHYSICAL.width}×{LIFESTYLE_PHYSICAL.height}
+            </button>
+          </div>
+        )}
+        {areaIn && (
+          <p className="muted" style={{ fontSize: 12, margin: "0 0 10px" }}>
+            This {areaIn.widthIn.toFixed(2)}″ area is{" "}
+            <strong style={{ color: "var(--ink)" }}>{printPctOfMockup.toFixed(0)}%</strong> of mockup
+            width ({phys.width}″). On a ~{TYPICAL_CHEST_WIDTH_IN}″ adult chest it should look about{" "}
+            {expectedPctOfChest.toFixed(0)}% of the shirt — not of the whole photo.
+          </p>
+        )}
+        {frameLooksLikePrintSize && (
+          <p style={{ fontSize: 12, color: "#b45309", margin: "0 0 10px" }}>
+            Mockup size matches this print area, so {areaIn!.widthIn}″ fills the whole image. Set
+            Mockup W/H to the full photo/garment size.
+          </p>
+        )}
+        {looksOversizedOnGarment && onPhysicalDimensionsChange && (
+          <p style={{ fontSize: 12, color: "#b45309", margin: "0 0 10px" }}>
+            {areaIn!.widthIn}″ looks too large on this photo — Mockup W ({phys.width}″) is probably
+            the shirt width, but inches map across the <em>entire</em> image (including background).
+            For model shots, raise Mockup W/H (try {LIFESTYLE_PHYSICAL.width}×
+            {LIFESTYLE_PHYSICAL.height}). Export size stays {areaIn!.widthIn}″ × DPI either way.{" "}
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              style={{ marginLeft: 4, verticalAlign: "baseline" }}
+              onClick={() =>
+                onPhysicalDimensionsChange({
+                  width: LIFESTYLE_PHYSICAL.width,
+                  height: LIFESTYLE_PHYSICAL.height,
+                  length: LIFESTYLE_PHYSICAL.length,
+                })
+              }
+            >
+              Use lifestyle {LIFESTYLE_PHYSICAL.width}×{LIFESTYLE_PHYSICAL.height}
+            </button>
+          </p>
+        )}
+
         {resolvedImages.length > 1 && (
           <div className="field">
             <label className="lbl">Mockup image</label>
-            <select className="inp" value={mockup} onChange={(e) => setMockup(e.target.value)}>
-              {resolvedImages.map((url) => (
-                <option key={url} value={url}>
-                  {url.split("/").pop()}
-                </option>
+            <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+              {resolvedImages.map((src) => (
+                <button
+                  key={src}
+                  type="button"
+                  onClick={() => setMockup(src)}
+                  style={{
+                    width: 48,
+                    height: 48,
+                    padding: 0,
+                    border: mockup === src ? "2px solid var(--brand)" : "1px solid var(--line)",
+                    borderRadius: 6,
+                    overflow: "hidden",
+                    cursor: "pointer",
+                    background: "#fff",
+                  }}
+                >
+                  <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                </button>
               ))}
-            </select>
+            </div>
           </div>
         )}
-        {colors.length > 0 && displaySrc && (
-          <div className="field">
+
+        {colors.length > 0 && (
+          <div className="field" style={{ marginTop: 8 }}>
             <label className="lbl">Preview colour</label>
-            <p className="muted" style={{ fontSize: 12, margin: "0 0 8px" }}>
+            <p className="muted" style={{ fontSize: 11, margin: "0 0 6px" }}>
               Recolours the garment only — background stays transparent.
             </p>
             <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-              <button type="button" className={tintHex === "" ? "btn btn-dark btn-sm" : "btn btn-ghost btn-sm"} onClick={() => setTintHex("")}>None</button>
+              <button
+                type="button"
+                className={tintHex === "" ? "btn btn-dark btn-sm" : "btn btn-ghost btn-sm"}
+                onClick={() => setTintHex("")}
+              >
+                None
+              </button>
               {colors.map((c) => (
                 <button
                   key={c.hex + c.name}
                   type="button"
                   title={c.name}
                   onClick={() => setTintHex(c.hex)}
-                  style={{ width: 26, height: 26, borderRadius: 6, background: c.hex, cursor: "pointer", border: tintHex === c.hex ? "2px solid var(--brand)" : "1px solid var(--line)" }}
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 6,
+                    background: c.hex,
+                    cursor: "pointer",
+                    border: tintHex === c.hex ? "2px solid var(--brand)" : "1px solid var(--line)",
+                  }}
                 />
               ))}
             </div>
@@ -216,96 +563,149 @@ export function PrintAreaEditor({
           style={{
             position: "relative",
             width: "100%",
-            aspectRatio: "1 / 1",
+            aspectRatio: `${CANVAS_WIDTH} / ${CANVAS_HEIGHT}`,
             background: "var(--surface-2)",
             border: "1px solid var(--line)",
             borderRadius: 10,
             overflow: "hidden",
             outline: "none",
+            marginTop: 10,
           }}
         >
           {displaySrc ? (
-            <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+            <div
+              style={{
+                position: "absolute",
+                left: CANVAS_PADDING * fitScale,
+                top: CANVAS_PADDING * fitScale,
+                right: CANVAS_PADDING * fitScale,
+                bottom: CANVAS_PADDING * fitScale,
+                pointerEvents: "none",
+              }}
+            >
               <TintedGarment src={displaySrc} hex={tintHex} alt="mockup" />
             </div>
           ) : (
-            <div className="muted" style={{ display: "grid", placeItems: "center", height: "100%" }}>
-              Upload an image first
+            <div className="muted" style={{ padding: 24, textAlign: "center" }}>
+              Upload a production mask to place print areas.
             </div>
           )}
 
-          {size > 0 && displaySrc && (
-            <Stage
-              width={size}
-              height={size}
-              style={{ position: "absolute", inset: 0 }}
-              onMouseDown={(e) => {
-                // Click on empty stage area: keep current selection but blur transformer.
-                if (e.target === e.target.getStage()) wrapRef.current?.focus();
+          {fitScale > 0 && displaySrc && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                transform: `scale(${fitScale})`,
+                transformOrigin: "top left",
+                width: CANVAS_WIDTH,
+                height: CANVAS_HEIGHT,
               }}
             >
-              <Layer>
-                {value.map((a, i) => {
-                  if (!isVisible(a)) {
-                    rectRefs.current[i] = null;
-                    return null;
-                  }
-                  const b = pxBox(a);
-                  const isSel = i === selected;
-                  return (
-                    <Rect
-                      key={i}
-                      ref={(node) => {
-                        rectRefs.current[i] = node;
-                      }}
-                      x={b.x}
-                      y={b.y}
-                      width={b.w}
-                      height={b.h}
-                      rotation={a.rotationDeg ?? 0}
-                      draggable
-                      stroke={isSel ? BRAND : "rgba(0,0,0,.45)"}
-                      strokeWidth={isSel ? 2 : 1.5}
-                      dash={isSel ? undefined : [5, 4]}
-                      fill={isSel ? "rgba(61,95,217,.12)" : "rgba(0,0,0,.04)"}
-                      onMouseDown={() => setSelected(i)}
-                      onTap={() => setSelected(i)}
-                      onDragMove={(e) => snapDrag(e.target as Konva.Rect)}
-                      onDragEnd={(e) => {
-                        setSelected(i);
-                        commitNode(i, e.target as Konva.Rect);
-                      }}
-                      onTransformEnd={(e) => commitNode(i, e.target as Konva.Rect)}
-                    />
-                  );
-                })}
+              <Stage
+                width={CANVAS_WIDTH}
+                height={CANVAS_HEIGHT}
+                onMouseDown={(e) => {
+                  if (e.target === e.target.getStage()) wrapRef.current?.focus();
+                }}
+              >
+                <Layer>
+                  {/* 1″ scale bar — calibrate Mockup W until this matches a real inch on the garment. */}
+                  {inchTickPx > 4 && (
+                    <>
+                      <Rect
+                        x={scaleFrame.frameX + 8}
+                        y={scaleFrame.frameY + scaleFrame.frameH - 22}
+                        width={inchTickPx}
+                        height={3}
+                        fill={BRAND}
+                        listening={false}
+                      />
+                      <Text
+                        x={scaleFrame.frameX + 8}
+                        y={scaleFrame.frameY + scaleFrame.frameH - 38}
+                        text="1 in"
+                        fontSize={11}
+                        fill={BRAND}
+                        fontStyle="bold"
+                        listening={false}
+                      />
+                    </>
+                  )}
+                  {value.map((a, i) => {
+                    if (!isVisible(a)) {
+                      rectRefs.current[i] = null;
+                      return null;
+                    }
+                    const b = pxBox(a);
+                    const isSel = i === selected;
+                    const inches = areaToInches(a, phys);
+                    return (
+                      <Rect
+                        key={i}
+                        ref={(node) => {
+                          rectRefs.current[i] = node;
+                        }}
+                        x={b.x}
+                        y={b.y}
+                        width={b.w}
+                        height={b.h}
+                        rotation={inches.rotationDeg ?? 0}
+                        draggable
+                        stroke={isSel ? BRAND : "rgba(0,0,0,.45)"}
+                        strokeWidth={isSel ? 2 : 1.5}
+                        dash={isSel ? undefined : [5, 4]}
+                        fill={isSel ? "rgba(61,95,217,.12)" : "rgba(0,0,0,.04)"}
+                        onMouseDown={() => setSelected(i)}
+                        onTap={() => setSelected(i)}
+                        onDragMove={(e) => snapDrag(e.target as Konva.Rect)}
+                        onDragEnd={(e) => {
+                          setSelected(i);
+                          commitNode(i, e.target as Konva.Rect);
+                        }}
+                        onTransformEnd={(e) => commitNode(i, e.target as Konva.Rect)}
+                      />
+                    );
+                  })}
 
-                {/* Labels above each visible area. */}
-                {value.map((a, i) => {
-                  if (!isVisible(a)) return null;
-                  const b = pxBox(a);
-                  return (
-                    <Label key={`lbl-${i}`} x={b.x} y={Math.max(0, b.y - 18)} rotation={a.rotationDeg ?? 0} listening={false}>
-                      <Tag fill="#fff" stroke="var(--line)" cornerRadius={3} />
-                      <Text text={a.label} fontSize={11} fontStyle="bold" padding={3} fill="#1c1c1c" />
-                    </Label>
-                  );
-                })}
+                  {value.map((a, i) => {
+                    if (!isVisible(a)) return null;
+                    const b = pxBox(a);
+                    const inches = areaToInches(a, phys);
+                    const sc = inches.scale && inches.scale > 0 ? inches.scale : 1;
+                    const label =
+                      inches.lockSize && Math.abs(sc - 1) > 0.02
+                        ? `${a.label}  ${inches.widthIn.toFixed(2)}×${inches.heightIn.toFixed(2)} in · preview ×${sc.toFixed(2)}`
+                        : `${a.label}  ${inches.widthIn.toFixed(2)}×${inches.heightIn.toFixed(2)} in`;
+                    return (
+                      <Label
+                        key={`lbl-${i}`}
+                        x={b.x}
+                        y={Math.max(0, b.y - 22)}
+                        rotation={inches.rotationDeg ?? 0}
+                        listening={false}
+                      >
+                        <Tag fill="#fff" stroke="var(--line)" cornerRadius={3} />
+                        <Text text={label} fontSize={11} fontStyle="bold" padding={3} fill="#1c1c1c" />
+                      </Label>
+                    );
+                  })}
 
-                <Transformer
-                  ref={trRef}
-                  rotateEnabled
-                  keepRatio={false}
-                  rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
-                  anchorSize={9}
-                  anchorStroke={BRAND}
-                  borderStroke={BRAND}
-                  boundBoxFunc={(oldBox, newBox) =>
-                    newBox.width < MIN_PX || newBox.height < MIN_PX ? oldBox : newBox
-                  }
-                />
-              </Layer>
-            </Stage>
+                  <Transformer
+                    ref={trRef}
+                    rotateEnabled
+                    keepRatio={Boolean(areaIn?.lockSize)}
+                    rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
+                    anchorSize={9}
+                    anchorStroke={BRAND}
+                    borderStroke={BRAND}
+                    boundBoxFunc={(oldBox, newBox) =>
+                      newBox.width < MIN_PX || newBox.height < MIN_PX ? oldBox : newBox
+                    }
+                  />
+                </Layer>
+              </Stage>
+            </div>
           )}
         </div>
 
@@ -314,14 +714,16 @@ export function PrintAreaEditor({
             + Add print area
           </button>
           <span className="muted" style={{ fontSize: 12 }}>
-            Drag to move · corner handles to resize · top handle to rotate · arrows to nudge · Del to remove
+            Inches are source of truth · drag / resize / rotate · arrows nudge 0.1″
           </span>
         </div>
       </div>
 
       <div style={{ flex: "1 1 300px", minWidth: 280 }}>
-        {!value.length && <p className="muted">No print areas yet. Add one to define where artwork can be placed.</p>}
-        {area && (
+        {!value.length && (
+          <p className="muted">No print areas yet. Add one to define where artwork can be placed.</p>
+        )}
+        {area && areaIn && (
           <div className="card" style={{ padding: 16 }}>
             <div className="field">
               <label className="lbl">Label</label>
@@ -333,42 +735,111 @@ export function PrintAreaEditor({
             </div>
             <div className="row" style={{ gap: 10 }}>
               <div className="field" style={{ flex: 1 }}>
-                <label className="lbl">Max width (cm)</label>
+                <label className="lbl">X (in)</label>
                 <input
                   className="inp"
                   type="number"
-                  value={area.maxWidthCm ?? 0}
-                  onChange={(e) => update(selected, { maxWidthCm: Number(e.target.value) })}
+                  step={0.1}
+                  value={areaIn.xIn}
+                  onChange={(e) => updateInches(selected, { xIn: Number(e.target.value) || 0 })}
                 />
               </div>
               <div className="field" style={{ flex: 1 }}>
-                <label className="lbl">Max height (cm)</label>
+                <label className="lbl">Y (in)</label>
                 <input
                   className="inp"
                   type="number"
-                  value={area.maxHeightCm ?? 0}
-                  onChange={(e) => update(selected, { maxHeightCm: Number(e.target.value) })}
-                />
-              </div>
-              <div className="field" style={{ flex: 1 }}>
-                <label className="lbl">DPI</label>
-                <input
-                  className="inp"
-                  type="number"
-                  value={area.dpi ?? 300}
-                  onChange={(e) => update(selected, { dpi: Number(e.target.value) })}
+                  step={0.1}
+                  value={areaIn.yIn}
+                  onChange={(e) => updateInches(selected, { yIn: Number(e.target.value) || 0 })}
                 />
               </div>
             </div>
-            <div className="field">
-              <label className="lbl">Rotation (°)</label>
+            <div className="row" style={{ gap: 10 }}>
+              <div className="field" style={{ flex: 1 }}>
+                <label className="lbl">Width (in)</label>
+                <input
+                  className="inp"
+                  type="number"
+                  step={0.1}
+                  min={0.1}
+                  value={areaIn.widthIn}
+                  disabled={Boolean(areaIn.lockSize)}
+                  onChange={(e) => updateInches(selected, { widthIn: Number(e.target.value) || 0.1 })}
+                />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label className="lbl">Height (in)</label>
+                <input
+                  className="inp"
+                  type="number"
+                  step={0.1}
+                  min={0.1}
+                  value={areaIn.heightIn}
+                  disabled={Boolean(areaIn.lockSize)}
+                  onChange={(e) => updateInches(selected, { heightIn: Number(e.target.value) || 0.1 })}
+                />
+              </div>
+            </div>
+            <label className="row" style={{ gap: 8, alignItems: "center", margin: "8px 0" }}>
               <input
-                className="inp"
-                type="number"
-                value={Math.round(area.rotationDeg ?? 0)}
-                onChange={(e) => update(selected, { rotationDeg: Number(e.target.value) })}
+                type="checkbox"
+                checked={Boolean(areaIn.lockSize)}
+                onChange={(e) => {
+                  const locked = e.target.checked;
+                  if (locked) {
+                    // Freeze current print inches; further transforms only change preview scale.
+                    updateInches(selected, { lockSize: true, scale: areaIn.scale && areaIn.scale > 0 ? areaIn.scale : 1 });
+                    return;
+                  }
+                  // Unlock: bake preview scale into print inches so the box stays the same size.
+                  const sc = areaIn.scale && areaIn.scale > 0 ? areaIn.scale : 1;
+                  updateInches(selected, {
+                    lockSize: false,
+                    widthIn: Math.round(areaIn.widthIn * sc * 1000) / 1000,
+                    heightIn: Math.round(areaIn.heightIn * sc * 1000) / 1000,
+                    scale: 1,
+                  });
+                }}
               />
+              <span style={{ fontSize: 13 }}>Lock print size (resize changes preview scale only)</span>
+            </label>
+            {areaIn.lockSize && (
+              <p className="muted" style={{ fontSize: 12, margin: "0 0 10px" }}>
+                Print stays {areaIn.widthIn.toFixed(2)}×{areaIn.heightIn.toFixed(2)}″ (
+                {exportPreview ? `${exportPreview.w}×${exportPreview.h} px` : "—"}). Expanding the
+                box only changes preview scale
+                {areaIn.scale && Math.abs(areaIn.scale - 1) > 0.02
+                  ? ` (now ×${areaIn.scale.toFixed(2)})`
+                  : ""}
+                — production file size does not grow.
+              </p>
+            )}
+            <div className="row" style={{ gap: 10 }}>
+              <div className="field" style={{ flex: 1 }}>
+                <label className="lbl">Rotation (°)</label>
+                <input
+                  className="inp"
+                  type="number"
+                  value={Math.round(areaIn.rotationDeg ?? 0)}
+                  onChange={(e) => updateInches(selected, { rotationDeg: Number(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label className="lbl">Area DPI</label>
+                <input
+                  className="inp"
+                  type="number"
+                  value={area.dpi ?? productDpi}
+                  onChange={(e) => update(selected, { dpi: Number(e.target.value) || productDpi })}
+                />
+              </div>
             </div>
+            {exportPreview && !areaIn.lockSize && (
+              <p className="muted" style={{ fontSize: 12, margin: "0 0 10px" }}>
+                Export preview: {exportPreview.w}×{exportPreview.h} px
+              </p>
+            )}
             <div className="field">
               <label className="lbl">Allowed methods</label>
               <div className="row" style={{ flexWrap: "wrap", gap: 0 }}>

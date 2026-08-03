@@ -46,10 +46,19 @@ export async function fetchPlatformOrders(params?: { status?: string; limit?: nu
 }
 
 export type ArtworkPlacement = {
+  printCxPct?: number;
+  printCyPct?: number;
+  printWPct?: number;
   xPct: number;
   yPct: number;
   wPct: number;
   rot: number;
+};
+
+export type PhysicalDimensions = {
+  width: number;
+  height: number;
+  length?: number;
 };
 
 export type OrderItemProduct = {
@@ -453,6 +462,14 @@ export type PrintArea = {
   key?: string;
   label: string;
   mockupImageUrl?: string;
+  xIn?: number;
+  yIn?: number;
+  widthIn?: number;
+  heightIn?: number;
+  scale?: number;
+  lockSize?: boolean;
+  shapeType?: "rect" | "polygon";
+  polygonPoints?: Array<{ xIn: number; yIn: number }>;
   box: PrintAreaBox;
   rotationDeg?: number;
   maxWidthCm?: number;
@@ -480,6 +497,8 @@ export type PlatformProduct = {
   moq?: number;
   material?: string;
   productionDays?: number;
+  physicalDimensions?: PhysicalDimensions;
+  dpi?: number;
   variants: ProductVariant[];
   imageUrls: string[];
   primaryImageUrl?: string;
@@ -551,10 +570,22 @@ export function uploadProductImage(id: string, file: File, role: "base" | "mask"
   );
 }
 
-export function setPrintAreas(id: string, printAreas: PrintArea[]) {
-  return apiFetch<PrintArea[]>(`/platform/products/${id}/print-areas`, {
+export function setPrintAreas(
+  id: string,
+  printAreas: PrintArea[],
+  extras?: { physicalDimensions?: PhysicalDimensions; dpi?: number },
+) {
+  return apiFetch<{
+    printAreas: PrintArea[];
+    physicalDimensions?: PhysicalDimensions;
+    dpi?: number;
+  }>(`/platform/products/${id}/print-areas`, {
     method: "PUT",
-    body: JSON.stringify({ printAreas }),
+    body: JSON.stringify({
+      printAreas,
+      ...(extras?.physicalDimensions ? { physicalDimensions: extras.physicalDimensions } : {}),
+      ...(extras?.dpi != null ? { dpi: extras.dpi } : {}),
+    }),
   });
 }
 

@@ -5,7 +5,12 @@ import { toast } from "sonner";
 import { refreshCatalogProducts } from "@/services/api-bridge";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { draftFromCollection } from "../draftFromCollection";
-import { bakeMockup, resolvePlacementForBake, type MockupUploadItem } from "../mockup-bake";
+import {
+  bakeMockup,
+  exportDesignOnly,
+  resolvePlacementForBake,
+  type MockupUploadItem,
+} from "../mockup-bake";
 import { buildPreviousUploads, type PreviousArtwork } from "../wizard/artworkHistory";
 import { useCreateCollection, useSyncCollectionPublish, useUpdateCollection } from "../model";
 import type { UiProduct, UiShop } from "../model";
@@ -127,20 +132,38 @@ export function useSwagWizardController(): SwagWizardVm {
     try {
       const artUrl = draft.art.preview;
       const baked = await Promise.all(
-        draft.picked.map((i, idx) => {
+        draft.picked.map(async (i, idx) => {
           const cp = catalog[i];
           const key = cp?.id || `idx${idx}`;
-          return bakeMockup(cp, artUrl, draft.placements[key] ?? null);
+          const placement = draft.placements[key] ?? null;
+          const [dataUrl, design] = await Promise.all([
+            bakeMockup(cp, artUrl, placement),
+            exportDesignOnly(cp, artUrl, placement),
+          ]);
+          return { dataUrl, design, placement: resolvePlacementForBake(cp, draft.placements, idx) };
         }),
       );
       const mockups = draft.picked
         .map((i, idx) => {
           const cp = catalog[i];
-          if (!cp?.id || !baked[idx]) return null;
+          const row = baked[idx];
+          if (!cp?.id || !row?.dataUrl) return null;
           return {
             catalogProductId: cp.id,
-            dataUrl: baked[idx],
-            placement: resolvePlacementForBake(cp, draft.placements, idx),
+            dataUrl: row.dataUrl,
+            placement: row.placement,
+            ...(row.design.dataUrl
+              ? {
+                  designOnlyDataUrl: row.design.dataUrl,
+                  printSpec: {
+                    widthIn: row.design.widthIn,
+                    heightIn: row.design.heightIn,
+                    dpi: row.design.dpi,
+                    widthPx: row.design.widthPx,
+                    heightPx: row.design.heightPx,
+                  },
+                }
+              : {}),
           } satisfies MockupUploadItem;
         })
         .filter((m): m is MockupUploadItem => m !== null);

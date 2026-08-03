@@ -8,6 +8,7 @@ export {
   setPrintAreas,
   updateProduct,
   uploadProductImage,
+  type PhysicalDimensions,
   type PlatformProduct,
   type PrintArea,
   type ProductInput,

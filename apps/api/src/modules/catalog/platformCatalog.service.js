@@ -221,10 +221,32 @@ export async function setCustomization(productId, customization) {
 }
 
 /** POD print-area placeholders. `printableAreas` (names) is derived from labels. */
-export async function setPrintAreas(productId, printAreas) {
+export async function setPrintAreas(productId, printAreas, extras = {}) {
+  const { normalizePlaceholder, resolvePhysical, physicalFrameForView, DEFAULT_DPI } = await import(
+    '../../lib/printCoords.js'
+  );
   const product = await getProduct(productId);
-  product.printAreas = printAreas;
-  product.printableAreas = printAreas.map((a) => a.label).filter(Boolean);
+  if (extras.physicalDimensions) {
+    product.physicalDimensions = {
+      ...resolvePhysical(product.physicalDimensions),
+      ...extras.physicalDimensions,
+    };
+  }
+  if (extras.dpi != null) {
+    product.dpi = Math.max(1, Math.round(Number(extras.dpi) || DEFAULT_DPI));
+  }
+  const phys = resolvePhysical(product.physicalDimensions);
+  const productDpi = Math.max(1, Number(product.dpi) || DEFAULT_DPI);
+  product.printAreas = (printAreas || []).map((a) => {
+    const frame = physicalFrameForView(phys, a?.key);
+    const n = normalizePlaceholder(a, frame);
+    return {
+      ...a,
+      ...n,
+      dpi: Math.max(1, Number(a?.dpi) || productDpi),
+    };
+  });
+  product.printableAreas = product.printAreas.map((a) => a.label).filter(Boolean);
   await product.save();
   return product;
 }

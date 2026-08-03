@@ -52,6 +52,10 @@ const area = (over = {}) => ({
   key: 'front',
   label: 'Front',
   mockupImageUrl: '/uploads/platform/product/abc.png',
+  xIn: 5,
+  yIn: 6,
+  widthIn: 10,
+  heightIn: 9.6,
   box: { xPct: 25, yPct: 30, widthPct: 50, heightPct: 40 },
   maxWidthCm: 28,
   maxHeightCm: 35,
@@ -67,19 +71,44 @@ describe('platform product print areas (POD placeholders)', () => {
       .set('Authorization', `Bearer ${catalogToken}`)
       .send({ printAreas: [area(), area({ key: 'back', label: 'Back' })] });
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(2);
-    expect(res.body[0].box.widthPct).toBe(50);
+    expect(res.body.printAreas).toHaveLength(2);
+    expect(res.body.printAreas[0].widthIn).toBe(10);
+    expect(res.body.printAreas[0].box.widthPct).toBeGreaterThan(0);
 
     const reloaded = await CatalogProduct.findById(product._id);
     expect(reloaded.printAreas).toHaveLength(2);
+    expect(reloaded.printAreas[0].widthIn).toBe(10);
     expect(reloaded.printableAreas).toEqual(['Front', 'Back']);
   });
 
-  it('rejects out-of-range box percentages (400 validation)', async () => {
+  it('persists physicalDimensions + dpi with print areas', async () => {
     const res = await request(app)
       .put(`/api/v1/platform/products/${product._id}/print-areas`)
       .set('Authorization', `Bearer ${catalogToken}`)
-      .send({ printAreas: [area({ box: { xPct: 10, yPct: 10, widthPct: 150, heightPct: 40 } })] });
+      .send({
+        physicalDimensions: { width: 18, height: 22, length: 16 },
+        dpi: 300,
+        printAreas: [area({ widthIn: 3.1, heightIn: 3.1, xIn: 7, yIn: 8 })],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.physicalDimensions.width).toBe(18);
+    expect(res.body.printAreas[0].widthIn).toBe(3.1);
+    expect(res.body.dpi).toBe(300);
+  });
+
+  it('rejects print areas without inches, box, or cm size (400)', async () => {
+    const res = await request(app)
+      .put(`/api/v1/platform/products/${product._id}/print-areas`)
+      .set('Authorization', `Bearer ${catalogToken}`)
+      .send({
+        printAreas: [
+          {
+            key: 'front',
+            label: 'Front',
+            box: { xPct: 10, yPct: 10, widthPct: 0, heightPct: 0 },
+          },
+        ],
+      });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
@@ -119,15 +148,14 @@ describe('product variant colorHex + master image roles', () => {
       domain: 'example.myshopify.com',
       externalId: '123',
     };
-    product.maskImageUrl = 'https://cdn.shopify.com/legacy-product.jpg';
+    product.primaryImageUrl = '/uploads/platform/product/shopify.png';
+    product.imageUrls = ['/uploads/platform/product/shopify.png'];
     await product.save();
 
     const { setRoleImage } = await import('../src/modules/catalog/platformCatalog.service.js');
-    await setRoleImage(product._id, 'mask', '/uploads/platform/product/production-mask.png');
-
+    await setRoleImage(product._id, 'mask', '/uploads/platform/product/mask.png');
     const reloaded = await CatalogProduct.findById(product._id);
-    expect(reloaded.primaryImageUrl).toBe('https://cdn.shopify.com/legacy-product.jpg');
-    expect(reloaded.imageUrls).toEqual(['https://cdn.shopify.com/legacy-product.jpg']);
-    expect(reloaded.maskImageUrl).toBe('/uploads/platform/product/production-mask.png');
+    expect(reloaded.maskImageUrl).toBe('/uploads/platform/product/mask.png');
+    expect(reloaded.primaryImageUrl).toBe('/uploads/platform/product/shopify.png');
   });
 });

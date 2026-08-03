@@ -1,16 +1,61 @@
 import { mediaUrlForCanvas, resolveMediaUrl } from "@/lib/mediaUrl";
 import type { UiProduct } from "@/services/mappers";
+import {
+  CANVAS_HEIGHT,
+  CANVAS_WIDTH,
+  DEFAULT_DPI,
+  DEFAULT_PHYSICAL,
+  designPlacementOnMockup,
+  normalizePlaceholder,
+  physicalFrameForView,
+  placeholderToStagePixels,
+  placementPrintFractions,
+  printExportSize,
+  resolvePhysical,
+  stagePixelsToArtworkPlacement,
+  type ArtworkPlacement,
+  type CanvasOpts,
+} from "@/lib/printCoords";
 
-/** Per-product artwork placement, stored as % of the square stage. */
-export type Placement = { xPct: number; yPct: number; wPct: number; rot: number };
+/** Per-product artwork placement — print-area % preferred; canvas % mirrored. */
+export type Placement = ArtworkPlacement;
 
 export type MockupUploadItem = {
   catalogProductId: string;
   dataUrl: string;
   placement: Placement;
+  designOnlyDataUrl?: string;
+  printSpec?: {
+    widthIn: number;
+    heightIn: number;
+    dpi: number;
+    widthPx: number;
+    heightPx: number;
+  };
 };
 
+/** Legacy fallback when a product has no inch or % print area yet. */
 export const DEFAULT_BOX = { xPct: 33, yPct: 30, widthPct: 34, heightPct: 38 };
+
+export function productPhysical(p: UiProduct | undefined) {
+  return resolvePhysical(p?.physicalDimensions ?? DEFAULT_PHYSICAL);
+}
+
+export function productDpi(p: UiProduct | undefined, areaDpi?: number) {
+  return Math.max(1, Number(areaDpi) || Number(p?.dpi) || DEFAULT_DPI);
+}
+
+/** Resolve placeholder inches + stage pixels for the active print area. */
+export function resolvePrintAreaStage(p: UiProduct, canvasOpts: CanvasOpts = {}) {
+  const area = pickPrintArea(p);
+  const phys = physicalFrameForView(productPhysical(p), area?.key);
+  const raw = area
+    ? (area as unknown as Record<string, unknown>)
+    : { box: DEFAULT_BOX, widthIn: 0, heightIn: 0 };
+  const ph = normalizePlaceholder(raw, phys);
+  const stage = placeholderToStagePixels(ph, phys, canvasOpts);
+  return { area, phys, ph, stage, dpi: productDpi(p, area?.dpi) };
+}
 
 export function placementKey(prod: UiProduct, idx: number): string {
   return prod?.id || `idx${idx}`;
@@ -75,27 +120,27 @@ export function pickPrintArea(p: UiProduct) {
     const match = areas.find((a) => normMediaPath(a.mockupImageUrl) === baseNorm);
     if (match) return match;
   }
-  return areas.find((a) => a?.box?.widthPct > 0) || areas[0];
+  return (
+    areas.find((a) => (a?.widthIn ?? 0) > 0 || a?.box?.widthPct > 0) || areas[0]
+  );
 }
 
 export function productHasPrintArea(p: UiProduct): boolean {
-  return Boolean(pickPrintArea(p)?.box?.widthPct);
+  const a = pickPrintArea(p);
+  return Boolean(a && ((a.widthIn ?? 0) > 0 || a.box?.widthPct > 0));
 }
 
-/** Default artwork placement — matches Konva / bakeMockup when none is stored. */
+/** Default artwork placement — centered in the inch print area. */
 export function defaultPlacement(ep: UiProduct, artAspect = 1): Placement {
-  const area = pickPrintArea(ep);
-  const box = area?.box?.widthPct ? area.box : DEFAULT_BOX;
-  const size = 100;
-  const bw = (box.widthPct / 100) * size;
-  const bh = (box.heightPct / 100) * size;
-  const fitW = Math.min(bw * 0.92, (bh * 0.92) / Math.max(artAspect, 0.01));
-  return {
-    xPct: box.xPct + box.widthPct / 2,
-    yPct: box.yPct + box.heightPct / 2,
-    wPct: (fitW / size) * 100,
-    rot: 0,
-  };
+  const { stage } = resolvePrintAreaStage(ep);
+  const fitW = Math.min(stage.w * 0.92, (stage.h * 0.92) / Math.max(artAspect, 0.01));
+  return stagePixelsToArtworkPlacement(
+    stage.x + stage.w / 2,
+    stage.y + stage.h / 2,
+    fitW,
+    0,
+    stage,
+  );
 }
 
 /** Load an image for canvas compositing (CORS-safe via media proxy when needed). */
@@ -254,15 +299,34 @@ export async function bakeMockupsForProducts(
       const product = catalog[catalogIndex];
       if (!product?.id) return null;
       const placement = resolvePlacementForBake(product, placements, idx);
-      const dataUrl = await bakeMockup(product, artUrl, placement);
+      const [dataUrl, design] = await Promise.all([
+        bakeMockup(product, artUrl, placement),
+        exportDesignOnly(product, artUrl, placement),
+      ]);
       if (!dataUrl) return null;
-      return { catalogProductId: product.id, dataUrl, placement };
+      return {
+        catalogProductId: product.id,
+        dataUrl,
+        placement,
+        ...(design.dataUrl
+          ? {
+              designOnlyDataUrl: design.dataUrl,
+              printSpec: {
+                widthIn: design.widthIn,
+                heightIn: design.heightIn,
+                dpi: design.dpi,
+                widthPx: design.widthPx,
+                heightPx: design.heightPx,
+              },
+            }
+          : {}),
+      } satisfies MockupUploadItem;
     }),
   );
   return baked.filter((m): m is MockupUploadItem => m !== null);
 }
 
-/** Flatten mask + placed artwork into one PNG data URL. */
+/** Flatten mask + placed artwork into one PNG data URL (preview quality). */
 export async function bakeMockup(
   ep: UiProduct,
   artUrl: string,
@@ -282,27 +346,110 @@ export async function bakeMockup(
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext("2d")!;
+
+    let mdx = 0;
+    let mdy = 0;
+    let mw = size;
+    let mh = size;
     if (maskImg) {
       const s = Math.min(size / maskImg.naturalWidth, size / maskImg.naturalHeight);
-      const w = maskImg.naturalWidth * s;
-      const h = maskImg.naturalHeight * s;
-      ctx.drawImage(maskImg, (size - w) / 2, (size - h) / 2, w, h);
+      mw = maskImg.naturalWidth * s;
+      mh = maskImg.naturalHeight * s;
+      mdx = (size - mw) / 2;
+      mdy = (size - mh) / 2;
+      ctx.drawImage(maskImg, mdx, mdy, mw, mh);
     }
+
     const aspect = (artImg.naturalHeight || 1) / (artImg.naturalWidth || 1);
     const pl = placement ?? defaultPlacement(ep, aspect);
+    const { ph, stage, phys } = resolvePrintAreaStage(ep);
     const realArt = buildRealisticArtwork(artImg, ep?.g);
-    const w0 = (pl.wPct / 100) * size;
+    const rel = placementPrintFractions(pl, stage, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    const printRect = designPlacementOnMockup({
+      mockupWidthPx: mw,
+      mockupHeightPx: mh,
+      placeholder: ph,
+      physicalDimensions: phys,
+      viewKey: ph.key,
+    });
+    const w0 = printRect.w * rel.w;
     const h0 = w0 * aspect;
+    const cx = mdx + printRect.x + rel.cx * printRect.w;
+    const cy = mdy + printRect.y + rel.cy * printRect.h;
+
     ctx.save();
+    ctx.beginPath();
+    ctx.rect(mdx + printRect.x, mdy + printRect.y, printRect.w, printRect.h);
+    ctx.clip();
     ctx.globalCompositeOperation = "multiply";
     ctx.globalAlpha = 0.96;
-    ctx.translate((pl.xPct / 100) * size, (pl.yPct / 100) * size);
-    ctx.rotate(((pl.rot || 0) * Math.PI) / 180);
+    ctx.translate(cx, cy);
+    ctx.rotate(((rel.rot || 0) * Math.PI) / 180);
     ctx.drawImage(realArt, -w0 / 2, -h0 / 2, w0, h0);
     ctx.restore();
     return canvas.toDataURL("image/png");
   } catch {
     return "";
+  }
+}
+
+/**
+ * Design-only production PNG: transparent canvas sized to inches × DPI.
+ * Draws artwork clipped to the print placeholder — no garment/mockup.
+ */
+export async function exportDesignOnly(
+  ep: UiProduct,
+  artUrl: string,
+  placement: Placement | null,
+): Promise<{
+  dataUrl: string;
+  widthPx: number;
+  heightPx: number;
+  widthIn: number;
+  heightIn: number;
+  dpi: number;
+}> {
+  const empty = { dataUrl: "", widthPx: 0, heightPx: 0, widthIn: 0, heightIn: 0, dpi: DEFAULT_DPI };
+  if (!artUrl) return empty;
+  try {
+    const artImg = await loadImageEl(artUrl, true);
+    const { ph, stage, dpi } = resolvePrintAreaStage(ep);
+    const { widthPx, heightPx } = printExportSize(ph.widthIn, ph.heightIn, dpi);
+    const aspect = (artImg.naturalHeight || 1) / (artImg.naturalWidth || 1);
+    const pl = placement ?? defaultPlacement(ep, aspect);
+    const rel = placementPrintFractions(pl, stage, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = widthPx;
+    canvas.height = heightPx;
+    const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, widthPx, heightPx);
+
+    const artW = rel.w * widthPx;
+    const artH = artW * aspect;
+    const artCx = rel.cx * widthPx;
+    const artCy = rel.cy * heightPx;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, widthPx, heightPx);
+    ctx.clip();
+    ctx.translate(artCx, artCy);
+    ctx.rotate(((rel.rot || 0) * Math.PI) / 180);
+    ctx.drawImage(artImg, -artW / 2, -artH / 2, artW, artH);
+    ctx.restore();
+
+    return {
+      dataUrl: canvas.toDataURL("image/png"),
+      widthPx,
+      heightPx,
+      widthIn: ph.widthIn,
+      heightIn: ph.heightIn,
+      dpi,
+    };
+  } catch {
+    return empty;
   }
 }
 
@@ -376,13 +523,27 @@ export async function bakeTintedMockup(
       const aspect = (artImg.naturalHeight || 1) / (artImg.naturalWidth || 1);
       const pl = placement ?? defaultPlacement(ep, aspect);
       const realArt = buildRealisticArtwork(artImg, ep?.g);
-      const w0 = (pl.wPct / 100) * size;
+      const { ph, stage, phys } = resolvePrintAreaStage(ep);
+      const rel = placementPrintFractions(pl, stage, CANVAS_WIDTH, CANVAS_HEIGHT);
+      const printRect = designPlacementOnMockup({
+        mockupWidthPx: w,
+        mockupHeightPx: h,
+        placeholder: ph,
+        physicalDimensions: phys,
+        viewKey: ph.key,
+      });
+      const w0 = printRect.w * rel.w;
       const h0 = w0 * aspect;
+      const cx = dx + printRect.x + rel.cx * printRect.w;
+      const cy = dy + printRect.y + rel.cy * printRect.h;
       ctx.save();
+      ctx.beginPath();
+      ctx.rect(dx + printRect.x, dy + printRect.y, printRect.w, printRect.h);
+      ctx.clip();
       ctx.globalCompositeOperation = "multiply";
       ctx.globalAlpha = 0.96;
-      ctx.translate((pl.xPct / 100) * size, (pl.yPct / 100) * size);
-      ctx.rotate(((pl.rot || 0) * Math.PI) / 180);
+      ctx.translate(cx, cy);
+      ctx.rotate(((rel.rot || 0) * Math.PI) / 180);
       ctx.drawImage(realArt, -w0 / 2, -h0 / 2, w0, h0);
       ctx.restore();
     }
