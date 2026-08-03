@@ -62,6 +62,8 @@ export type UiShop = {
   currency: string;
   currencyMode: ShopCurrencyMode;
   pointsConversionEnabled: boolean;
+  /** Company work-email domain for public store signup (e.g. "acme.com"). */
+  companyEmailDomain?: string;
   live: boolean;
   categories: string[];
   collections: string[];
@@ -362,6 +364,7 @@ export function mapShop(s: ApiProduct): UiShop {
     currency: currencyKeyFromMode(currencyMode),
     currencyMode,
     pointsConversionEnabled: Boolean(s.pointsConversionEnabled),
+    companyEmailDomain: String((s as { companyEmailDomain?: string }).companyEmailDomain || ""),
     live: s.status === "live",
     categories: s.categories || [],
     collections: [],

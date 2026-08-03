@@ -12,6 +12,7 @@ export type CreateShopInput = {
   name: string;
   currency: string;
   categories: string[];
+  companyEmailDomain?: string;
   logoUrl?: string;
   bannerConfig?: Record<string, unknown>;
 };
@@ -20,6 +21,7 @@ export type UpdateShopInput = {
   name?: string;
   currencyMode?: "points" | "inr";
   pointsConversionEnabled?: boolean;
+  companyEmailDomain?: string;
   logoUrl?: string;
   bannerConfig?: Record<string, unknown>;
   selectedCatalogProductIds?: string[];

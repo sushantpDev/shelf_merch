@@ -1,12 +1,12 @@
 import { shopSlugFromHostname } from "@/lib/shopRedeemUrl";
-import ShopRedeemEntry from "@/components/ShopRedeemEntry";
+import Storefront from "@/components/Storefront";
 import { Outlet } from "react-router";
 
-/** When visiting salesforce.store, render the shop entry instead of the main app. */
+/** When visiting salesforce.store, render the public storefront (not redeem entry). */
 export function ShopSubdomainGate() {
   const slug = shopSlugFromHostname();
   if (slug) {
-    return <ShopRedeemEntry slug={slug} />;
+    return <Storefront slug={slug} />;
   }
   return <Outlet />;
 }

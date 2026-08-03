@@ -9,6 +9,11 @@ const shopSchema = new mongoose.Schema(
     slug: { type: String, trim: true, lowercase: true },
     currencyMode: { type: String, enum: ['points', 'inr'], default: 'points' },
     pointsConversionEnabled: { type: Boolean, default: false },
+    /**
+     * Allowed work-email domain for public storefront signup (e.g. "acme.com").
+     * Platform email allowlist entries are always permitted in addition.
+     */
+    companyEmailDomain: { type: String, default: '', trim: true, lowercase: true },
     logoUrl: { type: String, default: '' },
     bannerConfig: { type: Object, default: () => ({}) },
     categories: { type: [String], default: [] },

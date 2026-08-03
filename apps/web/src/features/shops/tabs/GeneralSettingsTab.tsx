@@ -13,15 +13,23 @@ const SETTINGS_SECTIONS = [
   "Shop Users",
 ] as const;
 
+function normalizeDomain(value: string) {
+  return value.trim().toLowerCase().replace(/^@/, "");
+}
+
 export function GeneralSettingsTab({ shop }: { shop: UiShop }) {
   const updateShop = useUpdateShop();
   const [name, setName] = useState(shop.name);
+  const [companyEmailDomain, setCompanyEmailDomain] = useState(shop.companyEmailDomain || "");
 
   useEffect(() => {
     setName(shop.name);
+    setCompanyEmailDomain(shop.companyEmailDomain || "");
   }, [shop]);
 
-  const dirty = name.trim() !== shop.name;
+  const dirty =
+    name.trim() !== shop.name ||
+    normalizeDomain(companyEmailDomain) !== normalizeDomain(shop.companyEmailDomain || "");
   const currencyDescription =
     shop.currencyMode === "inr"
       ? "Product prices in this store are shown in Indian Rupees (₹). Recipients see Credits."
@@ -33,10 +41,15 @@ export function GeneralSettingsTab({ shop }: { shop: UiShop }) {
       toast.error("Shop name is required");
       return;
     }
+    const domain = normalizeDomain(companyEmailDomain);
+    if (domain && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domain)) {
+      toast.error("Enter a valid domain like company.com");
+      return;
+    }
     try {
       await updateShop.mutateAsync({
         shopId: shop.id,
-        input: { name: trimmed },
+        input: { name: trimmed, companyEmailDomain: domain },
       });
       toast.success("Shop settings updated");
     } catch (err) {
@@ -99,6 +112,20 @@ export function GeneralSettingsTab({ shop }: { shop: UiShop }) {
 
         <div className="muted" style={{ fontSize: 12, margin: "2px 0 22px", lineHeight: 1.55 }}>
           {currencyDescription} Store currency is locked and cannot be changed after creation.
+        </div>
+
+        <div className="field">
+          <label className="lbl">Company email domain</label>
+          <input
+            className="inp"
+            value={companyEmailDomain}
+            placeholder="company.com"
+            onChange={(e) => setCompanyEmailDomain(e.target.value.replace(/^@/, ""))}
+          />
+        </div>
+        <div className="muted" style={{ fontSize: 12, margin: "2px 0 22px", lineHeight: 1.55 }}>
+          Public storefront signups must use an email at this domain. Platform allowlisted emails
+          can always create accounts on any store. Leave blank to disable public signup until set.
         </div>
 
         <button

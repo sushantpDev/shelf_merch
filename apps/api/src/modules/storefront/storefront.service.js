@@ -23,7 +23,7 @@ export async function getStorefront(shopId) {
   };
 }
 
-function shopPublicPayload(shop) {
+export function shopPublicPayload(shop) {
   return {
     id: String(shop._id),
     slug: shop.slug || '',
@@ -33,6 +33,7 @@ function shopPublicPayload(shop) {
     bannerPreset: shop.bannerConfig?.preset || '',
     bannerImageUrl: shop.bannerConfig?.imageUrl || '',
     currencyMode: shop.currencyMode,
+    companyEmailDomain: shop.companyEmailDomain || '',
     featuredCatalogProductIds: (shop.featuredCatalogProductIds || []).map(String),
     featuredListingKeys: (shop.featuredListingKeys || []).map(String),
     activeListingKeys: (shop.activeListingKeys || []).map(String),

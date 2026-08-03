@@ -66,6 +66,7 @@ export function useCreateShopController(): CreateShopVm {
         name,
         currency: draft.currency,
         categories: draft.categories,
+        companyEmailDomain: draft.companyEmailDomain.trim().replace(/^@/, "").toLowerCase(),
         logoUrl: draft.logoUrl,
         bannerConfig: bannerConfigFromSource({
           bannerTheme: draft.bannerTheme,

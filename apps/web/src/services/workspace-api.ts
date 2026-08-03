@@ -591,6 +591,7 @@ export async function createShopApi(payload: {
   name: string;
   currencyMode: "points" | "inr";
   categories: string[];
+  companyEmailDomain?: string;
   logoUrl?: string;
   bannerConfig?: Record<string, unknown>;
 }) {
@@ -612,6 +613,7 @@ export async function updateShopApi(
     name?: string;
     currencyMode?: "points" | "inr";
     pointsConversionEnabled?: boolean;
+    companyEmailDomain?: string;
     logoUrl?: string;
     bannerConfig?: Record<string, unknown>;
     categories?: string[];

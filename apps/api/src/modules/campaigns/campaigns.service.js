@@ -104,7 +104,10 @@ function finalizeRecipientRedemption(recipient) {
 }
 
 export async function listCampaigns({ tenantId, user }) {
-  const filter = { tenantId };
+  const filter = {
+    tenantId,
+    name: { $ne: '__storefront_self_serve__' },
+  };
   if (user.scopeType === 'entity') {
     filter.entityId = { $in: user.assignedEntityIds };
   }

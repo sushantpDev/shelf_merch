@@ -4,6 +4,7 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 import {
   ApiError,
   resetPasswordWithToken,
+  resetShopPassword,
   validatePasswordResetToken,
 } from "@/services/api-bridge";
 import { AuthLabel, AuthLayout, authInputClassName } from "./views/AuthLayout";
@@ -13,13 +14,24 @@ import {
   allPasswordRulesPass,
   evaluatePasswordRules,
 } from "./components/PasswordRulesChecklist";
+import { shopStorefrontPath } from "@/lib/shopRedeemUrl";
 
 type Phase = "validating" | "invalid" | "form" | "success";
+
+/** Shop reset tokens are `rawHex.shopObjectId`. */
+function parseShopResetToken(token: string): { shopId: string } | null {
+  const dot = token.lastIndexOf(".");
+  if (dot <= 0) return null;
+  const shopId = token.slice(dot + 1);
+  if (!/^[a-f\d]{24}$/i.test(shopId)) return null;
+  return { shopId };
+}
 
 export function ResetPasswordPage() {
   const [params] = useSearchParams();
   const token = params.get("token")?.trim() || "";
   const navigate = useNavigate();
+  const shopReset = useMemo(() => (token ? parseShopResetToken(token) : null), [token]);
 
   const [phase, setPhase] = useState<Phase>(token ? "validating" : "invalid");
   const [email, setEmail] = useState("");
@@ -28,6 +40,7 @@ export function ResetPasswordPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [reuseFailed, setReuseFailed] = useState(false);
+  const [shopId, setShopId] = useState(shopReset?.shopId || "");
 
   const rules = useMemo(
     () =>
@@ -41,6 +54,11 @@ export function ResetPasswordPage() {
   useEffect(() => {
     if (!token) {
       setPhase("invalid");
+      return;
+    }
+    if (shopReset) {
+      setShopId(shopReset.shopId);
+      setPhase("form");
       return;
     }
     let cancelled = false;
@@ -61,13 +79,14 @@ export function ResetPasswordPage() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, shopReset]);
 
   useEffect(() => {
     if (phase !== "success") return;
-    const t = window.setTimeout(() => navigate("/login", { replace: true }), 2000);
+    const dest = shopId ? shopStorefrontPath(shopId) : "/login";
+    const t = window.setTimeout(() => navigate(dest, { replace: true }), 2000);
     return () => window.clearTimeout(t);
-  }, [phase, navigate]);
+  }, [phase, navigate, shopId]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,7 +95,12 @@ export function ResetPasswordPage() {
     setError("");
     setReuseFailed(false);
     try {
-      await resetPasswordWithToken(token, password);
+      if (shopReset) {
+        const res = await resetShopPassword(token, password);
+        setShopId(res.shopId);
+      } else {
+        await resetPasswordWithToken(token, password);
+      }
       setPhase("success");
     } catch (err) {
       if (err instanceof ApiError) {
@@ -92,7 +116,7 @@ export function ResetPasswordPage() {
         } else if (err.status === 429) {
           setError("Too many attempts. Please wait and try again.");
         } else {
-          setError("Something went wrong. Please try again.");
+          setError(err.message || "Something went wrong. Please try again.");
         }
       } else {
         setError("Cannot reach the server. Please try again shortly.");
@@ -149,9 +173,9 @@ export function ResetPasswordPage() {
           <p className="auth-success-headline">Password updated successfully</p>
           <p className="auth-success-copy">Your password has been reset.</p>
           <p className="auth-success-redirect" aria-live="polite">
-            Redirecting to Login…
+            {shopId ? "Redirecting to store…" : "Redirecting to Login…"}
           </p>
-          <Link to="/login" className="auth-simple-switch-link">
+          <Link to={shopId ? shopStorefrontPath(shopId) : "/login"} className="auth-simple-switch-link">
             Continue now
           </Link>
         </div>
@@ -167,18 +191,20 @@ export function ResetPasswordPage() {
     >
       <form className="auth-simple-form" onSubmit={onSubmit} aria-busy={busy} noValidate>
         <fieldset className="auth-simple-fieldset" disabled={busy}>
-          <div className="auth-simple-field">
-            <AuthLabel htmlFor="reset-email">Email Address</AuthLabel>
-            <input
-              id="reset-email"
-              type="email"
-              value={email}
-              readOnly
-              disabled
-              className={`${authInputClassName} auth-simple-input--readonly`}
-              autoComplete="username"
-            />
-          </div>
+          {!shopReset ? (
+            <div className="auth-simple-field">
+              <AuthLabel htmlFor="reset-email">Email Address</AuthLabel>
+              <input
+                id="reset-email"
+                type="email"
+                value={email}
+                readOnly
+                disabled
+                className={`${authInputClassName} auth-simple-input--readonly`}
+                autoComplete="username"
+              />
+            </div>
+          ) : null}
 
           <div className="auth-simple-field">
             <AuthLabel htmlFor="reset-password">New Password</AuthLabel>
