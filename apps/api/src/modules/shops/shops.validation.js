@@ -11,6 +11,20 @@ export const createShopSchema = z.object({
     .optional(),
   currencyMode: z.enum(['points', 'inr']).optional().default('points'),
   pointsConversionEnabled: z.boolean().optional().default(false),
+  /** Work-email domain for public storefront signup (e.g. "acme.com"). */
+  companyEmailDomain: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .transform((v) => v.replace(/^@/, ''))
+    .refine(
+      (v) =>
+        v === '' ||
+        /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(v),
+      'Enter a valid domain like company.com',
+    )
+    .optional()
+    .default(''),
   logoUrl: z.string().optional().default(''),
   bannerConfig: z.record(z.any()).optional().default({}),
   categories: z.array(z.string().min(1)).optional().default([]),
@@ -26,6 +40,17 @@ export const updateShopSchema = z
       .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use lowercase letters, numbers, and hyphens')
       .optional(),
     pointsConversionEnabled: z.boolean(),
+    companyEmailDomain: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .transform((v) => v.replace(/^@/, ''))
+      .refine(
+        (v) =>
+          v === '' ||
+          /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(v),
+        'Enter a valid domain like company.com',
+      ),
     logoUrl: z.string(),
     bannerConfig: z.record(z.any()),
     categories: z.array(z.string().min(1)),

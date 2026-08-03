@@ -315,6 +315,7 @@ export async function createShopFlow(payload: {
   name: string;
   currency: string;
   categories: string[];
+  companyEmailDomain?: string;
   logoUrl?: string;
   bannerConfig?: Record<string, unknown>;
 }) {
@@ -323,6 +324,7 @@ export async function createShopFlow(payload: {
     name: payload.name,
     currencyMode,
     categories: payload.categories,
+    companyEmailDomain: payload.companyEmailDomain || "",
     logoUrl: payload.logoUrl || "",
     bannerConfig: payload.bannerConfig || {},
   });
@@ -335,6 +337,7 @@ export async function updateShopFlow(
     name?: string;
     currencyMode?: "points" | "inr";
     pointsConversionEnabled?: boolean;
+    companyEmailDomain?: string;
     logoUrl?: string;
     bannerConfig?: Record<string, unknown>;
     selectedCatalogProductIds?: string[];
@@ -714,13 +717,17 @@ export async function getRedemptionPortal(token: string) {
 export type StorefrontData = {
   shop: {
     id: string;
+    slug?: string;
     name: string;
     logoUrl?: string;
     bannerTheme?: string;
     bannerPreset?: string;
     bannerImageUrl?: string;
     currencyMode: string;
+    companyEmailDomain?: string;
     featuredCatalogProductIds?: string[];
+    featuredListingKeys?: string[];
+    activeListingKeys?: string[];
   };
   products: Array<{
     _id: string;
@@ -754,6 +761,104 @@ export type StorefrontData = {
 
 export async function getPublicStorefront(shopId: string) {
   return publicFetch<StorefrontData>(`/storefront/${shopId}`);
+}
+
+export async function getPublicStorefrontBySlug(slug: string) {
+  return publicFetch<{ shop: StorefrontData["shop"] }>(`/storefront/by-slug/${encodeURIComponent(slug)}`);
+}
+
+export type ShopAuthSessionResponse = {
+  accessToken: string;
+  customer: {
+    id: string;
+    shopId: string;
+    email: string;
+    name: string;
+    claimedViaRedeem?: boolean;
+  };
+  shop: StorefrontData["shop"];
+  creditAmount: number;
+  redemptionToken: string | null;
+};
+
+export type ShopSignupStartResponse = {
+  pendingId: string;
+  email: string;
+  emailMasked: string;
+  otpExpiresInSec: number;
+  resendAvailableInSec: number;
+  shop: StorefrontData["shop"];
+};
+
+export async function startShopSignup(
+  shopId: string,
+  body: { name: string; email: string; password: string },
+) {
+  return publicFetch<ShopSignupStartResponse>(`/storefront/${shopId}/auth/signup/start`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function resendShopSignupOtp(shopId: string, pendingId: string) {
+  return publicFetch<Omit<ShopSignupStartResponse, "shop">>(`/storefront/${shopId}/auth/signup/resend`, {
+    method: "POST",
+    body: JSON.stringify({ pendingId }),
+  });
+}
+
+export async function verifyShopSignupOtp(shopId: string, body: { pendingId: string; otp: string }) {
+  return publicFetch<ShopAuthSessionResponse>(`/storefront/${shopId}/auth/signup/verify`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function loginShopCustomer(shopId: string, body: { email: string; password: string }) {
+  return publicFetch<ShopAuthSessionResponse>(`/storefront/${shopId}/auth/login`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchShopCustomerMe(shopId: string, accessToken: string) {
+  return publicFetch<Omit<ShopAuthSessionResponse, "accessToken">>(`/storefront/${shopId}/auth/me`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
+export async function forgotShopPassword(shopId: string, email: string) {
+  return publicFetch<{ success: boolean; message: string }>(
+    `/storefront/${shopId}/auth/forgot-password`,
+    {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    },
+  );
+}
+
+export async function resetShopPassword(token: string, newPassword: string) {
+  return publicFetch<{ success: boolean; shopId: string }>(`/storefront/auth/reset-password`, {
+    method: "POST",
+    body: JSON.stringify({ token, newPassword }),
+  });
+}
+
+export type ClaimRedeemResponse =
+  | {
+      needsPassword: true;
+      email: string;
+      emailMasked: string;
+      name: string;
+      shop: StorefrontData["shop"];
+    }
+  | (ShopAuthSessionResponse & { needsPassword: false; created: boolean });
+
+export async function claimRedeemShopAccount(token: string, password?: string) {
+  return publicFetch<ClaimRedeemResponse>(`/storefront/auth/claim-redeem`, {
+    method: "POST",
+    body: JSON.stringify(password ? { token, password } : { token }),
+  });
 }
 
 export async function sendRedemptionOtp(token: string, contact: string) {

@@ -167,7 +167,7 @@ type AddedToBagInfo = {
   image?: string;
 };
 
-type Mode = "preview" | "redeem";
+type Mode = "preview" | "redeem" | "store";
 type Page = "home" | "products" | "product" | "cart" | "checkout" | "done" | "orders" | "order-detail" | "support";
 
 const SUPPORT_TYPE_LABELS: Record<string, string> = {
@@ -728,6 +728,8 @@ export default function StoreShell({
   initialShippingAddress,
   onCheckout,
   onLogout,
+  onRequireAuth,
+  authenticated = false,
   onFetchOrders,
   onFetchTickets,
   onRaiseTicket,
@@ -748,6 +750,9 @@ export default function StoreShell({
   sessionToken?: string;
   /** Scope cart persistence across page refreshes (redemption token or shop id). */
   cartPersistId?: string;
+  /** Public storefront: prompt sign-in before cart actions. */
+  onRequireAuth?: () => void;
+  authenticated?: boolean;
   onCheckout?: (
     items: CheckoutItem[],
     address: ShippingAddress,
@@ -768,6 +773,7 @@ export default function StoreShell({
   onConfirmTicket?: (ticketId: string) => Promise<StoreSupportTicket>;
 }) {
   const storageKey = cartStorageKey(cartPersistId);
+  const isShopper = mode === "redeem" || mode === "store";
   const [page, setPage] = useState<Page>("home");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [cart, setCart] = useState<CartLine[]>(() => (storageKey ? readStoredCart(storageKey) : []));
@@ -911,8 +917,8 @@ export default function StoreShell({
   const pointsApplied = useRewardPoints ? Math.min(pointsAvailable, cartTotalInr) : 0;
   const upiDueInr = useRewardPoints ? Math.max(0, cartTotalInr - pointsApplied) : cartTotalInr;
   const hasEnoughPoints = balanceInr != null && cartTotalInr <= balanceInr;
-  const paysWithUpi = mode === "redeem" && upiDueInr > 0;
-  const canCheckout = mode !== "redeem" || cart.length > 0;
+  const paysWithUpi = isShopper && upiDueInr > 0;
+  const canCheckout = !isShopper || cart.length > 0;
 
   const shippingValid = useMemo(() => {
     const name = [checkoutFirst, checkoutLast].filter(Boolean).join(" ").trim();
@@ -943,9 +949,18 @@ export default function StoreShell({
     return formatStorePrice(inr, storeCurrency);
   }
 
-  /** Stadium-style product price — bold "Pts" or ₹ on cards. */
+  function fmtUpiAmount(inr: number) {
+    return `₹${inr.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  /** Stadium-style product price — bold "Pts" or ₹ on cards.
+   *  Public / self-pay points shoppers also see INR equivalent. */
   function fmtCardPrice(inr: number) {
-    return formatStoreCardPrice(inr, storeCurrency);
+    const base = formatStoreCardPrice(inr, storeCurrency);
+    if (mode === "store" && storeCurrency === "points" && (balanceInr ?? 0) <= 0) {
+      return `${base} (${fmtUpiAmount(inr)})`;
+    }
+    return base;
   }
 
   function navBalanceLabel() {
@@ -960,10 +975,6 @@ export default function StoreShell({
     return storeCurrency === "inr" ? formatStoreAmount(inr, storeCurrency) : fmtCardPrice(inr);
   }
 
-  function fmtUpiAmount(inr: number) {
-    return `₹${inr.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  }
-
   /** Checkout "You pay" — 0 when wallet covers all; partial shows Pts (₹). */
   function fmtYouPayDue(inr: number) {
     if (inr <= 0) {
@@ -976,7 +987,7 @@ export default function StoreShell({
   }
 
   function youPayAmountInr() {
-    if (mode !== "redeem") return cartTotalInr;
+    if (!isShopper) return cartTotalInr;
     if (!useRewardPoints) return cartTotalInr;
     return upiDueInr;
   }
@@ -1073,6 +1084,10 @@ export default function StoreShell({
   }
 
   function addToCart(p: StoreProduct, variant: { size?: string; color?: string }, qty: number) {
+    if (mode === "store" && !authenticated) {
+      onRequireAuth?.();
+      return;
+    }
     const key = `${p._id}|${variant.size || ""}|${variant.color || ""}`;
     const existing = cart.find((l) => l.key === key);
     const next = existing
@@ -1259,7 +1274,7 @@ export default function StoreShell({
       const paymentMode = checkoutPaymentMode();
       let razorpay: CheckoutPayment["razorpay"];
 
-      if (mode === "redeem" && upiDueInr > 0) {
+      if (isShopper && upiDueInr > 0) {
         razorpay = await collectRazorpayPayment(upiDueInr);
       }
 
@@ -1349,7 +1364,7 @@ export default function StoreShell({
             </div>
 
             <div className="sf-topbar-right sf-topbar-right--stadium">
-              {mode === "redeem" && balanceInr != null && (
+              {isShopper && balanceInr != null && (
                 <button
                   type="button"
                   className="topbar-wallet sf-topbar-wallet"
@@ -1368,7 +1383,7 @@ export default function StoreShell({
                 </button>
               )}
 
-              {mode === "redeem" && onLogout ? (
+              {isShopper && onLogout ? (
                 <StoreAccountMenu
                   recipientName={recipientName || "Guest"}
                   recipientEmail={recipientEmail}
@@ -1384,6 +1399,15 @@ export default function StoreShell({
                   onOpenSupport={onFetchTickets ? openSupport : undefined}
                   onLogout={onLogout}
                 />
+              ) : mode === "store" && onRequireAuth ? (
+                <button
+                  type="button"
+                  className="btn btn-dark"
+                  style={{ padding: "8px 14px", fontSize: 13 }}
+                  onClick={() => onRequireAuth()}
+                >
+                  Sign in
+                </button>
               ) : (
               <button type="button" className="topbar-user sf-topbar-user" aria-label="Account">
                 <span className="topbar-user-avatar">{userInitials}</span>
@@ -1395,7 +1419,7 @@ export default function StoreShell({
               </button>
               )}
 
-              {mode === "redeem" && (
+              {isShopper && (
                 <button
                   type="button"
                   className="sf-topbar-cart"
@@ -1425,7 +1449,7 @@ export default function StoreShell({
                 className={`sf-nav-link${page === "orders" || page === "order-detail" ? " active" : ""}`}
                 onClick={() => {
                   setPage("orders");
-                  if (mode === "redeem") void refreshOrders();
+                  if (isShopper) void refreshOrders();
                 }}
               >
                 Orders
@@ -1644,7 +1668,7 @@ export default function StoreShell({
                 </p>
               </div>
 
-              {mode === "redeem" && balanceInr != null ? (
+              {isShopper && balanceInr != null ? (
                 <div className={`sf-bag-funds sf-bag-funds--v2${useRewardPoints ? "" : " sf-bag-funds--off"}`}>
                   <div className="sf-bag-funds-copy">
                     <div className="sf-bag-funds-label">
@@ -1756,19 +1780,19 @@ export default function StoreShell({
                   <span>Bag Total (Inc. of GST)</span>
                   <b>{fmtCardPrice(cartTotalInr)}</b>
                 </div>
-                {mode === "redeem" && balanceInr != null && useRewardPoints && pointsApplied > 0 ? (
+                {isShopper && balanceInr != null && useRewardPoints && pointsApplied > 0 ? (
                   <div className="sf-bag-summary-row sf-bag-summary-row--credit">
                     <span>{appliedLabel(storeCurrency)}</span>
                     <b>-{fmtApplied(pointsApplied)}</b>
                   </div>
                 ) : null}
-                {mode === "redeem" && paysWithUpi ? (
+                {isShopper && paysWithUpi ? (
                   <div className="sf-bag-summary-row sf-bag-summary-row--muted">
                     <span>Pay via UPI</span>
                     <b>{fmtYouPayDue(upiDueInr)}</b>
                   </div>
                 ) : null}
-                {mode === "redeem" && balanceInr != null && useRewardPoints ? (
+                {isShopper && balanceInr != null && useRewardPoints ? (
                   <div className="sf-bag-summary-row sf-bag-summary-row--muted">
                     <span>Remaining After Order</span>
                     <b>
@@ -1780,7 +1804,7 @@ export default function StoreShell({
                 <div className="sf-bag-summary-total">
                   <span>Total</span>
                   <b>
-                    {mode === "redeem" && useRewardPoints
+                    {isShopper && useRewardPoints
                       ? fmtYouPayDue(youPayAmountInr())
                       : paysWithUpi
                         ? fmtUpiAmount(upiDueInr)
@@ -1790,15 +1814,21 @@ export default function StoreShell({
                   </b>
                 </div>
 
-                {mode === "redeem" ? (
+                {isShopper ? (
                   <>
                     <button
                       type="button"
                       className="sf-bag-checkout-btn"
-                      disabled={!canCheckout}
-                      onClick={() => setPage("checkout")}
+                      disabled={!canCheckout || (mode === "store" && !authenticated)}
+                      onClick={() => {
+                        if (mode === "store" && !authenticated) {
+                          onRequireAuth?.();
+                          return;
+                        }
+                        setPage("checkout");
+                      }}
                     >
-                      Proceed to Checkout
+                      {mode === "store" && !authenticated ? "Sign in to check out" : "Proceed to Checkout"}
                       <ArrowRightIcon />
                     </button>
                     <p className="sf-bag-secure-note">
@@ -2099,7 +2129,7 @@ export default function StoreShell({
                   </span>
                   <h2 className="sf-checkout-summary-title">Order Summary</h2>
                 </div>
-                {mode === "redeem" && balanceInr != null ? (
+                {isShopper && balanceInr != null ? (
                   <div className={`sf-bag-funds sf-bag-funds--checkout${useRewardPoints ? "" : " sf-bag-funds--off"}`}>
                     <div className="sf-bag-funds-label">{myWalletLabel(storeCurrency)}</div>
                     <label className="sf-bag-funds-wallet">
@@ -2139,19 +2169,19 @@ export default function StoreShell({
                   <span>Bag total (Inc. of GST)</span>
                   <b>{fmtCardPrice(cartTotalInr)}</b>
                 </div>
-                {mode === "redeem" && useRewardPoints && pointsApplied > 0 ? (
+                {isShopper && useRewardPoints && pointsApplied > 0 ? (
                   <div className="sf-checkout-summary-row sf-checkout-summary-row--credit">
                     <span>{appliedLabel(storeCurrency)}</span>
                     <b>-{fmtApplied(pointsApplied)}</b>
                   </div>
                 ) : null}
-                {mode === "redeem" && paysWithUpi ? (
+                {isShopper && paysWithUpi ? (
                   <div className="sf-checkout-summary-row sf-checkout-summary-row--muted">
                     <span>Pay via UPI</span>
                     <b>{fmtYouPayDue(upiDueInr)}</b>
                   </div>
                 ) : null}
-                {mode === "redeem" && balanceInr != null && useRewardPoints ? (
+                {isShopper && balanceInr != null && useRewardPoints ? (
                   <div className="sf-checkout-summary-row sf-checkout-summary-row--muted">
                     <span>Remaining in wallet</span>
                     <b>{navBalanceValue(Math.max(0, balanceInr - pointsApplied))}</b>
@@ -2160,7 +2190,7 @@ export default function StoreShell({
                 <div className="sf-checkout-summary-total">
                   <span>You pay</span>
                   <b>
-                    {mode === "redeem" && useRewardPoints
+                    {isShopper && useRewardPoints
                       ? fmtYouPayDue(youPayAmountInr())
                       : paysWithUpi
                         ? fmtUpiAmount(upiDueInr)
@@ -3864,6 +3894,7 @@ function ProductDetail({ product, mode, priceLabel, onBack, onAdd }: {
   onBack: () => void;
   onAdd: (variant: { size?: string; color?: string }, qty: number) => void;
 }) {
+  const isShopper = mode === "redeem" || mode === "store";
   const variants = product.variants || [];
   const sizes = useMemo(() => distinct(variants.map((v) => v.size)), [variants]);
   const colorOptions = useMemo(() => productColorOptions(product), [product]);
@@ -3948,7 +3979,7 @@ function ProductDetail({ product, mode, priceLabel, onBack, onAdd }: {
             </div>
           ) : null}
 
-          {mode === "redeem" ? (
+          {isShopper ? (
             <div className="sf-pdp-purchase">
               <div className="sf-pdp-purchase-qty">
                 <span className="sf-pdp-qty-label">Quantity</span>
@@ -3983,7 +4014,7 @@ function ProductDetail({ product, mode, priceLabel, onBack, onAdd }: {
               </button>
             </div>
           ) : (
-            <p className="sf-pdp-preview-note">Open your invite link to redeem this item.</p>
+            <p className="sf-pdp-preview-note">Sign in to add this item to your bag.</p>
           )}
 
           {hasProductInfo ? (

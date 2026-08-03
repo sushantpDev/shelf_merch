@@ -4,6 +4,8 @@ export type ShopDraft = {
   step: 0 | 1 | 2;
   name: string;
   currency: string;
+  /** Work-email domain for public storefront signup, e.g. "acme.com" (no @). */
+  companyEmailDomain: string;
   logoUrl: string;
   categories: string[];
   bannerTheme: string;
@@ -15,6 +17,7 @@ export const INITIAL_SHOP_DRAFT: ShopDraft = {
   step: 0,
   name: "",
   currency: "Points",
+  companyEmailDomain: "",
   logoUrl: "",
   categories: DEFAULT_BUILDER_CATEGORIES,
   bannerTheme: "dark",

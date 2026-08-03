@@ -8,6 +8,7 @@
 export const JWT_ISSUER = 'shelfmerch-api';
 export const JWT_ACCESS_AUDIENCE = 'shelfmerch-app';
 export const JWT_REDEMPTION_AUDIENCE = 'shelfmerch-redeem';
+export const JWT_SHOP_AUDIENCE = 'shelfmerch-shop';
 export const JWT_ALGORITHM = 'HS256';
 
 export const accessSignOptions = (extra = {}) => ({
@@ -34,4 +35,17 @@ export const redemptionVerifyOptions = () => ({
   algorithms: [JWT_ALGORITHM],
   issuer: JWT_ISSUER,
   audience: JWT_REDEMPTION_AUDIENCE,
+});
+
+export const shopSignOptions = (extra = {}) => ({
+  algorithm: JWT_ALGORITHM,
+  issuer: JWT_ISSUER,
+  audience: JWT_SHOP_AUDIENCE,
+  ...extra,
+});
+
+export const shopVerifyOptions = () => ({
+  algorithms: [JWT_ALGORITHM],
+  issuer: JWT_ISSUER,
+  audience: JWT_SHOP_AUDIENCE,
 });
