@@ -33,7 +33,6 @@ export async function fetchPlatformTenants(status?: string) {
       plan?: string;
       walletBalanceInr: number;
       openOrders: number;
-      outstandingInr: number;
     }>
   >(`/platform/tenants${q}`);
 }

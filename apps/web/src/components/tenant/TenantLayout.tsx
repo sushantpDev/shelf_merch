@@ -80,8 +80,12 @@ export default function TenantLayout() {
     isEntityManager && entityManagerWalletIds
       ? (workspace?.wallets ?? []).filter((w) => entityManagerWalletIds.has(w.id))
       : (workspace?.wallets ?? []);
-  const hasBudget = (workspace?.wallets?.length ?? 0) > 0;
+  const hasBudget = isEntityManager
+    ? Boolean(workspace && entityManagerDepartments(workspace).length > 0)
+    : (workspace?.wallets?.length ?? 0) > 0;
   const canRequestTopup = canWrite("wallets") && !isEntityManager && hasBudget;
+  const budgetTitle = isEntityManager ? "My budget" : "Organization budget";
+  const balanceCaption = isEntityManager ? "Available for you" : "Available balance";
 
   return (
     <div className="tenant-shell">
@@ -95,7 +99,8 @@ export default function TenantLayout() {
             wallets={headerWallets}
             totalLabel={walletBalance}
             hasBudget={hasBudget}
-            balanceCaption={isEntityManager ? "Available department budget" : "Available balance"}
+            budgetTitle={budgetTitle}
+            balanceCaption={balanceCaption}
             canRequestTopup={canRequestTopup}
           />
           <NotificationBell />
