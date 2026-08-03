@@ -33,7 +33,6 @@ export function TenantsView({
     { key: "plan", label: "Plan", render: (r) => String(r.plan ?? "—") },
     { key: "walletBalanceInr", label: "Wallet", render: (r) => inr(Number(r.walletBalanceInr)) },
     { key: "openOrders", label: "Open orders" },
-    { key: "outstandingInr", label: "Outstanding", render: (r) => inr(Number(r.outstandingInr)) },
   ];
 
   if (canWrite) {

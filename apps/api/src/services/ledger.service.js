@@ -13,8 +13,11 @@ import { ApiError, InsufficientFundsError, NotFoundError } from '../utils/errors
  * - `allocation_to_entity` is an earmark, not a cash movement: it moves
  *   `wallet.allocatedAmount` (and the entity's allocatedAmount) while the cash
  *   stays in the wallet. Invariant: allocatedAmount <= balance at all times.
- * - `campaign_spend` / `order_payment` debit cash only. Department earmarks
- *   stay until explicitly deallocated; entity `spentAmount` tracks consumption.
+ * - `campaign_spend` / `order_payment` with `relatedEntityId` debit cash and
+ *   release that share of the department earmark (`wallet.allocatedAmount`) so
+ *   org unallocated is not double-consumed. Entity `spentAmount` tracks usage;
+ *   remaining = allocatedAmount - spentAmount.
+ * - Spends without `relatedEntityId` debit cash only (admin unallocated spend).
  * - Every movement is an append-only WalletTransaction with a balanceAfter
  *   snapshot, so `balance` is always recomputable/auditable from the log.
  *
@@ -70,6 +73,21 @@ export async function createTransaction(
         );
       }
       if (type === 'fund_in') wallet.totalAmount += amount;
+      // Department spend: release earmark so admin unallocated is not also reduced.
+      if (
+        relatedEntityId &&
+        (type === 'campaign_spend' || type === 'order_payment') &&
+        amount < 0
+      ) {
+        newAllocated = wallet.allocatedAmount - Math.abs(amount);
+        if (newAllocated < 0) {
+          throw new ApiError(
+            422,
+            'Cannot spend more than the department earmark remaining on this wallet',
+            'INVALID_ALLOCATION',
+          );
+        }
+      }
     } else if (type === 'allocation_to_entity') {
       newAllocated = wallet.allocatedAmount + amount;
       if (newAllocated < 0) {
@@ -82,6 +100,12 @@ export async function createTransaction(
       }
     } else {
       throw new ApiError(422, `Unknown transaction type "${type}"`, 'INVALID_TRANSACTION_TYPE');
+    }
+
+    if (newAllocated > newBalance) {
+      throw new InsufficientFundsError(
+        `Allocation exceeds wallet balance: balance ₹${newBalance}, total allocation would be ₹${newAllocated}`,
+      );
     }
 
     const [txn] = await WalletTransaction.create(
@@ -235,19 +259,31 @@ export async function recomputeBalance({ tenantId, walletId }) {
   return rows[0]?.balance ?? 0;
 }
 
-/** Recompute earmarked budget from allocation transactions (spend does not release earmarks). */
+/**
+ * Outstanding earmarks = allocations minus department-tied spends that released them.
+ * Unrelated cash spends (no relatedEntityId) do not change this figure.
+ */
 export async function recomputeAllocatedAmount({ tenantId, walletId }) {
-  const rows = await WalletTransaction.aggregate([
-    {
-      $match: {
-        tenantId: new mongoose.Types.ObjectId(String(tenantId)),
-        walletId: new mongoose.Types.ObjectId(String(walletId)),
-        type: 'allocation_to_entity',
+  const tid = new mongoose.Types.ObjectId(String(tenantId));
+  const wid = new mongoose.Types.ObjectId(String(walletId));
+  const [allocRows, spendRows] = await Promise.all([
+    WalletTransaction.aggregate([
+      { $match: { tenantId: tid, walletId: wid, type: 'allocation_to_entity' } },
+      { $group: { _id: null, allocated: { $sum: '$amount' } } },
+    ]),
+    WalletTransaction.aggregate([
+      {
+        $match: {
+          tenantId: tid,
+          walletId: wid,
+          relatedEntityId: { $ne: null },
+          type: { $in: ['campaign_spend', 'order_payment'] },
+        },
       },
-    },
-    { $group: { _id: null, allocated: { $sum: '$amount' } } },
+      { $group: { _id: null, spent: { $sum: { $abs: '$amount' } } } },
+    ]),
   ]);
-  return rows[0]?.allocated ?? 0;
+  return Math.max(0, (allocRows[0]?.allocated ?? 0) - (spendRows[0]?.spent ?? 0));
 }
 
 export async function repairEntityCache({ tenantId, entityId }) {

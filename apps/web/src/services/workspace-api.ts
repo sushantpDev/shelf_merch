@@ -328,7 +328,9 @@ export function walletsForCheckout(workspace: WorkspaceSnapshot): UiWallet[] {
   const checkout: UiWallet[] = [];
   for (const [walletId, depts] of byWallet) {
     const live = workspace.wallets.find((w) => w.id === walletId);
-    checkout.push(live ?? synthesizeDepartmentWallet(workspace, walletId, depts));
+    const deptWallet = synthesizeDepartmentWallet(workspace, walletId, depts);
+    // Always show department remaining — never the parent org cash/unallocated.
+    checkout.push(live ? { ...deptWallet, name: live.name, owner: live.owner, email: live.email } : deptWallet);
   }
   return checkout;
 }

@@ -152,7 +152,7 @@ export async function updateTenant(tenantId, patch) {
   return { before: before.toObject(), after };
 }
 
-/** §3.4 list — status, plan, wallet balance, open orders, outstanding in one call. */
+/** §3.4 list — status, plan, wallet balance, and open orders in one call. */
 export async function listTenants({ status } = {}) {
   const filter = status ? { status } : {};
   const tenants = await Tenant.find(filter).sort({ createdAt: -1 }).lean();
@@ -160,7 +160,7 @@ export async function listTenants({ status } = {}) {
 
   // aggregate() is not covered by the tenantScope query guard; these are
   // intentional cross-tenant rollups for the platform list view.
-  const [walletAgg, openOrderAgg, unpaidInvoiceAgg] = await Promise.all([
+  const [walletAgg, openOrderAgg] = await Promise.all([
     Wallet.aggregate([
       { $match: { tenantId: { $in: ids } } },
       { $group: { _id: '$tenantId', balance: { $sum: '$balance' } } },
@@ -169,22 +169,16 @@ export async function listTenants({ status } = {}) {
       { $match: { tenantId: { $in: ids }, status: { $in: OPEN_ORDER_STATUSES } } },
       { $group: { _id: '$tenantId', count: { $sum: 1 } } },
     ]),
-    Invoice.aggregate([
-      { $match: { tenantId: { $in: ids }, status: 'issued' } },
-      { $group: { _id: '$tenantId', outstanding: { $sum: '$totalAmount' } } },
-    ]),
   ]);
 
   const byId = (rows) => Object.fromEntries(rows.map((r) => [String(r._id), r]));
   const wallets = byId(walletAgg);
   const orders = byId(openOrderAgg);
-  const invoices = byId(unpaidInvoiceAgg);
 
   return tenants.map((t) => ({
     ...t,
     walletBalanceInr: wallets[String(t._id)]?.balance ?? 0,
     openOrders: orders[String(t._id)]?.count ?? 0,
-    outstandingInr: invoices[String(t._id)]?.outstanding ?? 0,
   }));
 }
 

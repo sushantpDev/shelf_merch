@@ -1,9 +1,7 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router";
-import { CircleDollarSign, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { UiWallet } from "@/services/mappers";
-import { formatWalletAmount, walletUnallocated } from "@/lib/walletFormat";
 import walletIconImg from "../../../assets/wallet-icon.svg";
 
 function TopbarChevron({ open }: { open: boolean }) {
@@ -28,6 +26,8 @@ type Props = {
   wallets: UiWallet[];
   totalLabel: string;
   hasBudget?: boolean;
+  /** Short topbar title above the amount (e.g. Organization / My budget). */
+  budgetTitle?: string;
   balanceCaption?: string;
   canRequestTopup?: boolean;
 };
@@ -36,6 +36,7 @@ export function WalletBalanceMenu({
   wallets,
   totalLabel,
   hasBudget = wallets.length > 0,
+  budgetTitle = "Organization budget",
   balanceCaption = "Available balance",
   canRequestTopup = false,
 }: Props) {
@@ -74,7 +75,7 @@ export function WalletBalanceMenu({
       <button
         type="button"
         className="topbar-wallet"
-        aria-label="Organization budget"
+        aria-label={budgetTitle}
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((v) => !v)}
@@ -83,7 +84,7 @@ export function WalletBalanceMenu({
           <img src={walletIconImg} alt="" className="topbar-wallet-img" aria-hidden="true" />
         </span>
         <span className="topbar-wallet-copy">
-          <span className="k">Organization budget</span>
+          <span className="k">{budgetTitle}</span>
           <span className="v">
             {totalLabel}
             <TopbarChevron open={open} />
@@ -98,22 +99,25 @@ export function WalletBalanceMenu({
             <div className="wallet-menu-body">
               {!hasBudget ? (
                 <div className="wallet-menu-empty">
-                  <p className="mb-3 text-sm text-muted-foreground">No organization budget yet.</p>
-                  <Button size="sm" asChild onClick={close}>
-                    <Link to="/app/wallets" state={{ startCreateWallet: true }}>
-                      Setup budget
-                    </Link>
-                  </Button>
+                  <p className="mb-3 text-sm text-muted-foreground">
+                    {budgetTitle === "Organization budget"
+                      ? "No organization budget yet."
+                      : "No budget allocated yet."}
+                  </p>
+                  {budgetTitle === "Organization budget" ? (
+                    <Button size="sm" asChild onClick={close}>
+                      <Link to="/app/wallets" state={{ startCreateWallet: true }}>
+                        Setup budget
+                      </Link>
+                    </Button>
+                  ) : null}
                 </div>
               ) : (
                 <div className="wallet-menu-item on" role="menuitem">
                   <button type="button" className="wallet-menu-item-open" onClick={openBudget}>
-                    <span className="wallet-menu-item-name">Organization budget</span>
+                    <span className="wallet-menu-item-name">{budgetTitle}</span>
                     <span className="wallet-menu-item-bal">
-                      {balanceCaption}:{" "}
-                      {primaryWallet
-                        ? formatWalletAmount(walletUnallocated(primaryWallet), primaryWallet.cur)
-                        : totalLabel}
+                      {balanceCaption}: {totalLabel}
                     </span>
                   </button>
                   {canRequestTopup ? (
@@ -126,7 +130,7 @@ export function WalletBalanceMenu({
             </div>
             <div className="wallet-menu-foot">
               <Link to="/app/wallets" className="wallet-menu-create" onClick={close}>
-                {hasBudget ? "View budget dashboard" : "Setup budget"}
+                {hasBudget ? "View budget dashboard" : budgetTitle === "Organization budget" ? "Setup budget" : "View budget"}
               </Link>
             </div>
           </div>
