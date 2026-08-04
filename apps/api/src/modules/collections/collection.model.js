@@ -10,6 +10,8 @@ const productRefSchema = new mongoose.Schema(
     group: String,
     /** Pre-baked design mockup (mask + artwork) — served to shop/storefront as-is. */
     mockupUrl: { type: String, default: '' },
+    /** Pre-baked back-view design mockup (optional). */
+    mockupBackUrl: { type: String, default: '' },
     /** Transparent print-DPI design asset (inches × dpi) — production file, not mockup. */
     designOnlyImageUrl: { type: String, default: '' },
     /** Physical print size persisted with the design so production does not need EXIF. */

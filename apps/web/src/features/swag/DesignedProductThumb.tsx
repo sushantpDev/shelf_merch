@@ -7,7 +7,9 @@ import {
   bakeTintedMockupLayers,
   defaultPlacement,
   designImgUrl,
+  listPrintAreasForView,
   pickPrintArea,
+  printAreaViewKey,
   productThumbUrl,
   resolveProductArtworkLayers,
   type Placement,
@@ -247,6 +249,10 @@ export function DesignedProductThumb({
   artworkUrl,
   tintHex,
   preferBakedMockup = true,
+  view: viewProp,
+  onViewChange,
+  /** Show back on hover instead of Front/Back buttons (Swag collection cards). */
+  hoverSwapViews = false,
   className,
   style,
 }: {
@@ -256,18 +262,67 @@ export function DesignedProductThumb({
   tintHex?: string;
   /** When true, prefer the saved baked mockup unless a non-white tint is set. */
   preferBakedMockup?: boolean;
+  /** Controlled front/back view (shop PDP gallery). */
+  view?: "front" | "back";
+  onViewChange?: (view: "front" | "back") => void;
+  /** Hover swaps to back when a back asset exists; hides Front/Back chips. */
+  hoverSwapViews?: boolean;
   className?: string;
   style?: CSSProperties;
 }) {
-  const baked = resolveMediaUrl(product.mockupUrl);
-  const layers = resolveProductArtworkLayers(product, artworkUrl);
-  const overlay = layers[0]?.artUrl || (artworkUrl ? resolveMediaUrl(artworkUrl) : "");
-  const printAreaBase = resolveMediaUrl(pickPrintArea(product)?.mockupImageUrl);
-  const stageBase = resolveMediaUrl(product.baseImageUrl);
-  const resolvedMask = resolveMediaUrl(product.maskImageUrl);
+  const bakedFront = resolveMediaUrl(product.mockupUrl);
+  const bakedBack = resolveMediaUrl(product.mockupBackUrl);
+  const canShowBack = Boolean(
+    bakedBack ||
+      resolveMediaUrl(product.maskBackImageUrl) ||
+      resolveMediaUrl(product.baseBackImageUrl) ||
+      listPrintAreasForView(product, "back").length,
+  );
+  const canShowFront = Boolean(
+    bakedFront ||
+      resolveMediaUrl(product.maskImageUrl) ||
+      resolveMediaUrl(product.baseImageUrl) ||
+      listPrintAreasForView(product, "front").length,
+  );
+  const [uncontrolledView, setUncontrolledView] = useState<"front" | "back">("front");
+  const view = viewProp ?? uncontrolledView;
+  const setView = (next: "front" | "back") => {
+    onViewChange?.(next);
+    if (viewProp == null) setUncontrolledView(next);
+  };
+  const useHoverSwap = hoverSwapViews && canShowBack && canShowFront && viewProp == null;
+
+  // Only use the bake that matches the active view — never fall back to the other side.
+  const viewBaked = view === "back" ? bakedBack : bakedFront;
+  const allLayers = resolveProductArtworkLayers(product, artworkUrl);
+  const layers =
+    canShowBack
+      ? allLayers.filter((l) => {
+          const area = pickPrintArea(product, l.areaKey);
+          return printAreaViewKey(product, area) === view;
+        })
+      : allLayers;
+  const overlay =
+    layers[0]?.artUrl ||
+    // Shared collection artwork is front-only; never overlay it onto the back view.
+    (canShowBack && view === "back"
+      ? ""
+      : artworkUrl
+        ? resolveMediaUrl(artworkUrl)
+        : "");
+  const printAreaBase = resolveMediaUrl(pickPrintArea(product, layers[0]?.areaKey)?.mockupImageUrl);
+  // Never fall back to the opposite garment view — that made "Back" look like Front on the shop.
+  const stageBase =
+    view === "back"
+      ? resolveMediaUrl(product.baseBackImageUrl)
+      : resolveMediaUrl(product.baseImageUrl);
+  const resolvedMask =
+    view === "back"
+      ? resolveMediaUrl(product.maskBackImageUrl)
+      : resolveMediaUrl(product.maskImageUrl);
   /** Production garment image used for live colour tinting (never the marketing photo). */
   const tintMask = resolvedMask || stageBase || printAreaBase;
-  const maskStage = tintMask || resolveMediaUrl(designImgUrl(product));
+  const maskStage = tintMask || resolveMediaUrl(designImgUrl(product, layers[0]?.areaKey));
   const base =
     maskStage ||
     resolveMediaUrl(product.photoUrl) ||
@@ -275,12 +330,55 @@ export function DesignedProductThumb({
     productThumbUrl(product, true);
 
   const isDefaultTint = isDefaultMockupTint(tintHex);
-  const showBaked = Boolean(baked && isDefaultTint && preferBakedMockup);
+  const showBaked = Boolean(viewBaked && isDefaultTint && preferBakedMockup);
   const liveTintHex = tintHex || DEFAULT_MOCKUP_TINT_HEX;
+  const showViewToggle = canShowBack && canShowFront && viewProp == null && !hoverSwapViews;
 
+  const viewToggle = showViewToggle ? (
+    <div
+      className="row"
+      style={{
+        position: "absolute",
+        top: 8,
+        left: 8,
+        zIndex: 2,
+        gap: 4,
+      }}
+    >
+      {(["front", "back"] as const).map((v) => {
+        const available = v === "front" ? canShowFront : canShowBack;
+        if (!available) return null;
+        return (
+          <button
+            key={v}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setView(v);
+            }}
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              padding: "3px 8px",
+              borderRadius: 6,
+              border: view === v ? "1.5px solid var(--brand)" : "1px solid var(--line)",
+              background: view === v ? "var(--brand-50)" : "rgba(255,255,255,.92)",
+              color: view === v ? "var(--brand-d)" : "var(--ink-2)",
+              cursor: "pointer",
+            }}
+          >
+            {v === "front" ? "Front" : "Back"}
+          </button>
+        );
+      })}
+    </div>
+  ) : null;
+
+  const baked = viewBaked || "";
   const inner =
     showBaked ? (
-      <div className="img img-mockup">
+      <div className="img img-mockup" style={{ position: "relative" }}>
+        {viewToggle}
         <img
           src={baked}
           alt={product.nm}
@@ -289,43 +387,56 @@ export function DesignedProductThumb({
         />
       </div>
     ) : !isDefaultTint && tintMask && layers.length ? (
-      <TintedMockupImage
-        product={product}
-        layers={layers}
-        tintHex={liveTintHex}
-        fallback={
-          <MaskArtworkComposite
-            product={product}
-            mask={tintMask}
-            layers={layers}
-            tintHex={liveTintHex}
-          />
-        }
-      />
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        {viewToggle}
+        <TintedMockupImage
+          product={product}
+          layers={layers}
+          tintHex={liveTintHex}
+          fallback={
+            <MaskArtworkComposite
+              product={product}
+              mask={tintMask}
+              layers={layers}
+              tintHex={liveTintHex}
+            />
+          }
+        />
+      </div>
     ) : layers.length && resolvedMask ? (
-      <MaskArtworkComposite
-        product={product}
-        mask={resolvedMask}
-        layers={layers}
-        tintHex={liveTintHex}
-      />
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        {viewToggle}
+        <MaskArtworkComposite
+          product={product}
+          mask={resolvedMask}
+          layers={layers}
+          tintHex={liveTintHex}
+        />
+      </div>
     ) : layers.length && maskStage ? (
-      <LiveArtworkComposite product={product} base={maskStage} layers={layers} />
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        {viewToggle}
+        <LiveArtworkComposite product={product} base={maskStage} layers={layers} />
+      </div>
     ) : overlay && resolvedMask ? (
-      <MaskArtworkComposite
-        product={product}
-        mask={resolvedMask}
-        layers={[
-          {
-            areaKey: "area_1",
-            artUrl: overlay,
-            placement: product.placement ?? defaultPlacement(product),
-          },
-        ]}
-        tintHex={liveTintHex}
-      />
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        {viewToggle}
+        <MaskArtworkComposite
+          product={product}
+          mask={resolvedMask}
+          layers={[
+            {
+              areaKey: layers[0]?.areaKey || "area_1",
+              artUrl: overlay,
+              placement: product.placement ?? defaultPlacement(product),
+            },
+          ]}
+          tintHex={liveTintHex}
+        />
+      </div>
     ) : baked ? (
-      <div className="img img-mockup">
+      <div className="img img-mockup" style={{ position: "relative" }}>
+        {viewToggle}
         <img
           src={baked}
           alt={product.nm}
@@ -334,7 +445,8 @@ export function DesignedProductThumb({
         />
       </div>
     ) : (
-      <div className={`img${base ? " img-mockup" : ""}`}>
+      <div className={`img${base ? " img-mockup" : ""}`} style={{ position: "relative" }}>
+        {viewToggle}
         {base ? (
           <img
             src={base}
@@ -352,7 +464,7 @@ export function DesignedProductThumb({
       </div>
     );
 
-  if (!className && !style) return inner;
+  if (!className && !style && !useHoverSwap) return inner;
 
   return (
     <div
@@ -363,6 +475,8 @@ export function DesignedProductThumb({
         ...(className === "sf-pdp-thumb" ? {} : { height: "100%" }),
         ...style,
       }}
+      onMouseEnter={useHoverSwap ? () => setUncontrolledView("back") : undefined}
+      onMouseLeave={useHoverSwap ? () => setUncontrolledView("front") : undefined}
     >
       {inner}
     </div>
@@ -378,7 +492,10 @@ export function storeProductAsUi(p: {
   group?: string;
   maskImageUrl?: string;
   baseImageUrl?: string;
+  maskBackImageUrl?: string;
+  baseBackImageUrl?: string;
   mockupUrl?: string;
+  mockupBackUrl?: string;
   placement?: UiProduct["placement"];
   placements?: Array<
     NonNullable<UiProduct["placement"]> & { key: string; artworkUrl?: string }
@@ -425,9 +542,12 @@ export function storeProductAsUi(p: {
     sw: 4,
     maskImageUrl: mask,
     baseImageUrl: base,
+    maskBackImageUrl: resolveMediaUrl(p.maskBackImageUrl),
+    baseBackImageUrl: resolveMediaUrl(p.baseBackImageUrl),
     imgUrl: mask || base,
     photoUrl: photo,
     mockupUrl: p.mockupUrl,
+    mockupBackUrl: p.mockupBackUrl,
     placement: p.placement,
     areaPlacements: Object.keys(areaPlacements).length ? areaPlacements : undefined,
     printAreas: p.printAreas,

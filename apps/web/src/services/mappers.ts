@@ -60,6 +60,8 @@ export type UiProduct = {
   maskBackImageUrl?: string;
   /** Pre-baked design mockup served to shop/storefront. */
   mockupUrl?: string;
+  /** Pre-baked back-view design mockup (optional). */
+  mockupBackUrl?: string;
   /** Real-world size of the mockup frame (inches) — drives print-area mapping. */
   physicalDimensions?: { width: number; height: number; length?: number };
   /** Product print DPI (default 300). */
@@ -439,6 +441,7 @@ export function mapProductRef(ref: ApiProduct, catalogById?: Map<string, UiProdu
     maskBackImageUrl:
       resolveMediaUrl(ref.maskBackImageUrl) || fromCatalog?.maskBackImageUrl,
     mockupUrl: resolveMediaUrl(ref.mockupUrl),
+    mockupBackUrl: resolveMediaUrl(ref.mockupBackUrl),
     placement: mapPlacement((ref as { placement?: unknown }).placement),
     areaPlacements: mapAreaPlacements(ref),
     printAreas: fromCatalog?.printAreas,

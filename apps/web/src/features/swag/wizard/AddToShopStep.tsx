@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Info, Store } from "lucide-react";
 import { MockupCanvas, buildMockupLayers } from "../MockupCanvas";
+import { MockupViewGallery } from "../MockupViewGallery";
 import {
   areaPlacementKey,
+  designImgUrlForView,
   listPrintAreas,
+  listPrintAreasForView,
+  listProductViews,
   placementKey,
   printAreaStableKey,
+  printAreaViewKey,
   type Placement,
+  type ProductViewKey,
 } from "../mockup-bake";
 import type { ArtFile } from "../swagDraft";
 import type { UiProduct, UiShop } from "@/services/mappers";
@@ -59,6 +65,7 @@ export function AddToShopStep({
   onToggle: (shopId: string) => void;
 }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [previewView, setPreviewView] = useState<ProductViewKey>("front");
 
   useEffect(() => {
     if (selectedIdx >= products.length) {
@@ -70,19 +77,36 @@ export function AddToShopStep({
     () => products.filter((p, i) => productHasArtwork(p, i, areaArts)).length,
     [products, areaArts],
   );
+  void withArtwork;
 
   const selected = products[selectedIdx] ?? null;
+  const selectedViews = selected ? listProductViews(selected) : (["front"] as ProductViewKey[]);
+  const activeView: ProductViewKey = selectedViews.includes(previewView)
+    ? previewView
+    : selectedViews[0] || "front";
+
+  useEffect(() => {
+    if (!selected) return;
+    const views = listProductViews(selected);
+    if (!views.includes(previewView)) {
+      setPreviewView(views[0] || "front");
+    }
+  }, [selected, previewView]);
+
   const selectedLayers = selected
     ? buildMockupLayers(selected, {
         idx: selectedIdx,
         areaArts,
         placements,
+        view: activeView,
       })
     : [];
   const selectedCounts = selected
     ? areaArtCount(selected, selectedIdx, areaArts)
     : { designed: 0, total: 0 };
   const selectedHasArt = selectedCounts.designed > 0;
+  const backMaskMissing =
+    activeView === "back" && selected && !designImgUrlForView(selected, "back");
 
   return (
     <div className="sw-publish-review">
@@ -100,33 +124,12 @@ export function AddToShopStep({
             <dt>Products</dt>
             <dd>{products.length}</dd>
           </div>
-          {/* <div className="sw-publish-stat">
-            <dt>With artwork</dt>
-            <dd>
-              {withArtwork}
-              <span className="sw-publish-stat-of"> / {products.length}</span>
-            </dd>
-          </div> */}
           <div className="sw-publish-stat">
             <dt>Selected shops</dt>
             <dd>{picked.size}</dd>
           </div>
         </dl>
       </header>
-
-      {/* {picked.size === 0 ? (
-        <div className="sw-publish-alert">
-          <Info size={14} />
-          <span>Select at least one shop, then click Publish to publish this collection.</span>
-        </div>
-      ) : (
-        <div className="sw-publish-alert is-ready">
-          <Check size={14} strokeWidth={2.5} />
-          <span>
-            {picked.size} {picked.size === 1 ? "shop" : "shops"} selected — ready to publish.
-          </span>
-        </div>
-      )} */}
 
       <div className="sw-publish-top">
         <aside className="sw-publish-panel sw-publish-shops">
@@ -184,20 +187,16 @@ export function AddToShopStep({
                 {products.length} {products.length === 1 ? "product" : "products"} · click to review
               </p>
             </div>
-            {/* {picked.size > 0 ? (
-              <span className="sw-publish-badge">
-                <Check size={13} strokeWidth={2.5} />
-                {picked.size} {picked.size === 1 ? "shop" : "shops"}
-              </span>
-            ) : null} */}
           </div>
 
           <div className="sw-publish-collection-grid">
             {products.map((p, i) => {
+              const cardView = listProductViews(p)[0] || "front";
               const layers = buildMockupLayers(p, {
                 idx: i,
                 areaArts,
                 placements,
+                view: cardView,
               });
               const { designed, total } = areaArtCount(p, i, areaArts);
               const selectedCard = i === selectedIdx;
@@ -208,10 +207,13 @@ export function AddToShopStep({
                   className={`sw-publish-product-card${selectedCard ? " is-selected" : ""}${
                     designed > 0 ? " has-art" : ""
                   }`}
-                  onClick={() => setSelectedIdx(i)}
+                  onClick={() => {
+                    setSelectedIdx(i);
+                    setPreviewView(listProductViews(p)[0] || "front");
+                  }}
                 >
                   <div className="sw-publish-product-mock">
-                    <MockupCanvas product={p} layers={layers} />
+                    <MockupCanvas product={p} layers={layers} view={cardView} />
                   </div>
                   <div className="sw-publish-product-meta">
                     {p.brand ? <div className="sw-publish-product-brand">{p.brand}</div> : null}
@@ -242,7 +244,34 @@ export function AddToShopStep({
         ) : (
           <div className="sw-publish-detail-body">
             <div className="sw-publish-detail-mock">
-              <MockupCanvas product={selected} layers={selectedLayers} />
+              <MockupViewGallery
+                views={selectedViews}
+                activeView={activeView}
+                onChange={setPreviewView}
+                style={{ width: "100%", minHeight: 280 }}
+                mediaStyle={{
+                  minHeight: 260,
+                  padding: 12,
+                  background: "var(--gray-100)",
+                }}
+                renderThumb={(view) => {
+                  const thumbLayers = buildMockupLayers(selected, {
+                    idx: selectedIdx,
+                    areaArts,
+                    placements,
+                    view,
+                  });
+                  return <MockupCanvas product={selected} layers={thumbLayers} view={view} />;
+                }}
+              >
+                {backMaskMissing ? (
+                  <div className="mut3" style={{ padding: 24, textAlign: "center" }}>
+                    Back view image unavailable for this product.
+                  </div>
+                ) : (
+                  <MockupCanvas product={selected} layers={selectedLayers} view={activeView} />
+                )}
+              </MockupViewGallery>
             </div>
 
             <div className="sw-publish-detail-info">
@@ -253,12 +282,21 @@ export function AddToShopStep({
 
               <div className="sw-publish-areas-label">Print areas</div>
               <ul className="sw-publish-areas">
-                {selectedLayers.map((layer, i) => {
-                  const designed = Boolean(layer.artUrl);
+                {listPrintAreas(selected).map((area, i) => {
+                  const areaKey = printAreaStableKey(area, i);
+                  const draftKey = areaPlacementKey(selected, selectedIdx, areaKey);
+                  const designed = Boolean(areaArts[draftKey]?.preview);
+                  const view = printAreaViewKey(selected, area);
+                  const label = area.label || `Print area ${i + 1}`;
                   return (
                     <li
-                      key={layer.areaKey}
+                      key={areaKey}
                       className={`sw-publish-area${designed ? " is-designed" : ""}`}
+                      style={
+                        view === activeView
+                          ? { borderColor: "var(--brand)", background: "var(--brand-50)" }
+                          : undefined
+                      }
                     >
                       {designed ? (
                         <Check size={14} strokeWidth={2.5} aria-hidden="true" />
@@ -266,13 +304,17 @@ export function AddToShopStep({
                         <span className="sw-publish-area-dot" aria-hidden="true" />
                       )}
                       <span>
-                        {designed
-                          ? `Print area ${i + 1}`
-                          : `Not designed – Print area ${i + 1}`}
+                        {designed ? `${label} · ${view}` : `Not designed – ${label} · ${view}`}
                       </span>
                     </li>
                   );
                 })}
+                {!listPrintAreas(selected).length ? (
+                  <li className="sw-publish-area">
+                    <span className="sw-publish-area-dot" aria-hidden="true" />
+                    <span>No print areas configured</span>
+                  </li>
+                ) : null}
               </ul>
 
               {!selectedHasArt ? (
@@ -283,6 +325,9 @@ export function AddToShopStep({
               ) : (
                 <div className="sw-publish-detail-summary mut3">
                   {selectedCounts.designed} of {selectedCounts.total} print areas designed
+                  {listPrintAreasForView(selected, "back").length
+                    ? ` · ${listPrintAreasForView(selected, "back").length} on back`
+                    : ""}
                 </div>
               )}
             </div>

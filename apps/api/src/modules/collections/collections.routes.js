@@ -41,6 +41,7 @@ const productRef = z.object({
   name: z.string().min(1),
   group: z.string().optional().default(''),
   mockupUrl: z.string().optional().default(''),
+  mockupBackUrl: z.string().optional().default(''),
   // Konva artwork placement — carried so shop-specific collections (Add to shop)
   // recolour live colour variants at the same size/position as the baked mockup.
   placement: placementShape.nullish(),
@@ -349,6 +350,7 @@ const mockupMetaItem = z.object({
     })
     .optional(),
   hasDesignOnly: z.boolean().optional(),
+  hasMockupBack: z.boolean().optional(),
 });
 
 const mockupUpload = uploader({ allow: DOCUMENT_TYPES, maxSizeMb: 25, files: 200 });
@@ -356,12 +358,14 @@ const mockupUpload = uploader({ allow: DOCUMENT_TYPES, maxSizeMb: 25, files: 200
 // Upload pre-baked product mockups (one PNG per catalog product in the collection).
 // Optional `designOnly` files are print-DPI transparent PNGs (inches × dpi).
 // Optional `areaArts` files are per print-area artworks (colour-tint live composite).
+// Optional `mockupsBack` files are back-view baked mockups (paired via hasMockupBack).
 router.post(
   '/:id/mockups',
   canWrite,
   validate({ params: z.object({ id: objectId }) }),
   mockupUpload.fields([
     { name: 'mockups', maxCount: 50 },
+    { name: 'mockupsBack', maxCount: 50 },
     { name: 'designOnly', maxCount: 50 },
     { name: 'areaArts', maxCount: 100 },
   ]),
@@ -369,6 +373,7 @@ router.post(
     const collection = await Collection.findOne({ _id: req.params.id, tenantId: req.tenantId });
     if (!collection) throw new NotFoundError('Collection not found');
     const files = req.files?.mockups || [];
+    const backFiles = req.files?.mockupsBack || [];
     const designFiles = req.files?.designOnly || [];
     const areaArtFiles = req.files?.areaArts || [];
     let meta;
@@ -382,14 +387,24 @@ router.post(
     }
     let designIdx = 0;
     let areaArtIdx = 0;
+    let backIdx = 0;
     for (let i = 0; i < files.length; i++) {
-      const { catalogProductId, placement, placements, printSpec, hasDesignOnly } = meta[i];
+      const { catalogProductId, placement, placements, printSpec, hasDesignOnly, hasMockupBack } = meta[i];
       const { url } = await uploadFile({ tenantId: req.tenantId, kind: 'mockup', file: files[i] });
       const ref = collection.productRefs.find(
         (r) => String(r.catalogProductId) === String(catalogProductId),
       );
       if (ref) {
         ref.mockupUrl = url;
+        if (hasMockupBack && backFiles[backIdx]) {
+          const back = await uploadFile({
+            tenantId: req.tenantId,
+            kind: 'mockup',
+            file: backFiles[backIdx],
+          });
+          ref.mockupBackUrl = back.url;
+          backIdx += 1;
+        }
         if (placement) ref.placement = placement;
         if (Array.isArray(placements) && placements.length) {
           const saved = [];
@@ -437,6 +452,7 @@ router.post(
       entityId: collection._id,
       after: {
         mockupCount: files.length,
+        mockupBackCount: backIdx,
         designOnlyCount: designIdx,
         areaArtCount: areaArtIdx,
       },

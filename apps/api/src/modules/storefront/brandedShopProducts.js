@@ -37,6 +37,7 @@ export function mapBrandedListing(col, ref, base) {
     group: ref.group ?? base.group,
     artworkUrl: col.artworkUrl || '',
     mockupUrl: ref.mockupUrl || '',
+    mockupBackUrl: ref.mockupBackUrl || '',
     placement: ref.placement ?? null,
     /** Per print-area placements + artwork — required for multi-area colour tints. */
     placements,

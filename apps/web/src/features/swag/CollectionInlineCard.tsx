@@ -53,7 +53,11 @@ export function CollectionInlineCard({
           const body = (
             <>
               <div className="swag-col-pcard-img">
-                <DesignedProductThumb product={p} artworkUrl={collection.artworkUrl} />
+                <DesignedProductThumb
+                  product={p}
+                  artworkUrl={collection.artworkUrl}
+                  hoverSwapViews
+                />
               </div>
               <div className="swag-col-pcard-meta">
                 {swatches.length > 0 ? (

@@ -23,6 +23,8 @@ export type Placement = ArtworkPlacement;
 export type MockupUploadItem = {
   catalogProductId: string;
   dataUrl: string;
+  /** Optional baked back-view mockup (saved as mockupBackUrl). */
+  backDataUrl?: string;
   placement: Placement;
   /** Per print-area placements (Area 1, Area 2, …). */
   placements?: Array<{ key: string; artworkDataUrl?: string } & Placement>;
@@ -89,6 +91,71 @@ export function listPrintAreas(p: UiProduct | undefined) {
   return areas.filter((a) => (a?.widthIn ?? 0) > 0 || (a?.box?.widthPct ?? 0) > 0);
 }
 
+export type ProductViewKey = "front" | "back";
+
+function sameMediaPath(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  return normMediaPath(a) === normMediaPath(b);
+}
+
+/** Which garment view a print area belongs to (from mockup URL and/or key/label). */
+export function printAreaViewKey(
+  p: UiProduct | undefined,
+  area: { key?: string; label?: string; mockupImageUrl?: string } | null | undefined,
+): ProductViewKey {
+  const mockup = resolveMediaUrl(area?.mockupImageUrl);
+  const backMask = resolveMediaUrl(p?.maskBackImageUrl);
+  const backBase = resolveMediaUrl(p?.baseBackImageUrl);
+  const frontMask = resolveMediaUrl(p?.maskImageUrl);
+  const frontBase = resolveMediaUrl(p?.baseImageUrl);
+  if (mockup) {
+    if (
+      (backMask && sameMediaPath(mockup, backMask)) ||
+      (backBase && sameMediaPath(mockup, backBase))
+    ) {
+      return "back";
+    }
+    if (
+      (frontMask && sameMediaPath(mockup, frontMask)) ||
+      (frontBase && sameMediaPath(mockup, frontBase))
+    ) {
+      return "front";
+    }
+  }
+  const token = `${area?.key || ""} ${area?.label || ""}`.toLowerCase();
+  if (/\bback\b/.test(token)) return "back";
+  return "front";
+}
+
+/** Views available for a product (always front; back when mask/stage/areas exist). */
+export function listProductViews(p: UiProduct | undefined): ProductViewKey[] {
+  const views: ProductViewKey[] = ["front"];
+  const hasBackAssets = Boolean(
+    resolveMediaUrl(p?.maskBackImageUrl) || resolveMediaUrl(p?.baseBackImageUrl),
+  );
+  const hasBackArea = listPrintAreas(p).some((a) => printAreaViewKey(p, a) === "back");
+  if (hasBackAssets || hasBackArea) views.push("back");
+  return views;
+}
+
+/** Print areas that belong to a front/back view. */
+export function listPrintAreasForView(p: UiProduct | undefined, view: ProductViewKey) {
+  return listPrintAreas(p).filter((a) => printAreaViewKey(p, a) === view);
+}
+
+/** Production mask / stage image for a garment view. */
+export function designImgUrlForView(p: UiProduct | undefined, view: ProductViewKey = "front"): string {
+  if (!p) return "";
+  if (view === "back") {
+    return (
+      resolveMediaUrl(p.maskBackImageUrl) ||
+      resolveMediaUrl(p.baseBackImageUrl) ||
+      ""
+    );
+  }
+  return resolveMediaUrl(p.maskImageUrl) || resolveMediaUrl(p.baseImageUrl) || "";
+}
+
 /** Draft / upload key for artwork on one print area of one product. */
 export function areaPlacementKey(prod: UiProduct, idx: number, areaKey: string): string {
   return `${placementKey(prod, idx)}::${areaKey}`;
@@ -121,28 +188,16 @@ function normMediaPath(url: string | undefined): string {
 export function designImgUrl(p: UiProduct, areaKey?: string | null): string {
   if (areaKey) {
     const area = pickPrintArea(p, areaKey);
+    const view = printAreaViewKey(p, area);
+    const fromView = designImgUrlForView(p, view);
+    if (fromView) return fromView;
     const mockup = resolveMediaUrl(area?.mockupImageUrl);
-    if (mockup) {
-      const frontMask = resolveMediaUrl(p.maskImageUrl);
-      const backMask = resolveMediaUrl(p.maskBackImageUrl);
-      const frontBase = resolveMediaUrl(p.baseImageUrl);
-      const backBase = resolveMediaUrl(p.baseBackImageUrl);
-      if (backMask && sameMediaPath(mockup, backMask)) return backMask;
-      if (frontMask && sameMediaPath(mockup, frontMask)) return frontMask;
-      if (backBase && sameMediaPath(mockup, backBase)) return backMask || backBase;
-      if (frontBase && sameMediaPath(mockup, frontBase)) return frontMask || frontBase;
-      // Print area was drawn on this mockup — use it as the garment image for that view.
-      return mockup;
-    }
+    if (mockup) return mockup;
   }
-  return p?.maskImageUrl || p?.baseImageUrl || "";
+  return designImgUrlForView(p, "front") || p?.maskImageUrl || p?.baseImageUrl || "";
 }
 
 /** Same-origin path compare — ignores scheme/host so catalog vs collection refs match. */
-function sameMediaPath(a: string, b: string): boolean {
-  if (!a || !b) return false;
-  return normMediaPath(a) === normMediaPath(b);
-}
 
 /**
  * Production garment image for live colour tinting. Never returns the marketing
@@ -496,11 +551,32 @@ export async function bakeMockupLayers(
   layers: Array<{ artUrl: string; placement: Placement | null; areaKey: string }>,
   size = 1000,
   requireProductBase = false,
+  view?: ProductViewKey,
 ): Promise<string> {
   const usable = layers.filter((l) => l.artUrl);
   if (!usable.length) return "";
   try {
-    const maskUrl = designImgUrl(ep);
+    const viewUsable = view
+      ? usable.filter((l) => {
+          const area = pickPrintArea(ep, l.areaKey);
+          return printAreaViewKey(ep, area) === view;
+        })
+      : usable;
+    const frontUsable = usable.filter((l) => {
+      const area = pickPrintArea(ep, l.areaKey);
+      return printAreaViewKey(ep, area) === "front";
+    });
+    const layersToBake = view
+      ? viewUsable
+      : frontUsable.length
+        ? frontUsable
+        : usable;
+    if (!layersToBake.length) return "";
+    const bakeView =
+      view ||
+      printAreaViewKey(ep, pickPrintArea(ep, layersToBake[0]?.areaKey));
+    const maskUrl =
+      designImgUrlForView(ep, bakeView) || designImgUrl(ep, layersToBake[0]?.areaKey);
     const maskImg = maskUrl ? await loadImageEl(maskUrl, true).catch(() => null) : null;
     if (requireProductBase && !maskImg) return "";
     const canvas = document.createElement("canvas");
@@ -521,7 +597,7 @@ export async function bakeMockupLayers(
       ctx.drawImage(maskImg, mdx, mdy, mw, mh);
     }
 
-    for (const layer of usable) {
+    for (const layer of layersToBake) {
       const artImg = await loadImageEl(layer.artUrl, true).catch(() => null);
       if (!artImg) continue;
       const aspect = (artImg.naturalHeight || 1) / (artImg.naturalWidth || 1);

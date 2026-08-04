@@ -142,12 +142,16 @@ export function useSwagWizardController(): SwagWizardVm {
             idx,
             draft.areaArts || {},
           );
-          const [dataUrl, design] = await Promise.all([
-            bakeMockupLayers(cp, layers),
+          const [frontDataUrl, backDataUrl, design] = await Promise.all([
+            bakeMockupLayers(cp, layers, 1000, false, "front"),
+            bakeMockupLayers(cp, layers, 1000, false, "back"),
             exportDesignOnly(cp, primaryLayer.artUrl, primaryLayer.placement, primaryLayer.areaKey),
           ]);
+          const dataUrl = frontDataUrl || backDataUrl;
+          if (!dataUrl) return null;
           return {
             dataUrl,
+            backDataUrl: frontDataUrl && backDataUrl ? backDataUrl : undefined,
             design,
             placement: primaryLayer.placement,
             placements: areaPlacements,
@@ -162,6 +166,7 @@ export function useSwagWizardController(): SwagWizardVm {
           return {
             catalogProductId: cp.id,
             dataUrl: row.dataUrl,
+            ...(row.backDataUrl ? { backDataUrl: row.backDataUrl } : {}),
             placement: row.placement,
             placements: row.placements?.length ? row.placements : undefined,
             ...(row.design.dataUrl

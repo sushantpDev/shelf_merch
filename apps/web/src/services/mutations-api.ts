@@ -284,6 +284,7 @@ async function resolveWalletId(org: OrgWizardState, createNewWallet = false): Pr
 function productRefFromUi(p: UiProduct) {
   if (!p.id) throw new Error(`Product "${p.nm}" has no catalog id — reload the catalog`);
   const mockupUrl = p.mockupUrl ? resolveMediaUrl(p.mockupUrl) : "";
+  const mockupBackUrl = p.mockupBackUrl ? resolveMediaUrl(p.mockupBackUrl) : "";
   const placements = p.areaPlacements
     ? Object.entries(p.areaPlacements).map(([key, pl]) => ({ key, ...pl }))
     : undefined;
@@ -293,6 +294,7 @@ function productRefFromUi(p: UiProduct) {
     name: p.nm,
     group: p.g || "tee",
     ...(mockupUrl ? { mockupUrl } : {}),
+    ...(mockupBackUrl ? { mockupBackUrl } : {}),
     // Carry the saved Konva placement so live colour tints match the baked mockup.
     ...(p.placement ? { placement: p.placement } : {}),
     ...(placements?.length ? { placements } : {}),
@@ -577,6 +579,7 @@ export async function uploadCollectionArtworkApi(collectionId: string, file: Fil
 type MockupUploadItem = {
   catalogProductId: string;
   dataUrl: string;
+  backDataUrl?: string;
   placement?: MockupPlacement;
   placements?: Array<{ key: string; artworkDataUrl?: string } & MockupPlacement>;
   designOnlyDataUrl?: string;
@@ -600,15 +603,27 @@ export async function uploadCollectionMockupsApi(
     placements?: Array<{ key: string; hasArtwork?: boolean } & MockupPlacement>;
     printSpec?: MockupUploadItem["printSpec"];
     hasDesignOnly?: boolean;
+    hasMockupBack?: boolean;
   }> = [];
   const form = new FormData();
   let areaArtCount = 0;
+  let backCount = 0;
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     if (!item.dataUrl?.startsWith("data:")) continue;
     const res = await fetch(item.dataUrl);
     const blob = await res.blob();
     form.append("mockups", new File([blob], `mockup-${i}.png`, { type: blob.type || "image/png" }));
+    const hasMockupBack = Boolean(item.backDataUrl?.startsWith("data:"));
+    if (hasMockupBack && item.backDataUrl) {
+      const bRes = await fetch(item.backDataUrl);
+      const bBlob = await bRes.blob();
+      form.append(
+        "mockupsBack",
+        new File([bBlob], `mockup-back-${backCount}.png`, { type: bBlob.type || "image/png" }),
+      );
+      backCount += 1;
+    }
     const hasDesignOnly = Boolean(item.designOnlyDataUrl?.startsWith("data:"));
     if (hasDesignOnly && item.designOnlyDataUrl) {
       const dRes = await fetch(item.designOnlyDataUrl);
@@ -645,6 +660,7 @@ export async function uploadCollectionMockupsApi(
       ...(placementsMeta.length ? { placements: placementsMeta } : {}),
       ...(item.printSpec ? { printSpec: item.printSpec } : {}),
       ...(hasDesignOnly ? { hasDesignOnly: true } : {}),
+      ...(hasMockupBack ? { hasMockupBack: true } : {}),
     });
   }
   if (!meta.length) return null;
@@ -742,6 +758,9 @@ export async function addProductToShopApi(payload: {
     ...(payload.product.mockupUrl
       ? { mockupUrl: resolveMediaUrl(payload.product.mockupUrl) }
       : {}),
+    ...(payload.product.mockupBackUrl
+      ? { mockupBackUrl: resolveMediaUrl(payload.product.mockupBackUrl) }
+      : {}),
     // catalogProduct has no placement — take it from the designed product so the
     // shop-specific collection keeps the artwork size/position on colour variants.
     ...(payload.product.placement ? { placement: payload.product.placement } : {}),
@@ -768,10 +787,17 @@ export async function addProductToShopApi(payload: {
     createdId = result.id;
 
     const mockup = resolveMediaUrl(payload.product.mockupUrl);
+    const mockupBack = resolveMediaUrl(payload.product.mockupBackUrl);
     if (mockup?.startsWith("data:") && catalogProduct.id) {
       const withMockups = await uploadCollectionMockupsApi(
         result.id,
-        [{ catalogProductId: catalogProduct.id, dataUrl: mockup }],
+        [
+          {
+            catalogProductId: catalogProduct.id,
+            dataUrl: mockup,
+            ...(mockupBack?.startsWith("data:") ? { backDataUrl: mockupBack } : {}),
+          },
+        ],
         catalogById,
       );
       if (!withMockups) {

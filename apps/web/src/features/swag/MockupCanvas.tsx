@@ -13,15 +13,19 @@ import {
   areaPlacementKey,
   buildRealisticArtwork,
   designImgUrl,
+  designImgUrlForView,
   listPrintAreas,
+  listPrintAreasForView,
   loadImageEl,
   placementKey,
   primaryAreaKey,
   printAreaStableKey,
+  printAreaViewKey,
   productHasPrintArea,
   resolveMediaSrc,
   resolvePrintAreaStage,
   type Placement,
+  type ProductViewKey,
 } from "./mockup-bake";
 
 const MIN_ART_PX = 16;
@@ -95,6 +99,7 @@ export function MockupCanvas({
   placement,
   printAreaKey,
   activeAreaKey: activeAreaKeyProp,
+  view: viewProp,
   resetEpoch = 0,
   fillContainer = false,
   onChange,
@@ -107,6 +112,8 @@ export function MockupCanvas({
   placement?: Placement;
   printAreaKey?: string | null;
   activeAreaKey?: string | null;
+  /** Force front/back garment image (and only that view's print areas when layers omit filter). */
+  view?: ProductViewKey;
   resetEpoch?: number;
   /** Stretch to parent height/width (artwork studio canvas). */
   fillContainer?: boolean;
@@ -139,7 +146,14 @@ export function MockupCanvas({
         ];
 
   const activeAreaKey = activeAreaKeyProp || printAreaKey || (layersProp?.length ? undefined : layers[0]?.areaKey);
-  const maskSrc = resolveMediaSrc(designImgUrl(product, activeAreaKey));
+  const activeArea = activeAreaKey
+    ? listPrintAreas(product).find((a, i) => printAreaStableKey(a, i) === activeAreaKey)
+    : null;
+  const resolvedView: ProductViewKey =
+    viewProp || (activeArea ? printAreaViewKey(product, activeArea) : "front");
+  const maskSrc = resolveMediaSrc(
+    designImgUrlForView(product, resolvedView) || designImgUrl(product, activeAreaKey),
+  );
   const sig = layersSignature(layers);
 
   useEffect(() => {
@@ -572,13 +586,19 @@ export function buildMockupLayers(
     placements: Record<string, Placement>;
     stagingPreview?: string;
     activeAreaKey?: string;
+    /** When set, only include print areas for this garment view. */
+    view?: ProductViewKey;
   },
 ): MockupAreaLayer[] {
-  const areas = listPrintAreas(product);
-  const list = areas.length ? areas : [null];
+  const areas = args.view
+    ? listPrintAreasForView(product, args.view)
+    : listPrintAreas(product);
+  const list = areas.length ? areas : args.view ? [] : [null];
   const primary = primaryAreaKey(product);
   const productKey = placementKey(product, args.idx);
-  return list.map((a, i) => {
+  const allAreas = listPrintAreas(product);
+  return list.map((a) => {
+    const i = a ? Math.max(0, allAreas.indexOf(a)) : 0;
     const areaKey = printAreaStableKey(a, i);
     const draftKey = areaPlacementKey(product, args.idx, areaKey);
     const artUrl =

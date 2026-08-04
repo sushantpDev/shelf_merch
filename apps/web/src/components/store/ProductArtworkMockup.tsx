@@ -6,6 +6,9 @@ export type MockupProduct = {
   primaryImageUrl?: string;
   imageUrls?: string[];
   maskImageUrl?: string;
+  maskBackImageUrl?: string;
+  mockupUrl?: string;
+  mockupBackUrl?: string;
   artworkUrl?: string;
   printAreas?: Array<{
     key?: string;
@@ -30,7 +33,14 @@ function uniquePaths(urls: Array<string | undefined>) {
 }
 
 function defaultImageCandidates(p: MockupProduct) {
-  return uniquePaths([p.maskImageUrl, p.primaryImageUrl, ...(p.imageUrls || [])]);
+  return uniquePaths([
+    p.mockupUrl,
+    p.mockupBackUrl,
+    p.maskImageUrl,
+    p.maskBackImageUrl,
+    p.primaryImageUrl,
+    ...(p.imageUrls || []),
+  ]);
 }
 
 function printAreaWrapStyle(box?: {

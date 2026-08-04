@@ -749,6 +749,7 @@ export type StorefrontData = {
     baseBackImageUrl?: string;
     artworkUrl?: string;
     mockupUrl?: string;
+    mockupBackUrl?: string;
     placement?: { xPct: number; yPct: number; wPct: number; rot: number };
     preferredColors?: string[];
     printAreas?: Array<{

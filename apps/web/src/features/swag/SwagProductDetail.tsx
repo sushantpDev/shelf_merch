@@ -9,6 +9,8 @@ import {
   productColorHex,
 } from "./colors";
 import { DesignedProductThumb } from "./DesignedProductThumb";
+import { listProductViews, type ProductViewKey } from "./mockup-bake";
+import { MockupViewGallery } from "./MockupViewGallery";
 
 export type SwagDesignTarget = { collection: UiCollection; product: UiProduct; pIdx: number };
 
@@ -27,18 +29,27 @@ export function SwagProductDetail({
   // Only tint once the user actually picks a swatch, so the baked white Konva
   // mockup is shown on first paint (matches the storefront product page).
   const [hasUserPickedColor, setHasUserPickedColor] = useState(false);
+  const hasBackView = listProductViews(product).includes("back");
+  const productViews: ProductViewKey[] = hasBackView ? ["front", "back"] : ["front"];
+  const [mockupView, setMockupView] = useState<ProductViewKey>("front");
 
   // Reset the selection back to the default (White) whenever the product changes.
   useEffect(() => {
     setSel(defaultWhiteColorIndex(names));
     setHasUserPickedColor(false);
+    setMockupView("front");
   }, [product.id, collection.id]);
+
+  useEffect(() => {
+    if (!hasBackView && mockupView === "back") setMockupView("front");
+  }, [hasBackView, mockupView]);
 
   const selectedName = names[sel];
   const tintHex = getMockupTintHex(
     selectedName ? productColorHex(product, selectedName) : undefined,
     hasUserPickedColor,
   );
+  const activeView: ProductViewKey = hasBackView ? mockupView : "front";
 
   return (
     <div>
@@ -58,20 +69,36 @@ export function SwagProductDetail({
           marginTop: 20,
         }}
       >
-        <div
-          style={{
+        <MockupViewGallery
+          views={productViews}
+          activeView={activeView}
+          onChange={setMockupView}
+          style={{ minHeight: 420 }}
+          mediaStyle={{
             background: "var(--gray-100)",
             borderRadius: "var(--r-sm)",
             aspectRatio: "1 / 1",
             overflow: "hidden",
+            minHeight: 0,
+            padding: 16,
           }}
+          renderThumb={(view) => (
+            <DesignedProductThumb
+              product={product}
+              artworkUrl={collection.artworkUrl}
+              tintHex={tintHex}
+              view={view}
+            />
+          )}
         >
           <DesignedProductThumb
             product={product}
             artworkUrl={collection.artworkUrl}
             tintHex={tintHex}
+            view={hasBackView ? activeView : undefined}
+            onViewChange={hasBackView ? setMockupView : undefined}
           />
-        </div>
+        </MockupViewGallery>
 
         <div>
           {names.length > 0 && (

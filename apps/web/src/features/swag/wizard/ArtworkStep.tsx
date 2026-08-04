@@ -4,14 +4,20 @@ import { toast } from "sonner";
 import { mediaUrlForCanvas } from "@/lib/mediaUrl";
 import type { UiProduct } from "@/services/mappers";
 import { MockupCanvas, buildMockupLayers } from "../MockupCanvas";
+import { MockupViewGallery } from "../MockupViewGallery";
 import {
   areaPlacementKey,
   designImgUrl,
+  designImgUrlForView,
   listPrintAreas,
+  listPrintAreasForView,
+  listProductViews,
   placementKey,
   primaryAreaKey,
   printAreaStableKey,
+  printAreaViewKey,
   type Placement,
+  type ProductViewKey,
 } from "../mockup-bake";
 import type { ArtFile } from "../swagDraft";
 import { rememberArtwork, type PreviousArtwork } from "./artworkHistory";
@@ -20,7 +26,7 @@ const ART_ACCEPT = /\.(svg|png|jpe?g|ai)$/i;
 const ART_MAX = 5 * 1024 * 1024;
 
 type PrintQuality = "good" | "poor";
-type Focus = { productIdx: number; areaKey: string };
+type Focus = { productIdx: number; areaKey: string; view: ProductViewKey };
 
 function productHasArtwork(
   product: UiProduct,
@@ -34,10 +40,19 @@ function productHasArtwork(
   );
 }
 
-function defaultAreaKey(product: UiProduct): string {
-  const areas = listPrintAreas(product);
-  if (!areas.length) return primaryAreaKey(product);
-  return printAreaStableKey(areas[0], 0);
+function defaultAreaKey(product: UiProduct, view: ProductViewKey = "front"): string {
+  const areas = listPrintAreasForView(product, view);
+  if (areas.length) {
+    const all = listPrintAreas(product);
+    const a = areas[0];
+    return printAreaStableKey(a, Math.max(0, all.indexOf(a)));
+  }
+  if (view === "front") return primaryAreaKey(product);
+  return "";
+}
+
+function defaultView(product: UiProduct): ProductViewKey {
+  return listProductViews(product)[0] || "front";
 }
 
 export function ArtworkStep({
@@ -79,17 +94,24 @@ export function ArtworkStep({
   useEffect(() => {
     if (!products.length) return;
     if (!focus) {
-      setFocus({ productIdx: 0, areaKey: defaultAreaKey(products[0]) });
+      const p0 = products[0];
+      const view = defaultView(p0);
+      setFocus({ productIdx: 0, areaKey: defaultAreaKey(p0, view), view });
       return;
     }
     const p = products[Math.min(focus.productIdx, products.length - 1)] || products[0];
-    const keys = listPrintAreas(p).map((a, i) => printAreaStableKey(a, i));
+    const views = listProductViews(p);
+    const view = views.includes(focus.view) ? focus.view : views[0] || "front";
+    const keys = listPrintAreasForView(p, view).map((a) => {
+      const all = listPrintAreas(p);
+      return printAreaStableKey(a, Math.max(0, all.indexOf(a)));
+    });
     const nextKey = keys.includes(focus.areaKey)
       ? focus.areaKey
-      : keys[0] || primaryAreaKey(p);
+      : keys[0] || defaultAreaKey(p, view);
     const nextIdx = Math.min(focus.productIdx, products.length - 1);
-    if (nextIdx !== focus.productIdx || nextKey !== focus.areaKey) {
-      setFocus({ productIdx: nextIdx, areaKey: nextKey });
+    if (nextIdx !== focus.productIdx || nextKey !== focus.areaKey || view !== focus.view) {
+      setFocus({ productIdx: nextIdx, areaKey: nextKey, view });
     }
   }, [products, focus]);
 
@@ -100,11 +122,18 @@ export function ArtworkStep({
 
   const focusIdx = focus ? Math.min(focus.productIdx, products.length - 1) : 0;
   const focusedProduct = products[focusIdx] || null;
-  const focusedAreas = focusedProduct ? listPrintAreas(focusedProduct) : [];
+  const productViews = focusedProduct ? listProductViews(focusedProduct) : (["front"] as ProductViewKey[]);
+  const activeView: ProductViewKey = focus?.view || "front";
+  const focusedAreas = focusedProduct
+    ? listPrintAreasForView(focusedProduct, activeView)
+    : [];
+  const allFocusedAreas = focusedProduct ? listPrintAreas(focusedProduct) : [];
   const focusedArea =
     focus && focusedProduct
-      ? focusedAreas.find((a, i) => printAreaStableKey(a, i) === focus.areaKey) ||
-        focusedAreas[0]
+      ? focusedAreas.find(
+          (a) =>
+            printAreaStableKey(a, Math.max(0, allFocusedAreas.indexOf(a))) === focus.areaKey,
+        ) || focusedAreas[0]
       : null;
   const focusedAreaLabel = focusedArea?.label || focus?.areaKey || "print area";
   const focusedDraftKey =
@@ -112,17 +141,40 @@ export function ArtworkStep({
       ? areaPlacementKey(focusedProduct, focusIdx, focus.areaKey)
       : "";
   const focusedAreaArt = focusedDraftKey ? areaArts[focusedDraftKey] : null;
-  const canUpload = Boolean(focus && focusedDraftKey && focusedProduct);
+  const canUpload = Boolean(focus && focusedDraftKey && focusedProduct && focus.areaKey);
+  const backMaskMissing =
+    activeView === "back" &&
+    focusedProduct &&
+    !designImgUrlForView(focusedProduct, "back");
 
   function selectProduct(idx: number) {
     const p = products[idx];
     if (!p) return;
-    const keys = listPrintAreas(p).map((a, i) => printAreaStableKey(a, i));
+    const views = listProductViews(p);
+    const view =
+      focus?.view && views.includes(focus.view) ? focus.view : views[0] || "front";
+    const keys = listPrintAreasForView(p, view).map((a) => {
+      const all = listPrintAreas(p);
+      return printAreaStableKey(a, Math.max(0, all.indexOf(a)));
+    });
     const keep =
       focus?.areaKey && keys.includes(focus.areaKey)
         ? focus.areaKey
-        : keys[0] || primaryAreaKey(p);
-    setFocus({ productIdx: idx, areaKey: keep });
+        : keys[0] || defaultAreaKey(p, view);
+    setFocus({ productIdx: idx, areaKey: keep, view });
+  }
+
+  function selectView(view: ProductViewKey) {
+    if (!focusedProduct || focus == null) return;
+    const keys = listPrintAreasForView(focusedProduct, view).map((a) => {
+      const all = listPrintAreas(focusedProduct);
+      return printAreaStableKey(a, Math.max(0, all.indexOf(a)));
+    });
+    setFocus({
+      productIdx: focus.productIdx,
+      view,
+      areaKey: keys[0] || defaultAreaKey(focusedProduct, view),
+    });
   }
 
   function remember(file: ArtFile) {
@@ -207,6 +259,7 @@ export function ArtworkStep({
           areaArts,
           placements,
           activeAreaKey: focus.areaKey,
+          view: activeView,
         })
       : [];
 
@@ -301,26 +354,70 @@ export function ArtworkStep({
                   Click a placeholder · drag to move · corners to scale
                 </div>
               </div>
-              <div className="sw-art-canvas-board">
-                <div className="sw-art-canvas-slot">
-                  <MockupCanvas
-                    product={focusedProduct}
-                    layers={layers}
-                    activeAreaKey={focus.areaKey}
-                    resetEpoch={placementEpoch}
-                    fillContainer
-                    onSelectArea={(areaKey) =>
-                      setFocus({ productIdx: focusIdx, areaKey })
-                    }
-                    onChange={(next, areaKey) => {
-                      onPlacementChange(
-                        areaPlacementKey(focusedProduct, focusIdx, areaKey),
-                        next,
-                      );
-                    }}
-                  />
+              {backMaskMissing ? (
+                <div className="mut3" style={{ marginBottom: 10, fontSize: 13 }}>
+                  No back production mask on this catalog product yet — upload one in the platform
+                  product wizard to design the back view.
                 </div>
-              </div>
+              ) : null}
+              <MockupViewGallery
+                views={productViews}
+                activeView={activeView}
+                onChange={selectView}
+                style={{ flex: 1, minHeight: 0, alignItems: "stretch" }}
+                mediaClassName="sw-art-canvas-board"
+                mediaStyle={{
+                  flex: 1,
+                  minHeight: 0,
+                  padding: 0,
+                  background: "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                renderThumb={(view) => {
+                  const thumbLayers = buildMockupLayers(focusedProduct, {
+                    idx: focusIdx,
+                    areaArts,
+                    placements,
+                    view,
+                  });
+                  return (
+                    <MockupCanvas product={focusedProduct} layers={thumbLayers} view={view} />
+                  );
+                }}
+              >
+                <div className="sw-art-canvas-slot">
+                  {backMaskMissing ? (
+                    <div className="sw-art-canvas-empty">Back view image unavailable</div>
+                  ) : (
+                    <MockupCanvas
+                      product={focusedProduct}
+                      layers={layers}
+                      activeAreaKey={focus.areaKey}
+                      view={activeView}
+                      resetEpoch={placementEpoch}
+                      fillContainer
+                      onSelectArea={(areaKey) => {
+                        const area = listPrintAreas(focusedProduct).find(
+                          (a, i) => printAreaStableKey(a, i) === areaKey,
+                        );
+                        setFocus({
+                          productIdx: focusIdx,
+                          areaKey,
+                          view: printAreaViewKey(focusedProduct, area),
+                        });
+                      }}
+                      onChange={(next, areaKey) => {
+                        onPlacementChange(
+                          areaPlacementKey(focusedProduct, focusIdx, areaKey),
+                          next,
+                        );
+                      }}
+                    />
+                  )}
+                </div>
+              </MockupViewGallery>
             </div>
           ) : (
             <div className="sw-art-canvas-empty">Select a product to start designing</div>
