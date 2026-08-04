@@ -18,7 +18,6 @@ import { useCreateCollection, useSyncCollectionPublish, useUpdateCollection } fr
 import type { UiProduct, UiShop } from "../model";
 import {
   INITIAL_SWAG_DRAFT,
-  draftHasAreaArtwork,
   swagDraftReducer,
   type SwagAction,
   type SwagDraft,
@@ -122,10 +121,6 @@ export function useSwagWizardController(): SwagWizardVm {
   }
 
   async function onPublish() {
-    if (!draftHasAreaArtwork(draft)) {
-      toast.error("Add artwork to at least one print area before publishing");
-      return;
-    }
     if (!pickedShops.size) {
       toast.error("Select at least one shop");
       return;

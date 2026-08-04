@@ -6,6 +6,7 @@ import type { UiProduct } from "@/services/mappers";
 import { MockupCanvas, buildMockupLayers } from "../MockupCanvas";
 import {
   areaPlacementKey,
+  designImgUrl,
   listPrintAreas,
   placementKey,
   primaryAreaKey,
@@ -19,10 +20,29 @@ const ART_ACCEPT = /\.(svg|png|jpe?g|ai)$/i;
 const ART_MAX = 5 * 1024 * 1024;
 
 type PrintQuality = "good" | "poor";
+type Focus = { productIdx: number; areaKey: string };
+
+function productHasArtwork(
+  product: UiProduct,
+  idx: number,
+  areaArts: Record<string, ArtFile>,
+): boolean {
+  const areas = listPrintAreas(product);
+  const list = areas.length ? areas : [null];
+  return list.some((a, i) =>
+    Boolean(areaArts[areaPlacementKey(product, idx, printAreaStableKey(a, i))]),
+  );
+}
+
+function defaultAreaKey(product: UiProduct): string {
+  const areas = listPrintAreas(product);
+  if (!areas.length) return primaryAreaKey(product);
+  return printAreaStableKey(areas[0], 0);
+}
 
 export function ArtworkStep({
   products,
-  art,
+  art: _art,
   areaArts,
   placements,
   placementEpoch,
@@ -49,14 +69,19 @@ export function ArtworkStep({
   onResetPlacements: () => void;
   onPlacementChange: (key: string, placement: Placement) => void;
 }) {
+  void _art;
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
-  /** Null until the user clicks a placeholder on a mockup. */
-  const [focus, setFocus] = useState<{ productIdx: number; areaKey: string } | null>(null);
+  /** Null until a product/placeholder is available; auto-seeds to first product. */
+  const [focus, setFocus] = useState<Focus | null>(null);
 
   useEffect(() => {
-    if (!products.length || !focus) return;
+    if (!products.length) return;
+    if (!focus) {
+      setFocus({ productIdx: 0, areaKey: defaultAreaKey(products[0]) });
+      return;
+    }
     const p = products[Math.min(focus.productIdx, products.length - 1)] || products[0];
     const keys = listPrintAreas(p).map((a, i) => printAreaStableKey(a, i));
     const nextKey = keys.includes(focus.areaKey)
@@ -68,8 +93,13 @@ export function ArtworkStep({
     }
   }, [products, focus]);
 
-  const focusedProduct =
-    focus != null ? products[focus.productIdx] || products[0] : null;
+  const designedCount = products.reduce(
+    (n, p, idx) => n + (productHasArtwork(p, idx, areaArts) ? 1 : 0),
+    0,
+  );
+
+  const focusIdx = focus ? Math.min(focus.productIdx, products.length - 1) : 0;
+  const focusedProduct = products[focusIdx] || null;
   const focusedAreas = focusedProduct ? listPrintAreas(focusedProduct) : [];
   const focusedArea =
     focus && focusedProduct
@@ -79,13 +109,21 @@ export function ArtworkStep({
   const focusedAreaLabel = focusedArea?.label || focus?.areaKey || "print area";
   const focusedDraftKey =
     focus && focusedProduct
-      ? areaPlacementKey(focusedProduct, focus.productIdx, focus.areaKey)
+      ? areaPlacementKey(focusedProduct, focusIdx, focus.areaKey)
       : "";
   const focusedAreaArt = focusedDraftKey ? areaArts[focusedDraftKey] : null;
+  const canUpload = Boolean(focus && focusedDraftKey && focusedProduct);
 
-  const assignedCount = Object.keys(areaArts).length;
-  const totalAreas = products.reduce((n, p) => n + Math.max(1, listPrintAreas(p).length), 0);
-  const canUpload = Boolean(focus && focusedDraftKey);
+  function selectProduct(idx: number) {
+    const p = products[idx];
+    if (!p) return;
+    const keys = listPrintAreas(p).map((a, i) => printAreaStableKey(a, i));
+    const keep =
+      focus?.areaKey && keys.includes(focus.areaKey)
+        ? focus.areaKey
+        : keys[0] || primaryAreaKey(p);
+    setFocus({ productIdx: idx, areaKey: keep });
+  }
 
   function remember(file: ArtFile) {
     rememberArtwork({
@@ -162,59 +200,146 @@ export function ArtworkStep({
     toast.success(`Artwork applied to ${keys.length} print areas`);
   }
 
+  const layers =
+    focusedProduct && focus
+      ? buildMockupLayers(focusedProduct, {
+          idx: focusIdx,
+          areaArts,
+          placements,
+          activeAreaKey: focus.areaKey,
+        })
+      : [];
+
   return (
-    <div className="sw-art-studio">
-      <div className="sw-art-layout">
-        <header className="sw-art-page-head">
+    <div className="sw-art-studio sw-art-studio--canvas">
+      <header className="sw-art-studio-head">
+        <div>
           <h1>Add artwork to your products</h1>
           <p className="sw-art-page-lead">
-            Click a placeholder on the mockup, then upload artwork for that area. Each placeholder
-            can have its own design. DTF decoration ·{" "}
+            Select a product, click a placeholder on the mockup, then upload artwork. DTF decoration
+            ·{" "}
             <span className="sw-art-page-info" title="Decoration info" aria-label="More information">
               <Info size={11} strokeWidth={2.5} />
             </span>
           </p>
-        </header>
+        </div>
+        <div className="sw-art-progress" aria-live="polite">
+          <span className="sw-art-progress-count">
+            {designedCount} / {products.length}
+          </span>
+          <span className="sw-art-progress-label">Products Designed</span>
+        </div>
+      </header>
 
-        {!assignedCount && !bannerDismissed ? (
-          <div className="sw-art-alert">
-            <span>
-              Start by selecting a dashed print-area box on the mockup, then upload artwork for that
-              placeholder.
-            </span>
-            <button
-              type="button"
-              className="sw-art-alert-close"
-              aria-label="Dismiss"
-              onClick={() => setBannerDismissed(true)}
-            >
-              <X size={14} />
-            </button>
+      {!designedCount && !bannerDismissed ? (
+        <div className="sw-art-alert sw-art-alert--bar">
+          <span>
+            Tip: click a dashed print-area box on the mockup, then upload artwork for that
+            placeholder. You can leave products blank and continue anytime.
+          </span>
+          <button
+            type="button"
+            className="sw-art-alert-close"
+            aria-label="Dismiss"
+            onClick={() => setBannerDismissed(true)}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ) : null}
+
+      <div className="sw-art-canvas-layout">
+        {/* LEFT — products */}
+        <aside className="sw-art-products" aria-label="Selected products">
+          <div className="sw-art-products-title">Products</div>
+          <div className="sw-art-products-list">
+            {products.map((p, idx) => {
+              const designed = productHasArtwork(p, idx, areaArts);
+              const selected = focusIdx === idx;
+              const thumb = p.photoUrl || designImgUrl(p) || p.imgUrl || "";
+              return (
+                <button
+                  key={placementKey(p, idx)}
+                  type="button"
+                  className={`sw-art-product-card${selected ? " is-selected" : ""}${designed ? " is-designed" : ""}`}
+                  onClick={() => selectProduct(idx)}
+                  aria-pressed={selected}
+                >
+                  <span className="sw-art-product-thumb">
+                    {thumb ? <img src={thumb} alt="" /> : <span className="sw-art-product-thumb-empty" />}
+                  </span>
+                  <span className="sw-art-product-copy">
+                    <span className="sw-art-product-name">{p.nm}</span>
+                    <span className={`sw-art-product-badge${designed ? " on" : ""}`}>
+                      {designed ? (
+                        <>
+                          <Check size={11} strokeWidth={2.75} aria-hidden /> Designed
+                        </>
+                      ) : (
+                        "Not Designed"
+                      )}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        ) : null}
+        </aside>
 
-        <aside className="sw-art-panel">
+        {/* CENTER — large canvas */}
+        <section className="sw-art-canvas-stage" aria-label="Design canvas">
+          {focusedProduct && focus ? (
+            <div key={placementKey(focusedProduct, focusIdx)} className="sw-art-canvas-frame">
+              <div className="sw-art-canvas-meta">
+                <div>
+                  {focusedProduct.brand ? (
+                    <div className="sw-art-canvas-brand">{focusedProduct.brand}</div>
+                  ) : null}
+                  <div className="sw-art-canvas-name">{focusedProduct.nm}</div>
+                </div>
+                <div className="mut3 sw-art-canvas-hint">
+                  Click a placeholder · drag to move · corners to scale
+                </div>
+              </div>
+              <div className="sw-art-canvas-board">
+                <div className="sw-art-canvas-slot">
+                  <MockupCanvas
+                    product={focusedProduct}
+                    layers={layers}
+                    activeAreaKey={focus.areaKey}
+                    resetEpoch={placementEpoch}
+                    fillContainer
+                    onSelectArea={(areaKey) =>
+                      setFocus({ productIdx: focusIdx, areaKey })
+                    }
+                    onChange={(next, areaKey) => {
+                      onPlacementChange(
+                        areaPlacementKey(focusedProduct, focusIdx, areaKey),
+                        next,
+                      );
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="sw-art-canvas-empty">Select a product to start designing</div>
+          )}
+        </section>
+
+        {/* RIGHT — artwork panel */}
+        <aside className="sw-art-panel sw-art-panel--side" aria-label="Artwork">
           <h2 className="sw-art-panel-title">Artwork</h2>
 
-          <div
-            style={{
-              marginBottom: 12,
-              padding: "10px 12px",
-              borderRadius: 8,
-              border: "1px solid var(--line)",
-              background: canUpload ? "var(--surface-2)" : "transparent",
-            }}
-          >
-            <div className="mut3" style={{ fontSize: 11, marginBottom: 4 }}>
-              Selected placeholder
-            </div>
+          <div className={`sw-art-selected-box${canUpload ? " is-ready" : ""}`}>
+            <div className="mut3 sw-art-selected-label">Selected placeholder</div>
             {canUpload && focusedProduct ? (
               <>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>
+                <div className="sw-art-selected-title">
                   {focusedProduct.nm} · {focusedAreaLabel}
                 </div>
                 {focusedArea?.widthIn && focusedArea?.heightIn ? (
-                  <div className="mut3" style={{ fontSize: 12, marginTop: 2 }}>
+                  <div className="mut3 sw-art-selected-dims">
                     {Number(focusedArea.widthIn).toFixed(2)}″ ×{" "}
                     {Number(focusedArea.heightIn).toFixed(2)}″
                     {focusedArea.dpi ? ` · ${focusedArea.dpi} DPI` : ""}
@@ -222,8 +347,8 @@ export function ArtworkStep({
                 ) : null}
               </>
             ) : (
-              <div style={{ fontSize: 13, color: "var(--muted)" }}>
-                Click a print-area box on a mockup to select it
+              <div className="sw-art-selected-empty">
+                Click a print-area box on the mockup to select it
               </div>
             )}
           </div>
@@ -287,10 +412,8 @@ export function ArtworkStep({
           />
 
           {previousUploads.length > 0 ? (
-            <div style={{ marginTop: 16 }}>
-              <div className="mut3" style={{ fontSize: 11, marginBottom: 8 }}>
-                Previous uploads
-              </div>
+            <div className="sw-art-prev-block">
+              <div className="mut3 sw-art-prev-heading">Previous uploads</div>
               <div className="sw-art-prev-scroll">
                 <div className="sw-art-tab-body sw-art-prev-list">
                   {previousUploads.map((item) => (
@@ -324,7 +447,7 @@ export function ArtworkStep({
           </div>
 
           {focusedAreaArt ? (
-            <div className="col" style={{ gap: 8, marginTop: 8 }}>
+            <div className="col sw-art-apply-actions">
               <button
                 type="button"
                 className="btn btn-soft btn-block btn-sm"
@@ -345,7 +468,7 @@ export function ArtworkStep({
             </div>
           ) : null}
 
-          {assignedCount > 0 ? (
+          {Object.keys(areaArts).length > 0 ? (
             <button
               type="button"
               className="btn btn-ghost btn-block btn-sm sw-art-reset"
@@ -359,132 +482,6 @@ export function ArtworkStep({
             </button>
           ) : null}
         </aside>
-
-        <div className="sw-art-preview-stage">
-          <div className="sw-art-preview-head">
-            <div>
-              <div className="sw-art-preview-title">Your mockups</div>
-              <div className="mut3 sw-art-preview-hint">
-                Click a placeholder · upload artwork · drag to move · corners to scale
-              </div>
-            </div>
-            {assignedCount > 0 ? (
-              <span className="sw-art-applied-badge">
-                <Check size={13} strokeWidth={2.5} />
-                {assignedCount}/{totalAreas} areas have artwork
-              </span>
-            ) : null}
-          </div>
-
-          <div className="sw-art-preview-scroll">
-            <div className="sw-mockups">
-              {products.map((p, idx) => (
-                <ProductArtworkCard
-                  key={placementKey(p, idx)}
-                  product={p}
-                  idx={idx}
-                  areaArts={areaArts}
-                  activeAreaKey={focus?.productIdx === idx ? focus.areaKey : undefined}
-                  placements={placements}
-                  placementEpoch={placementEpoch}
-                  onFocusArea={(areaKey) => setFocus({ productIdx: idx, areaKey })}
-                  onPlacementChange={onPlacementChange}
-                  onClearAreaArt={onClearAreaArt}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ProductArtworkCard({
-  product,
-  idx,
-  areaArts,
-  activeAreaKey,
-  placements,
-  placementEpoch,
-  onFocusArea,
-  onPlacementChange,
-  onClearAreaArt,
-}: {
-  product: UiProduct;
-  idx: number;
-  areaArts: Record<string, ArtFile>;
-  activeAreaKey?: string;
-  placements: Record<string, Placement>;
-  placementEpoch: number;
-  onFocusArea: (areaKey: string) => void;
-  onPlacementChange: (key: string, placement: Placement) => void;
-  onClearAreaArt: (key: string) => void;
-}) {
-  const areas = listPrintAreas(product);
-  const draftKey = activeAreaKey
-    ? areaPlacementKey(product, idx, activeAreaKey)
-    : "";
-  const areaArt = draftKey ? areaArts[draftKey] : null;
-  const layers = buildMockupLayers(product, {
-    idx,
-    areaArts,
-    placements,
-    activeAreaKey,
-  });
-  const activeLabel =
-    (activeAreaKey &&
-      areas.find((a, i) => printAreaStableKey(a, i) === activeAreaKey)?.label) ||
-    activeAreaKey ||
-    null;
-
-  return (
-    <div
-      className="pcard mockup-card sw-mockup-card"
-      style={{
-        outline: activeAreaKey ? "2px solid var(--brand)" : undefined,
-        outlineOffset: 2,
-      }}
-    >
-      <MockupCanvas
-        product={product}
-        layers={layers}
-        activeAreaKey={activeAreaKey}
-        resetEpoch={placementEpoch}
-        onSelectArea={onFocusArea}
-        onChange={(next, areaKey) => {
-          onPlacementChange(areaPlacementKey(product, idx, areaKey), next);
-        }}
-      />
-
-      <div className="meta">
-        {product.brand ? <div className="brand">{product.brand}</div> : null}
-        <div className="nm">{product.nm}</div>
-        <div
-          className="row"
-          style={{ gap: 8, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}
-        >
-          <div className="mut3" style={{ fontSize: 11 }}>
-            {activeLabel
-              ? areaArt
-                ? `Editing ${activeLabel} — drag artwork inside the box`
-                : `${activeLabel} selected — upload artwork in the left panel`
-              : "Click a dashed placeholder to select it"}
-          </div>
-          {areaArt && draftKey ? (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              style={{ fontSize: 11, padding: "2px 8px" }}
-              onClick={() => {
-                onClearAreaArt(draftKey);
-                toast.success("Removed artwork from this print area");
-              }}
-            >
-              Remove
-            </button>
-          ) : null}
-        </div>
       </div>
     </div>
   );
@@ -531,7 +528,7 @@ function ArtworkPickRow({
             </span>
             <span className="sw-art-pick-meta">
               {name ? <span className="sw-art-pick-name">{name}</span> : null}
-              <span className="sw-art-pick-quality">
+              {/* <span className="sw-art-pick-quality">
                 Print Quality:{" "}
                 <strong className={quality === "poor" ? "poor" : quality === "good" ? "good" : ""}>
                   {quality === "poor"
@@ -540,7 +537,7 @@ function ArtworkPickRow({
                       ? "Good Quality"
                       : "Checking…"}
                 </strong>
-              </span>
+              </span> */}
               <span className="mut3 sw-art-pick-type">File Type: {fileType}</span>
             </span>
           </div>

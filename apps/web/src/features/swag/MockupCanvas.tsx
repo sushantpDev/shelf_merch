@@ -96,6 +96,7 @@ export function MockupCanvas({
   printAreaKey,
   activeAreaKey: activeAreaKeyProp,
   resetEpoch = 0,
+  fillContainer = false,
   onChange,
   onSelectArea,
 }: {
@@ -107,6 +108,8 @@ export function MockupCanvas({
   printAreaKey?: string | null;
   activeAreaKey?: string | null;
   resetEpoch?: number;
+  /** Stretch to parent height/width (artwork studio canvas). */
+  fillContainer?: boolean;
   onChange?: (placement: Placement, areaKey: string) => void;
   onSelectArea?: (areaKey: string) => void;
 }) {
@@ -119,6 +122,7 @@ export function MockupCanvas({
   onSelectRef.current = onSelectArea;
   layersRef.current = layersProp;
   const [dpiWarn, setDpiWarn] = useState<number | null>(null);
+  const [wrapSize, setWrapSize] = useState({ w: 0, h: 0 });
 
   const maskSrc = resolveMediaSrc(designImgUrl(product));
   const branded = productHasPrintArea(product);
@@ -137,6 +141,20 @@ export function MockupCanvas({
 
   const activeAreaKey = activeAreaKeyProp || printAreaKey || (layersProp?.length ? undefined : layers[0]?.areaKey);
   const sig = layersSignature(layers);
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const update = () => {
+      const w = Math.round(wrap.clientWidth);
+      const h = Math.round(wrap.clientHeight);
+      setWrapSize((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, [fillContainer]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -158,6 +176,7 @@ export function MockupCanvas({
           ];
 
     (async () => {
+      if (wrap.clientWidth < 8 || wrap.clientHeight < 8) return;
       const Konva = (await import("konva")).default;
       if (cancelled || !host.isConnected) return;
 
@@ -175,11 +194,19 @@ export function MockupCanvas({
       if (cancelled || !host.isConnected) return;
 
       const fit = Math.min(wrap.clientWidth / CANVAS_WIDTH, wrap.clientHeight / CANVAS_HEIGHT) || 1;
+      const drawnW = CANVAS_WIDTH * fit;
+      const drawnH = CANVAS_HEIGHT * fit;
+      const offsetX = Math.max(0, (wrap.clientWidth - drawnW) / 2);
+      const offsetY = Math.max(0, (wrap.clientHeight - drawnH) / 2);
       host.innerHTML = "";
+      host.style.position = "absolute";
+      host.style.left = "0";
+      host.style.top = "0";
       host.style.width = `${CANVAS_WIDTH}px`;
       host.style.height = `${CANVAS_HEIGHT}px`;
-      host.style.transform = `scale(${fit})`;
+      host.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${fit})`;
       host.style.transformOrigin = "top left";
+      host.style.willChange = "transform";
 
       stage = new Konva.Stage({ container: host, width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
       const layer = new Konva.Layer();
@@ -226,29 +253,38 @@ export function MockupCanvas({
       // Draw all placeholder boxes first (inactive under art).
       for (const g of geoms) {
         const isActive = g.areaKey === activeAreaKey;
+        const hasActive = Boolean(activeAreaKey);
+        const dimmed = hasActive && !isActive;
         layer.add(
           new Konva.Rect({
             x: g.box.bx,
             y: g.box.by,
             width: g.box.bw,
             height: g.box.bh,
-            stroke: isActive ? BRAND : "rgba(61,95,217,.4)",
-            strokeWidth: isActive ? 2 : 1.25,
-            dash: [5, 4],
-            fill: isActive ? "rgba(61,95,217,.06)" : "transparent",
+            stroke: isActive ? BRAND : dimmed ? "rgba(61,95,217,.22)" : "rgba(61,95,217,.55)",
+            strokeWidth: isActive ? 3 : 1.75,
+            dash: isActive ? [7, 4] : [5, 4],
+            fill: isActive
+              ? "rgba(61,95,217,.12)"
+              : dimmed
+                ? "rgba(15,23,42,.04)"
+                : "rgba(61,95,217,.04)",
+            opacity: dimmed ? 0.72 : 1,
             listening: true,
+            hitStrokeWidth: 14,
             name: `box:${g.areaKey}`,
           }),
         );
         layer.add(
           new Konva.Text({
             x: g.box.bx,
-            y: Math.max(0, g.box.by - 16),
+            y: Math.max(0, g.box.by - 18),
             text: `${g.label} · ${g.ph.widthIn.toFixed(2)}×${g.ph.heightIn.toFixed(2)} in`,
-            fontSize: 11,
-            fill: isActive ? BRAND : "rgba(61,95,217,.75)",
+            fontSize: isActive ? 12 : 11,
+            fill: isActive ? BRAND : dimmed ? "rgba(61,95,217,.4)" : "rgba(61,95,217,.85)",
             fontStyle: isActive ? "bold" : "normal",
             listening: false,
+            opacity: dimmed ? 0.7 : 1,
           }),
         );
       }
@@ -447,35 +483,64 @@ export function MockupCanvas({
         /* noop */
       }
     };
-  }, [product, sig, resetEpoch, maskSrc, activeAreaKey]);
+  }, [product, sig, resetEpoch, maskSrc, activeAreaKey, wrapSize.w, wrapSize.h]);
 
   return (
     <div
-      className={`img${branded ? " img-mockup" : ""}`}
+      className={`img${branded ? " img-mockup" : ""}${fillContainer ? " img-mockup-fill" : ""}`}
       ref={wrapRef}
-      style={{
-        position: "relative",
-        width: "100%",
-        aspectRatio: `${CANVAS_WIDTH} / ${CANVAS_HEIGHT}`,
-        overflow: "hidden",
-        background: "var(--surface-2)",
-      }}
+      style={
+        fillContainer
+          ? {
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              overflow: "hidden",
+              background: "#fff",
+              contain: "strict",
+            }
+          : {
+              position: "relative",
+              width: "100%",
+              aspectRatio: `${CANVAS_WIDTH} / ${CANVAS_HEIGHT}`,
+              overflow: "hidden",
+              background: "#fff",
+              flexShrink: 0,
+            }
+      }
     >
-      {maskSrc && (
+      {/* Stable product backdrop — layout never depends on Konva children. */}
+      {maskSrc ? (
         <img
           src={maskSrc}
           alt=""
+          draggable={false}
           style={{
             position: "absolute",
             inset: 0,
             width: "100%",
             height: "100%",
             objectFit: "contain",
+            objectPosition: "center center",
             pointerEvents: "none",
+            zIndex: 0,
           }}
         />
-      )}
-      <div ref={hostRef} style={{ position: "absolute", top: 0, left: 0 }} />
+      ) : null}
+      <div
+        ref={hostRef}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: CANVAS_WIDTH,
+          height: CANVAS_HEIGHT,
+          zIndex: 1,
+          pointerEvents: "auto",
+          /* Do not use contain:paint — CSS scale must not clip Konva overlays. */
+        }}
+      />
       {dpiWarn != null && (
         <div
           style={{
@@ -488,6 +553,7 @@ export function MockupCanvas({
             color: "#fff",
             padding: "4px 8px",
             borderRadius: 4,
+            pointerEvents: "none",
           }}
         >
           Active area ~{dpiWarn} DPI — aim for {MIN_EFFECTIVE_DPI}+

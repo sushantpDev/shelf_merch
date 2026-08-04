@@ -5,7 +5,7 @@ import { CatalogStep } from "../wizard/CatalogStep";
 import { ArtworkStep } from "../wizard/ArtworkStep";
 import { AddToShopStep } from "../wizard/AddToShopStep";
 import type { SwagWizardVm } from "../controllers/useSwagWizardController";
-import { draftHasAreaArtwork, type SwagDraft } from "../swagDraft";
+import type { SwagDraft } from "../swagDraft";
 
 const STEPS = ["Collection", "Products", "Artwork", "Add to shop"];
 
@@ -130,7 +130,6 @@ export function SwagWizardView(vm: SwagWizardVm) {
               <button
                 type="button"
                 className="btn btn-brand"
-                disabled={!draftHasAreaArtwork(draft)}
                 onClick={() => vm.onStep(3)}
               >
                 Add Artwork
@@ -184,7 +183,7 @@ export function SwagWizardView(vm: SwagWizardVm) {
             <button
               type="button"
               className="btn btn-brand"
-              disabled={vm.isWorking || vm.pickedShops.size === 0 || !draftHasAreaArtwork(draft)}
+              disabled={vm.isWorking || vm.pickedShops.size === 0}
               onClick={vm.onPublish}
             >
               Publish
