@@ -12,6 +12,14 @@ export type UiPrintArea = {
   key?: string;
   label?: string;
   mockupImageUrl?: string;
+  /** Inch geometry — source of truth when present. */
+  xIn?: number;
+  yIn?: number;
+  widthIn?: number;
+  heightIn?: number;
+  rotationDeg?: number;
+  scale?: number;
+  lockSize?: boolean;
   box: { xPct: number; yPct: number; widthPct: number; heightPct: number };
   maxWidthCm?: number;
   maxHeightCm?: number;
@@ -48,9 +56,36 @@ export type UiProduct = {
   maskImageUrl?: string;
   /** Pre-baked design mockup served to shop/storefront. */
   mockupUrl?: string;
+  /** Real-world size of the mockup frame (inches) — drives print-area mapping. */
+  physicalDimensions?: { width: number; height: number; length?: number };
+  /** Product print DPI (default 300). */
+  dpi?: number;
   /** Saved artwork placement from the design wizard (matches the baked mockup). */
-  placement?: { xPct: number; yPct: number; wPct: number; rot: number };
-  /** Super-admin design zones — artwork is clipped to the first matching area. */
+  placement?: {
+    xPct: number;
+    yPct: number;
+    wPct: number;
+    rot: number;
+    printCxPct?: number;
+    printCyPct?: number;
+    printWPct?: number;
+  };
+  /** Per print-area placements keyed by area key (Area 1, Area 2, …). */
+  areaPlacements?: Record<
+    string,
+    {
+      xPct: number;
+      yPct: number;
+      wPct: number;
+      rot: number;
+      printCxPct?: number;
+      printCyPct?: number;
+      printWPct?: number;
+      /** Hosted artwork for this print area (colour-tint live composite). */
+      artworkUrl?: string;
+    }
+  >;
+  /** Super-admin design zones — designer places on pickPrintArea() for now. */
   printAreas?: UiPrintArea[];
   variants?: Array<{ size?: string; color?: string; colorHex?: string; material?: string; sku?: string }>;
 };
@@ -243,14 +278,61 @@ const GROUP_BY_CATEGORY: Record<string, string> = {
   "Health & Wellness": "pillow",
 };
 
+function mapPrintArea(a: Record<string, unknown> | null | undefined): UiPrintArea | null {
+  if (!a || typeof a !== "object") return null;
+  const boxRaw = (a.box as UiPrintArea["box"] | undefined) || {
+    xPct: 0,
+    yPct: 0,
+    widthPct: 0,
+    heightPct: 0,
+  };
+  const box = {
+    xPct: Number(boxRaw.xPct) || 0,
+    yPct: Number(boxRaw.yPct) || 0,
+    widthPct: Number(boxRaw.widthPct) || 0,
+    heightPct: Number(boxRaw.heightPct) || 0,
+  };
+  const widthIn = Number(a.widthIn) || 0;
+  const heightIn = Number(a.heightIn) || 0;
+  const hasBox = box.widthPct > 0 && box.heightPct > 0;
+  const hasInches = widthIn > 0 && heightIn > 0;
+  if (!hasBox && !hasInches) return null;
+  return {
+    key: typeof a.key === "string" ? a.key : undefined,
+    label: typeof a.label === "string" ? a.label : undefined,
+    mockupImageUrl: resolveMediaUrl(typeof a.mockupImageUrl === "string" ? a.mockupImageUrl : undefined),
+    xIn: Number.isFinite(Number(a.xIn)) ? Number(a.xIn) : undefined,
+    yIn: Number.isFinite(Number(a.yIn)) ? Number(a.yIn) : undefined,
+    widthIn: hasInches ? widthIn : undefined,
+    heightIn: hasInches ? heightIn : undefined,
+    rotationDeg: Number.isFinite(Number(a.rotationDeg)) ? Number(a.rotationDeg) : undefined,
+    scale: Number(a.scale) > 0 ? Number(a.scale) : undefined,
+    lockSize: Boolean(a.lockSize),
+    box,
+    maxWidthCm: Number(a.maxWidthCm) || undefined,
+    maxHeightCm: Number(a.maxHeightCm) || undefined,
+    dpi: Number(a.dpi) > 0 ? Number(a.dpi) : undefined,
+    methods: Array.isArray(a.methods) ? (a.methods as string[]) : undefined,
+  };
+}
+
 export function mapCatalogProduct(p: ApiProduct): UiProduct {
   const { colors: variantColors, colorHexByName } = extractVariantColors(p.variants);
   const photoUrl = resolveMediaUrl(p.primaryImageUrl || p.imageUrls?.[0]);
   const baseImageUrl = resolveMediaUrl(p.baseImageUrl);
   const imgUrl = resolveMediaUrl(p.maskImageUrl || photoUrl);
   const printAreas = Array.isArray(p.printAreas)
-    ? (p.printAreas as UiPrintArea[]).filter((a) => a?.box?.widthPct > 0 && a?.box?.heightPct > 0)
+    ? (p.printAreas as Record<string, unknown>[]).map(mapPrintArea).filter((a): a is UiPrintArea => !!a)
     : undefined;
+  const phys = p.physicalDimensions;
+  const physicalDimensions =
+    phys && typeof phys === "object"
+      ? {
+          width: Number(phys.width) || 0,
+          height: Number(phys.height) || 0,
+          length: Number(phys.length) || undefined,
+        }
+      : undefined;
   return {
     id: String(p._id),
     g: p.group || GROUP_BY_CATEGORY[p.category] || "tee",
@@ -270,6 +352,11 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
     baseImageUrl,
     imgUrl,
     maskImageUrl: resolveMediaUrl(p.maskImageUrl),
+    physicalDimensions:
+      physicalDimensions && physicalDimensions.width > 0 && physicalDimensions.height > 0
+        ? physicalDimensions
+        : undefined,
+    dpi: Number(p.dpi) > 0 ? Number(p.dpi) : undefined,
     printAreas: printAreas?.length ? printAreas : undefined,
     variants: p.variants,
   };
@@ -302,6 +389,8 @@ export function mergeCatalogProductDetails(
     photoUrl: product.photoUrl || fromCatalog.photoUrl,
     imgUrl: product.imgUrl || fromCatalog.imgUrl,
     printAreas: product.printAreas?.length ? product.printAreas : fromCatalog.printAreas,
+    physicalDimensions: product.physicalDimensions || fromCatalog.physicalDimensions,
+    dpi: product.dpi ?? fromCatalog.dpi,
     price: product.price || fromCatalog.price,
     basePriceInr: product.basePriceInr ?? fromCatalog.basePriceInr,
     sw: product.sw ?? fromCatalog.sw,
@@ -338,19 +427,69 @@ export function mapProductRef(ref: ApiProduct, catalogById?: Map<string, UiProdu
     maskImageUrl: resolveMediaUrl(ref.maskImageUrl) || fromCatalog?.maskImageUrl,
     mockupUrl: resolveMediaUrl(ref.mockupUrl),
     placement: mapPlacement((ref as { placement?: unknown }).placement),
+    areaPlacements: mapAreaPlacements(ref),
     printAreas: fromCatalog?.printAreas,
+    physicalDimensions: fromCatalog?.physicalDimensions,
+    dpi: fromCatalog?.dpi,
   };
+}
+
+function mapAreaPlacements(
+  ref: ApiProduct,
+): UiProduct["areaPlacements"] {
+  const raw = (ref as { placements?: unknown }).placements;
+  const out: NonNullable<UiProduct["areaPlacements"]> = {};
+  if (Array.isArray(raw)) {
+    for (const row of raw) {
+      if (!row || typeof row !== "object") continue;
+      const key = String((row as { key?: string }).key || "").trim();
+      const pl = mapPlacement(row);
+      if (key && pl) {
+        const art = String((row as { artworkUrl?: string }).artworkUrl || "").trim();
+        out[key] = {
+          ...pl,
+          ...(art ? { artworkUrl: resolveMediaUrl(art) || art } : {}),
+        };
+      }
+    }
+  }
+  if (!Object.keys(out).length) {
+    const legacy = mapPlacement((ref as { placement?: unknown }).placement);
+    if (legacy) out.area_1 = legacy;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /** Validate a stored artwork placement — all four numbers or nothing. */
 export function mapPlacement(
   raw: unknown,
-): { xPct: number; yPct: number; wPct: number; rot: number } | undefined {
+):
+  | {
+      xPct: number;
+      yPct: number;
+      wPct: number;
+      rot: number;
+      printCxPct?: number;
+      printCyPct?: number;
+      printWPct?: number;
+    }
+  | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const p = raw as Record<string, unknown>;
   const nums = [p.xPct, p.yPct, p.wPct, p.rot].map(Number);
   if (nums.some((n) => !Number.isFinite(n))) return undefined;
-  return { xPct: nums[0], yPct: nums[1], wPct: nums[2], rot: nums[3] };
+  const printCxPct = Number(p.printCxPct);
+  const printCyPct = Number(p.printCyPct);
+  const printWPct = Number(p.printWPct);
+  return {
+    xPct: nums[0],
+    yPct: nums[1],
+    wPct: nums[2],
+    rot: nums[3],
+    ...(Number.isFinite(printCxPct) ? { printCxPct } : {}),
+    ...(Number.isFinite(printCyPct) ? { printCyPct } : {}),
+    ...(Number.isFinite(printWPct) ? { printWPct } : {}),
+  };
 }
 
 export function mapShop(s: ApiProduct): UiShop {

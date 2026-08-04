@@ -5,12 +5,27 @@ import { bootstrapActiveListingKeys } from '../shops/shopCatalogSync.js';
 import { listingKey } from '../shops/listingKeys.js';
 
 export const CATALOG_SELECT =
-  'name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas';
+  'name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas physicalDimensions dpi';
 
 /** One storefront row per Branded Swag design (collection × productRef). */
 export function mapBrandedListing(col, ref, base) {
   const catalogProductId = String(ref.catalogProductId);
   const collectionId = String(col._id);
+  const placements = Array.isArray(ref.placements)
+    ? ref.placements
+        .filter((p) => p && typeof p === 'object' && String(p.key || '').trim())
+        .map((p) => ({
+          key: String(p.key).trim(),
+          printCxPct: p.printCxPct,
+          printCyPct: p.printCyPct,
+          printWPct: p.printWPct,
+          xPct: p.xPct,
+          yPct: p.yPct,
+          wPct: p.wPct,
+          rot: p.rot,
+          ...(p.artworkUrl ? { artworkUrl: p.artworkUrl } : {}),
+        }))
+    : [];
   return {
     ...base,
     _id: listingKey(collectionId, catalogProductId),
@@ -23,6 +38,8 @@ export function mapBrandedListing(col, ref, base) {
     artworkUrl: col.artworkUrl || '',
     mockupUrl: ref.mockupUrl || '',
     placement: ref.placement ?? null,
+    /** Per print-area placements + artwork — required for multi-area colour tints. */
+    placements,
     preferredColors: col.preferredColors || [],
   };
 }
@@ -143,5 +160,7 @@ export function resolveBrandedListingSnapshot(collections, listing) {
     brand: ref?.brand || '',
     mockupUrl: ref?.mockupUrl || '',
     artworkUrl: col?.artworkUrl || '',
+    placement: ref?.placement ?? null,
+    placements: Array.isArray(ref?.placements) ? ref.placements : [],
   };
 }

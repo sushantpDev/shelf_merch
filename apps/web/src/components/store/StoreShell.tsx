@@ -57,7 +57,27 @@ export type StoreProduct = {
   /** Pre-baked design mockup (mask + artwork flattened) — shown as-is when set. */
   mockupUrl?: string;
   /** Saved Konva placement — keeps live colour previews aligned with the bake. */
-  placement?: { xPct: number; yPct: number; wPct: number; rot: number };
+  placement?: {
+    xPct: number;
+    yPct: number;
+    wPct: number;
+    rot: number;
+    printCxPct?: number;
+    printCyPct?: number;
+    printWPct?: number;
+  };
+  /** Per print-area placements + artwork URLs (multi-area colour tints). */
+  placements?: Array<{
+    key: string;
+    xPct: number;
+    yPct: number;
+    wPct: number;
+    rot: number;
+    printCxPct?: number;
+    printCyPct?: number;
+    printWPct?: number;
+    artworkUrl?: string;
+  }>;
   preferredColors?: string[];
   printAreas?: PrintArea[];
   variants?: Array<{ size?: string; color?: string; colorHex?: string; material?: string; sku?: string }>;

@@ -284,6 +284,9 @@ async function resolveWalletId(org: OrgWizardState, createNewWallet = false): Pr
 function productRefFromUi(p: UiProduct) {
   if (!p.id) throw new Error(`Product "${p.nm}" has no catalog id — reload the catalog`);
   const mockupUrl = p.mockupUrl ? resolveMediaUrl(p.mockupUrl) : "";
+  const placements = p.areaPlacements
+    ? Object.entries(p.areaPlacements).map(([key, pl]) => ({ key, ...pl }))
+    : undefined;
   return {
     catalogProductId: p.id,
     brand: p.brand || "",
@@ -292,6 +295,7 @@ function productRefFromUi(p: UiProduct) {
     ...(mockupUrl ? { mockupUrl } : {}),
     // Carry the saved Konva placement so live colour tints match the baked mockup.
     ...(p.placement ? { placement: p.placement } : {}),
+    ...(placements?.length ? { placements } : {}),
   };
 }
 
@@ -399,6 +403,7 @@ type MockupPlacement = {
   yPct: number;
   wPct: number;
   rot: number;
+  artworkUrl?: string;
 };
 
 type KitMockupUploadItem = {
@@ -573,6 +578,7 @@ type MockupUploadItem = {
   catalogProductId: string;
   dataUrl: string;
   placement?: MockupPlacement;
+  placements?: Array<{ key: string; artworkDataUrl?: string } & MockupPlacement>;
   designOnlyDataUrl?: string;
   printSpec?: {
     widthIn: number;
@@ -591,10 +597,12 @@ export async function uploadCollectionMockupsApi(
   const meta: Array<{
     catalogProductId: string;
     placement?: MockupPlacement;
+    placements?: Array<{ key: string; hasArtwork?: boolean } & MockupPlacement>;
     printSpec?: MockupUploadItem["printSpec"];
     hasDesignOnly?: boolean;
   }> = [];
   const form = new FormData();
+  let areaArtCount = 0;
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     if (!item.dataUrl?.startsWith("data:")) continue;
@@ -607,9 +615,34 @@ export async function uploadCollectionMockupsApi(
       const dBlob = await dRes.blob();
       form.append("designOnly", new File([dBlob], `design-${i}.png`, { type: dBlob.type || "image/png" }));
     }
+    const placementsMeta: Array<{ key: string; hasArtwork?: boolean } & MockupPlacement> = [];
+    for (const row of item.placements || []) {
+      const { artworkDataUrl, ...rest } = row;
+      const hasArtwork = Boolean(
+        artworkDataUrl &&
+          (artworkDataUrl.startsWith("data:") || artworkDataUrl.startsWith("blob:")),
+      );
+      if (hasArtwork && artworkDataUrl) {
+        const aRes = await fetch(artworkDataUrl);
+        const aBlob = await aRes.blob();
+        const ext = (aBlob.type || "image/png").includes("jpeg") ? "jpg" : "png";
+        form.append(
+          "areaArts",
+          new File([aBlob], `area-art-${areaArtCount}.${ext}`, { type: aBlob.type || "image/png" }),
+        );
+        areaArtCount += 1;
+        placementsMeta.push({ ...rest, hasArtwork: true });
+      } else if (artworkDataUrl && !artworkDataUrl.startsWith("data:") && !artworkDataUrl.startsWith("blob:")) {
+        // Already-hosted URL (edit flow) — persist as-is.
+        placementsMeta.push({ ...rest, artworkUrl: resolveMediaUrl(artworkDataUrl) || artworkDataUrl });
+      } else {
+        placementsMeta.push(rest);
+      }
+    }
     meta.push({
       catalogProductId: item.catalogProductId,
       ...(item.placement ? { placement: item.placement } : {}),
+      ...(placementsMeta.length ? { placements: placementsMeta } : {}),
       ...(item.printSpec ? { printSpec: item.printSpec } : {}),
       ...(hasDesignOnly ? { hasDesignOnly: true } : {}),
     });

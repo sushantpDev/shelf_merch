@@ -12,6 +12,8 @@ export type MockupProduct = {
     label?: string;
     mockupImageUrl?: string;
     box: { xPct: number; yPct: number; widthPct: number; heightPct: number };
+    /** Optional per-area artwork (when present, drawn instead of shared artworkUrl). */
+    artworkUrl?: string;
   }>;
 };
 
@@ -31,23 +33,12 @@ function defaultImageCandidates(p: MockupProduct) {
   return uniquePaths([p.maskImageUrl, p.primaryImageUrl, ...(p.imageUrls || [])]);
 }
 
-function pickPrintArea(p: MockupProduct, activeImage: string) {
-  const areas = p.printAreas;
-  if (!areas?.length) return null;
-  const imgNorm = resolveMediaUrl(activeImage);
-  const maskNorm = resolveMediaUrl(p.maskImageUrl);
-  if (maskNorm) {
-    const maskArea = areas.find((a) => resolveMediaUrl(a.mockupImageUrl) === maskNorm);
-    if (maskArea) return maskArea;
-  }
-  if (imgNorm) {
-    const match = areas.find((a) => resolveMediaUrl(a.mockupImageUrl) === imgNorm);
-    if (match) return match;
-  }
-  return areas.find((a) => a?.box?.widthPct > 0 && a?.box?.heightPct > 0) || areas[0] || null;
-}
-
-function printAreaWrapStyle(box?: { xPct: number; yPct: number; widthPct: number; heightPct: number }): CSSProperties {
+function printAreaWrapStyle(box?: {
+  xPct: number;
+  yPct: number;
+  widthPct: number;
+  heightPct: number;
+}): CSSProperties {
   if (!box?.widthPct || !box?.heightPct) {
     return {
       position: "absolute",
@@ -77,6 +68,27 @@ function printAreaWrapStyle(box?: { xPct: number; yPct: number; widthPct: number
   };
 }
 
+/** Areas to draw on the active mockup image — prefer areas matching the image, else all usable. */
+function areasForImage(p: MockupProduct, activeImage: string) {
+  const areas = p.printAreas || [];
+  if (!areas.length) return [];
+  const imgNorm = resolveMediaUrl(activeImage);
+  const maskNorm = resolveMediaUrl(p.maskImageUrl);
+  const usable = areas.filter((a) => a?.box?.widthPct > 0 && a?.box?.heightPct > 0);
+  const list = usable.length ? usable : areas;
+  // If areas share this mockup (or mask), draw all of them on one image.
+  const onThisImage = list.filter((a) => {
+    const areaImg = resolveMediaUrl(a.mockupImageUrl);
+    if (!areaImg) return true;
+    if (maskNorm && areaImg === maskNorm) return true;
+    if (imgNorm && areaImg === imgNorm) return true;
+    return false;
+  });
+  if (onThisImage.length) return onThisImage;
+  // Fallback: first usable area only (legacy single-overlay behaviour).
+  return list.slice(0, 1);
+}
+
 export default function ProductArtworkMockup({
   product,
   imageCandidates,
@@ -94,13 +106,18 @@ export default function ProductArtworkMockup({
   );
   const [idx, setIdx] = useState(0);
   const img = candidates[idx] || "";
-  const area = pickPrintArea(product, img);
-  const overlay = product.artworkUrl ? resolveMediaUrl(product.artworkUrl) : "";
+  const areas = areasForImage(product, img);
+  const sharedOverlay = product.artworkUrl ? resolveMediaUrl(product.artworkUrl) : "";
 
   if (!img) {
     return (
-      <div className={className} style={{ display: "grid", placeItems: "center", height: "100%", ...style }}>
-        <span className="mut3" style={{ fontSize: 12 }}>No image</span>
+      <div
+        className={className}
+        style={{ display: "grid", placeItems: "center", height: "100%", ...style }}
+      >
+        <span className="mut3" style={{ fontSize: 12 }}>
+          No image
+        </span>
       </div>
     );
   }
@@ -116,11 +133,27 @@ export default function ProductArtworkMockup({
           if (idx + 1 < candidates.length) setIdx((i) => i + 1);
         }}
       />
-      {overlay && (
-        <div className="art-overlay" style={printAreaWrapStyle(area?.box)}>
-          <img className="art-overlay-img" src={overlay} alt="Artwork" />
+      {areas.map((area, i) => {
+        const overlay =
+          (area.artworkUrl ? resolveMediaUrl(area.artworkUrl) : "") ||
+          (i === 0 ? sharedOverlay : "");
+        if (!overlay) return null;
+        return (
+          <div
+            key={area.key || area.label || `area_${i}`}
+            className="art-overlay"
+            style={printAreaWrapStyle(area.box)}
+          >
+            <img className="art-overlay-img" src={overlay} alt="Artwork" />
+          </div>
+        );
+      })}
+      {/* Legacy: no print areas, still show shared artwork centered. */}
+      {!areas.length && sharedOverlay ? (
+        <div className="art-overlay" style={printAreaWrapStyle()}>
+          <img className="art-overlay-img" src={sharedOverlay} alt="Artwork" />
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

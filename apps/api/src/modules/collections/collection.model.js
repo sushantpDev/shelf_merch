@@ -38,6 +38,25 @@ const productRefSchema = new mongoose.Schema(
       default: null,
       _id: false,
     },
+    /** Per print-area placements (Area 1, Area 2, …). `placement` mirrors the primary. */
+    placements: {
+      type: [
+        {
+          key: { type: String, default: '' },
+          printCxPct: Number,
+          printCyPct: Number,
+          printWPct: Number,
+          xPct: Number,
+          yPct: Number,
+          wPct: Number,
+          rot: Number,
+          /** Hosted artwork for this print area (colour-tint live composite). */
+          artworkUrl: { type: String, default: '' },
+        },
+      ],
+      default: [],
+      _id: false,
+    },
   },
   { _id: false },
 );

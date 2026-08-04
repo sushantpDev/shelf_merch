@@ -100,7 +100,7 @@ export async function getPlatformOrderDetail(orderId) {
   ];
   const catalogProducts = catalogIds.length
     ? await CatalogProduct.find({ _id: { $in: catalogIds } })
-        .select('name baseImageUrl maskImageUrl primaryImageUrl imageUrls printAreas variants')
+        .select('name baseImageUrl maskImageUrl primaryImageUrl imageUrls printAreas physicalDimensions dpi variants')
         .lean()
     : [];
   const productById = Object.fromEntries(catalogProducts.map((p) => [String(p._id), p]));

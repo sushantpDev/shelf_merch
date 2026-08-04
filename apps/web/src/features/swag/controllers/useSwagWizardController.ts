@@ -6,9 +6,11 @@ import { refreshCatalogProducts } from "@/services/api-bridge";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { draftFromCollection } from "../draftFromCollection";
 import {
-  bakeMockup,
+  bakeMockupLayers,
+  collectAreaPlacements,
+  collectBakeLayers,
   exportDesignOnly,
-  resolvePlacementForBake,
+  primaryAreaKey,
   type MockupUploadItem,
 } from "../mockup-bake";
 import { buildPreviousUploads, type PreviousArtwork } from "../wizard/artworkHistory";
@@ -16,6 +18,7 @@ import { useCreateCollection, useSyncCollectionPublish, useUpdateCollection } fr
 import type { UiProduct, UiShop } from "../model";
 import {
   INITIAL_SWAG_DRAFT,
+  draftHasAreaArtwork,
   swagDraftReducer,
   type SwagAction,
   type SwagDraft,
@@ -119,8 +122,8 @@ export function useSwagWizardController(): SwagWizardVm {
   }
 
   async function onPublish() {
-    if (!draft.art) {
-      toast.error("Add artwork before publishing");
+    if (!draftHasAreaArtwork(draft)) {
+      toast.error("Add artwork to at least one print area before publishing");
       return;
     }
     if (!pickedShops.size) {
@@ -130,17 +133,30 @@ export function useSwagWizardController(): SwagWizardVm {
 
     setWorking(true);
     try {
-      const artUrl = draft.art.preview;
+      const fallbackArt = draft.art?.preview || "";
       const baked = await Promise.all(
         draft.picked.map(async (i, idx) => {
           const cp = catalog[i];
-          const key = cp?.id || `idx${idx}`;
-          const placement = draft.placements[key] ?? null;
+          const layers = collectBakeLayers(cp, draft.placements, draft.areaArts || {}, idx, fallbackArt);
+          if (!layers.length) return null;
+          const areaKey = primaryAreaKey(cp);
+          const primaryLayer = layers.find((l) => l.areaKey === areaKey) || layers[0];
+          const areaPlacements = collectAreaPlacements(
+            cp,
+            draft.placements,
+            idx,
+            draft.areaArts || {},
+          );
           const [dataUrl, design] = await Promise.all([
-            bakeMockup(cp, artUrl, placement),
-            exportDesignOnly(cp, artUrl, placement),
+            bakeMockupLayers(cp, layers),
+            exportDesignOnly(cp, primaryLayer.artUrl, primaryLayer.placement, primaryLayer.areaKey),
           ]);
-          return { dataUrl, design, placement: resolvePlacementForBake(cp, draft.placements, idx) };
+          return {
+            dataUrl,
+            design,
+            placement: primaryLayer.placement,
+            placements: areaPlacements,
+          };
         }),
       );
       const mockups = draft.picked
@@ -152,6 +168,7 @@ export function useSwagWizardController(): SwagWizardVm {
             catalogProductId: cp.id,
             dataUrl: row.dataUrl,
             placement: row.placement,
+            placements: row.placements?.length ? row.placements : undefined,
             ...(row.design.dataUrl
               ? {
                   designOnlyDataUrl: row.design.dataUrl,

@@ -24,6 +24,17 @@ router.use(authenticate, resolveTenant, requireTenantContext);
 const canWrite = tenantArea('swag', 'write');
 const canRead = tenantArea('swag', 'read');
 
+const placementShape = z.object({
+  printCxPct: z.number().finite().optional(),
+  printCyPct: z.number().finite().optional(),
+  printWPct: z.number().finite().optional(),
+  xPct: z.number(),
+  yPct: z.number(),
+  wPct: z.number(),
+  rot: z.number(),
+  artworkUrl: z.string().optional(),
+});
+
 const productRef = z.object({
   catalogProductId: objectId,
   brand: z.string().optional().default(''),
@@ -32,17 +43,15 @@ const productRef = z.object({
   mockupUrl: z.string().optional().default(''),
   // Konva artwork placement — carried so shop-specific collections (Add to shop)
   // recolour live colour variants at the same size/position as the baked mockup.
-  placement: z
-    .object({
-      printCxPct: z.number().finite().optional(),
-      printCyPct: z.number().finite().optional(),
-      printWPct: z.number().finite().optional(),
-      xPct: z.number(),
-      yPct: z.number(),
-      wPct: z.number(),
-      rot: z.number(),
-    })
-    .nullish(),
+  placement: placementShape.nullish(),
+  placements: z
+    .array(
+      placementShape.extend({
+        key: z.string().min(1),
+      }),
+    )
+    .optional()
+    .default([]),
   designOnlyImageUrl: z.string().optional().default(''),
   printSpec: z
     .object({
@@ -320,16 +329,15 @@ router.post(
 const mockupMetaItem = z.object({
   catalogProductId: objectId,
   // Placement baked into this mockup — print-area % preferred.
-  placement: z
-    .object({
-      printCxPct: z.number().finite().optional(),
-      printCyPct: z.number().finite().optional(),
-      printWPct: z.number().finite().optional(),
-      xPct: z.number().finite(),
-      yPct: z.number().finite(),
-      wPct: z.number().finite(),
-      rot: z.number().finite(),
-    })
+  placement: placementShape.optional(),
+  placements: z
+    .array(
+      placementShape.extend({
+        key: z.string().min(1),
+        /** When true, next `areaArts` file is uploaded and stored on this placement. */
+        hasArtwork: z.boolean().optional(),
+      }),
+    )
     .optional(),
   printSpec: z
     .object({
@@ -343,21 +351,26 @@ const mockupMetaItem = z.object({
   hasDesignOnly: z.boolean().optional(),
 });
 
+const mockupUpload = uploader({ allow: DOCUMENT_TYPES, maxSizeMb: 25, files: 200 });
+
 // Upload pre-baked product mockups (one PNG per catalog product in the collection).
 // Optional `designOnly` files are print-DPI transparent PNGs (inches × dpi).
+// Optional `areaArts` files are per print-area artworks (colour-tint live composite).
 router.post(
   '/:id/mockups',
   canWrite,
   validate({ params: z.object({ id: objectId }) }),
-  upload.fields([
+  mockupUpload.fields([
     { name: 'mockups', maxCount: 50 },
     { name: 'designOnly', maxCount: 50 },
+    { name: 'areaArts', maxCount: 100 },
   ]),
   asyncHandler(async (req, res) => {
     const collection = await Collection.findOne({ _id: req.params.id, tenantId: req.tenantId });
     if (!collection) throw new NotFoundError('Collection not found');
     const files = req.files?.mockups || [];
     const designFiles = req.files?.designOnly || [];
+    const areaArtFiles = req.files?.areaArts || [];
     let meta;
     try {
       meta = mockupMetaItem.array().parse(JSON.parse(req.body.meta || '[]'));
@@ -368,8 +381,9 @@ router.post(
       throw new ApiError(400, 'Mockup file count does not match metadata', 'MOCKUP_COUNT_MISMATCH');
     }
     let designIdx = 0;
+    let areaArtIdx = 0;
     for (let i = 0; i < files.length; i++) {
-      const { catalogProductId, placement, printSpec, hasDesignOnly } = meta[i];
+      const { catalogProductId, placement, placements, printSpec, hasDesignOnly } = meta[i];
       const { url } = await uploadFile({ tenantId: req.tenantId, kind: 'mockup', file: files[i] });
       const ref = collection.productRefs.find(
         (r) => String(r.catalogProductId) === String(catalogProductId),
@@ -377,6 +391,31 @@ router.post(
       if (ref) {
         ref.mockupUrl = url;
         if (placement) ref.placement = placement;
+        if (Array.isArray(placements) && placements.length) {
+          const saved = [];
+          for (const row of placements) {
+            const { hasArtwork, artworkUrl: existingArt, ...rest } = row;
+            let artworkUrl = existingArt || '';
+            if (hasArtwork && areaArtFiles[areaArtIdx]) {
+              const art = await uploadFile({
+                tenantId: req.tenantId,
+                kind: 'artwork',
+                file: areaArtFiles[areaArtIdx],
+              });
+              artworkUrl = art.url;
+              areaArtIdx += 1;
+            }
+            saved.push({ ...rest, ...(artworkUrl ? { artworkUrl } : {}) });
+          }
+          ref.placements = saved;
+          const primary = saved[0];
+          if (primary && !placement) {
+            const { key: _k, artworkUrl: _a, ...pl } = primary;
+            ref.placement = pl;
+          }
+        } else if (placement) {
+          ref.placements = [{ key: 'area_1', ...placement }];
+        }
         if (printSpec) ref.printSpec = printSpec;
         if (hasDesignOnly && designFiles[designIdx]) {
           const design = await uploadFile({
@@ -396,7 +435,11 @@ router.post(
       action: 'collection.mockups',
       entityType: 'Collection',
       entityId: collection._id,
-      after: { mockupCount: files.length, designOnlyCount: designIdx },
+      after: {
+        mockupCount: files.length,
+        designOnlyCount: designIdx,
+        areaArtCount: areaArtIdx,
+      },
     });
     res.json(collection);
   }),

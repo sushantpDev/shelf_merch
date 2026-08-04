@@ -695,7 +695,32 @@ export function PrintAreaEditor({
           )}
         </div>
 
-        <div className="row" style={{ gap: 8, marginTop: 12, alignItems: "center" }}>
+        <div className="row" style={{ gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
+          {value.length > 0 && (
+            <div className="row" style={{ gap: 6, flexWrap: "wrap", flex: "1 1 auto" }}>
+              {value.map((a, i) => (
+                <button
+                  key={`${a.key || a.label || "area"}_${i}`}
+                  type="button"
+                  className={i === selected ? "btn btn-dark btn-sm" : "btn btn-ghost btn-sm"}
+                  onClick={() => {
+                    setSelected(i);
+                    if (a.mockupImageUrl) {
+                      const src = resolveMediaUrl(a.mockupImageUrl);
+                      if (src && resolvedImages.includes(src)) setMockup(src);
+                    }
+                  }}
+                  title={
+                    a.widthIn && a.heightIn
+                      ? `${a.widthIn}×${a.heightIn} in`
+                      : a.label || `Area ${i + 1}`
+                  }
+                >
+                  {a.label || `Area ${i + 1}`}
+                </button>
+              ))}
+            </div>
+          )}
           <button type="button" className="btn btn-soft btn-sm" onClick={addArea}>
             + Add print area
           </button>

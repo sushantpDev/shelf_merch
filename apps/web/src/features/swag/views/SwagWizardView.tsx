@@ -5,7 +5,7 @@ import { CatalogStep } from "../wizard/CatalogStep";
 import { ArtworkStep } from "../wizard/ArtworkStep";
 import { AddToShopStep } from "../wizard/AddToShopStep";
 import type { SwagWizardVm } from "../controllers/useSwagWizardController";
-import type { SwagDraft } from "../swagDraft";
+import { draftHasAreaArtwork, type SwagDraft } from "../swagDraft";
 
 const STEPS = ["Collection", "Products", "Artwork", "Add to shop"];
 
@@ -130,7 +130,7 @@ export function SwagWizardView(vm: SwagWizardVm) {
               <button
                 type="button"
                 className="btn btn-brand"
-                disabled={!draft.art}
+                disabled={!draftHasAreaArtwork(draft)}
                 onClick={() => vm.onStep(3)}
               >
                 Add Artwork
@@ -143,10 +143,14 @@ export function SwagWizardView(vm: SwagWizardVm) {
           products={vm.pickedProducts}
           previousUploads={vm.previousUploads}
           art={draft.art}
+          areaArts={draft.areaArts || {}}
           placements={draft.placements}
           placementEpoch={draft.placementEpoch}
           onSetArt={(art) => dispatch({ type: "setArt", art })}
           onClearArt={() => dispatch({ type: "clearArt" })}
+          onSetAreaArt={(key, art) => dispatch({ type: "setAreaArt", key, art })}
+          onSetAreaArts={(keys, art) => dispatch({ type: "setAreaArts", keys, art })}
+          onClearAreaArt={(key) => dispatch({ type: "clearAreaArt", key })}
           onResetPlacements={() => dispatch({ type: "resetPlacements" })}
           onPlacementChange={(key, placement) => dispatch({ type: "setPlacement", key, placement })}
         />
@@ -180,7 +184,7 @@ export function SwagWizardView(vm: SwagWizardVm) {
             <button
               type="button"
               className="btn btn-brand"
-              disabled={vm.isWorking || vm.pickedShops.size === 0 || !draft.art}
+              disabled={vm.isWorking || vm.pickedShops.size === 0 || !draftHasAreaArtwork(draft)}
               onClick={vm.onPublish}
             >
               Publish
@@ -193,7 +197,7 @@ export function SwagWizardView(vm: SwagWizardVm) {
         collectionName={draft.name}
         products={vm.pickedProducts}
         placements={draft.placements}
-        artworkPreview={draft.art?.preview}
+        areaArts={draft.areaArts || {}}
         shops={vm.shops}
         picked={vm.pickedShops}
         onToggle={vm.onToggleShop}

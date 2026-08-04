@@ -4,11 +4,12 @@ import { TintedGarment } from "@/components/store/TintedGarment";
 import type { UiProduct } from "@/services/mappers";
 import { DEFAULT_MOCKUP_TINT_HEX, isDefaultMockupTint } from "./colors";
 import {
-  bakeTintedMockup,
+  bakeTintedMockupLayers,
   defaultPlacement,
   designImgUrl,
   pickPrintArea,
   productThumbUrl,
+  resolveProductArtworkLayers,
   type Placement,
 } from "./mockup-bake";
 
@@ -105,116 +106,114 @@ const STAGE_GARMENT_STYLE: CSSProperties = {
   margin: 0,
 };
 
-/** Live mask + artwork on the full square stage (Konva / bake coordinate system). */
+/** Live mask + one or more artworks on the full square stage (Konva / bake coordinate system). */
 function LiveArtworkComposite({
   product,
   base,
-  overlay,
-  savedPlacement,
+  layers,
 }: {
   product: UiProduct;
   base: string;
-  overlay: string;
-  savedPlacement?: Placement | null;
+  layers: Array<{ artUrl: string; placement: Placement; areaKey: string }>;
+}) {
+  return (
+    <MockupStage>
+      <img src={base} alt={product.nm} loading="lazy" style={STAGE_GARMENT_STYLE} />
+      {layers.map((layer) => (
+        <ArtworkOverlay key={layer.areaKey} src={layer.artUrl} placement={layer.placement} product={product} />
+      ))}
+    </MockupStage>
+  );
+}
+
+function ArtworkOverlay({
+  src,
+  placement: savedPlacement,
+  product,
+  tintHex,
+}: {
+  src: string;
+  placement: Placement;
+  product: UiProduct;
+  tintHex?: string;
 }) {
   const [artAspect, setArtAspect] = useState(1);
   const placement = useMemo(
     () => savedPlacement ?? defaultPlacement(product, artAspect),
     [savedPlacement, product, artAspect],
   );
-
+  const fx = tintHex ? artworkFabricFx(tintHex) : { opacity: 1, mixBlendMode: "normal" as const };
   return (
-    <MockupStage>
-      <img src={base} alt={product.nm} loading="lazy" style={STAGE_GARMENT_STYLE} />
-      <img
-        className="art-overlay-img"
-        src={overlay}
-        alt="Artwork"
-        style={placementStyle(placement, artAspect)}
-        onLoad={(e) => {
-          const img = e.currentTarget;
-          const aspect = (img.naturalHeight || 1) / (img.naturalWidth || 1);
-          if (aspect > 0) setArtAspect(aspect);
-        }}
-      />
-    </MockupStage>
+    <img
+      className="art-overlay-img"
+      src={src}
+      alt="Artwork"
+      style={{
+        ...placementStyle(placement, artAspect),
+        opacity: fx.opacity,
+        mixBlendMode: fx.mixBlendMode,
+      }}
+      onLoad={(e) => {
+        const img = e.currentTarget;
+        const aspect = (img.naturalHeight || 1) / (img.naturalWidth || 1);
+        if (aspect > 0) setArtAspect(aspect);
+      }}
+    />
   );
 }
 
 function MaskArtworkComposite({
   product,
   mask,
-  overlay,
+  layers,
   tintHex,
-  savedPlacement,
 }: {
   product: UiProduct;
   mask: string;
-  overlay: string;
+  layers: Array<{ artUrl: string; placement: Placement; areaKey: string }>;
   tintHex: string;
-  savedPlacement?: Placement | null;
 }) {
-  const [artAspect, setArtAspect] = useState(1);
-  const placement = useMemo(
-    () => savedPlacement ?? defaultPlacement(product, artAspect),
-    [savedPlacement, product, artAspect],
-  );
-  // Blend the print into the fabric so it respects the garment's shadows/texture.
-  const fx = artworkFabricFx(tintHex);
-
   return (
     <MockupStage isolation>
       <TintedGarment src={mask} hex={tintHex} alt={product.nm} style={STAGE_GARMENT_STYLE} />
-      {overlay ? (
-        <img
-          className="art-overlay-img"
-          src={overlay}
-          alt="Artwork"
-          style={{
-            ...placementStyle(placement, artAspect),
-            opacity: fx.opacity,
-            mixBlendMode: fx.mixBlendMode,
-          }}
-          onLoad={(e) => {
-            const img = e.currentTarget;
-            const aspect = (img.naturalHeight || 1) / (img.naturalWidth || 1);
-            if (aspect > 0) setArtAspect(aspect);
-          }}
+      {layers.map((layer) => (
+        <ArtworkOverlay
+          key={layer.areaKey}
+          src={layer.artUrl}
+          placement={layer.placement}
+          product={product}
+          tintHex={tintHex}
         />
-      ) : null}
+      ))}
     </MockupStage>
   );
 }
 
 /**
  * Live realistic tinted mockup. Whenever the colour swatch changes it bakes the
- * recoloured garment mask (multiply keeps the fabric folds/shadows) plus the
- * warped, fabric-blended artwork to a canvas — the same realistic path as the
- * saved bake — and shows the result. While the bake is in flight (or if it
- * can't run, e.g. a cross-origin mask), it falls back to the DOM mask+overlay
- * composite so there is always a live preview.
+ * recoloured garment mask plus all print-area artworks — same path as the
+ * saved multi-area bake. Falls back to the DOM composite while baking.
  */
 function TintedMockupImage({
   product,
-  overlay,
+  layers,
   tintHex,
-  savedPlacement,
   fallback,
 }: {
   product: UiProduct;
-  overlay: string;
+  layers: Array<{ artUrl: string; placement: Placement; areaKey: string }>;
   tintHex: string;
-  savedPlacement?: Placement | null;
   fallback: ReactElement;
 }) {
   const [src, setSrc] = useState("");
   const [failed, setFailed] = useState(false);
   const reqRef = useRef(0);
+  const layersKey = layers.map((l) => `${l.areaKey}:${l.artUrl}`).join("|");
 
   useEffect(() => {
     const req = ++reqRef.current;
     setFailed(false);
-    bakeTintedMockup(product, overlay, savedPlacement ?? null, tintHex)
+    bakeTintedMockupLayers(product, layers, tintHex)
       .then((url) => {
         if (req !== reqRef.current) return;
         if (url) setSrc(url);
@@ -223,8 +222,7 @@ function TintedMockupImage({
       .catch(() => {
         if (req === reqRef.current) setFailed(true);
       });
-    // Keep the previous baked image visible while the next colour bakes.
-  }, [product, overlay, tintHex, savedPlacement]);
+  }, [product, layersKey, tintHex]);
 
   if (failed || !src) return fallback;
   return (
@@ -241,9 +239,8 @@ function TintedMockupImage({
 /**
  * Saved-design thumbnail. The baked Konva mockup (uploaded at the artwork step)
  * is the source of truth for the default look — it is preferred whenever
- * present. Live compositing remains for tinted colour variants (using the
- * saved placement so the artwork sits exactly where the user put it) and for
- * products that never got a bake.
+ * present. Live compositing remains for tinted colour variants (using every
+ * saved print-area artwork) and for products that never got a bake.
  */
 export function DesignedProductThumb({
   product,
@@ -263,7 +260,8 @@ export function DesignedProductThumb({
   style?: CSSProperties;
 }) {
   const baked = resolveMediaUrl(product.mockupUrl);
-  const overlay = artworkUrl ? resolveMediaUrl(artworkUrl) : "";
+  const layers = resolveProductArtworkLayers(product, artworkUrl);
+  const overlay = layers[0]?.artUrl || (artworkUrl ? resolveMediaUrl(artworkUrl) : "");
   const printAreaBase = resolveMediaUrl(pickPrintArea(product)?.mockupImageUrl);
   const stageBase = resolveMediaUrl(product.baseImageUrl);
   const resolvedMask = resolveMediaUrl(product.maskImageUrl);
@@ -278,7 +276,6 @@ export function DesignedProductThumb({
 
   const isDefaultTint = isDefaultMockupTint(tintHex);
   const showBaked = Boolean(baked && isDefaultTint && preferBakedMockup);
-  const savedPlacement = product.placement ?? null;
   const liveTintHex = tintHex || DEFAULT_MOCKUP_TINT_HEX;
 
   const inner =
@@ -291,39 +288,41 @@ export function DesignedProductThumb({
           style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
         />
       </div>
-    ) : !isDefaultTint && tintMask ? (
-      // Colour swatch selected: bake a realistic recoloured mockup (tinted
-      // garment + warped/blended artwork). Falls back to the DOM composite
-      // while baking or if the canvas bake can't run.
+    ) : !isDefaultTint && tintMask && layers.length ? (
       <TintedMockupImage
         product={product}
-        overlay={overlay}
+        layers={layers}
         tintHex={liveTintHex}
-        savedPlacement={savedPlacement}
         fallback={
           <MaskArtworkComposite
             product={product}
             mask={tintMask}
-            overlay={overlay}
+            layers={layers}
             tintHex={liveTintHex}
-            savedPlacement={savedPlacement}
           />
         }
       />
+    ) : layers.length && resolvedMask ? (
+      <MaskArtworkComposite
+        product={product}
+        mask={resolvedMask}
+        layers={layers}
+        tintHex={liveTintHex}
+      />
+    ) : layers.length && maskStage ? (
+      <LiveArtworkComposite product={product} base={maskStage} layers={layers} />
     ) : overlay && resolvedMask ? (
       <MaskArtworkComposite
         product={product}
         mask={resolvedMask}
-        overlay={overlay}
+        layers={[
+          {
+            areaKey: "area_1",
+            artUrl: overlay,
+            placement: product.placement ?? defaultPlacement(product),
+          },
+        ]}
         tintHex={liveTintHex}
-        savedPlacement={savedPlacement}
-      />
-    ) : overlay && maskStage ? (
-      <LiveArtworkComposite
-        product={product}
-        base={maskStage}
-        overlay={overlay}
-        savedPlacement={savedPlacement}
       />
     ) : baked ? (
       <div className="img img-mockup">
@@ -381,7 +380,12 @@ export function storeProductAsUi(p: {
   baseImageUrl?: string;
   mockupUrl?: string;
   placement?: UiProduct["placement"];
+  placements?: Array<
+    NonNullable<UiProduct["placement"]> & { key: string; artworkUrl?: string }
+  >;
   printAreas?: UiProduct["printAreas"];
+  physicalDimensions?: UiProduct["physicalDimensions"];
+  dpi?: UiProduct["dpi"];
   primaryImageUrl?: string;
   imageUrls?: string[];
 }): UiProduct {
@@ -390,6 +394,28 @@ export function storeProductAsUi(p: {
   const photo = resolveMediaUrl(p.primaryImageUrl) || resolveMediaUrl(p.imageUrls?.[0]) || "";
   const mask = resolveMediaUrl(p.maskImageUrl);
   const base = resolveMediaUrl(p.baseImageUrl);
+
+  const areaPlacements: NonNullable<UiProduct["areaPlacements"]> = {};
+  if (Array.isArray(p.placements)) {
+    for (const row of p.placements) {
+      if (!row?.key) continue;
+      const art = row.artworkUrl ? resolveMediaUrl(row.artworkUrl) || row.artworkUrl : "";
+      areaPlacements[row.key] = {
+        xPct: row.xPct,
+        yPct: row.yPct,
+        wPct: row.wPct,
+        rot: row.rot,
+        ...(Number.isFinite(row.printCxPct) ? { printCxPct: row.printCxPct } : {}),
+        ...(Number.isFinite(row.printCyPct) ? { printCyPct: row.printCyPct } : {}),
+        ...(Number.isFinite(row.printWPct) ? { printWPct: row.printWPct } : {}),
+        ...(art ? { artworkUrl: art } : {}),
+      };
+    }
+  }
+  if (!Object.keys(areaPlacements).length && p.placement) {
+    areaPlacements.area_1 = { ...p.placement };
+  }
+
   return {
     id: catalogId,
     g: p.group || "tee",
@@ -403,6 +429,9 @@ export function storeProductAsUi(p: {
     photoUrl: photo,
     mockupUrl: p.mockupUrl,
     placement: p.placement,
+    areaPlacements: Object.keys(areaPlacements).length ? areaPlacements : undefined,
     printAreas: p.printAreas,
+    physicalDimensions: p.physicalDimensions,
+    dpi: p.dpi,
   };
 }

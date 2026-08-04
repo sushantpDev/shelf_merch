@@ -24,6 +24,8 @@ export type MockupUploadItem = {
   catalogProductId: string;
   dataUrl: string;
   placement: Placement;
+  /** Per print-area placements (Area 1, Area 2, …). */
+  placements?: Array<{ key: string; artworkDataUrl?: string } & Placement>;
   designOnlyDataUrl?: string;
   printSpec?: {
     widthIn: number;
@@ -45,9 +47,13 @@ export function productDpi(p: UiProduct | undefined, areaDpi?: number) {
   return Math.max(1, Number(areaDpi) || Number(p?.dpi) || DEFAULT_DPI);
 }
 
-/** Resolve placeholder inches + stage pixels for the active print area. */
-export function resolvePrintAreaStage(p: UiProduct, canvasOpts: CanvasOpts = {}) {
-  const area = pickPrintArea(p);
+/** Resolve placeholder inches + stage pixels for a print area (or primary). */
+export function resolvePrintAreaStage(
+  p: UiProduct,
+  canvasOpts: CanvasOpts = {},
+  areaKey?: string | null,
+) {
+  const area = pickPrintArea(p, areaKey);
   const phys = physicalFrameForView(productPhysical(p), area?.key);
   const raw = area
     ? (area as unknown as Record<string, unknown>)
@@ -59,6 +65,44 @@ export function resolvePrintAreaStage(p: UiProduct, canvasOpts: CanvasOpts = {})
 
 export function placementKey(prod: UiProduct, idx: number): string {
   return prod?.id || `idx${idx}`;
+}
+
+/** Stable key for a catalog print area (matches admin `key` when set). */
+export function printAreaStableKey(
+  area: { key?: string; label?: string } | null | undefined,
+  index = 0,
+): string {
+  if (area?.key && String(area.key).trim()) return String(area.key).trim();
+  if (area?.label && String(area.label).trim()) {
+    return String(area.label)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || `area_${index + 1}`;
+  }
+  return `area_${index + 1}`;
+}
+
+/** Usable print areas from catalog (inches or legacy box %). */
+export function listPrintAreas(p: UiProduct | undefined) {
+  const areas = p?.printAreas;
+  if (!Array.isArray(areas) || !areas.length) return [];
+  return areas.filter((a) => (a?.widthIn ?? 0) > 0 || (a?.box?.widthPct ?? 0) > 0);
+}
+
+/** Draft / upload key for artwork on one print area of one product. */
+export function areaPlacementKey(prod: UiProduct, idx: number, areaKey: string): string {
+  return `${placementKey(prod, idx)}::${areaKey}`;
+}
+
+export function primaryAreaKey(p: UiProduct): string {
+  const areas = listPrintAreas(p);
+  if (!areas.length) return "area_1";
+  const primary = pickPrintArea(p);
+  const index = Math.max(
+    0,
+    primary ? areas.findIndex((a) => a === primary) : 0,
+  );
+  return printAreaStableKey(primary || areas[0], index >= 0 ? index : 0);
 }
 
 export function resolveMediaSrc(url: string | undefined): string {
@@ -105,34 +149,42 @@ export function resolveGarmentMaskUrl(p: UiProduct | undefined): string {
   return "";
 }
 
-/** Pick the print area whose mockup image matches the mask/photo, else the first usable one. */
-export function pickPrintArea(p: UiProduct) {
-  const areas = p?.printAreas;
-  if (!areas?.length) return null;
+/**
+ * Pick a print area. When `areaKey` is set, prefer that key/label; otherwise
+ * match mask/base mockup, else first usable area.
+ */
+export function pickPrintArea(p: UiProduct, areaKey?: string | null) {
+  const areas = listPrintAreas(p);
+  const all = areas.length ? areas : p?.printAreas || [];
+  if (!all.length) return null;
+  if (areaKey) {
+    const hit = all.find((a, i) => printAreaStableKey(a, i) === areaKey);
+    if (hit) return hit;
+  }
   const maskUrl = p.maskImageUrl;
   if (maskUrl) {
     const maskNorm = normMediaPath(maskUrl);
-    const maskArea = areas.find((a) => normMediaPath(a.mockupImageUrl) === maskNorm);
+    const maskArea = all.find((a) => normMediaPath(a.mockupImageUrl) === maskNorm);
     if (maskArea) return maskArea;
   }
   if (p.baseImageUrl) {
     const baseNorm = normMediaPath(p.baseImageUrl);
-    const match = areas.find((a) => normMediaPath(a.mockupImageUrl) === baseNorm);
+    const match = all.find((a) => normMediaPath(a.mockupImageUrl) === baseNorm);
     if (match) return match;
   }
   return (
-    areas.find((a) => (a?.widthIn ?? 0) > 0 || a?.box?.widthPct > 0) || areas[0]
+    all.find((a) => (a?.widthIn ?? 0) > 0 || (a?.box?.widthPct ?? 0) > 0) || all[0]
   );
 }
 
 export function productHasPrintArea(p: UiProduct): boolean {
   const a = pickPrintArea(p);
-  return Boolean(a && ((a.widthIn ?? 0) > 0 || a.box?.widthPct > 0));
+  return Boolean(a && ((a.widthIn ?? 0) > 0 || (a.box?.widthPct ?? 0) > 0));
 }
 
 /** Default artwork placement — centered in the inch print area. */
-export function defaultPlacement(ep: UiProduct, artAspect = 1): Placement {
-  const { stage } = resolvePrintAreaStage(ep);
+export function defaultPlacement(ep: UiProduct, artAspect = 1, areaKey?: string | null): Placement {
+  const { stage } = resolvePrintAreaStage(ep, {}, areaKey);
   const fitW = Math.min(stage.w * 0.92, (stage.h * 0.92) / Math.max(artAspect, 0.01));
   return stagePixelsToArtworkPlacement(
     stage.x + stage.w / 2,
@@ -277,14 +329,91 @@ export function buildRealisticArtwork(
   }
 }
 
-/** Resolve Konva placement for bake/upload — draft value or catalog default. */
+/** Resolve Konva placement for bake/upload — primary area, with legacy product-key fallback. */
 export function resolvePlacementForBake(
   product: UiProduct,
   placements: Record<string, Placement>,
   idx: number,
+  areaKey?: string | null,
 ): Placement {
-  const key = placementKey(product, idx);
-  return placements[key] ?? defaultPlacement(product);
+  const key = areaKey || primaryAreaKey(product);
+  const areaDraftKey = areaPlacementKey(product, idx, key);
+  const productDraftKey = placementKey(product, idx);
+  return (
+    placements[areaDraftKey] ??
+    (key === primaryAreaKey(product) ? placements[productDraftKey] : undefined) ??
+    defaultPlacement(product, 1, key)
+  );
+}
+
+/** All area placements set for a product in the wizard draft. */
+export function collectAreaPlacements(
+  product: UiProduct,
+  placements: Record<string, Placement>,
+  idx: number,
+  areaArts?: Record<string, { preview?: string }>,
+): Array<{ key: string; artworkDataUrl?: string } & Placement> {
+  const areas = listPrintAreas(product);
+  const primary = primaryAreaKey(product);
+  const productKey = placementKey(product, idx);
+  const legacy = placements[productKey];
+  const out: Array<{ key: string; artworkDataUrl?: string } & Placement> = [];
+  const list = areas.length ? areas : [pickPrintArea(product)].filter(Boolean);
+  list.forEach((area, i) => {
+    if (!area) return;
+    const key = printAreaStableKey(area, i);
+    const draftKey = areaPlacementKey(product, idx, key);
+    const artPreview = areaArts?.[draftKey]?.preview || "";
+    const hasArt = Boolean(artPreview);
+    const pl =
+      placements[draftKey] ??
+      (key === primary ? legacy : undefined);
+    if (!pl && !hasArt) return;
+    out.push({
+      key,
+      ...(pl ?? defaultPlacement(product, 1, key)),
+      ...(artPreview ? { artworkDataUrl: artPreview } : {}),
+    });
+  });
+  if (!out.length && legacy) {
+    out.push({ key: primary, ...legacy });
+  }
+  return out;
+}
+
+/**
+ * Layers for live colour-tint / storefront composite from saved product refs.
+ * Prefers per-area `artworkUrl` on areaPlacements; falls back to collection art
+ * on the primary area only.
+ */
+export function resolveProductArtworkLayers(
+  product: UiProduct,
+  fallbackArtworkUrl?: string | null,
+): Array<{ artUrl: string; placement: Placement; areaKey: string }> {
+  const primary = primaryAreaKey(product);
+  const fallback = fallbackArtworkUrl ? resolveMediaUrl(fallbackArtworkUrl) || fallbackArtworkUrl : "";
+  const map = product.areaPlacements;
+  const out: Array<{ artUrl: string; placement: Placement; areaKey: string }> = [];
+
+  if (map && Object.keys(map).length) {
+    for (const [areaKey, pl] of Object.entries(map)) {
+      const artUrl =
+        (pl.artworkUrl ? resolveMediaUrl(pl.artworkUrl) || pl.artworkUrl : "") ||
+        (areaKey === primary ? fallback : "");
+      if (!artUrl) continue;
+      const { artworkUrl: _a, ...placement } = pl;
+      out.push({ areaKey, artUrl, placement });
+    }
+  }
+
+  if (!out.length && fallback) {
+    out.push({
+      areaKey: primary,
+      artUrl: fallback,
+      placement: product.placement ?? defaultPlacement(product, 1, primary),
+    });
+  }
+  return out;
 }
 
 /** Bake white default mockups for a picked product list (wizard generate flow). */
@@ -298,16 +427,19 @@ export async function bakeMockupsForProducts(
     pickedIndices.map(async (catalogIndex, idx) => {
       const product = catalog[catalogIndex];
       if (!product?.id) return null;
-      const placement = resolvePlacementForBake(product, placements, idx);
+      const areaKey = primaryAreaKey(product);
+      const placement = resolvePlacementForBake(product, placements, idx, areaKey);
+      const areaPlacements = collectAreaPlacements(product, placements, idx);
       const [dataUrl, design] = await Promise.all([
-        bakeMockup(product, artUrl, placement),
-        exportDesignOnly(product, artUrl, placement),
+        bakeMockup(product, artUrl, placement, 1000, false, areaKey),
+        exportDesignOnly(product, artUrl, placement, areaKey),
       ]);
       if (!dataUrl) return null;
-      return {
+      const item: MockupUploadItem = {
         catalogProductId: product.id,
         dataUrl,
         placement,
+        ...(areaPlacements.length ? { placements: areaPlacements } : {}),
         ...(design.dataUrl
           ? {
               designOnlyDataUrl: design.dataUrl,
@@ -320,27 +452,25 @@ export async function bakeMockupsForProducts(
               },
             }
           : {}),
-      } satisfies MockupUploadItem;
+      };
+      return item;
     }),
   );
-  return baked.filter((m): m is MockupUploadItem => m !== null);
+  return baked.filter((m): m is MockupUploadItem => m != null);
 }
 
-/** Flatten mask + placed artwork into one PNG data URL (preview quality). */
-export async function bakeMockup(
+/** Flatten mask + one or more area artworks into one PNG data URL (preview quality). */
+export async function bakeMockupLayers(
   ep: UiProduct,
-  artUrl: string,
-  placement: Placement | null,
+  layers: Array<{ artUrl: string; placement: Placement | null; areaKey: string }>,
   size = 1000,
   requireProductBase = false,
 ): Promise<string> {
-  if (!artUrl) return "";
+  const usable = layers.filter((l) => l.artUrl);
+  if (!usable.length) return "";
   try {
     const maskUrl = designImgUrl(ep);
-    const [maskImg, artImg] = await Promise.all([
-      maskUrl ? loadImageEl(maskUrl, true).catch(() => null) : Promise.resolve(null),
-      loadImageEl(artUrl, true),
-    ]);
+    const maskImg = maskUrl ? await loadImageEl(maskUrl, true).catch(() => null) : null;
     if (requireProductBase && !maskImg) return "";
     const canvas = document.createElement("canvas");
     canvas.width = size;
@@ -360,38 +490,94 @@ export async function bakeMockup(
       ctx.drawImage(maskImg, mdx, mdy, mw, mh);
     }
 
-    const aspect = (artImg.naturalHeight || 1) / (artImg.naturalWidth || 1);
-    const pl = placement ?? defaultPlacement(ep, aspect);
-    const { ph, stage, phys } = resolvePrintAreaStage(ep);
-    const realArt = buildRealisticArtwork(artImg, ep?.g);
-    const rel = placementPrintFractions(pl, stage, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-    const printRect = designPlacementOnMockup({
-      mockupWidthPx: mw,
-      mockupHeightPx: mh,
-      placeholder: ph,
-      physicalDimensions: phys,
-      viewKey: ph.key,
-    });
-    const w0 = printRect.w * rel.w;
-    const h0 = w0 * aspect;
-    const cx = mdx + printRect.x + rel.cx * printRect.w;
-    const cy = mdy + printRect.y + rel.cy * printRect.h;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(mdx + printRect.x, mdy + printRect.y, printRect.w, printRect.h);
-    ctx.clip();
-    ctx.globalCompositeOperation = "multiply";
-    ctx.globalAlpha = 0.96;
-    ctx.translate(cx, cy);
-    ctx.rotate(((rel.rot || 0) * Math.PI) / 180);
-    ctx.drawImage(realArt, -w0 / 2, -h0 / 2, w0, h0);
-    ctx.restore();
+    for (const layer of usable) {
+      const artImg = await loadImageEl(layer.artUrl, true).catch(() => null);
+      if (!artImg) continue;
+      const aspect = (artImg.naturalHeight || 1) / (artImg.naturalWidth || 1);
+      const key = layer.areaKey || primaryAreaKey(ep);
+      const pl = layer.placement ?? defaultPlacement(ep, aspect, key);
+      const { ph, stage, phys } = resolvePrintAreaStage(ep, {}, key);
+      const realArt = buildRealisticArtwork(artImg, ep?.g);
+      const rel = placementPrintFractions(pl, stage, CANVAS_WIDTH, CANVAS_HEIGHT);
+      const printRect = designPlacementOnMockup({
+        mockupWidthPx: mw,
+        mockupHeightPx: mh,
+        placeholder: ph,
+        physicalDimensions: phys,
+        viewKey: ph.key,
+      });
+      const w0 = printRect.w * rel.w;
+      const h0 = w0 * aspect;
+      const cx = mdx + printRect.x + rel.cx * printRect.w;
+      const cy = mdy + printRect.y + rel.cy * printRect.h;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(mdx + printRect.x, mdy + printRect.y, printRect.w, printRect.h);
+      ctx.clip();
+      ctx.globalCompositeOperation = "multiply";
+      ctx.globalAlpha = 0.96;
+      ctx.translate(cx, cy);
+      ctx.rotate(((rel.rot || 0) * Math.PI) / 180);
+      ctx.drawImage(realArt, -w0 / 2, -h0 / 2, w0, h0);
+      ctx.restore();
+    }
     return canvas.toDataURL("image/png");
   } catch {
     return "";
   }
+}
+
+/**
+ * Build bake layers for every print area that has artwork (area-specific or fallback).
+ */
+export function collectBakeLayers(
+  product: UiProduct,
+  placements: Record<string, Placement>,
+  areaArts: Record<string, { preview: string }>,
+  idx: number,
+  fallbackArtUrl?: string | null,
+): Array<{ artUrl: string; placement: Placement; areaKey: string }> {
+  const areas = listPrintAreas(product);
+  const list = areas.length ? areas : [pickPrintArea(product)].filter(Boolean);
+  const primary = primaryAreaKey(product);
+  const out: Array<{ artUrl: string; placement: Placement; areaKey: string }> = [];
+  list.forEach((area, i) => {
+    if (!area) return;
+    const areaKey = printAreaStableKey(area, i);
+    const draftKey = areaPlacementKey(product, idx, areaKey);
+    const artUrl = areaArts[draftKey]?.preview || (areaKey === primary ? fallbackArtUrl : null) || "";
+    if (!artUrl) return;
+    out.push({
+      areaKey,
+      artUrl,
+      placement: resolvePlacementForBake(product, placements, idx, areaKey),
+    });
+  });
+  if (!out.length && fallbackArtUrl) {
+    out.push({
+      areaKey: primary,
+      artUrl: fallbackArtUrl,
+      placement: resolvePlacementForBake(product, placements, idx, primary),
+    });
+  }
+  return out;
+}
+
+/** Flatten mask + placed artwork into one PNG data URL (preview quality). */
+export async function bakeMockup(
+  ep: UiProduct,
+  artUrl: string,
+  placement: Placement | null,
+  size = 1000,
+  requireProductBase = false,
+  areaKey?: string | null,
+): Promise<string> {
+  return bakeMockupLayers(
+    ep,
+    [{ artUrl, placement, areaKey: areaKey || primaryAreaKey(ep) }],
+    size,
+    requireProductBase,
+  );
 }
 
 /**
@@ -402,6 +588,7 @@ export async function exportDesignOnly(
   ep: UiProduct,
   artUrl: string,
   placement: Placement | null,
+  areaKey?: string | null,
 ): Promise<{
   dataUrl: string;
   widthPx: number;
@@ -414,10 +601,11 @@ export async function exportDesignOnly(
   if (!artUrl) return empty;
   try {
     const artImg = await loadImageEl(artUrl, true);
-    const { ph, stage, dpi } = resolvePrintAreaStage(ep);
+    const key = areaKey || primaryAreaKey(ep);
+    const { ph, stage, dpi } = resolvePrintAreaStage(ep, {}, key);
     const { widthPx, heightPx } = printExportSize(ph.widthIn, ph.heightIn, dpi);
     const aspect = (artImg.naturalHeight || 1) / (artImg.naturalWidth || 1);
-    const pl = placement ?? defaultPlacement(ep, aspect);
+    const pl = placement ?? defaultPlacement(ep, aspect, key);
     const rel = placementPrintFractions(pl, stage, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     const canvas = document.createElement("canvas");
@@ -455,33 +643,25 @@ export async function exportDesignOnly(
 
 /**
  * Live realistic mockup recoloured to a garment colour. Recolours the
- * transparent production mask to `tintHex` (multiply keeps the fabric's
- * folds/shadows, then clip back to the mask alpha so the background stays
- * clear) and bakes the warped/blended artwork on top — the same realistic
- * path as bakeMockup, but tinted per colour swatch. Returns "" when there is
- * no usable garment mask to recolour.
+ * transparent production mask to `tintHex` and bakes one or more print-area
+ * artworks on top — same path as bakeMockupLayers, but tinted per swatch.
  */
-export async function bakeTintedMockup(
+export async function bakeTintedMockupLayers(
   ep: UiProduct,
-  artUrl: string,
-  placement: Placement | null,
+  layers: Array<{ artUrl: string; placement: Placement | null; areaKey: string }>,
   tintHex: string,
   size = 1000,
 ): Promise<string> {
   const maskUrl = designImgUrl(ep);
   if (!maskUrl || !tintHex) return "";
+  const usable = layers.filter((l) => l.artUrl);
   try {
-    const [maskImg, artImg] = await Promise.all([
-      loadImageEl(maskUrl, true),
-      artUrl ? loadImageEl(artUrl, true).catch(() => null) : Promise.resolve(null),
-    ]);
+    const maskImg = await loadImageEl(maskUrl, true);
     const canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext("2d")!;
 
-    // ── Garment: draw the mask, multiply the colour in (keeps fabric shading),
-    //    then clip back to the mask alpha so only the garment is recoloured.
     const s = Math.min(size / maskImg.naturalWidth, size / maskImg.naturalHeight);
     const w = maskImg.naturalWidth * s;
     const h = maskImg.naturalHeight * s;
@@ -489,11 +669,6 @@ export async function bakeTintedMockup(
     const dy = (size - h) / 2;
     ctx.drawImage(maskImg, dx, dy, w, h);
 
-    // A production mask is a transparent cutout. If the source has an opaque
-    // background (a marketing/model photo, not a real mask), a multiply tint
-    // would recolour the whole background — so bail and let the caller fall
-    // back to the DOM TintedGarment, which flood-fills the background away
-    // before recolouring. Sample the four image corners for opacity.
     let opaqueCorners = 0;
     try {
       const alphaAt = (x: number, y: number) =>
@@ -518,12 +693,14 @@ export async function bakeTintedMockup(
     ctx.drawImage(maskImg, dx, dy, w, h);
     ctx.restore();
 
-    // ── Artwork: warped + fabric-blended, multiplied onto the tinted garment.
-    if (artImg) {
+    for (const layer of usable) {
+      const artImg = await loadImageEl(layer.artUrl, true).catch(() => null);
+      if (!artImg) continue;
       const aspect = (artImg.naturalHeight || 1) / (artImg.naturalWidth || 1);
-      const pl = placement ?? defaultPlacement(ep, aspect);
+      const key = layer.areaKey || primaryAreaKey(ep);
+      const pl = layer.placement ?? defaultPlacement(ep, aspect, key);
       const realArt = buildRealisticArtwork(artImg, ep?.g);
-      const { ph, stage, phys } = resolvePrintAreaStage(ep);
+      const { ph, stage, phys } = resolvePrintAreaStage(ep, {}, key);
       const rel = placementPrintFractions(pl, stage, CANVAS_WIDTH, CANVAS_HEIGHT);
       const printRect = designPlacementOnMockup({
         mockupWidthPx: w,
@@ -551,6 +728,30 @@ export async function bakeTintedMockup(
   } catch {
     return "";
   }
+}
+
+/**
+ * Live realistic mockup recoloured to a garment colour. Recolours the
+ * transparent production mask to `tintHex` (multiply keeps the fabric's
+ * folds/shadows, then clip back to the mask alpha so the background stays
+ * clear) and bakes the warped/blended artwork on top — the same realistic
+ * path as bakeMockup, but tinted per colour swatch. Returns "" when there is
+ * no usable garment mask to recolour.
+ */
+export async function bakeTintedMockup(
+  ep: UiProduct,
+  artUrl: string,
+  placement: Placement | null,
+  tintHex: string,
+  size = 1000,
+  areaKey?: string | null,
+): Promise<string> {
+  return bakeTintedMockupLayers(
+    ep,
+    [{ artUrl, placement, areaKey: areaKey || primaryAreaKey(ep) }],
+    tintHex,
+    size,
+  );
 }
 
 /** Resolved photo/mockup thumbnail for a product or baked design. */

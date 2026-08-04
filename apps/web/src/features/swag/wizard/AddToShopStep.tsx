@@ -1,32 +1,28 @@
 import { Check, Info, Store } from "lucide-react";
-import { DesignedProductThumb } from "../DesignedProductThumb";
-import { placementKey, type Placement } from "../mockup-bake";
+import { MockupCanvas, buildMockupLayers } from "../MockupCanvas";
+import { listPrintAreas, placementKey, type Placement } from "../mockup-bake";
+import type { ArtFile } from "../swagDraft";
 import type { UiProduct, UiShop } from "@/services/mappers";
 
 export function AddToShopStep({
   collectionName,
   products,
   placements = {},
-  artworkPreview,
+  areaArts = {},
   shops,
   picked,
   onToggle,
 }: {
   collectionName: string;
   products: UiProduct[];
-  /** Artwork-step placements keyed by `placementKey` — required for accurate preview. */
+  /** Artwork-step placements keyed by product / area. */
   placements?: Record<string, Placement>;
-  artworkPreview?: string;
+  /** Per print-area artwork from the artwork step. */
+  areaArts?: Record<string, ArtFile>;
   shops: UiShop[];
   picked: Set<string>;
   onToggle: (shopId: string) => void;
 }) {
-  const previewProducts = products.map((p, i) => {
-    const key = placementKey(p, i);
-    const placement = placements[key];
-    return placement ? { ...p, placement } : p;
-  });
-
   return (
     <div className="sw-art-studio">
       <div className="sw-art-layout">
@@ -109,8 +105,8 @@ export function AddToShopStep({
             <div>
               <div className="sw-art-preview-title">Collection preview</div>
               <div className="mut3 sw-art-preview-hint">
-                {previewProducts.length}{" "}
-                {previewProducts.length === 1 ? "product" : "products"} in this collection
+                {products.length} {products.length === 1 ? "product" : "products"} · all print areas
+                as designed
               </div>
             </div>
             {picked.size > 0 ? (
@@ -123,19 +119,27 @@ export function AddToShopStep({
 
           <div className="sw-art-preview-scroll">
             <div className="sw-mockups">
-              {previewProducts.map((p, i) => (
-                <div key={`${p.id ?? p.nm}-${i}`} className="pcard mockup-card sw-mockup-card">
-                  {artworkPreview ? (
-                    <DesignedProductThumb product={p} artworkUrl={artworkPreview} />
-                  ) : (
-                    <DesignedProductThumb product={p} />
-                  )}
-                  <div className="meta">
-                    {p.brand ? <div className="brand">{p.brand}</div> : null}
-                    <div className="nm">{p.nm}</div>
+              {products.map((p, i) => {
+                const layers = buildMockupLayers(p, {
+                  idx: i,
+                  areaArts,
+                  placements,
+                });
+                const areaCount = Math.max(1, listPrintAreas(p).length);
+                const artCount = layers.filter((l) => l.artUrl).length;
+                return (
+                  <div key={placementKey(p, i)} className="pcard mockup-card sw-mockup-card">
+                    <MockupCanvas product={p} layers={layers} />
+                    <div className="meta">
+                      {p.brand ? <div className="brand">{p.brand}</div> : null}
+                      <div className="nm">{p.nm}</div>
+                      <div className="mut3" style={{ fontSize: 11, marginTop: 4 }}>
+                        {artCount}/{areaCount} print areas with artwork
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

@@ -6,7 +6,10 @@ export type SwagDraft = {
   step: 0 | 1 | 2 | 3;
   name: string;
   picked: number[];
+  /** Last library selection (also used as fallback / collection artworkUrl). */
   art: ArtFile | null;
+  /** Artwork assigned per product print area — key = `productId::areaKey`. */
+  areaArts: Record<string, ArtFile>;
   placements: Record<string, Placement>;
   placementEpoch: number;
 };
@@ -16,6 +19,7 @@ export const INITIAL_SWAG_DRAFT: SwagDraft = {
   name: "New Employee Swag",
   picked: [],
   art: null,
+  areaArts: {},
   placements: {},
   placementEpoch: 0,
 };
@@ -26,6 +30,9 @@ export type SwagAction =
   | { type: "togglePick"; index: number }
   | { type: "setArt"; art: ArtFile }
   | { type: "clearArt" }
+  | { type: "setAreaArt"; key: string; art: ArtFile }
+  | { type: "setAreaArts"; keys: string[]; art: ArtFile }
+  | { type: "clearAreaArt"; key: string }
   | { type: "setPlacement"; key: string; placement: Placement }
   | { type: "resetPlacements" }
   | { type: "hydrate"; draft: SwagDraft };
@@ -51,9 +58,32 @@ export function swagDraftReducer(state: SwagDraft, action: SwagAction): SwagDraf
       return {
         ...state,
         art: null,
+        areaArts: {},
         placements: {},
         placementEpoch: (state.placementEpoch ?? 0) + 1,
       };
+    case "setAreaArt":
+      return {
+        ...state,
+        art: action.art,
+        areaArts: { ...state.areaArts, [action.key]: action.art },
+      };
+    case "setAreaArts": {
+      const next = { ...state.areaArts };
+      for (const key of action.keys) next[key] = action.art;
+      return { ...state, art: action.art, areaArts: next };
+    }
+    case "clearAreaArt": {
+      const next = { ...state.areaArts };
+      delete next[action.key];
+      const stillHas = Object.keys(next).length > 0;
+      return {
+        ...state,
+        areaArts: next,
+        art: stillHas ? state.art : null,
+        placementEpoch: (state.placementEpoch ?? 0) + 1,
+      };
+    }
     case "setPlacement":
       return { ...state, placements: { ...state.placements, [action.key]: action.placement } };
     case "resetPlacements":
@@ -63,8 +93,17 @@ export function swagDraftReducer(state: SwagDraft, action: SwagAction): SwagDraf
         placementEpoch: (state.placementEpoch ?? 0) + 1,
       };
     case "hydrate":
-      return action.draft;
+      return {
+        ...INITIAL_SWAG_DRAFT,
+        ...action.draft,
+        areaArts: action.draft.areaArts ?? {},
+      };
     default:
       return state;
   }
+}
+
+/** True when at least one print area has artwork assigned. */
+export function draftHasAreaArtwork(draft: SwagDraft): boolean {
+  return Object.keys(draft.areaArts || {}).length > 0 || Boolean(draft.art);
 }

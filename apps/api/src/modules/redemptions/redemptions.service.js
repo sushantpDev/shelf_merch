@@ -47,7 +47,7 @@ function isKitFulfillment(campaign) {
 }
 
 const KIT_PRODUCT_SELECT =
-  'name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas';
+  'name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas physicalDimensions dpi';
 
 /** Active catalog rows for a kit — same list shown to recipients and validated on submit. */
 function parseCuratedMeta(designNotes) {
@@ -555,7 +555,7 @@ export async function getCatalog(token) {
       status: 'active',
       _id: { $in: campaign.selectedProductIds },
     })
-      .select('name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas')
+      .select('name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas physicalDimensions dpi')
       .sort({ name: 1 })
       .lean()
       .then((rows) =>
@@ -578,7 +578,7 @@ export async function getCatalog(token) {
   }
 
   const products = await CatalogProduct.find({ status: 'active' })
-    .select('name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas')
+    .select('name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas physicalDimensions dpi')
     .sort({ name: 1 })
     .lean();
   return { products };
