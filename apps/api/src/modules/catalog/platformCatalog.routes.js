@@ -319,12 +319,17 @@ platformProductsRouter.post(
     // Also accept pre-uploaded URLs in the body for API-driven imports.
     if (Array.isArray(req.body?.urls)) urls.push(...req.body.urls);
 
-    // role 'base'|'mask' set the recolourable master pair; otherwise mask image.
+    // role 'base'|'mask' (front) or 'base_back'|'mask_back' (back); otherwise mask image.
     const role = req.body?.role;
-    if ((role === 'base' || role === 'mask') && urls[0]) {
+    if ((role === 'base' || role === 'mask' || role === 'base_back' || role === 'mask_back') && urls[0]) {
       const product = await catalogService.setRoleImage(req.params.id, role, urls[0]);
       writeAudit({ req, action: 'product.images_add', entityType: 'CatalogProduct', entityId: product._id, after: { role, url: urls[0] } });
-      return res.status(201).json({ baseImageUrl: product.baseImageUrl, maskImageUrl: product.maskImageUrl });
+      return res.status(201).json({
+        baseImageUrl: product.baseImageUrl,
+        maskImageUrl: product.maskImageUrl,
+        baseBackImageUrl: product.baseBackImageUrl,
+        maskBackImageUrl: product.maskBackImageUrl,
+      });
     }
 
     const product = await catalogService.addImages(req.params.id, urls);

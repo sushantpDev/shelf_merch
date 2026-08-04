@@ -54,6 +54,10 @@ export type UiProduct = {
   baseImageUrl?: string;
   /** Transparent design/production image used by artwork mockups. */
   maskImageUrl?: string;
+  /** Optional back-view stage image. */
+  baseBackImageUrl?: string;
+  /** Optional back-view transparent design/production mask. */
+  maskBackImageUrl?: string;
   /** Pre-baked design mockup served to shop/storefront. */
   mockupUrl?: string;
   /** Real-world size of the mockup frame (inches) — drives print-area mapping. */
@@ -320,6 +324,7 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
   const { colors: variantColors, colorHexByName } = extractVariantColors(p.variants);
   const photoUrl = resolveMediaUrl(p.primaryImageUrl || p.imageUrls?.[0]);
   const baseImageUrl = resolveMediaUrl(p.baseImageUrl);
+  const baseBackImageUrl = resolveMediaUrl(p.baseBackImageUrl);
   const imgUrl = resolveMediaUrl(p.maskImageUrl || photoUrl);
   const printAreas = Array.isArray(p.printAreas)
     ? (p.printAreas as Record<string, unknown>[]).map(mapPrintArea).filter((a): a is UiPrintArea => !!a)
@@ -352,6 +357,8 @@ export function mapCatalogProduct(p: ApiProduct): UiProduct {
     baseImageUrl,
     imgUrl,
     maskImageUrl: resolveMediaUrl(p.maskImageUrl),
+    baseBackImageUrl,
+    maskBackImageUrl: resolveMediaUrl(p.maskBackImageUrl),
     physicalDimensions:
       physicalDimensions && physicalDimensions.width > 0 && physicalDimensions.height > 0
         ? physicalDimensions
@@ -386,6 +393,8 @@ export function mergeCatalogProductDetails(
     // own baked mockup/placement untouched.
     maskImageUrl: product.maskImageUrl || fromCatalog.maskImageUrl,
     baseImageUrl: product.baseImageUrl || fromCatalog.baseImageUrl,
+    maskBackImageUrl: product.maskBackImageUrl || fromCatalog.maskBackImageUrl,
+    baseBackImageUrl: product.baseBackImageUrl || fromCatalog.baseBackImageUrl,
     photoUrl: product.photoUrl || fromCatalog.photoUrl,
     imgUrl: product.imgUrl || fromCatalog.imgUrl,
     printAreas: product.printAreas?.length ? product.printAreas : fromCatalog.printAreas,
@@ -425,6 +434,10 @@ export function mapProductRef(ref: ApiProduct, catalogById?: Map<string, UiProdu
     baseImageUrl,
     imgUrl,
     maskImageUrl: resolveMediaUrl(ref.maskImageUrl) || fromCatalog?.maskImageUrl,
+    baseBackImageUrl:
+      resolveMediaUrl(ref.baseBackImageUrl) || fromCatalog?.baseBackImageUrl,
+    maskBackImageUrl:
+      resolveMediaUrl(ref.maskBackImageUrl) || fromCatalog?.maskBackImageUrl,
     mockupUrl: resolveMediaUrl(ref.mockupUrl),
     placement: mapPlacement((ref as { placement?: unknown }).placement),
     areaPlacements: mapAreaPlacements(ref),

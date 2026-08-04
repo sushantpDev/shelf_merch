@@ -22,13 +22,19 @@ export function ProductWizardView({
   physicalDimensions,
   dpi,
   previewColor,
+  imageView,
   categoryOptions,
   colorSwatches,
   activeSwatch,
   firstHex,
   marketingImageUrl,
+  marketingBackImageUrl,
   baseStageImageUrl,
   productionMaskImageUrl,
+  baseBackStageImageUrl,
+  productionMaskBackImageUrl,
+  printAreaImages,
+  printAreaImageViews,
   onBack,
   onStep,
   onSet,
@@ -37,16 +43,24 @@ export function ProductWizardView({
   onPhysicalDimensions,
   onDpi,
   onPreviewColor,
+  onImageView,
   onSaveDetails,
   onAddVariant,
   onUploadMask,
   onUploadBase,
+  onUploadMaskBack,
+  onUploadBaseBack,
   onSaveAreas,
   onContinueFromVariants,
   onGoToStep,
   onPublish,
   onSaveDraft,
 }: ProductWizardVm) {
+  const activeMarketingUrl = imageView === "back" ? marketingBackImageUrl : marketingImageUrl;
+  const activeStageUrl = imageView === "back" ? baseBackStageImageUrl : baseStageImageUrl;
+  const activeMaskUrl = imageView === "back" ? productionMaskBackImageUrl : productionMaskImageUrl;
+  const onUploadActiveBase = imageView === "back" ? onUploadBaseBack : onUploadBase;
+  const onUploadActiveMask = imageView === "back" ? onUploadMaskBack : onUploadMask;
   return (
     <>
       <PlatformPageHeader
@@ -312,27 +326,53 @@ export function ProductWizardView({
           <>
             <h3 style={{ marginBottom: 4 }}>Product images</h3>
             <p className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
-              Marketing and production imagery are kept separate. Upload both a visible product stage image and the
-              transparent production mask.
+              Marketing and production imagery are kept separate. Upload both a visible product stage
+              image and the transparent production mask for each view you need.
             </p>
+
+            <div className="row" style={{ gap: 8, marginBottom: 16 }}>
+              {(["front", "back"] as const).map((view) => (
+                <button
+                  type="button"
+                  key={view}
+                  className="chip"
+                  style={
+                    imageView === view
+                      ? { borderColor: "var(--brand)", color: "var(--brand-d)", fontWeight: 700 }
+                      : undefined
+                  }
+                  onClick={() => onImageView(view)}
+                >
+                  {view === "front" ? "Front view" : "Back view"}
+                </button>
+              ))}
+            </div>
+
             <div className="row" style={{ gap: 18, flexWrap: "wrap", marginBottom: 22, alignItems: "flex-start" }}>
-              <MarketingImageCard imageUrl={marketingImageUrl} />
-              <MasterImageUpload
-                label="Product stage image"
-                hint="Visible garment/product image used in swag previews"
-                accept="image/*"
-                imageUrl={baseStageImageUrl}
-                disabled={busy || !id}
-                onFile={onUploadBase}
+              <MarketingImageCard
+                imageUrl={activeMarketingUrl}
+                label={imageView === "back" ? "Shopify marketing image (back)" : "Shopify marketing image"}
               />
               <MasterImageUpload
-                label="Design & production mask"
+                label={imageView === "back" ? "Product stage image (back)" : "Product stage image"}
+                hint={
+                  imageView === "back"
+                    ? "Visible back garment/product image used in swag previews"
+                    : "Visible garment/product image used in swag previews"
+                }
+                accept="image/*"
+                imageUrl={activeStageUrl}
+                disabled={busy || !id}
+                onFile={onUploadActiveBase}
+              />
+              <MasterImageUpload
+                label={imageView === "back" ? "Design & production mask (back)" : "Design & production mask"}
                 hint="Transparent PNG · used for artwork, print areas and production"
                 accept="image/png"
-                imageUrl={productionMaskImageUrl ? resolveMediaUrl(productionMaskImageUrl) : undefined}
+                imageUrl={activeMaskUrl ? resolveMediaUrl(activeMaskUrl) : undefined}
                 tintHex={firstHex}
                 disabled={busy || !id}
-                onFile={onUploadMask}
+                onFile={onUploadActiveMask}
               />
             </div>
 
@@ -342,12 +382,12 @@ export function ProductWizardView({
               </p>
             )}
 
-            {productionMaskImageUrl && (
+            {activeMaskUrl && (
               <div style={{ marginBottom: 22 }}>
                 <h3 style={{ marginBottom: 2 }}>Colour preview</h3>
                 <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
-                  The single mask recolours to each variant colour automatically. Pick a colour to inspect the runtime
-                  tint.
+                  The {imageView} mask recolours to each variant colour automatically. Pick a colour to
+                  inspect the runtime tint.
                 </p>
                 {colorSwatches.length === 0 ? (
                   <p className="muted">Add variants with colours to preview the recoloured mask.</p>
@@ -364,7 +404,7 @@ export function ProductWizardView({
                           overflow: "hidden",
                         }}
                       >
-                        <TintedGarment src={resolveMediaUrl(productionMaskImageUrl)} hex={activeSwatch?.hex} />
+                        <TintedGarment src={resolveMediaUrl(activeMaskUrl)} hex={activeSwatch?.hex} />
                       </div>
                       {activeSwatch && (
                         <div className="row" style={{ gap: 8, alignItems: "center", marginTop: 8 }}>
@@ -414,7 +454,7 @@ export function ProductWizardView({
                                 background: "var(--surface-2)",
                               }}
                             >
-                              <TintedGarment src={resolveMediaUrl(productionMaskImageUrl)} hex={c.hex} />
+                              <TintedGarment src={resolveMediaUrl(activeMaskUrl)} hex={c.hex} />
                             </div>
                             <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, maxWidth: 72 }}>
                               <span
@@ -454,9 +494,20 @@ export function ProductWizardView({
         {step === 3 && (
           <>
             <h3 style={{ marginBottom: 12 }}>Design placeholders</h3>
+            <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
+              Place design areas on the front and back masks. Switch the mockup image to edit each view —
+              areas are saved with the selected mask.
+            </p>
+            {!printAreaImages.length && (
+              <p className="muted" style={{ marginBottom: 12 }}>
+                Upload a front (and optionally back) production mask on the Images step before placing
+                design areas.
+              </p>
+            )}
             <PrintAreaEditor
-              images={[productionMaskImageUrl].filter(Boolean) as string[]}
-              maskImageUrl={productionMaskImageUrl}
+              images={printAreaImages}
+              maskImageUrl={productionMaskImageUrl || productionMaskBackImageUrl}
+              imageViews={printAreaImageViews}
               colors={colorSwatches}
               value={printAreas}
               onChange={onPrintAreas}
@@ -481,9 +532,12 @@ export function ProductWizardView({
             <h3 style={{ marginBottom: 12 }}>Review &amp; publish</h3>
             <p className="muted" style={{ marginBottom: 6 }}>
               {product?.name} · {product?.sku} · {product?.variants?.length ?? 0} variants ·{" "}
-              {marketingImageUrl ? "Shopify marketing image" : "no marketing image"} ·{" "}
-              {baseStageImageUrl ? "stage image" : "no stage image"} ·{" "}
-              {productionMaskImageUrl ? "production mask" : "no production mask"} · {printAreas.length} print areas
+              {marketingImageUrl ? "front marketing" : "no front marketing"} ·{" "}
+              {baseStageImageUrl ? "front stage" : "no front stage"} ·{" "}
+              {productionMaskImageUrl ? "front mask" : "no front mask"} ·{" "}
+              {baseBackStageImageUrl ? "back stage" : "no back stage"} ·{" "}
+              {productionMaskBackImageUrl ? "back mask" : "no back mask"} · {printAreas.length} print
+              areas
             </p>
             {problems.length > 0 && (
               <ul style={{ color: "var(--danger)", margin: "10px 0", paddingLeft: 18 }}>

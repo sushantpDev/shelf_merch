@@ -43,6 +43,7 @@ export function useProductWizardController(mode: "create" | "edit", productId?: 
   });
   const [dpi, setDpi] = useState(DEFAULT_DPI);
   const [previewColor, setPreviewColor] = useState<string>("");
+  const [imageView, setImageView] = useState<"front" | "back">("front");
 
   const categoryOptions = useMemo(
     () =>
@@ -123,9 +124,34 @@ export function useProductWizardController(mode: "create" | "edit", productId?: 
       (legacyShopifyImageInMask ? product?.maskImageUrl : undefined);
     return raw ? resolveMediaUrl(raw) : undefined;
   }, [legacyShopifyImageInMask, product?.primaryImageUrl, product?.imageUrls, product?.maskImageUrl]);
+  const marketingBackImageUrl = useMemo(() => {
+    const urls = product?.imageUrls ?? [];
+    const primary = product?.primaryImageUrl || urls[0];
+    const back = urls.find((u) => u && u !== primary) || (urls.length > 1 ? urls[1] : undefined);
+    return back ? resolveMediaUrl(back) : undefined;
+  }, [product?.imageUrls, product?.primaryImageUrl]);
   const baseStageImageUrl = product?.baseImageUrl ? resolveMediaUrl(product.baseImageUrl) : undefined;
   const productionMaskImageUrl =
     product?.maskImageUrl && !legacyShopifyImageInMask ? product.maskImageUrl : undefined;
+  const baseBackStageImageUrl = product?.baseBackImageUrl
+    ? resolveMediaUrl(product.baseBackImageUrl)
+    : undefined;
+  const productionMaskBackImageUrl = product?.maskBackImageUrl || undefined;
+  const printAreaImages = useMemo(
+    () =>
+      [productionMaskImageUrl, productionMaskBackImageUrl].filter(Boolean) as string[],
+    [productionMaskImageUrl, productionMaskBackImageUrl],
+  );
+  const printAreaImageViews = useMemo(() => {
+    const views: Array<{ url: string; key: string; label: string }> = [];
+    if (productionMaskImageUrl) {
+      views.push({ url: productionMaskImageUrl, key: "front", label: "Front" });
+    }
+    if (productionMaskBackImageUrl) {
+      views.push({ url: productionMaskBackImageUrl, key: "back", label: "Back" });
+    }
+    return views;
+  }, [productionMaskImageUrl, productionMaskBackImageUrl]);
 
   async function refresh() {
     if (!id) return;
@@ -204,6 +230,47 @@ export function useProductWizardController(mode: "create" | "edit", productId?: 
     setError("");
     try {
       await uploadProductImage(id, file, "base");
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function uploadMaskBack(file: File | undefined) {
+    if (!id || !file) return;
+    const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+    if (!isPng) {
+      setError("Back design mask must be a PNG file.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      if (!(await pngHasTransparency(file))) {
+        setError("Back design mask must contain transparent pixels. Please upload a transparent PNG.");
+        return;
+      }
+      await uploadProductImage(id, file, "mask_back");
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function uploadBaseBack(file: File | undefined) {
+    if (!id || !file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Back product stage image must be an image file.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await uploadProductImage(id, file, "base_back");
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
@@ -313,13 +380,19 @@ export function useProductWizardController(mode: "create" | "edit", productId?: 
     physicalDimensions,
     dpi,
     previewColor,
+    imageView,
     categoryOptions,
     colorSwatches,
     activeSwatch,
     firstHex,
     marketingImageUrl,
+    marketingBackImageUrl,
     baseStageImageUrl,
     productionMaskImageUrl,
+    baseBackStageImageUrl,
+    productionMaskBackImageUrl,
+    printAreaImages,
+    printAreaImageViews,
     onBack: () => navigate("/platform/catalog"),
     onStep: goToStep,
     onSet: set,
@@ -328,10 +401,13 @@ export function useProductWizardController(mode: "create" | "edit", productId?: 
     onPhysicalDimensions: setPhysicalDimensions,
     onDpi: setDpi,
     onPreviewColor: setPreviewColor,
+    onImageView: setImageView,
     onSaveDetails: saveDetails,
     onAddVariant: addOneVariant,
     onUploadMask: uploadMask,
     onUploadBase: uploadBase,
+    onUploadMaskBack: uploadMaskBack,
+    onUploadBaseBack: uploadBaseBack,
     onSaveAreas: saveAreas,
     onContinueFromVariants: continueFromVariants,
     onGoToStep: setStep,

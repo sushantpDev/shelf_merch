@@ -118,7 +118,23 @@ function normMediaPath(url: string | undefined): string {
 }
 
 /** Production mask used behind artwork in design previews and baked mockups (never the marketing photo). */
-export function designImgUrl(p: UiProduct): string {
+export function designImgUrl(p: UiProduct, areaKey?: string | null): string {
+  if (areaKey) {
+    const area = pickPrintArea(p, areaKey);
+    const mockup = resolveMediaUrl(area?.mockupImageUrl);
+    if (mockup) {
+      const frontMask = resolveMediaUrl(p.maskImageUrl);
+      const backMask = resolveMediaUrl(p.maskBackImageUrl);
+      const frontBase = resolveMediaUrl(p.baseImageUrl);
+      const backBase = resolveMediaUrl(p.baseBackImageUrl);
+      if (backMask && sameMediaPath(mockup, backMask)) return backMask;
+      if (frontMask && sameMediaPath(mockup, frontMask)) return frontMask;
+      if (backBase && sameMediaPath(mockup, backBase)) return backMask || backBase;
+      if (frontBase && sameMediaPath(mockup, frontBase)) return frontMask || frontBase;
+      // Print area was drawn on this mockup — use it as the garment image for that view.
+      return mockup;
+    }
+  }
   return p?.maskImageUrl || p?.baseImageUrl || "";
 }
 
@@ -133,9 +149,13 @@ function sameMediaPath(a: string, b: string): boolean {
  * photo (`photoUrl`) — only mask, stage, print-area mockup, or imgUrl when it
  * differs from the catalog photo.
  */
-export function resolveGarmentMaskUrl(p: UiProduct | undefined): string {
+export function resolveGarmentMaskUrl(p: UiProduct | undefined, areaKey?: string | null): string {
   if (!p) return "";
   const photo = resolveMediaUrl(p.photoUrl);
+  if (areaKey) {
+    const fromArea = resolveMediaUrl(designImgUrl(p, areaKey));
+    if (fromArea && !sameMediaPath(fromArea, photo)) return fromArea;
+  }
   const mask = resolveMediaUrl(p.maskImageUrl);
   if (mask) return mask;
   const base = resolveMediaUrl(p.baseImageUrl);
@@ -167,8 +187,19 @@ export function pickPrintArea(p: UiProduct, areaKey?: string | null) {
     const maskArea = all.find((a) => normMediaPath(a.mockupImageUrl) === maskNorm);
     if (maskArea) return maskArea;
   }
+  const backMaskUrl = p.maskBackImageUrl;
+  if (backMaskUrl) {
+    const backNorm = normMediaPath(backMaskUrl);
+    const backArea = all.find((a) => normMediaPath(a.mockupImageUrl) === backNorm);
+    if (backArea) return backArea;
+  }
   if (p.baseImageUrl) {
     const baseNorm = normMediaPath(p.baseImageUrl);
+    const match = all.find((a) => normMediaPath(a.mockupImageUrl) === baseNorm);
+    if (match) return match;
+  }
+  if (p.baseBackImageUrl) {
+    const baseNorm = normMediaPath(p.baseBackImageUrl);
     const match = all.find((a) => normMediaPath(a.mockupImageUrl) === baseNorm);
     if (match) return match;
   }

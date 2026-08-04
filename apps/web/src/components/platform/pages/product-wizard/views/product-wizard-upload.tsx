@@ -158,10 +158,16 @@ export function MasterImageUpload({
   );
 }
 
-export function MarketingImageCard({ imageUrl }: { imageUrl?: string }) {
+export function MarketingImageCard({
+  imageUrl,
+  label = "Shopify marketing image",
+}: {
+  imageUrl?: string;
+  label?: string;
+}) {
   return (
     <div style={{ flex: "1 1 200px", maxWidth: 220 }}>
-      <label className="lbl">Shopify marketing image</label>
+      <label className="lbl">{label}</label>
       <div style={{ overflow: "hidden", border: "1px solid var(--line)", borderRadius: 10, background: "#fff" }}>
         <div
           style={{

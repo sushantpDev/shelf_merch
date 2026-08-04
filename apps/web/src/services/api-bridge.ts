@@ -745,6 +745,8 @@ export type StorefrontData = {
     imageUrls?: string[];
     maskImageUrl?: string;
     baseImageUrl?: string;
+    maskBackImageUrl?: string;
+    baseBackImageUrl?: string;
     artworkUrl?: string;
     mockupUrl?: string;
     placement?: { xPct: number; yPct: number; wPct: number; rot: number };
@@ -892,6 +894,8 @@ export type KitRedemptionItem = {
   artworkUrl: string;
   maskImageUrl?: string;
   baseImageUrl?: string;
+  maskBackImageUrl?: string;
+  baseBackImageUrl?: string;
   primaryImageUrl?: string;
   imageUrls?: string[];
   printAreas?: Array<{

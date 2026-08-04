@@ -124,7 +124,6 @@ export function MockupCanvas({
   const [dpiWarn, setDpiWarn] = useState<number | null>(null);
   const [wrapSize, setWrapSize] = useState({ w: 0, h: 0 });
 
-  const maskSrc = resolveMediaSrc(designImgUrl(product));
   const branded = productHasPrintArea(product);
 
   const layers: MockupAreaLayer[] =
@@ -140,6 +139,7 @@ export function MockupCanvas({
         ];
 
   const activeAreaKey = activeAreaKeyProp || printAreaKey || (layersProp?.length ? undefined : layers[0]?.areaKey);
+  const maskSrc = resolveMediaSrc(designImgUrl(product, activeAreaKey));
   const sig = layersSignature(layers);
 
   useEffect(() => {

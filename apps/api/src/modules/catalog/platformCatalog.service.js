@@ -191,10 +191,15 @@ export async function addImages(productId, urls) {
   return product;
 }
 
-/** Set the recolourable master pair: role 'base' (internal) or 'mask' (customer). */
+/**
+ * Set a production image by role.
+ * Front: 'base' | 'mask'. Back: 'base_back' | 'mask_back'.
+ */
 export async function setRoleImage(productId, role, url) {
   const product = await getProduct(productId);
   if (role === 'base') product.baseImageUrl = url;
+  else if (role === 'base_back') product.baseBackImageUrl = url;
+  else if (role === 'mask_back') product.maskBackImageUrl = url;
   else if (role === 'mask') {
     // Legacy Shopify imports stored the marketing photo in maskImageUrl.
     // Preserve that photo in the marketing fields before replacing the mask.

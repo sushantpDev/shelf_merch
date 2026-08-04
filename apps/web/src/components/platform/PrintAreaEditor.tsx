@@ -93,6 +93,7 @@ function patchFromInches(
 export function PrintAreaEditor({
   images,
   maskImageUrl,
+  imageViews,
   colors = [],
   value,
   onChange,
@@ -103,6 +104,8 @@ export function PrintAreaEditor({
 }: {
   images: string[];
   maskImageUrl?: string;
+  /** Optional Front/Back (etc.) labels keyed to mockup image URLs. */
+  imageViews?: Array<{ url: string; key: string; label: string }>;
   colors?: { name: string; hex: string }[];
   value: PrintArea[];
   onChange: (areas: PrintArea[]) => void;
@@ -216,11 +219,14 @@ export function PrintAreaEditor({
 
   function addArea() {
     const n = value.length + 1;
-    const frame = physicalFrameForView(phys, `area_${n}`);
+    const view = imageViews?.find((v) => resolveMediaUrl(v.url) === mockup);
+    const key = view?.key || `area_${n}`;
+    const label = view?.label || `Area ${n}`;
+    const frame = physicalFrameForView(phys, key);
     const centered = defaultCenteredPlaceholder(frame);
     const draft: PrintArea = {
-      key: `area_${n}`,
-      label: `Area ${n}`,
+      key,
+      label,
       mockupImageUrl: mockup,
       xIn: centered.xIn,
       yIn: centered.yIn,
@@ -485,26 +491,53 @@ export function PrintAreaEditor({
           <div className="field">
             <label className="lbl">Mockup image</label>
             <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-              {resolvedImages.map((src) => (
-                <button
-                  key={src}
-                  type="button"
-                  onClick={() => setMockup(src)}
-                  style={{
-                    width: 48,
-                    height: 48,
-                    padding: 0,
-                    border: mockup === src ? "2px solid var(--brand)" : "1px solid var(--line)",
-                    borderRadius: 6,
-                    overflow: "hidden",
-                    cursor: "pointer",
-                    background: "#fff",
-                  }}
-                >
-                  <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                </button>
-              ))}
+              {resolvedImages.map((src) => {
+                const view = imageViews?.find((v) => resolveMediaUrl(v.url) === src);
+                return (
+                  <button
+                    key={src}
+                    type="button"
+                    onClick={() => setMockup(src)}
+                    title={view?.label || "Mockup"}
+                    style={{
+                      width: 48,
+                      height: 48,
+                      padding: 0,
+                      border: mockup === src ? "2px solid var(--brand)" : "1px solid var(--line)",
+                      borderRadius: 6,
+                      overflow: "hidden",
+                      cursor: "pointer",
+                      background: "#fff",
+                      position: "relative",
+                    }}
+                  >
+                    <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    {view?.label && (
+                      <span
+                        style={{
+                          position: "absolute",
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          fontSize: 9,
+                          fontWeight: 700,
+                          textAlign: "center",
+                          background: "rgba(0,0,0,.55)",
+                          color: "#fff",
+                          lineHeight: "14px",
+                        }}
+                      >
+                        {view.label}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
+            <p className="muted" style={{ fontSize: 11, margin: "6px 0 0" }}>
+              Switch mockups to place design placeholders on the front or back. New areas bind to the
+              selected image.
+            </p>
           </div>
         )}
 

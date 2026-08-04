@@ -504,6 +504,8 @@ export type PlatformProduct = {
   primaryImageUrl?: string;
   baseImageUrl?: string;
   maskImageUrl?: string;
+  baseBackImageUrl?: string;
+  maskBackImageUrl?: string;
   printAreas: PrintArea[];
   inventory?: { available?: number; mode?: string };
   source?: { provider?: string; domain?: string; externalId?: string; handle?: string };
@@ -559,15 +561,21 @@ export function updateVariant(id: string, variantId: string, patch: Partial<Prod
   });
 }
 
-/** Upload a production image. New products use role 'mask' for the transparent design PNG. */
-export function uploadProductImage(id: string, file: File, role: "base" | "mask") {
+/** Upload a production image. Front: 'base'|'mask'. Back: 'base_back'|'mask_back'. */
+export function uploadProductImage(
+  id: string,
+  file: File,
+  role: "base" | "mask" | "base_back" | "mask_back",
+) {
   const form = new FormData();
   form.append("images", file);
   form.append("role", role);
-  return apiFetch<{ baseImageUrl: string; maskImageUrl: string }>(
-    `/platform/products/${id}/images`,
-    { method: "POST", body: form },
-  );
+  return apiFetch<{
+    baseImageUrl: string;
+    maskImageUrl: string;
+    baseBackImageUrl?: string;
+    maskBackImageUrl?: string;
+  }>(`/platform/products/${id}/images`, { method: "POST", body: form });
 }
 
 /** Drop non-positive inch fields so Zod `.positive()` does not reject legacy 0 defaults. */

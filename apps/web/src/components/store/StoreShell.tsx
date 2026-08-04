@@ -53,6 +53,8 @@ export type StoreProduct = {
   imageUrls?: string[];
   maskImageUrl?: string;
   baseImageUrl?: string;
+  maskBackImageUrl?: string;
+  baseBackImageUrl?: string;
   artworkUrl?: string;
   /** Pre-baked design mockup (mask + artwork flattened) — shown as-is when set. */
   mockupUrl?: string;

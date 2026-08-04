@@ -161,6 +161,15 @@ describe('product variant colorHex + master image roles', () => {
     expect(reloaded.maskImageUrl).toBe('/uploads/platform/product/mask.png');
   });
 
+  it('setRoleImage stores back-view base and mask images', async () => {
+    const { setRoleImage } = await import('../src/modules/catalog/platformCatalog.service.js');
+    await setRoleImage(product._id, 'base_back', '/uploads/platform/product/base-back.png');
+    await setRoleImage(product._id, 'mask_back', '/uploads/platform/product/mask-back.png');
+    const reloaded = await CatalogProduct.findById(product._id);
+    expect(reloaded.baseBackImageUrl).toBe('/uploads/platform/product/base-back.png');
+    expect(reloaded.maskBackImageUrl).toBe('/uploads/platform/product/mask-back.png');
+  });
+
   it('keeps a legacy Shopify photo as marketing when a production mask is uploaded', async () => {
     product.source = {
       provider: 'shopify',

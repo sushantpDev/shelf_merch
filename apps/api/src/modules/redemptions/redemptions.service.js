@@ -47,7 +47,7 @@ function isKitFulfillment(campaign) {
 }
 
 const KIT_PRODUCT_SELECT =
-  'name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas physicalDimensions dpi';
+  'name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl maskBackImageUrl baseBackImageUrl variants printAreas physicalDimensions dpi'
 
 /** Active catalog rows for a kit — same list shown to recipients and validated on submit. */
 function parseCuratedMeta(designNotes) {
@@ -86,6 +86,8 @@ function buildCuratedRedemptionItems(kit, meta) {
       printAreas: [],
       maskImageUrl: '',
       baseImageUrl: '',
+      maskBackImageUrl: '',
+      baseBackImageUrl: '',
       primaryImageUrl: entry.imageUrl || '',
       imageUrls: entry.imageUrl ? [entry.imageUrl] : [],
       requiresSize: false,
@@ -110,6 +112,8 @@ function buildCuratedRedemptionItems(kit, meta) {
       printAreas: [],
       maskImageUrl: '',
       baseImageUrl: '',
+      maskBackImageUrl: '',
+      baseBackImageUrl: '',
       primaryImageUrl: hero,
       imageUrls: hero ? [hero] : [],
       requiresSize: false,
@@ -184,6 +188,8 @@ function mapKitEntryToItem({ ref, product }, kit) {
     printAreas: product.printAreas || [],
     maskImageUrl: drinkware ? '' : product.maskImageUrl || '',
     baseImageUrl: product.baseImageUrl || '',
+    maskBackImageUrl: drinkware ? '' : product.maskBackImageUrl || '',
+    baseBackImageUrl: product.baseBackImageUrl || '',
     primaryImageUrl: product.primaryImageUrl || '',
     imageUrls: product.imageUrls || [],
     requiresSize: options.requiresSize,
@@ -555,7 +561,7 @@ export async function getCatalog(token) {
       status: 'active',
       _id: { $in: campaign.selectedProductIds },
     })
-      .select('name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas physicalDimensions dpi')
+      .select('name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl maskBackImageUrl baseBackImageUrl variants printAreas physicalDimensions dpi')
       .sort({ name: 1 })
       .lean()
       .then((rows) =>
@@ -578,7 +584,7 @@ export async function getCatalog(token) {
   }
 
   const products = await CatalogProduct.find({ status: 'active' })
-    .select('name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl variants printAreas physicalDimensions dpi')
+    .select('name brand group category description keyFeatures sizeGuide basePriceInr primaryImageUrl imageUrls maskImageUrl baseImageUrl maskBackImageUrl baseBackImageUrl variants printAreas physicalDimensions dpi')
     .sort({ name: 1 })
     .lean();
   return { products };
