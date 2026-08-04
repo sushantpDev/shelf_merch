@@ -570,6 +570,15 @@ export function uploadProductImage(id: string, file: File, role: "base" | "mask"
   );
 }
 
+/** Drop non-positive inch fields so Zod `.positive()` does not reject legacy 0 defaults. */
+function sanitizePrintAreaForSave(a: PrintArea): PrintArea {
+  const next: PrintArea = { ...a };
+  if (!(typeof next.widthIn === "number" && next.widthIn > 0)) delete (next as { widthIn?: number }).widthIn;
+  if (!(typeof next.heightIn === "number" && next.heightIn > 0)) delete (next as { heightIn?: number }).heightIn;
+  if (!(typeof next.scale === "number" && next.scale > 0)) delete (next as { scale?: number }).scale;
+  return next;
+}
+
 export function setPrintAreas(
   id: string,
   printAreas: PrintArea[],
@@ -582,7 +591,7 @@ export function setPrintAreas(
   }>(`/platform/products/${id}/print-areas`, {
     method: "PUT",
     body: JSON.stringify({
-      printAreas,
+      printAreas: printAreas.map(sanitizePrintAreaForSave),
       ...(extras?.physicalDimensions ? { physicalDimensions: extras.physicalDimensions } : {}),
       ...(extras?.dpi != null ? { dpi: extras.dpi } : {}),
     }),

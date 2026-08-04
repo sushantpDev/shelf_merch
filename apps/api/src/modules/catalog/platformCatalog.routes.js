@@ -76,6 +76,15 @@ const customizationSchema = z.object({
 
 const pct = z.number().min(0).max(100);
 const inch = z.number().finite();
+/** Treat 0 / negative / NaN as "unset" so legacy defaults don't fail `.positive()`. */
+const positiveInch = z.preprocess(
+  (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined),
+  inch.positive().optional(),
+);
+const positiveScale = z.preprocess(
+  (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined),
+  z.number().positive().optional().default(1),
+);
 const printAreasSchema = z.object({
   physicalDimensions: z
     .object({
@@ -93,10 +102,10 @@ const printAreasSchema = z.object({
         mockupImageUrl: z.string().optional().default(''),
         xIn: inch.optional(),
         yIn: inch.optional(),
-        widthIn: inch.positive().optional(),
-        heightIn: inch.positive().optional(),
+        widthIn: positiveInch,
+        heightIn: positiveInch,
         rotationDeg: z.number().optional().default(0),
-        scale: z.number().positive().optional().default(1),
+        scale: positiveScale,
         lockSize: z.boolean().optional().default(false),
         shapeType: z.enum(['rect', 'polygon']).optional().default('rect'),
         polygonPoints: z.array(z.object({ xIn: inch, yIn: inch })).optional(),

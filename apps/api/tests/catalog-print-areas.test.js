@@ -113,6 +113,25 @@ describe('platform product print areas (POD placeholders)', () => {
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
+  it('accepts legacy widthIn: 0 when box % is valid (treats 0 as unset)', async () => {
+    const res = await request(app)
+      .put(`/api/v1/platform/products/${product._id}/print-areas`)
+      .set('Authorization', `Bearer ${catalogToken}`)
+      .send({
+        printAreas: [
+          {
+            key: 'front',
+            label: 'Front',
+            widthIn: 0,
+            heightIn: 0,
+            box: { xPct: 25, yPct: 30, widthPct: 50, heightPct: 40 },
+          },
+        ],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.printAreas[0].widthIn).toBeGreaterThan(0);
+  });
+
   it('forbids a tenant role from writing print areas (403)', async () => {
     const res = await request(app)
       .put(`/api/v1/platform/products/${product._id}/print-areas`)

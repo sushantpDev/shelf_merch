@@ -14,11 +14,6 @@ export const EFFECTIVE_H = CANVAS_HEIGHT - 2 * CANVAS_PADDING; // 520
 
 /** Flat garment / product shot that fills most of the mockup frame. */
 export const DEFAULT_PHYSICAL = { width: 20, height: 24, length: 18 } as const;
-/**
- * Lifestyle / model photos: the full image is much wider than the shirt.
- * Use this so a 4–5″ chest print looks realistic on-body.
- */
-export const LIFESTYLE_PHYSICAL = { width: 48, height: 60, length: 36 } as const;
 /** Typical adult tee chest width — used for on-canvas scale guidance. */
 export const TYPICAL_CHEST_WIDTH_IN = 18;
 export const DEFAULT_DPI = 300;

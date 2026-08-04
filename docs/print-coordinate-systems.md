@@ -31,14 +31,9 @@ exportW = round(widthIn × dpi)
 exportH = round(heightIn × dpi)
 ```
 
-**Mockup W/H ≠ print area.** Set Mockup W/H to the real-world size of the **entire photo** (including background), not the shirt alone.
+**Mockup W/H ≠ print area.** Set Mockup W/H to the real-world size of the **flat garment mockup** (default **20×24**), not the print plate.
 
-| Mockup type | Typical Mockup W×H | Notes |
-|-------------|-------------------|--------|
-| Flat garment filling the frame | 20×24 | Default |
-| Lifestyle / model photo | ~48×60 | Shirt is only part of the image; use the **Lifestyle** preset or 4.5″ looks huge |
-
-A 4.5″ print on an ~18″ adult chest should look ~25% of chest width. If it overflows the shoulder, raise Mockup W.
+Prefer flat measured garment shots that fill the frame. A 4.5″ print on an ~18″ adult chest should look ~25% of chest width.
 
 Module: `apps/web/src/lib/printCoords.ts` (web) and `apps/api/src/lib/printCoords.js` (API) — keep in sync.
 

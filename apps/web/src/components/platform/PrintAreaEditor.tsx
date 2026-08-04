@@ -9,7 +9,6 @@ import {
   CANVAS_WIDTH,
   DEFAULT_DPI,
   DEFAULT_PHYSICAL,
-  LIFESTYLE_PHYSICAL,
   TYPICAL_CHEST_WIDTH_IN,
   defaultCenteredPlaceholder,
   inchesToPrintPixels,
@@ -360,8 +359,9 @@ export function PrintAreaEditor({
       <div style={{ flex: "1 1 360px", minWidth: 320 }}>
         <p className="muted" style={{ fontSize: 12, margin: "0 0 8px" }}>
           <strong style={{ color: "var(--ink)", fontWeight: 600 }}>Mockup image size (inches)</strong>{" "}
-          is the real-world size of the <em>entire photo</em> (including background), not the print
-          plate. Print areas are mapped as a fraction of that width.
+          is the real-world size of the <em>flat garment mockup</em> (default{" "}
+          {DEFAULT_PHYSICAL.width}×{DEFAULT_PHYSICAL.height}″), not the print plate. Print areas are
+          mapped as a fraction of that width.
         </p>
         <div className="row" style={{ gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
           <div className="field" style={{ flex: "1 1 90px" }}>
@@ -443,19 +443,6 @@ export function PrintAreaEditor({
             >
               Flat mockup {DEFAULT_PHYSICAL.width}×{DEFAULT_PHYSICAL.height}
             </button>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() =>
-                onPhysicalDimensionsChange({
-                  width: LIFESTYLE_PHYSICAL.width,
-                  height: LIFESTYLE_PHYSICAL.height,
-                  length: LIFESTYLE_PHYSICAL.length,
-                })
-              }
-            >
-              Lifestyle / model {LIFESTYLE_PHYSICAL.width}×{LIFESTYLE_PHYSICAL.height}
-            </button>
           </div>
         )}
         {areaIn && (
@@ -463,34 +450,33 @@ export function PrintAreaEditor({
             This {areaIn.widthIn.toFixed(2)}″ area is{" "}
             <strong style={{ color: "var(--ink)" }}>{printPctOfMockup.toFixed(0)}%</strong> of mockup
             width ({phys.width}″). On a ~{TYPICAL_CHEST_WIDTH_IN}″ adult chest it should look about{" "}
-            {expectedPctOfChest.toFixed(0)}% of the shirt — not of the whole photo.
+            {expectedPctOfChest.toFixed(0)}% of the shirt.
           </p>
         )}
         {frameLooksLikePrintSize && (
           <p style={{ fontSize: 12, color: "#b45309", margin: "0 0 10px" }}>
             Mockup size matches this print area, so {areaIn!.widthIn}″ fills the whole image. Set
-            Mockup W/H to the full photo/garment size.
+            Mockup W/H to the flat garment size ({DEFAULT_PHYSICAL.width}×{DEFAULT_PHYSICAL.height}
+            ″).
           </p>
         )}
         {looksOversizedOnGarment && onPhysicalDimensionsChange && (
           <p style={{ fontSize: 12, color: "#b45309", margin: "0 0 10px" }}>
-            {areaIn!.widthIn}″ looks too large on this photo — Mockup W ({phys.width}″) is probably
-            the shirt width, but inches map across the <em>entire</em> image (including background).
-            For model shots, raise Mockup W/H (try {LIFESTYLE_PHYSICAL.width}×
-            {LIFESTYLE_PHYSICAL.height}). Export size stays {areaIn!.widthIn}″ × DPI either way.{" "}
+            {areaIn!.widthIn}″ looks large relative to Mockup W ({phys.width}″). Use a flat measured
+            mockup and set Mockup W/H to {DEFAULT_PHYSICAL.width}×{DEFAULT_PHYSICAL.height}.{" "}
             <button
               type="button"
               className="btn btn-ghost btn-sm"
               style={{ marginLeft: 4, verticalAlign: "baseline" }}
               onClick={() =>
                 onPhysicalDimensionsChange({
-                  width: LIFESTYLE_PHYSICAL.width,
-                  height: LIFESTYLE_PHYSICAL.height,
-                  length: LIFESTYLE_PHYSICAL.length,
+                  width: DEFAULT_PHYSICAL.width,
+                  height: DEFAULT_PHYSICAL.height,
+                  length: DEFAULT_PHYSICAL.length,
                 })
               }
             >
-              Use lifestyle {LIFESTYLE_PHYSICAL.width}×{LIFESTYLE_PHYSICAL.height}
+              Use flat {DEFAULT_PHYSICAL.width}×{DEFAULT_PHYSICAL.height}
             </button>
           </p>
         )}

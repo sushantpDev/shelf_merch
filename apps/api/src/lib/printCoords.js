@@ -10,7 +10,6 @@ export const EFFECTIVE_W = CANVAS_WIDTH - 2 * CANVAS_PADDING;
 export const EFFECTIVE_H = CANVAS_HEIGHT - 2 * CANVAS_PADDING;
 
 export const DEFAULT_PHYSICAL = { width: 20, height: 24, length: 18 };
-export const LIFESTYLE_PHYSICAL = { width: 48, height: 60, length: 36 };
 export const TYPICAL_CHEST_WIDTH_IN = 18;
 export const DEFAULT_DPI = 300;
 export const DEFAULT_PLACEHOLDER_IN = 6;
