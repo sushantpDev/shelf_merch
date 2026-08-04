@@ -9,6 +9,7 @@ import {
   peekShopCelebration,
 } from "../shopCelebration";
 import type { UiCollection, UiProduct, UiShop } from "../model";
+import { shopStorefrontHref } from "@/lib/shopRedeemUrl";
 
 const MANAGER_TABS: ShopTab[] = ["Branded Swag", "Shop Catalog", "Sent Gifts", "Reports"];
 
@@ -136,6 +137,9 @@ export function useShopDetailController(): ShopDetailVm {
     onSendPoints,
     onStartDesigning: () =>
       canDesignSwag && shop && navigate(`/app/swag/new?shop=${encodeURIComponent(shop.id)}`),
-    onViewLiveShop: () => shop && window.open(`/shop/${shop.id}`, "_blank", "noopener"),
+    onViewLiveShop: () => {
+      if (!shop) return;
+      window.open(shopStorefrontHref(shop), "_blank", "noopener");
+    },
   };
 }
