@@ -299,7 +299,7 @@ export function RecipientExperience({
       <p className="muted">
         {shipMode
           ? "These gifts ship directly to recipients. Preview the tracking page and shipping email they receive."
-          : "Craft the message and see exactly what recipients get — on the landing page and in their invitation email."}
+          : "Craft the message and see exactly what recipients get on the landing page and in their invitation email."}
       </p>
       </div>
       <div className="recipient-exp__grid">

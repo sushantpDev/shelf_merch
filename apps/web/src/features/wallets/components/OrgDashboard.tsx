@@ -228,7 +228,7 @@ export function OrgDashboard({
               {inr(total)}
             </div>
             <div className="mut3" style={{ fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
-              Total organization budget after funding and spend
+              Total organization budget from funding
             </div>
           </div>
           <div style={{ width: 1, background: "var(--line)" }} />

@@ -95,10 +95,11 @@ export function Step2Departments({ state, dispatch }: StepProps) {
             <thead>
               <tr>
                 <th className="dept-picker-th-check" aria-label="Select" />
-                <th>Department</th>
-                <th>Users</th>
+                <th className="dept-picker-th-name">Department</th>
+                <th className="dept-picker-th-users">Users</th>
                 {isEdit ? <th className="dept-picker-th-num">Current budget</th> : null}
                 <th className="dept-picker-th-actions" aria-label="Actions" />
+                <th className="dept-picker-th-spacer" aria-hidden />
               </tr>
             </thead>
             <tbody>
@@ -121,7 +122,7 @@ export function Step2Departments({ state, dispatch }: StepProps) {
                         onChange={() => handleToggleSelect(d)}
                       />
                     </td>
-                    <td>
+                    <td className="dept-picker-td-name">
                       <div className="dept-picker-name">
                         <span
                           className="dept-dot dept-dot--lg"
@@ -134,7 +135,7 @@ export function Step2Departments({ state, dispatch }: StepProps) {
                         </div>
                       </div>
                     </td>
-                    <td className="dept-picker-td-muted">{d.users}</td>
+                    <td className="dept-picker-td-users dept-picker-td-muted">{d.users}</td>
                     {isEdit ? (
                       <td className="dept-picker-td-num num">
                         {currentBudget > 0 ? inr(currentBudget) : "—"}
@@ -158,6 +159,7 @@ export function Step2Departments({ state, dispatch }: StepProps) {
                         <Trash2 size={15} />
                       </button>
                     </td>
+                    <td className="dept-picker-td-spacer" aria-hidden />
                   </tr>
                 );
               })}
