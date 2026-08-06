@@ -384,6 +384,9 @@ export async function login({ email, password, ip, userAgent }) {
     if (tenant?.status === 'archived') {
       throw new UnauthorizedError('This workspace has been archived — contact support');
     }
+    if (tenant?.status === 'suspended') {
+      throw new UnauthorizedError('This workspace has been suspended — contact support');
+    }
   }
 
   const roleAssignment = await getPrimaryRoleAssignment(user._id);

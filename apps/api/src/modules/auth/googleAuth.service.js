@@ -106,6 +106,9 @@ async function loginExistingGoogleUser(user, { ip, userAgent }) {
     if (tenant?.status === 'archived') {
       throw new ApiError(401, 'This workspace has been archived — contact support', 'TENANT_ARCHIVED');
     }
+    if (tenant?.status === 'suspended') {
+      throw new ApiError(401, 'This workspace has been suspended — contact support', 'TENANT_SUSPENDED');
+    }
   }
   const roleAssignment = await getPrimaryRoleAssignment(user._id);
   user.lastLoginAt = new Date();

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown } from "lucide-react";
 import { LoadingState } from "@/components/LoadingState";
@@ -68,6 +68,7 @@ export function PlatformModal({
   onClose,
   children,
   size = "md",
+  closeDisabled = false,
 }: {
   title: string;
   subtitle?: string;
@@ -75,11 +76,55 @@ export function PlatformModal({
   children: ReactNode;
   /** md ≈ 460px (default); lg ≈ 1140px for denser manage UIs */
   size?: "md" | "lg";
+  /** When true, Escape and backdrop click do not close (e.g. in-flight request). */
+  closeDisabled?: boolean;
 }) {
   const maxWidth = size === "lg" ? 1140 : 460;
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current;
+    const focusable = panel?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    focusable?.focus();
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !closeDisabled) {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !panel) return;
+      const nodes = panel.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (!nodes.length) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      previouslyFocused?.focus?.();
+    };
+  }, [onClose, closeDisabled]);
+
   return (
     <div
-      onClick={onClose}
+      role="presentation"
+      onClick={() => {
+        if (!closeDisabled) onClose();
+      }}
       style={{
         position: "fixed",
         inset: 0,
@@ -91,6 +136,10 @@ export function PlatformModal({
       }}
     >
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="platform-modal-title"
         onClick={(e) => e.stopPropagation()}
         className="card"
         style={{
@@ -112,8 +161,16 @@ export function PlatformModal({
             flex: "none",
           }}
         >
-          <h3 style={{ fontSize: 18 }}>{title}</h3>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
+          <h3 id="platform-modal-title" style={{ fontSize: 18 }}>
+            {title}
+          </h3>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={onClose}
+            disabled={closeDisabled}
+            aria-label="Close"
+          >
             ✕
           </button>
         </div>
@@ -168,19 +225,23 @@ export function PlatformError({ message }: { message: string }) {
 }
 
 export function StatusTag({ status }: { status: string }) {
-  const s = status.replace(/_/g, " ");
+  const label = status
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
   const cls =
     status === "active" || status === "delivered" || status === "completed"
       ? "tag-live"
       : status === "draft" || status === "trial"
         ? "tag-draft"
-        : status === "open" || status === "in_progress"
-          ? "tag-proc"
-          : "tag-warn";
+        : status === "suspended" || status === "archived"
+          ? "tag-warn"
+          : status === "open" || status === "in_progress"
+            ? "tag-proc"
+            : "tag-warn";
   return (
     <span className={`tag ${cls}`}>
       <span className="dot" />
-      {s}
+      {label}
     </span>
   );
 }

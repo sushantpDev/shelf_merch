@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router";
 import { fetchPlatformOrder, fetchPlatformOrders } from "@/services/platform-api";
 import { useLoad } from "../../useLoad";
 
@@ -16,9 +17,11 @@ export {
   type ProductVariant,
 } from "@/services/platform-api";
 
-/** Cross-tenant order list. */
+/** Cross-tenant order list (optional ?tenantId= filter from URL). */
 export function usePlatformOrders() {
-  return useLoad(() => fetchPlatformOrders({ limit: 100 }), []);
+  const [searchParams] = useSearchParams();
+  const tenantId = searchParams.get("tenantId") || undefined;
+  return useLoad(() => fetchPlatformOrders({ limit: 100, tenantId }), [tenantId]);
 }
 
 /** Single platform order; bump `reloadKey` to refetch after a mutation. */

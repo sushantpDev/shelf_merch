@@ -22,25 +22,125 @@ export async function fetchPlatformDashboard() {
   }>("/platform/dashboard");
 }
 
-export async function fetchPlatformTenants(status?: string) {
-  const q = status ? `?status=${encodeURIComponent(status)}` : "";
-  return apiFetch<
-    Array<{
-      _id: string;
-      name: string;
-      slug: string;
-      status: string;
-      plan?: string;
-      walletBalanceInr: number;
-      openOrders: number;
-    }>
-  >(`/platform/tenants${q}`);
+export type TenantPrimaryAdmin = {
+  id: string;
+  name: string;
+  email: string;
+  status?: string;
+} | null;
+
+export type PlatformTenantRow = {
+  _id: string;
+  name: string;
+  slug: string;
+  status: string;
+  logoUrl?: string;
+  currency?: string;
+  gstin?: string;
+  billingAddress?: Record<string, string>;
+  createdAt?: string;
+  updatedAt?: string;
+  /** @deprecated Phase 1 has no subscription plans */
+  plan?: string;
+  walletBalanceInr: number;
+  openOrders: number;
+  userCount: number;
+  lastActiveAt: string | null;
+  primaryAdmin: TenantPrimaryAdmin;
+};
+
+export type TenantListParams = {
+  status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+  sort?: "name" | "createdAt" | "lastActiveAt";
+  order?: "asc" | "desc";
+};
+
+export async function fetchPlatformTenants(params: TenantListParams = {}) {
+  const search = new URLSearchParams();
+  if (params.status) search.set("status", params.status);
+  if (params.search) search.set("search", params.search);
+  if (params.page) search.set("page", String(params.page));
+  if (params.limit) search.set("limit", String(params.limit));
+  if (params.sort) search.set("sort", params.sort);
+  if (params.order) search.set("order", params.order);
+  const q = search.toString();
+  const res = await apiFetch<{
+    items: PlatformTenantRow[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }>(`/platform/tenants${q ? `?${q}` : ""}`);
+  return {
+    items: res.items ?? [],
+    total: res.pagination?.total ?? 0,
+    page: res.pagination?.page ?? 1,
+    limit: res.pagination?.limit ?? 20,
+    totalPages: res.pagination?.totalPages ?? 1,
+  };
 }
 
-export async function fetchPlatformOrders(params?: { status?: string; limit?: number }) {
+export function fetchPlatformTenant(id: string) {
+  return apiFetch<PlatformTenantRow>(`/platform/tenants/${id}`);
+}
+
+export function fetchTenantOverview(id: string) {
+  return apiFetch<{
+    tenant: PlatformTenantRow;
+    primaryAdmin: TenantPrimaryAdmin;
+    userCount: number;
+    lastActiveAt: string | null;
+    wallets: Array<{ _id: string; name: string; balance: number; status?: string }>;
+    walletBalanceInr: number;
+    openOrders: number;
+    activeCampaigns: number;
+    unpaidInvoices: unknown[];
+    outstandingInr: number;
+    openTickets: number;
+  }>(`/platform/tenants/${id}/overview`);
+}
+
+export function fetchTenantUsers(id: string) {
+  return apiFetch<
+    Array<{
+      id: string;
+      name: string;
+      email: string;
+      status: string;
+      role: string | null;
+      lastLoginAt?: string | null;
+    }>
+  >(`/platform/tenants/${id}/users`);
+}
+
+export function updatePlatformTenant(
+  id: string,
+  body: Record<string, unknown> & { confirmSlugChange?: boolean },
+) {
+  return apiFetch(`/platform/tenants/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export function setPrimaryAdmin(id: string, userId: string, reason?: string) {
+  return apiFetch(`/platform/tenants/${id}/primary-admin`, {
+    method: "PATCH",
+    body: JSON.stringify({ userId, ...(reason ? { reason } : {}) }),
+  });
+}
+
+export async function fetchPlatformOrders(params?: {
+  status?: string;
+  limit?: number;
+  tenantId?: string;
+  page?: number;
+}) {
   const search = new URLSearchParams();
   if (params?.status) search.set("status", params.status);
   if (params?.limit) search.set("limit", String(params.limit));
+  if (params?.page) search.set("page", String(params.page));
+  if (params?.tenantId) search.set("tenantId", params.tenantId);
   const q = search.toString();
   return apiFetch<Paginated<Record<string, unknown>>>(`/platform/orders${q ? `?${q}` : ""}`);
 }
@@ -384,8 +484,10 @@ export async function fetchPlatformTeam() {
   }));
 }
 
-// ---- Tenant lifecycle controls ----
-export const TENANT_STATUSES = ["active", "suspended", "trial", "archived"] as const;
+// ---- Tenant lifecycle controls (Phase 1: no subscription plans) ----
+/** Operational statuses selectable in Phase 1 UI. Legacy `trial` may still appear in data. */
+export const TENANT_STATUSES = ["active", "suspended", "archived"] as const;
+/** @deprecated Phase 1 has no subscription plans — do not surface in UI. */
 export const TENANT_PLANS = ["trial", "starter", "growth", "enterprise"] as const;
 
 export function setTenantStatus(id: string, status: string, reason?: string) {
@@ -395,6 +497,7 @@ export function setTenantStatus(id: string, status: string, reason?: string) {
   });
 }
 
+/** @deprecated Phase 1 has no subscription plans. */
 export function setTenantPlan(id: string, plan: string) {
   return apiFetch(`/platform/tenants/${id}/plan`, {
     method: "PATCH",
@@ -439,8 +542,15 @@ export async function fetchPlatformSettings() {
   return apiFetch<Record<string, unknown>>("/platform/settings");
 }
 
-export async function fetchAuditLogs(limit = 50) {
-  return apiFetch<Paginated<Record<string, unknown>>>(`/platform/audit-logs?limit=${limit}`);
+export async function fetchAuditLogs(
+  limit = 50,
+  params?: { tenantId?: string; page?: number },
+) {
+  const search = new URLSearchParams();
+  search.set("limit", String(limit));
+  if (params?.tenantId) search.set("tenantId", params.tenantId);
+  if (params?.page) search.set("page", String(params.page));
+  return apiFetch<Paginated<Record<string, unknown>>>(`/platform/audit-logs?${search}`);
 }
 
 // ---- Catalog product management (platform_catalog_admin / super admin) ----

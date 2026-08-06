@@ -1,4 +1,5 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Link } from "react-router";
 import {
   DataTable,
   inr,
@@ -8,63 +9,441 @@ import {
   StatusTag,
 } from "../../../platform-ui";
 import type { TenantsVm } from "../controllers/useTenantsController";
-import type { TenantRow } from "../model";
-import { TenantManageModal } from "./TenantManageModal";
+import {
+  formatRelativeTime,
+  formatTenantStatus,
+  PAGE_SIZES,
+  STATUS_FILTERS,
+  type TenantRow,
+} from "../model";
+import { TenantStatusModal } from "./TenantStatusModal";
 
-/** All workspaces on the platform. */
-export function TenantsView({
-  data,
-  error,
-  loading,
+function TenantActionsMenu({
+  row,
   canWrite,
-  managing,
   onManage,
-  onCloseManage,
-  onTenantsChanged,
-}: TenantsVm) {
+}: {
+  row: TenantRow;
+  canWrite: boolean;
+  onManage: (row: TenantRow) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const isArchived = row.status === "archived";
+
+  return (
+    <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        Actions
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="card"
+          style={{
+            position: "absolute",
+            right: 0,
+            top: "100%",
+            zIndex: 20,
+            minWidth: 180,
+            padding: 6,
+            display: "grid",
+            gap: 2,
+          }}
+        >
+          <Link
+            role="menuitem"
+            to={`/platform/tenants/${row._id}`}
+            className="btn btn-ghost btn-sm"
+            style={{ justifyContent: "flex-start" }}
+            onClick={() => setOpen(false)}
+          >
+            Open tenant
+          </Link>
+          {canWrite && (
+            <button
+              type="button"
+              role="menuitem"
+              className="btn btn-ghost btn-sm"
+              style={{ justifyContent: "flex-start" }}
+              onClick={() => {
+                setOpen(false);
+                onManage(row);
+              }}
+            >
+              {isArchived ? "Restore…" : "Manage status"}
+            </button>
+          )}
+          <Link
+            role="menuitem"
+            to={`/platform/tenants/${row._id}?tab=users`}
+            className="btn btn-ghost btn-sm"
+            style={{ justifyContent: "flex-start" }}
+            onClick={() => setOpen(false)}
+          >
+            View users
+          </Link>
+          <Link
+            role="menuitem"
+            to={`/platform/orders?tenantId=${row._id}`}
+            className="btn btn-ghost btn-sm"
+            style={{ justifyContent: "flex-start" }}
+            onClick={() => setOpen(false)}
+          >
+            View orders
+          </Link>
+          <Link
+            role="menuitem"
+            to={`/platform/tenants/${row._id}?tab=audit`}
+            className="btn btn-ghost btn-sm"
+            style={{ justifyContent: "flex-start" }}
+            onClick={() => setOpen(false)}
+          >
+            View audit logs
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Phase 1 operational tenant directory. */
+export function TenantsView(vm: TenantsVm) {
+  const {
+    data,
+    error,
+    loading,
+    params,
+    searchDraft,
+    canWrite,
+    managing,
+    hasActiveFilters,
+    onSearchDraft,
+    onSearchSubmit,
+    onStatusFilter,
+    onSort,
+    onOrder,
+    onPage,
+    onLimit,
+    onClearFilters,
+    onManage,
+    onCloseManage,
+    onTenantsChanged,
+    onRetry,
+  } = vm;
+
   const columns: {
     key: string;
     label: string;
     render?: (row: Record<string, unknown>) => ReactNode;
   }[] = [
-    { key: "name", label: "Tenant" },
-    { key: "slug", label: "Slug" },
-    { key: "status", label: "Status", render: (r) => <StatusTag status={String(r.status)} /> },
-    { key: "plan", label: "Plan", render: (r) => String(r.plan ?? "—") },
-    { key: "walletBalanceInr", label: "Wallet", render: (r) => inr(Number(r.walletBalanceInr)) },
-    { key: "openOrders", label: "Open orders" },
+    {
+      key: "name",
+      label: "Tenant",
+      render: (r) => {
+        const row = r as unknown as TenantRow;
+        return (
+          <div className="row" style={{ gap: 10, alignItems: "center" }}>
+            {row.logoUrl ? (
+              <img
+                src={row.logoUrl}
+                alt=""
+                width={28}
+                height={28}
+                style={{ borderRadius: 6, objectFit: "cover", background: "var(--gray-100)" }}
+              />
+            ) : (
+              <div
+                aria-hidden
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 6,
+                  background: "var(--gray-100)",
+                  display: "grid",
+                  placeItems: "center",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "var(--muted)",
+                }}
+              >
+                {row.name.slice(0, 1).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <Link
+                to={`/platform/tenants/${row._id}`}
+                style={{ fontWeight: 600, color: "inherit", textDecoration: "none" }}
+              >
+                {row.name}
+              </Link>
+              <div className="muted" style={{ fontSize: 12 }}>
+                @{row.slug}
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (r) => <StatusTag status={String(r.status)} />,
+    },
+    {
+      key: "primaryAdmin",
+      label: "Primary Admin",
+      render: (r) => {
+        const admin = (r as unknown as TenantRow).primaryAdmin;
+        if (!admin) return <span className="muted">Not assigned</span>;
+        return (
+          <div>
+            <div>{admin.name || admin.email}</div>
+            {admin.name ? (
+              <div className="muted" style={{ fontSize: 12 }}>
+                {admin.email}
+              </div>
+            ) : null}
+          </div>
+        );
+      },
+    },
+    {
+      key: "userCount",
+      label: "Users",
+      render: (r) => (
+        <span style={{ display: "block", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+          {Number(r.userCount ?? 0)}
+        </span>
+      ),
+    },
+    {
+      key: "walletBalanceInr",
+      label: "Wallet",
+      render: (r) => (
+        <span style={{ display: "block", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+          {inr(Number(r.walletBalanceInr))}
+        </span>
+      ),
+    },
+    {
+      key: "openOrders",
+      label: "Open Orders",
+      render: (r) => {
+        const count = Number(r.openOrders ?? 0);
+        return (
+          <Link
+            to={`/platform/orders?tenantId=${String(r._id)}`}
+            style={{ display: "block", textAlign: "right", fontVariantNumeric: "tabular-nums" }}
+          >
+            {count}
+          </Link>
+        );
+      },
+    },
+    {
+      key: "lastActiveAt",
+      label: "Last Active",
+      render: (r) => (
+        <span className="muted" style={{ fontSize: 13 }}>
+          {formatRelativeTime((r as { lastActiveAt?: string | null }).lastActiveAt)}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      render: (r) => (
+        <TenantActionsMenu
+          row={r as unknown as TenantRow}
+          canWrite={canWrite}
+          onManage={onManage}
+        />
+      ),
+    },
   ];
 
-  if (canWrite) {
-    columns.push({
-      key: "manage",
-      label: "",
-      render: (r) => (
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={() => onManage(r as unknown as TenantRow)}
-        >
-          Manage
-        </button>
-      ),
-    });
-  }
+  const total = data?.total ?? 0;
+  const page = data?.page ?? params.page;
+  const limit = data?.limit ?? params.limit;
+  const totalPages = data?.totalPages ?? 1;
+  const emptyMessage = hasActiveFilters ? "No tenants match your filters." : "No tenants yet.";
 
   return (
     <>
-      <PlatformPageHeader title="Tenants" subtitle="All workspaces on the platform." />
-      {loading && <PlatformLoading />}
-      {error && <PlatformError message={error} />}
-      {data && (
-        <DataTable
-          empty="No tenants yet."
-          rows={data as unknown as Record<string, unknown>[]}
-          columns={columns}
-        />
+      <PlatformPageHeader
+        title="Tenants"
+        subtitle="Operational directory of workspaces on the platform."
+      />
+
+      <div
+        className="card"
+        style={{
+          padding: 12,
+          marginBottom: 14,
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 10,
+          alignItems: "center",
+        }}
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSearchSubmit();
+          }}
+          style={{ display: "flex", gap: 8, flex: "1 1 240px" }}
+        >
+          <input
+            className="inp"
+            placeholder="Search name, slug, or admin email"
+            value={searchDraft}
+            onChange={(e) => onSearchDraft(e.target.value)}
+            aria-label="Search tenants"
+          />
+          <button type="submit" className="btn btn-soft btn-sm">
+            Search
+          </button>
+        </form>
+
+        <select
+          className="inp"
+          style={{ width: "auto", minWidth: 160 }}
+          value={params.status ?? ""}
+          onChange={(e) => onStatusFilter(e.target.value)}
+          aria-label="Filter by status"
+        >
+          {STATUS_FILTERS.map((f) => (
+            <option key={f.value || "default"} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+
+        <select
+          className="inp"
+          style={{ width: "auto" }}
+          value={params.sort}
+          onChange={(e) => onSort(e.target.value)}
+          aria-label="Sort by"
+        >
+          <option value="name">Sort: Name</option>
+          <option value="createdAt">Sort: Created</option>
+          <option value="lastActiveAt">Sort: Last active</option>
+        </select>
+
+        <select
+          className="inp"
+          style={{ width: "auto" }}
+          value={params.order}
+          onChange={(e) => onOrder(e.target.value)}
+          aria-label="Sort order"
+        >
+          <option value="asc">Asc</option>
+          <option value="desc">Desc</option>
+        </select>
+
+        <select
+          className="inp"
+          style={{ width: "auto" }}
+          value={String(params.limit)}
+          onChange={(e) => onLimit(Number(e.target.value))}
+          aria-label="Page size"
+        >
+          {PAGE_SIZES.map((n) => (
+            <option key={n} value={n}>
+              {n} / page
+            </option>
+          ))}
+        </select>
+
+        {hasActiveFilters && (
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onClearFilters}>
+            Clear filters
+          </button>
+        )}
+      </div>
+
+      {loading && <PlatformLoading message="Loading tenants…" />}
+      {error && (
+        <div className="card" style={{ padding: 20 }}>
+          <PlatformError message={error} />
+          <button type="button" className="btn btn-soft btn-sm" style={{ marginTop: 10 }} onClick={onRetry}>
+            Retry
+          </button>
+        </div>
       )}
+      {!loading && !error && data && (
+        <>
+          <DataTable
+            empty={emptyMessage}
+            rows={data.items as unknown as Record<string, unknown>[]}
+            columns={columns}
+          />
+          {total > 0 && (
+            <div
+              className="row"
+              style={{
+                marginTop: 12,
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 8,
+              }}
+            >
+              <span className="muted" style={{ fontSize: 13 }}>
+                {total} tenant{total === 1 ? "" : "s"}
+                {params.status ? ` · ${formatTenantStatus(params.status)}` : ""}
+              </span>
+              <div className="row" style={{ gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={page <= 1}
+                  onClick={() => onPage(page - 1)}
+                >
+                  Previous
+                </button>
+                <span className="muted" style={{ fontSize: 13, alignSelf: "center" }}>
+                  Page {page} of {Math.max(1, totalPages)}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={page >= totalPages}
+                  onClick={() => onPage(page + 1)}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
       {managing && (
-        <TenantManageModal row={managing} onClose={onCloseManage} onChanged={onTenantsChanged} />
+        <TenantStatusModal
+          row={managing}
+          onClose={onCloseManage}
+          onChanged={() => {
+            onTenantsChanged();
+          }}
+        />
       )}
     </>
   );

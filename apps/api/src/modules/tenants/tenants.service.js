@@ -9,8 +9,16 @@ import { Invoice } from '../invoices/invoice.model.js';
 import { SupportTicket } from '../support/supportTicket.model.js';
 import { Contact } from '../contacts/contact.model.js';
 import { inviteUser } from '../users/users.service.js';
+import { listUsers } from '../users/users.service.js';
 import { signImpersonationAccessToken } from '../auth/auth.service.js';
-import { ApiError, ConflictError, ForbiddenError, NotFoundError } from '../../utils/errors.js';
+import { getPagination, paginatedResponse } from '../../utils/pagination.js';
+import {
+  ApiError,
+  ConflictError,
+  ForbiddenError,
+  InvalidTransitionError,
+  NotFoundError,
+} from '../../utils/errors.js';
 
 const OPEN_ORDER_STATUSES = [
   'created',
@@ -23,6 +31,33 @@ const OPEN_ORDER_STATUSES = [
   'shipped',
 ];
 
+/** Allowed Phase 1 status transitions. Legacy `trial` may activate/suspend/archive. */
+const ALLOWED_TRANSITIONS = {
+  trial: ['active', 'suspended', 'archived'],
+  active: ['suspended', 'archived'],
+  suspended: ['active', 'archived'],
+  archived: ['active'],
+};
+
+function assertTransition(from, to) {
+  const allowed = ALLOWED_TRANSITIONS[from] ?? [];
+  if (!allowed.includes(to)) {
+    throw new InvalidTransitionError('Tenant', from, to);
+  }
+}
+
+function requireReason(reason, action) {
+  if (!reason || !String(reason).trim()) {
+    throw new ApiError(400, `A reason is required to ${action} a tenant`, 'REASON_REQUIRED');
+  }
+  return String(reason).trim();
+}
+
+function serializePrimaryAdmin(user) {
+  if (!user) return null;
+  return { id: String(user._id), name: user.name, email: user.email, status: user.status };
+}
+
 /** Platform-only: create tenant + first company_admin (invited). */
 export async function createTenant({ name, slug, adminName, adminEmail, gstin = '', currency = 'INR' }) {
   const existing = await Tenant.findOne({ slug: slug.toLowerCase() });
@@ -32,7 +67,10 @@ export async function createTenant({ name, slug, adminName, adminEmail, gstin = 
   try {
     let result;
     await session.withTransaction(async () => {
-      const [tenant] = await Tenant.create([{ name, slug, gstin, currency }], { session });
+      const [tenant] = await Tenant.create(
+        [{ name, slug, gstin, currency, status: 'active' }],
+        { session },
+      );
       const { user, inviteToken } = await inviteUser(
         {
           tenantId: tenant._id,
@@ -43,6 +81,8 @@ export async function createTenant({ name, slug, adminName, adminEmail, gstin = 
         },
         session,
       );
+      tenant.primaryAdminUserId = user._id;
+      await tenant.save({ session });
       result = { tenant, admin: user, inviteToken };
     });
     return result;
@@ -57,10 +97,15 @@ export async function getTenant(tenantId) {
   return tenant;
 }
 
-/** Resolve workspace owner from wallet ownerUserId, else earliest company_admin. */
+/** Resolve primary admin: explicit field → wallet owner → earliest company_admin. */
 export async function resolveWorkspaceOwner(tenantId) {
-  const wallets = await Wallet.find({ tenantId }).sort({ createdAt: 1 }).select('ownerUserId').lean();
-  let ownerUserId = wallets.find((w) => w.ownerUserId)?.ownerUserId ?? null;
+  const tenant = await Tenant.findOne({ _id: tenantId }).select('primaryAdminUserId').lean();
+  let ownerUserId = tenant?.primaryAdminUserId ?? null;
+
+  if (!ownerUserId) {
+    const wallets = await Wallet.find({ tenantId }).sort({ createdAt: 1 }).select('ownerUserId').lean();
+    ownerUserId = wallets.find((w) => w.ownerUserId)?.ownerUserId ?? null;
+  }
 
   if (!ownerUserId) {
     const assignment = await RoleAssignment.findOne({ tenantId, role: 'company_admin' })
@@ -81,7 +126,7 @@ export async function getTenantWithOwner(tenantId) {
   const tenant = await getTenant(tenantId);
   const owner = await resolveWorkspaceOwner(tenantId);
   const obj = tenant.toObject ? tenant.toObject() : tenant;
-  return { ...obj, owner };
+  return { ...obj, owner, primaryAdmin: owner };
 }
 
 /** Transfer workspace ownership to another active company_admin. */
@@ -122,6 +167,7 @@ export async function transferOwnership({ tenantId, actorUserId, newOwnerUserId 
   try {
     let result;
     await session.withTransaction(async () => {
+      await Tenant.updateOne({ _id: tenantId }, { primaryAdminUserId: newOwnerUserId }).session(session);
       await Wallet.updateMany({ tenantId }, { ownerUserId: newOwnerUserId }).session(session);
 
       await Contact.updateMany(
@@ -152,15 +198,122 @@ export async function updateTenant(tenantId, patch) {
   return { before: before.toObject(), after };
 }
 
-/** §3.4 list — status, plan, wallet balance, and open orders in one call. */
-export async function listTenants({ status } = {}) {
-  const filter = status ? { status } : {};
-  const tenants = await Tenant.find(filter).sort({ createdAt: -1 }).lean();
+/** Platform settings update with slug uniqueness + confirmation. */
+export async function updatePlatformTenant(tenantId, patch) {
+  const tenant = await getTenant(tenantId);
+  const before = tenant.toObject();
+  const { confirmSlugChange, ...fields } = patch;
+
+  if (fields.slug && fields.slug.toLowerCase() !== tenant.slug) {
+    if (!confirmSlugChange) {
+      throw new ApiError(
+        400,
+        'Changing the slug may affect tenant URLs — set confirmSlugChange to proceed',
+        'SLUG_CONFIRMATION_REQUIRED',
+      );
+    }
+    const clash = await Tenant.findOne({ slug: fields.slug.toLowerCase(), _id: { $ne: tenantId } });
+    if (clash) throw new ConflictError(`Slug "${fields.slug}" is already taken`);
+    tenant.slug = fields.slug.toLowerCase();
+  }
+
+  if (fields.name !== undefined) tenant.name = fields.name;
+  if (fields.logoUrl !== undefined) tenant.logoUrl = fields.logoUrl;
+  if (fields.currency !== undefined) tenant.currency = fields.currency;
+  if (fields.gstin !== undefined) tenant.gstin = fields.gstin;
+  if (fields.billingAddress !== undefined) {
+    tenant.billingAddress = { ...tenant.billingAddress?.toObject?.() ?? tenant.billingAddress ?? {}, ...fields.billingAddress };
+  }
+
+  await tenant.save();
+  return { before, after: tenant };
+}
+
+/**
+ * Assign primary tenant admin. Must be an existing active member of the tenant.
+ * Platform admins and tenant admins remain separate role scopes.
+ */
+export async function setPrimaryAdmin(tenantId, userId, { reason } = {}) {
+  const tenant = await getTenant(tenantId);
+  const user = await User.findOne({ _id: userId, tenantId, status: 'active' });
+  if (!user) {
+    throw new ApiError(422, 'Primary admin must be an existing active tenant member', 'INVALID_PRIMARY_ADMIN');
+  }
+
+  const membership = await RoleAssignment.findOne({ tenantId, userId });
+  if (!membership) {
+    throw new ApiError(422, 'User is not a member of this tenant', 'INVALID_PRIMARY_ADMIN');
+  }
+
+  const previous = tenant.primaryAdminUserId ? String(tenant.primaryAdminUserId) : null;
+  tenant.primaryAdminUserId = user._id;
+  await tenant.save();
+  await Wallet.updateMany({ tenantId }, { ownerUserId: user._id });
+
+  return {
+    tenant,
+    previousPrimaryAdminUserId: previous,
+    primaryAdmin: serializePrimaryAdmin(user),
+    reason: reason ?? '',
+  };
+}
+
+function buildTenantListFilter({ status, search, primaryAdminTenantIds }) {
+  const filter = {};
+
+  if (!status || status === 'operational') {
+    filter.status = { $in: ['active', 'suspended'] };
+  } else if (status === 'all') {
+    // no status filter
+  } else {
+    filter.status = status;
+  }
+
+  if (search?.trim()) {
+    const q = search.trim();
+    const or = [
+      { name: { $regex: q, $options: 'i' } },
+      { slug: { $regex: q, $options: 'i' } },
+    ];
+    if (primaryAdminTenantIds?.length) {
+      or.push({ _id: { $in: primaryAdminTenantIds } });
+    }
+    filter.$or = or;
+  }
+
+  return filter;
+}
+
+async function findTenantIdsByPrimaryAdminEmail(search) {
+  if (!search?.trim()) return [];
+  const users = await User.find({
+    email: { $regex: search.trim(), $options: 'i' },
+    tenantId: { $ne: null },
+  })
+    .select('_id')
+    .lean();
+  if (!users.length) return [];
+  const userIds = users.map((u) => u._id);
+  const tenants = await Tenant.find({ primaryAdminUserId: { $in: userIds } }).select('_id').lean();
+  // Also match via company_admin when primaryAdminUserId is unset
+  const assignments = await RoleAssignment.find({
+    userId: { $in: userIds },
+    role: 'company_admin',
+  })
+    .select('tenantId')
+    .lean();
+  const ids = [
+    ...tenants.map((t) => t._id),
+    ...assignments.map((a) => a.tenantId),
+  ];
+  return [...new Map(ids.map((id) => [String(id), id])).values()];
+}
+
+async function enrichTenantRows(tenants) {
+  if (!tenants.length) return [];
   const ids = tenants.map((t) => t._id);
 
-  // aggregate() is not covered by the tenantScope query guard; these are
-  // intentional cross-tenant rollups for the platform list view.
-  const [walletAgg, openOrderAgg] = await Promise.all([
+  const [walletAgg, openOrderAgg, userCountAgg, lastActiveAgg, primaryAdmins] = await Promise.all([
     Wallet.aggregate([
       { $match: { tenantId: { $in: ids } } },
       { $group: { _id: '$tenantId', balance: { $sum: '$balance' } } },
@@ -169,26 +322,174 @@ export async function listTenants({ status } = {}) {
       { $match: { tenantId: { $in: ids }, status: { $in: OPEN_ORDER_STATUSES } } },
       { $group: { _id: '$tenantId', count: { $sum: 1 } } },
     ]),
+    User.aggregate([
+      { $match: { tenantId: { $in: ids } } },
+      { $group: { _id: '$tenantId', count: { $sum: 1 } } },
+    ]),
+    User.aggregate([
+      { $match: { tenantId: { $in: ids }, lastLoginAt: { $ne: null } } },
+      { $group: { _id: '$tenantId', lastActiveAt: { $max: '$lastLoginAt' } } },
+    ]),
+    User.find({
+      _id: { $in: tenants.map((t) => t.primaryAdminUserId).filter(Boolean) },
+    })
+      .select('name email status')
+      .lean(),
   ]);
 
   const byId = (rows) => Object.fromEntries(rows.map((r) => [String(r._id), r]));
   const wallets = byId(walletAgg);
   const orders = byId(openOrderAgg);
+  const userCounts = byId(userCountAgg);
+  const lastActive = byId(lastActiveAgg);
+  const adminById = Object.fromEntries(primaryAdmins.map((u) => [String(u._id), u]));
 
-  return tenants.map((t) => ({
-    ...t,
-    walletBalanceInr: wallets[String(t._id)]?.balance ?? 0,
-    openOrders: orders[String(t._id)]?.count ?? 0,
-  }));
+  // Fallback primary admin for tenants without primaryAdminUserId
+  const missingOwnerIds = tenants.filter((t) => !t.primaryAdminUserId).map((t) => t._id);
+  const fallbackOwners = {};
+  if (missingOwnerIds.length) {
+    const assignments = await RoleAssignment.find({
+      tenantId: { $in: missingOwnerIds },
+      role: 'company_admin',
+    })
+      .sort({ createdAt: 1 })
+      .lean();
+    const firstByTenant = {};
+    for (const a of assignments) {
+      const key = String(a.tenantId);
+      if (!firstByTenant[key]) firstByTenant[key] = a.userId;
+    }
+    const fallbackUsers = await User.find({
+      _id: { $in: Object.values(firstByTenant) },
+    })
+      .select('name email status')
+      .lean();
+    const userMap = Object.fromEntries(fallbackUsers.map((u) => [String(u._id), u]));
+    for (const [tid, uid] of Object.entries(firstByTenant)) {
+      fallbackOwners[tid] = userMap[String(uid)] ?? null;
+    }
+  }
+
+  return tenants.map((t) => {
+    const adminUser = t.primaryAdminUserId
+      ? adminById[String(t.primaryAdminUserId)]
+      : fallbackOwners[String(t._id)];
+    return {
+      ...t,
+      walletBalanceInr: wallets[String(t._id)]?.balance ?? 0,
+      openOrders: orders[String(t._id)]?.count ?? 0,
+      userCount: userCounts[String(t._id)]?.count ?? 0,
+      lastActiveAt: lastActive[String(t._id)]?.lastActiveAt ?? null,
+      primaryAdmin: serializePrimaryAdmin(adminUser),
+    };
+  });
 }
 
-export async function setTenantStatus(tenantId, status) {
-  const before = await getTenant(tenantId);
-  before.status = status; // simple enum, not a state machine per spec
-  await before.save();
-  return before;
+/** Phase 1 operational tenant directory — server-side search, filter, sort, pagination. */
+export async function listTenants(query = {}) {
+  const { page, limit, skip } = getPagination(query, { defaultLimit: 20, maxLimit: 100 });
+  const sortKey = query.sort || 'createdAt';
+  const sortOrder = query.order === 'asc' ? 1 : -1;
+
+  let primaryAdminTenantIds = [];
+  if (query.search?.trim()) {
+    primaryAdminTenantIds = await findTenantIdsByPrimaryAdminEmail(query.search);
+  }
+
+  const filter = buildTenantListFilter({
+    status: query.status,
+    search: query.search,
+    primaryAdminTenantIds,
+  });
+
+  // lastActiveAt requires a computed sort — fetch ids + lastActive then page in memory for that sort only
+  if (sortKey === 'lastActiveAt') {
+    const all = await Tenant.find(filter).select('_id').lean();
+    const ids = all.map((t) => t._id);
+    const lastActiveAgg = ids.length
+      ? await User.aggregate([
+          { $match: { tenantId: { $in: ids }, lastLoginAt: { $ne: null } } },
+          { $group: { _id: '$tenantId', lastActiveAt: { $max: '$lastLoginAt' } } },
+        ])
+      : [];
+    const lastMap = Object.fromEntries(lastActiveAgg.map((r) => [String(r._id), r.lastActiveAt]));
+    const sorted = [...ids].sort((a, b) => {
+      const aT = lastMap[String(a)] ? new Date(lastMap[String(a)]).getTime() : 0;
+      const bT = lastMap[String(b)] ? new Date(lastMap[String(b)]).getTime() : 0;
+      return sortOrder === 1 ? aT - bT : bT - aT;
+    });
+    const total = sorted.length;
+    const pageIds = sorted.slice(skip, skip + limit);
+    const tenants = await Tenant.find({ _id: { $in: pageIds } }).lean();
+    const byId = Object.fromEntries(tenants.map((t) => [String(t._id), t]));
+    const ordered = pageIds.map((id) => byId[String(id)]).filter(Boolean);
+    const items = await enrichTenantRows(ordered);
+    return paginatedResponse(items, total, { page, limit });
+  }
+
+  const sort = sortKey === 'name' ? { name: sortOrder } : { createdAt: sortOrder };
+  const [tenants, total] = await Promise.all([
+    Tenant.find(filter).sort(sort).skip(skip).limit(limit).lean(),
+    Tenant.countDocuments(filter),
+  ]);
+  const items = await enrichTenantRows(tenants);
+  return paginatedResponse(items, total, { page, limit });
 }
 
+export async function activateTenant(tenantId, { reason } = {}) {
+  const tenant = await getTenant(tenantId);
+  const previousStatus = tenant.status;
+  assertTransition(previousStatus, 'active');
+  // Restore from suspended/archived requires a reason; legacy trial → active does not.
+  if (previousStatus === 'suspended' || previousStatus === 'archived') {
+    requireReason(reason, 'restore');
+  }
+  tenant.status = 'active';
+  await tenant.save();
+  return { tenant, previousStatus, reason: reason?.trim() || '', action: previousStatus === 'trial' ? 'activated' : 'restored' };
+}
+
+export async function suspendTenant(tenantId, { reason } = {}) {
+  const tenant = await getTenant(tenantId);
+  const previousStatus = tenant.status;
+  assertTransition(previousStatus, 'suspended');
+  const trimmed = requireReason(reason, 'suspend');
+  tenant.status = 'suspended';
+  await tenant.save();
+  return { tenant, previousStatus, reason: trimmed, action: 'suspended' };
+}
+
+export async function archiveTenant(tenantId, { reason } = {}) {
+  const tenant = await getTenant(tenantId);
+  const previousStatus = tenant.status;
+  assertTransition(previousStatus, 'archived');
+  const trimmed = requireReason(reason, 'archive');
+  tenant.status = 'archived';
+  await tenant.save();
+  return { tenant, previousStatus, reason: trimmed, action: 'archived' };
+}
+
+export async function restoreTenant(tenantId, { reason } = {}) {
+  const tenant = await getTenant(tenantId);
+  const previousStatus = tenant.status;
+  if (previousStatus !== 'archived' && previousStatus !== 'suspended') {
+    throw new InvalidTransitionError('Tenant', previousStatus, 'active');
+  }
+  return activateTenant(tenantId, { reason });
+}
+
+/**
+ * Dispatch status change to the appropriate Phase 1 transition method.
+ * Rejects unrestricted updates that skip the state machine.
+ */
+export async function setTenantStatus(tenantId, status, { reason } = {}) {
+  if (status === 'suspended') return suspendTenant(tenantId, { reason });
+  if (status === 'archived') return archiveTenant(tenantId, { reason });
+  if (status === 'active') return activateTenant(tenantId, { reason });
+  throw new ApiError(400, `Unsupported Phase 1 status: ${status}`, 'INVALID_STATUS');
+}
+
+/** @deprecated Phase 1 has no subscription plans. */
 export async function setTenantPlan(tenantId, plan) {
   const tenant = await getTenant(tenantId);
   const previous = tenant.plan;
@@ -197,6 +498,7 @@ export async function setTenantPlan(tenantId, plan) {
   return { tenant, previous };
 }
 
+/** @deprecated Phase 1 does not enforce business quotas via this API. */
 export async function setTenantLimits(tenantId, limits) {
   const tenant = await getTenant(tenantId);
   const previous = tenant.toObject().limits;
@@ -205,20 +507,33 @@ export async function setTenantLimits(tenantId, limits) {
   return { tenant, previous };
 }
 
-/** §3.4 overview drill-in — wallet, campaigns, orders, invoices, tickets in one call. */
+/** Enriched overview for the tenant detail page. */
 export async function getTenantOverview(tenantId) {
   const tenant = await getTenant(tenantId);
+  const primaryAdmin = await resolveWorkspaceOwner(tenantId);
 
-  const [wallets, activeCampaigns, openOrders, unpaidInvoices, openTickets] = await Promise.all([
-    Wallet.find({ tenantId }).select('name balance allocatedAmount status').lean(),
-    Campaign.countDocuments({ tenantId, status: { $in: ['approved', 'launched', 'redemption_open'] } }),
-    Order.countDocuments({ tenantId, status: { $in: OPEN_ORDER_STATUSES } }),
-    Invoice.find({ tenantId, status: 'issued' }).select('invoiceNumber totalAmount type dueAt').lean(),
-    SupportTicket.countDocuments({ tenantId, status: { $in: ['open', 'in_progress', 'waiting_on_customer'] } }),
-  ]);
+  const [wallets, activeCampaigns, openOrders, unpaidInvoices, openTickets, userCount, lastActive] =
+    await Promise.all([
+      Wallet.find({ tenantId }).select('name balance allocatedAmount status').lean(),
+      Campaign.countDocuments({ tenantId, status: { $in: ['approved', 'launched', 'redemption_open'] } }),
+      Order.countDocuments({ tenantId, status: { $in: OPEN_ORDER_STATUSES } }),
+      Invoice.find({ tenantId, status: 'issued' }).select('invoiceNumber totalAmount type dueAt').lean(),
+      SupportTicket.countDocuments({
+        tenantId,
+        status: { $in: ['open', 'in_progress', 'waiting_on_customer'] },
+      }),
+      User.countDocuments({ tenantId }),
+      User.findOne({ tenantId, lastLoginAt: { $ne: null } })
+        .sort({ lastLoginAt: -1 })
+        .select('lastLoginAt')
+        .lean(),
+    ]);
 
   return {
     tenant,
+    primaryAdmin,
+    userCount,
+    lastActiveAt: lastActive?.lastLoginAt ?? null,
     wallets,
     walletBalanceInr: wallets.reduce((sum, w) => sum + (w.balance ?? 0), 0),
     activeCampaigns,
@@ -227,6 +542,11 @@ export async function getTenantOverview(tenantId) {
     outstandingInr: unpaidInvoices.reduce((sum, i) => sum + (i.totalAmount ?? 0), 0),
     openTickets,
   };
+}
+
+export async function listTenantUsers(tenantId) {
+  await getTenant(tenantId);
+  return listUsers({ tenantId });
 }
 
 /** §3.4 — re-issue the company_admin invite (lost access recovery). */
@@ -238,7 +558,6 @@ export async function resetAdminAccess(tenantId) {
   const admin = await User.findOne({ _id: assignment.userId });
   if (!admin) throw new NotFoundError('Admin user not found');
 
-  // Force the user back into the invite flow with a fresh token.
   admin.status = 'invited';
   await admin.save();
   const { user, inviteToken } = await inviteUser({
