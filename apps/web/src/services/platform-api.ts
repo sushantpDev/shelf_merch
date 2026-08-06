@@ -99,6 +99,9 @@ export function fetchTenantOverview(id: string) {
       balance: number;
       totalAmount?: number;
       allocatedAmount?: number;
+      approvedBudgetInr?: number;
+      allocatedBudgetInr?: number;
+      remainingBalanceInr?: number;
       status?: string;
     }>;
     walletBalanceInr: number;

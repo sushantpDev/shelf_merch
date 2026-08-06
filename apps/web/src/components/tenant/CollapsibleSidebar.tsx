@@ -17,7 +17,6 @@ import {
   Landmark,
   LayoutGrid,
   LifeBuoy,
-  LogOut,
   Megaphone,
   Settings,
   Shirt,
@@ -27,11 +26,10 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { getStoredUser, logout } from "@/services/api-bridge";
+import { getStoredUser } from "@/services/api-bridge";
 import { navItemsForTenantRole } from "@/services/tenant-access";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import "./collapsible-sidebar.css";
-// import NavFooterImage from "../../../assets/nav_footer_img.png";
 
 const STORAGE_KEY = "shelfmerch.sidebar.expanded";
 
@@ -116,8 +114,6 @@ export function CollapsibleSidebar() {
   const [expanded, setExpanded] = useState(readExpandedPreference);
   const [flyout, setFlyout] = useState<HoverFlyout | null>(null);
   const [togglePos, setTogglePos] = useState<{ top: number; left: number } | null>(null);
-  const [showFooterImage, setShowFooterImage] = useState(true);
-
 
   const syncTogglePosition = useCallback(() => {
     const rail = railRef.current;
@@ -172,27 +168,8 @@ export function CollapsibleSidebar() {
   const hideFlyout = () => setFlyout(null);
 
   const handleToggle = () => {
-    setExpanded((prev) => {
-      const next = !prev;
-      setShowFooterImage(!prev);
-      return next;
-    });
+    setExpanded((prev) => !prev);
   };
-
-  const onLogout = () => {
-    hideFlyout();
-    void logout();
-  };
-
-  const logoutHoverHandlers = expanded
-    ? {}
-    : {
-        onMouseEnter: (event: MouseEvent<HTMLElement>) =>
-          showFlyout("Log Out", event.currentTarget),
-        onMouseLeave: hideFlyout,
-        onFocus: (event: FocusEvent<HTMLElement>) => showFlyout("Log Out", event.currentTarget),
-        onBlur: hideFlyout,
-      };
 
   const toggleButton =
     togglePos &&
@@ -239,21 +216,6 @@ export function CollapsibleSidebar() {
               />
             );
           })}
-        </div>
-
-        <div className="sidebar-rail__footer">
-          <button
-            type="button"
-            className="sidebar-rail__item sidebar-rail__logout"
-            aria-label={expanded ? undefined : "Log Out"}
-            onClick={onLogout}
-            {...logoutHoverHandlers}
-          >
-            <span className="sidebar-rail__item-icon">
-              <LogOut size={20} strokeWidth={1.75} aria-hidden="true" />
-            </span>
-            {expanded ? <span className="sidebar-rail__item-label">Log Out</span> : null}
-          </button>
         </div>
       </nav>
 

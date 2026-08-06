@@ -22,11 +22,10 @@ export type TenantRow = PlatformTenantRow;
 export const PAGE_SIZES = [20, 50, 100] as const;
 
 export const STATUS_FILTERS = [
-  { value: "", label: "Active & Suspended" },
+  { value: "all", label: "All" },
   { value: "active", label: "Active" },
   { value: "suspended", label: "Suspended" },
   { value: "archived", label: "Archived" },
-  { value: "all", label: "All" },
 ] as const;
 
 /** Title-case a status for display; unknown/legacy values render safely. */

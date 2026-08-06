@@ -283,6 +283,124 @@
 }
 .status-page-actions .btn{min-width:148px;justify-content:center}
 
+/* Route error page (500-style) */
+.error-page .auth-simple-body{
+  padding:40px 20px 48px;
+}
+.error-page-card{
+  width:100%;
+  max-width:560px;
+  margin:0 auto;
+  text-align:center;
+}
+.error-page-illu{
+  display:block;
+  width:min(280px, 72vw);
+  height:auto;
+  margin:8px auto 22px;
+}
+.error-page-title{
+  font-family:var(--disp);
+  font-size:clamp(26px, 4vw, 34px);
+  font-weight:800;
+  letter-spacing:-.03em;
+  line-height:1.15;
+  margin:0 0 12px;
+  color:var(--ink);
+}
+.error-page-description{
+  margin:0 auto 28px;
+  max-width:420px;
+  font-size:15px;
+  line-height:1.55;
+  color:var(--ink-2);
+}
+.error-page-actions{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  margin-bottom:36px;
+}
+.error-page-btn{
+  min-width:168px;
+  height:44px;
+  border-radius:999px;
+  gap:8px;
+  justify-content:center;
+  font-weight:700;
+}
+.error-page-meta{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:0;
+  padding-top:22px;
+  border-top:1px solid var(--line);
+  text-align:left;
+}
+.error-page-meta__item{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  padding:4px 14px;
+  min-width:0;
+}
+.error-page-meta__item + .error-page-meta__item{
+  border-left:1px solid var(--line);
+}
+.error-page-meta__icon{
+  flex-shrink:0;
+  width:36px;
+  height:36px;
+  border-radius:999px;
+  display:grid;
+  place-items:center;
+  background:#EDE4FF;
+  color:#7C3AED;
+}
+.error-page-meta__label{
+  font-size:12px;
+  font-weight:500;
+  color:var(--ink-3);
+  margin-bottom:2px;
+}
+.error-page-meta__value{
+  font-size:14px;
+  font-weight:700;
+  color:#7C3AED;
+  word-break:break-all;
+}
+.error-page-meta__value--mono{
+  font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size:12.5px;
+  letter-spacing:-.01em;
+}
+.error-page-meta__link{
+  display:inline-block;
+  font-size:14px;
+  font-weight:700;
+  color:#7C3AED;
+  text-decoration:none;
+}
+.error-page-meta__link:hover{text-decoration:underline}
+@media (max-width:640px){
+  .error-page-meta{
+    grid-template-columns:1fr;
+    gap:14px;
+  }
+  .error-page-meta__item{
+    padding:0;
+  }
+  .error-page-meta__item + .error-page-meta__item{
+    border-left:none;
+    padding-top:14px;
+    border-top:1px solid var(--line);
+  }
+  .error-page-actions{flex-direction:column;align-items:stretch}
+  .error-page-btn{width:100%}
+}
+
 /* Password reset / lockout extensions */
 .auth-simple-secondary{
   width:100%;

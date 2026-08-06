@@ -1169,11 +1169,10 @@
 .dash-wallet-create span { width: 44px; height: 44px; border-radius: 50%; background: var(--brand-50); color: var(--brand); display: grid; place-items: center; font-size: 28px; line-height: 1; font-weight: 500; }
 
 .dash-shop-banner-link { position: relative; display: block; overflow: hidden; border-radius: var(--r-sm); color: #fff; text-decoration: none; }
-.dash-shop-banner-link::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(55,64,210,0.72), rgba(55,64,210,0.22) 60%, rgba(255,255,255,0.08)); pointer-events: none; }
-.dash-shop-status { position: absolute; z-index: 2; left: 16px; top: 14px; padding: 4px 9px; border-radius: 999px; background: rgba(255,255,255,0.24); color: #fff; font-size: 10px; font-weight: 900; }
+.dash-shop-status { position: absolute; z-index: 2; left: 16px; top: 14px; padding: 4px 9px; border-radius: 999px; background: rgba(0,0,0,0.35); color: #fff; font-size: 10px; font-weight: 900; }
 .dash-shop-copy { position: absolute; z-index: 2; left: 16px; bottom: 16px; right: 92px; }
-.dash-shop-copy strong { display: block; font-size: 18px; font-weight: 900; color: #fff; }
-.dash-shop-copy small { display: block; margin-top: 4px; font-size: 11px; color: rgba(255,255,255,0.86); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-shop-copy strong { display: block; font-size: 18px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.35); }
+.dash-shop-copy small { display: block; margin-top: 4px; font-size: 11px; color: rgba(255,255,255,0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,0.35); }
 .dash-open-shop { width: fit-content; gap: 8px; margin-top: 14px; padding: 9px 13px; border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink); font-weight: 900; text-decoration: none; }
 .dash-empty-note { color: var(--ink-2); font-size: 13px; line-height: 1.5; }
 

@@ -418,6 +418,32 @@ select.inp{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http
 .platform-tenant-num--avail{color:var(--brand-d,#1d4ed8)}
 .platform-tenant-num--link{color:var(--brand-d,#1d4ed8);text-decoration:none}
 .platform-tenant-num--link:hover{text-decoration:underline}
+.platform-tenant-back{
+  display:inline-flex;align-items:center;justify-content:center;
+  margin:0 0 10px;padding:0;border:none;background:none;
+  font-size:22px;line-height:1;font-weight:600;color:var(--ink);
+  text-decoration:none;cursor:pointer;
+}
+.platform-tenant-back:hover{color:var(--brand-d,#1d4ed8)}
+.platform-tenant-actions-btn{
+  background:#e8eef8 !important;
+  border-color:#d5deec !important;
+  color:var(--ink) !important;
+  font-weight:600;
+}
+.platform-tenant-actions-btn:hover{
+  background:#dce6f4 !important;
+  border-color:#c5d0e3 !important;
+}
+.platform-tenant-wallet-table{
+  border:1px solid var(--line);
+  box-shadow:none;
+  border-radius:var(--r-sm, 10px);
+}
+.platform-tenant-wallet-table .tbl th,
+.platform-tenant-wallet-table .tbl td{
+  vertical-align:middle;
+}
 
 
 /* workspace contacts (Stadium-style) */

@@ -322,10 +322,10 @@ export async function setPrimaryAdmin(tenantId, userId, { reason } = {}) {
 function buildTenantListFilter({ status, search, primaryAdminTenantIds }) {
   const filter = {};
 
-  if (!status || status === 'operational') {
+  if (!status || status === 'all') {
+    // no status filter — show all non-deleted tenants
+  } else if (status === 'operational') {
     filter.status = { $in: ['active', 'suspended'] };
-  } else if (status === 'all') {
-    // no status filter
   } else {
     filter.status = status;
   }
@@ -622,26 +622,33 @@ export async function getTenantOverview(tenantId) {
     ]);
 
   const primary = pickPrimaryWallet(wallets);
-  const entityAlloc = primary
-    ? await Entity.aggregate([
-        {
-          $match: {
-            tenantId: tenant._id,
-            walletId: primary._id,
-            deletedAt: null,
-          },
-        },
-        { $group: { _id: null, allocated: { $sum: '$allocatedAmount' } } },
-      ])
-    : [];
+  const entityAgg = await Entity.aggregate([
+    { $match: { tenantId: tenant._id, deletedAt: null } },
+    { $group: { _id: '$walletId', allocated: { $sum: '$allocatedAmount' } } },
+  ]);
+  const allocatedByWallet = Object.fromEntries(
+    entityAgg.map((r) => [String(r._id), Math.round(Number(r.allocated) || 0)]),
+  );
+  const primaryAllocated = primary ? (allocatedByWallet[String(primary._id)] ?? 0) : 0;
+
+  const walletRows = wallets.map((w) => {
+    const balance = Math.round(Number(w.balance) || 0);
+    const earmarked = Math.round(Number(w.allocatedAmount) || 0);
+    return {
+      ...w,
+      approvedBudgetInr: Math.round(Number(w.totalAmount) || 0),
+      allocatedBudgetInr: allocatedByWallet[String(w._id)] ?? 0,
+      remainingBalanceInr: Math.max(0, balance - earmarked),
+    };
+  });
 
   return {
     tenant,
     primaryAdmin,
     userCount,
     lastActiveAt: lastActive?.lastLoginAt ?? null,
-    wallets,
-    ...walletBudgetFields(primary, entityAlloc[0]?.allocated ?? 0),
+    wallets: walletRows,
+    ...walletBudgetFields(primary, primaryAllocated),
     activeCampaigns,
     openOrders,
     unpaidInvoices,

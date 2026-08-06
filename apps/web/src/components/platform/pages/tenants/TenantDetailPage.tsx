@@ -23,6 +23,19 @@ import {
 } from "./model";
 import { TenantStatusModal } from "./views/TenantStatusModal";
 
+function BackToTenantsLink() {
+  return (
+    <Link
+      to="/platform/tenants"
+      className="platform-tenant-back"
+      aria-label="Back to tenants"
+      title="Back to tenants"
+    >
+      ←
+    </Link>
+  );
+}
+
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "users", label: "Users" },
@@ -100,9 +113,7 @@ export function TenantDetailPage() {
   if (error || !overview || !tenant) {
     return (
       <div>
-        <Link to="/platform/tenants" className="btn btn-ghost btn-sm" style={{ paddingLeft: 0 }}>
-          ← Tenants
-        </Link>
+        <BackToTenantsLink />
         <PlatformError message={error || "Tenant not found"} />
         <button type="button" className="btn btn-soft btn-sm" onClick={() => setReloadKey((k) => k + 1)}>
           Retry
@@ -113,9 +124,7 @@ export function TenantDetailPage() {
 
   return (
     <div>
-      <Link to="/platform/tenants" className="btn btn-ghost btn-sm" style={{ paddingLeft: 0 }}>
-        ← Tenants
-      </Link>
+      <BackToTenantsLink />
       <PlatformPageHeader
         title={tenant.name}
         subtitle={`@${tenant.slug}`}
@@ -378,6 +387,38 @@ function OrdersTab({ tenantId }: { tenantId: string }) {
 }
 
 function WalletTab({ overview }: { overview: OverviewData }) {
+  const rows = (overview.wallets ?? []).map((w) => {
+    const row = w as {
+      _id?: string;
+      name?: string;
+      status?: string;
+      totalAmount?: number;
+      balance?: number;
+      allocatedAmount?: number;
+      approvedBudgetInr?: number;
+      allocatedBudgetInr?: number;
+      remainingBalanceInr?: number;
+    };
+    const approved = Math.round(
+      Number(row.approvedBudgetInr ?? row.totalAmount ?? row.balance ?? 0) || 0,
+    );
+    const allocated = Math.round(Number(row.allocatedBudgetInr ?? 0) || 0);
+    const remaining = Math.round(
+      Number(
+        row.remainingBalanceInr ??
+          Math.max(0, Number(row.balance ?? 0) - Number(row.allocatedAmount ?? 0)),
+      ) || 0,
+    );
+    return {
+      _id: String(row._id ?? row.name ?? ""),
+      name: row.name,
+      status: row.status,
+      approvedBudget: approved,
+      allocatedBudget: allocated,
+      remainingBalance: remaining,
+    };
+  });
+
   return (
     <div className="card" style={{ padding: 20 }}>
       <div className="lbl">Budget balance</div>
@@ -390,28 +431,40 @@ function WalletTab({ overview }: { overview: OverviewData }) {
       </div>
       <DataTable
         empty="No wallets."
-        rows={overview.wallets as unknown as Record<string, unknown>[]}
+        className="platform-tenant-wallet-table"
+        rows={rows as unknown as Record<string, unknown>[]}
         columns={[
           { key: "name", label: "Wallet" },
           {
-            key: "totalAmount",
-            label: "Budget",
+            key: "approvedBudget",
+            label: "Approved Budget",
+            align: "center",
             render: (r) => (
-              <span style={{ display: "block", textAlign: "right" }}>
-                {inr(Number(r.totalAmount ?? r.balance ?? 0))}
-              </span>
+              <span className="platform-tenant-num">{inr(Number(r.approvedBudget ?? 0))}</span>
             ),
           },
           {
-            key: "balance",
-            label: "Cash",
+            key: "allocatedBudget",
+            label: "Allocated Budget",
+            align: "center",
             render: (r) => (
-              <span style={{ display: "block", textAlign: "right" }}>{inr(Number(r.balance))}</span>
+              <span className="platform-tenant-num">{inr(Number(r.allocatedBudget ?? 0))}</span>
+            ),
+          },
+          {
+            key: "remainingBalance",
+            label: "Remaining Balance",
+            align: "center",
+            render: (r) => (
+              <span className="platform-tenant-num platform-tenant-num--avail">
+                {inr(Number(r.remainingBalance ?? 0))}
+              </span>
             ),
           },
           {
             key: "status",
             label: "Status",
+            align: "center",
             render: (r) => (r.status ? <StatusTag status={String(r.status)} /> : "—"),
           },
         ]}

@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router";
 import {
   DataTable,
@@ -28,97 +29,147 @@ function TenantActionsMenu({
   onManage: (row: TenantRow) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current) {
+      setMenuPos(null);
+      return;
+    }
+    const place = () => {
+      const btn = btnRef.current;
+      const menu = menuRef.current;
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      const menuHeight = menu?.offsetHeight ?? 220;
+      const menuWidth = menu?.offsetWidth ?? 180;
+      const gap = 4;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUp = spaceBelow < menuHeight + gap && rect.top > menuHeight + gap;
+      const top = openUp ? rect.top - menuHeight - gap : rect.bottom + gap;
+      const left = Math.min(
+        Math.max(8, rect.right - menuWidth),
+        window.innerWidth - menuWidth - 8,
+      );
+      setMenuPos({ top, left });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     function onDoc(e: MouseEvent) {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (btnRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
     }
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   const isArchived = row.status === "archived";
 
+  const menu =
+    open &&
+    createPortal(
+      <div
+        ref={menuRef}
+        role="menu"
+        className="card platform-tenant-actions-menu"
+        style={{
+          position: "fixed",
+          top: menuPos?.top ?? -9999,
+          left: menuPos?.left ?? -9999,
+          zIndex: 80,
+          minWidth: 180,
+          padding: 6,
+          display: "grid",
+          gap: 2,
+          visibility: menuPos ? "visible" : "hidden",
+        }}
+      >
+        <Link
+          role="menuitem"
+          to={`/platform/tenants/${row._id}`}
+          className="btn btn-ghost btn-sm"
+          style={{ justifyContent: "flex-start" }}
+          onClick={() => setOpen(false)}
+        >
+          Open tenant
+        </Link>
+        {canWrite && (
+          <button
+            type="button"
+            role="menuitem"
+            className="btn btn-ghost btn-sm"
+            style={{ justifyContent: "flex-start" }}
+            onClick={() => {
+              setOpen(false);
+              onManage(row);
+            }}
+          >
+            {isArchived ? "Restore…" : "Manage status"}
+          </button>
+        )}
+        <Link
+          role="menuitem"
+          to={`/platform/tenants/${row._id}?tab=users`}
+          className="btn btn-ghost btn-sm"
+          style={{ justifyContent: "flex-start" }}
+          onClick={() => setOpen(false)}
+        >
+          View users
+        </Link>
+        <Link
+          role="menuitem"
+          to={`/platform/orders?tenantId=${row._id}`}
+          className="btn btn-ghost btn-sm"
+          style={{ justifyContent: "flex-start" }}
+          onClick={() => setOpen(false)}
+        >
+          View orders
+        </Link>
+        <Link
+          role="menuitem"
+          to={`/platform/tenants/${row._id}?tab=audit`}
+          className="btn btn-ghost btn-sm"
+          style={{ justifyContent: "flex-start" }}
+          onClick={() => setOpen(false)}
+        >
+          View audit logs
+        </Link>
+      </div>,
+      document.body,
+    );
+
   return (
-    <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
+    <div style={{ display: "inline-block" }}>
       <button
+        ref={btnRef}
         type="button"
-        className="btn btn-ghost btn-sm"
+        className="btn btn-soft btn-sm platform-tenant-actions-btn"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
         Actions
       </button>
-      {open && (
-        <div
-          role="menu"
-          className="card"
-          style={{
-            position: "absolute",
-            right: 0,
-            top: "100%",
-            zIndex: 20,
-            minWidth: 180,
-            padding: 6,
-            display: "grid",
-            gap: 2,
-          }}
-        >
-          <Link
-            role="menuitem"
-            to={`/platform/tenants/${row._id}`}
-            className="btn btn-ghost btn-sm"
-            style={{ justifyContent: "flex-start" }}
-            onClick={() => setOpen(false)}
-          >
-            Open tenant
-          </Link>
-          {canWrite && (
-            <button
-              type="button"
-              role="menuitem"
-              className="btn btn-ghost btn-sm"
-              style={{ justifyContent: "flex-start" }}
-              onClick={() => {
-                setOpen(false);
-                onManage(row);
-              }}
-            >
-              {isArchived ? "Restore…" : "Manage status"}
-            </button>
-          )}
-          <Link
-            role="menuitem"
-            to={`/platform/tenants/${row._id}?tab=users`}
-            className="btn btn-ghost btn-sm"
-            style={{ justifyContent: "flex-start" }}
-            onClick={() => setOpen(false)}
-          >
-            View users
-          </Link>
-          <Link
-            role="menuitem"
-            to={`/platform/orders?tenantId=${row._id}`}
-            className="btn btn-ghost btn-sm"
-            style={{ justifyContent: "flex-start" }}
-            onClick={() => setOpen(false)}
-          >
-            View orders
-          </Link>
-          <Link
-            role="menuitem"
-            to={`/platform/tenants/${row._id}?tab=audit`}
-            className="btn btn-ghost btn-sm"
-            style={{ justifyContent: "flex-start" }}
-            onClick={() => setOpen(false)}
-          >
-            View audit logs
-          </Link>
-        </div>
-      )}
+      {menu}
     </div>
   );
 }
@@ -348,12 +399,12 @@ export function TenantsView(vm: TenantsVm) {
         <select
           className="inp"
           style={{ width: "auto", minWidth: 160 }}
-          value={params.status ?? ""}
+          value={params.status || "all"}
           onChange={(e) => onStatusFilter(e.target.value)}
           aria-label="Filter by status"
         >
           {STATUS_FILTERS.map((f) => (
-            <option key={f.value || "default"} value={f.value}>
+            <option key={f.value} value={f.value}>
               {f.label}
             </option>
           ))}
