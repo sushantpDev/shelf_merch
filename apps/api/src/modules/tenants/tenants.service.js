@@ -59,6 +59,66 @@ function serializePrimaryAdmin(user) {
   return { id: String(user._id), name: user.name, email: user.email, status: user.status };
 }
 
+/** Match tenant Budget page: ignore empty drafts when choosing the primary wallet. */
+function isEmptyDraftWallet(w) {
+  const doc = w.fundingDocument ?? {};
+  return (
+    (w.status ?? 'draft') === 'draft' &&
+    Number(w.balance ?? 0) === 0 &&
+    Number(w.totalAmount ?? 0) === 0 &&
+    Number(w.allocatedAmount ?? 0) === 0 &&
+    Number(doc.requestedAmount ?? 0) === 0 &&
+    !doc.fileUrl &&
+    !doc.docNumber &&
+    !doc.approvalStatus
+  );
+}
+
+/** Same primary-wallet preference as the tenant Budget dashboard. */
+function pickPrimaryWallet(wallets) {
+  const visible = wallets.filter((w) => !isEmptyDraftWallet(w));
+  if (!visible.length) return null;
+  const stuckSetup = [...visible]
+    .filter(
+      (w) =>
+        ['entities_added', 'budget_allocated', 'managers_assigned'].includes(w.status ?? '') &&
+        (w.balance ?? 0) > 0 &&
+        (w.allocatedAmount ?? 0) === 0,
+    )
+    .sort((a, b) => new Date(b.updatedAt ?? 0) - new Date(a.updatedAt ?? 0))[0];
+  if (stuckSetup) return stuckSetup;
+  const active = visible.find((w) => w.status === 'active');
+  if (active) return active;
+  const funded = [...visible]
+    .filter((w) => (w.balance ?? 0) > 0 || (w.totalAmount ?? 0) > 0)
+    .sort((a, b) => new Date(b.updatedAt ?? 0) - new Date(a.updatedAt ?? 0))[0];
+  if (funded) return funded;
+  return [...visible].sort((a, b) => (b.balance ?? 0) - (a.balance ?? 0))[0];
+}
+
+function walletBudgetFields(wallet, allocatedFromEntities) {
+  if (!wallet) {
+    return {
+      walletBudgetBalanceInr: 0,
+      walletAllocatedInr: 0,
+      walletAvailableInr: 0,
+      walletBalanceInr: 0,
+    };
+  }
+  const balance = Math.round(Number(wallet.balance) || 0);
+  const funded = Math.round(Number(wallet.totalAmount) || 0);
+  const earmarked = Math.round(Number(wallet.allocatedAmount) || 0);
+  const allocated = Math.round(Number(allocatedFromEntities) || 0);
+  return {
+    // Budget balance = lifetime funded (not reduced by department spend).
+    walletBudgetBalanceInr: funded,
+    walletAllocatedInr: allocated,
+    walletAvailableInr: Math.max(0, balance - earmarked),
+    // Legacy list column — keep as funded total so platform matches tenant Budget.
+    walletBalanceInr: funded || balance,
+  };
+}
+
 /** Platform-only: create tenant + first company_admin (invited). */
 export async function createTenant({ name, slug, adminName, adminEmail, gstin = '', currency = 'INR' }) {
   const existing = await Tenant.findOne({ slug: slug.toLowerCase() });
@@ -314,11 +374,10 @@ async function enrichTenantRows(tenants) {
   if (!tenants.length) return [];
   const ids = tenants.map((t) => t._id);
 
-  const [walletAgg, openOrderAgg, userCountAgg, lastActiveAgg, primaryAdmins] = await Promise.all([
-    Wallet.aggregate([
-      { $match: { tenantId: { $in: ids } } },
-      { $group: { _id: '$tenantId', balance: { $sum: '$balance' } } },
-    ]),
+  const [walletRows, openOrderAgg, userCountAgg, lastActiveAgg, primaryAdmins] = await Promise.all([
+    Wallet.find({ tenantId: { $in: ids } })
+      .select('tenantId name balance totalAmount allocatedAmount status updatedAt fundingDocument')
+      .lean(),
     Order.aggregate([
       { $match: { tenantId: { $in: ids }, status: { $in: OPEN_ORDER_STATUSES } } },
       { $group: { _id: '$tenantId', count: { $sum: 1 } } },
@@ -338,8 +397,38 @@ async function enrichTenantRows(tenants) {
       .lean(),
   ]);
 
+  const walletsByTenant = new Map();
+  for (const w of walletRows) {
+    const key = String(w.tenantId);
+    if (!walletsByTenant.has(key)) walletsByTenant.set(key, []);
+    walletsByTenant.get(key).push(w);
+  }
+
+  const primaryByTenant = new Map();
+  const primaryWalletIds = [];
+  for (const t of tenants) {
+    const primary = pickPrimaryWallet(walletsByTenant.get(String(t._id)) ?? []);
+    if (primary) {
+      primaryByTenant.set(String(t._id), primary);
+      primaryWalletIds.push(primary._id);
+    }
+  }
+
+  const entityAgg = primaryWalletIds.length
+    ? await Entity.aggregate([
+        {
+          $match: {
+            tenantId: { $in: ids },
+            walletId: { $in: primaryWalletIds },
+            deletedAt: null,
+          },
+        },
+        { $group: { _id: '$tenantId', allocated: { $sum: '$allocatedAmount' } } },
+      ])
+    : [];
+
   const byId = (rows) => Object.fromEntries(rows.map((r) => [String(r._id), r]));
-  const wallets = byId(walletAgg);
+  const entities = byId(entityAgg);
   const orders = byId(openOrderAgg);
   const userCounts = byId(userCountAgg);
   const lastActive = byId(lastActiveAgg);
@@ -372,15 +461,17 @@ async function enrichTenantRows(tenants) {
   }
 
   return tenants.map((t) => {
+    const key = String(t._id);
     const adminUser = t.primaryAdminUserId
       ? adminById[String(t.primaryAdminUserId)]
-      : fallbackOwners[String(t._id)];
+      : fallbackOwners[key];
+    const primary = primaryByTenant.get(key);
     return {
       ...t,
-      walletBalanceInr: wallets[String(t._id)]?.balance ?? 0,
-      openOrders: orders[String(t._id)]?.count ?? 0,
-      userCount: userCounts[String(t._id)]?.count ?? 0,
-      lastActiveAt: lastActive[String(t._id)]?.lastActiveAt ?? null,
+      ...walletBudgetFields(primary, entities[key]?.allocated ?? 0),
+      openOrders: orders[key]?.count ?? 0,
+      userCount: userCounts[key]?.count ?? 0,
+      lastActiveAt: lastActive[key]?.lastActiveAt ?? null,
       primaryAdmin: serializePrimaryAdmin(adminUser),
     };
   });
@@ -515,7 +606,7 @@ export async function getTenantOverview(tenantId) {
 
   const [wallets, activeCampaigns, openOrders, unpaidInvoices, openTickets, userCount, lastActive] =
     await Promise.all([
-      Wallet.find({ tenantId }).select('name balance allocatedAmount status').lean(),
+      Wallet.find({ tenantId }).select('name balance totalAmount allocatedAmount status updatedAt fundingDocument').lean(),
       Campaign.countDocuments({ tenantId, status: { $in: ['approved', 'launched', 'redemption_open'] } }),
       Order.countDocuments({ tenantId, status: { $in: OPEN_ORDER_STATUSES } }),
       Invoice.find({ tenantId, status: 'issued' }).select('invoiceNumber totalAmount type dueAt').lean(),

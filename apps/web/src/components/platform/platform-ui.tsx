@@ -250,10 +250,17 @@ export function DataTable({
   columns,
   rows,
   empty = "Nothing here yet.",
+  className,
 }: {
-  columns: { key: string; label: string; render?: (row: Record<string, unknown>) => ReactNode }[];
+  columns: {
+    key: string;
+    label: string;
+    align?: "left" | "center" | "right";
+    render?: (row: Record<string, unknown>) => ReactNode;
+  }[];
   rows: Record<string, unknown>[];
   empty?: string;
+  className?: string;
 }) {
   if (!rows.length) {
     return (
@@ -263,12 +270,14 @@ export function DataTable({
     );
   }
   return (
-    <div className="card" style={{ overflow: "hidden" }}>
+    <div className={`card${className ? ` ${className}` : ""}`} style={{ overflow: "hidden" }}>
       <table className="tbl">
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key}>{c.label}</th>
+              <th key={c.key} style={{ textAlign: c.align ?? "left", verticalAlign: "middle" }}>
+                {c.label}
+              </th>
             ))}
           </tr>
         </thead>
@@ -276,7 +285,7 @@ export function DataTable({
           {rows.map((row, i) => (
             <tr key={String(row._id ?? row.id ?? row.productId ?? i)}>
               {columns.map((c) => (
-                <td key={c.key}>
+                <td key={c.key} style={{ textAlign: c.align ?? "left", verticalAlign: "middle" }}>
                   {c.render ? c.render(row) : String(row[c.key] ?? "—")}
                 </td>
               ))}

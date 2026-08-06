@@ -43,6 +43,9 @@ export type PlatformTenantRow = {
   /** @deprecated Phase 1 has no subscription plans */
   plan?: string;
   walletBalanceInr: number;
+  walletBudgetBalanceInr?: number;
+  walletAllocatedInr?: number;
+  walletAvailableInr?: number;
   openOrders: number;
   userCount: number;
   lastActiveAt: string | null;
@@ -90,8 +93,18 @@ export function fetchTenantOverview(id: string) {
     primaryAdmin: TenantPrimaryAdmin;
     userCount: number;
     lastActiveAt: string | null;
-    wallets: Array<{ _id: string; name: string; balance: number; status?: string }>;
+    wallets: Array<{
+      _id: string;
+      name: string;
+      balance: number;
+      totalAmount?: number;
+      allocatedAmount?: number;
+      status?: string;
+    }>;
     walletBalanceInr: number;
+    walletBudgetBalanceInr?: number;
+    walletAllocatedInr?: number;
+    walletAvailableInr?: number;
     openOrders: number;
     activeCampaigns: number;
     unpaidInvoices: unknown[];

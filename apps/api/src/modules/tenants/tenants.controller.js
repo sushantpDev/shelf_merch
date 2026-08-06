@@ -79,6 +79,9 @@ export async function getOne(req, res) {
     userCount: overview.userCount,
     lastActiveAt: overview.lastActiveAt,
     walletBalanceInr: overview.walletBalanceInr,
+    walletBudgetBalanceInr: overview.walletBudgetBalanceInr,
+    walletAllocatedInr: overview.walletAllocatedInr,
+    walletAvailableInr: overview.walletAvailableInr,
     openOrders: overview.openOrders,
   });
 }

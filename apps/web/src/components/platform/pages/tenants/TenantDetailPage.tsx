@@ -183,7 +183,9 @@ function OverviewTab({ overview, tenant }: { overview: OverviewData; tenant: Ten
         : "Not assigned",
     },
     { label: "Users", value: overview.userCount },
-    { label: "Wallet balance", value: inr(overview.walletBalanceInr) },
+    { label: "Budget balance", value: inr(overview.walletBudgetBalanceInr ?? overview.walletBalanceInr) },
+    { label: "Allocated", value: inr(overview.walletAllocatedInr ?? 0) },
+    { label: "Available", value: inr(overview.walletAvailableInr ?? 0) },
     {
       label: "Open orders",
       value: (
@@ -378,9 +380,13 @@ function OrdersTab({ tenantId }: { tenantId: string }) {
 function WalletTab({ overview }: { overview: OverviewData }) {
   return (
     <div className="card" style={{ padding: 20 }}>
-      <div className="lbl">Total balance</div>
-      <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 16 }}>
-        {inr(overview.walletBalanceInr)}
+      <div className="lbl">Budget balance</div>
+      <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 8 }}>
+        {inr(overview.walletBudgetBalanceInr ?? overview.walletBalanceInr)}
+      </div>
+      <div className="muted" style={{ fontSize: 13, marginBottom: 16 }}>
+        Allocated {inr(overview.walletAllocatedInr ?? 0)} · Available{" "}
+        {inr(overview.walletAvailableInr ?? 0)}
       </div>
       <DataTable
         empty="No wallets."
@@ -388,8 +394,17 @@ function WalletTab({ overview }: { overview: OverviewData }) {
         columns={[
           { key: "name", label: "Wallet" },
           {
+            key: "totalAmount",
+            label: "Budget",
+            render: (r) => (
+              <span style={{ display: "block", textAlign: "right" }}>
+                {inr(Number(r.totalAmount ?? r.balance ?? 0))}
+              </span>
+            ),
+          },
+          {
             key: "balance",
-            label: "Balance",
+            label: "Cash",
             render: (r) => (
               <span style={{ display: "block", textAlign: "right" }}>{inr(Number(r.balance))}</span>
             ),

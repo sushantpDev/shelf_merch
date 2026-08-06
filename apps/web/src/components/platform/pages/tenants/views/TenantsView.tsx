@@ -151,6 +151,7 @@ export function TenantsView(vm: TenantsVm) {
   const columns: {
     key: string;
     label: string;
+    align?: "left" | "center" | "right";
     render?: (row: Record<string, unknown>) => ReactNode;
   }[] = [
     {
@@ -204,6 +205,7 @@ export function TenantsView(vm: TenantsVm) {
     {
       key: "status",
       label: "Status",
+      align: "center",
       render: (r) => <StatusTag status={String(r.status)} />,
     },
     {
@@ -227,30 +229,49 @@ export function TenantsView(vm: TenantsVm) {
     {
       key: "userCount",
       label: "Users",
+      align: "center",
       render: (r) => (
-        <span style={{ display: "block", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-          {Number(r.userCount ?? 0)}
+        <span className="platform-tenant-num">{Number(r.userCount ?? 0)}</span>
+      ),
+    },
+    {
+      key: "walletBudgetBalanceInr",
+      label: "Approved Budget",
+      align: "center",
+      render: (r) => (
+        <span className="platform-tenant-num">
+          {inr(Number(r.walletBudgetBalanceInr ?? r.walletBalanceInr ?? 0))}
         </span>
       ),
     },
     {
-      key: "walletBalanceInr",
-      label: "Wallet",
+      key: "walletAllocatedInr",
+      label: "Allocated",
+      align: "center",
       render: (r) => (
-        <span style={{ display: "block", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-          {inr(Number(r.walletBalanceInr))}
+        <span className="platform-tenant-num">{inr(Number(r.walletAllocatedInr ?? 0))}</span>
+      ),
+    },
+    {
+      key: "walletAvailableInr",
+      label: "Available",
+      align: "center",
+      render: (r) => (
+        <span className="platform-tenant-num platform-tenant-num--avail">
+          {inr(Number(r.walletAvailableInr ?? 0))}
         </span>
       ),
     },
     {
       key: "openOrders",
       label: "Open Orders",
+      align: "center",
       render: (r) => {
         const count = Number(r.openOrders ?? 0);
         return (
           <Link
             to={`/platform/orders?tenantId=${String(r._id)}`}
-            style={{ display: "block", textAlign: "right", fontVariantNumeric: "tabular-nums" }}
+            className="platform-tenant-num platform-tenant-num--link"
           >
             {count}
           </Link>
@@ -260,6 +281,7 @@ export function TenantsView(vm: TenantsVm) {
     {
       key: "lastActiveAt",
       label: "Last Active",
+      align: "center",
       render: (r) => (
         <span className="muted" style={{ fontSize: 13 }}>
           {formatRelativeTime((r as { lastActiveAt?: string | null }).lastActiveAt)}
@@ -269,6 +291,7 @@ export function TenantsView(vm: TenantsVm) {
     {
       key: "actions",
       label: "Actions",
+      align: "center",
       render: (r) => (
         <TenantActionsMenu
           row={r as unknown as TenantRow}
