@@ -25,8 +25,21 @@ function loginErrorMessage(err: unknown): string {
     if (err.status === 502 || err.status === 503) {
       return "Cannot reach the server. Start the API with npm run dev:api.";
     }
-    if (err.code === "INVALID_CREDENTIALS" || err.status === 401) {
+    if (
+      err.code === "TENANT_ARCHIVED" ||
+      err.code === "TENANT_SUSPENDED" ||
+      err.code === "ACCOUNT_SUSPENDED"
+    ) {
+      return (
+        err.message ||
+        "Your organization account has been suspended. Please contact Shelf Merch support."
+      );
+    }
+    if (err.code === "INVALID_CREDENTIALS") {
       return "Incorrect password.";
+    }
+    if (err.status === 401) {
+      return err.message || "Incorrect password.";
     }
     return err.message;
   }

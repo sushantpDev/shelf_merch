@@ -3,6 +3,7 @@ import { Tenant } from './tenant.model.js';
 import { User } from '../users/user.model.js';
 import { RoleAssignment } from '../roles/roleAssignment.model.js';
 import { Wallet } from '../wallets/wallet.model.js';
+import { Entity } from '../entities/entity.model.js';
 import { Campaign } from '../campaigns/campaign.model.js';
 import { Order } from '../orders/order.model.js';
 import { Invoice } from '../invoices/invoice.model.js';
@@ -22,6 +23,64 @@ const OPEN_ORDER_STATUSES = [
   'packed',
   'shipped',
 ];
+
+/** Match tenant Budget page: ignore empty drafts when rolling up wallet totals. */
+function isEmptyDraftWallet(w) {
+  const doc = w.fundingDocument ?? {};
+  return (
+    (w.status ?? 'draft') === 'draft' &&
+    Number(w.balance ?? 0) === 0 &&
+    Number(w.totalAmount ?? 0) === 0 &&
+    Number(w.allocatedAmount ?? 0) === 0 &&
+    Number(doc.requestedAmount ?? 0) === 0 &&
+    !doc.fileUrl &&
+    !doc.docNumber &&
+    !doc.approvalStatus
+  );
+}
+
+/** Same primary-wallet preference as the tenant Budget dashboard. */
+function pickPrimaryWallet(wallets) {
+  const visible = wallets.filter((w) => !isEmptyDraftWallet(w));
+  if (!visible.length) return null;
+  const stuckSetup = [...visible]
+    .filter(
+      (w) =>
+        ['entities_added', 'budget_allocated', 'managers_assigned'].includes(w.status ?? '') &&
+        (w.balance ?? 0) > 0 &&
+        (w.allocatedAmount ?? 0) === 0,
+    )
+    .sort((a, b) => new Date(b.updatedAt ?? 0) - new Date(a.updatedAt ?? 0))[0];
+  if (stuckSetup) return stuckSetup;
+  const active = visible.find((w) => w.status === 'active');
+  if (active) return active;
+  const funded = [...visible]
+    .filter((w) => (w.balance ?? 0) > 0 || (w.totalAmount ?? 0) > 0)
+    .sort((a, b) => new Date(b.updatedAt ?? 0) - new Date(a.updatedAt ?? 0))[0];
+  if (funded) return funded;
+  return [...visible].sort((a, b) => (b.balance ?? 0) - (a.balance ?? 0))[0];
+}
+
+function walletBudgetFields(wallet, allocatedFromEntities) {
+  if (!wallet) {
+    return {
+      walletBudgetBalanceInr: 0,
+      walletAllocatedInr: 0,
+      walletAvailableInr: 0,
+      walletBalanceInr: 0,
+    };
+  }
+  const balance = Math.round(Number(wallet.balance) || 0);
+  const funded = Math.round(Number(wallet.totalAmount) || 0);
+  const earmarked = Math.round(Number(wallet.allocatedAmount) || 0);
+  const allocated = Math.round(Number(allocatedFromEntities) || 0);
+  return {
+    walletBudgetBalanceInr: funded,
+    walletAllocatedInr: allocated,
+    walletAvailableInr: Math.max(0, balance - earmarked),
+    walletBalanceInr: funded || balance,
+  };
+}
 
 /** Platform-only: create tenant + first company_admin (invited). */
 export async function createTenant({ name, slug, adminName, adminEmail, gstin = '', currency = 'INR' }) {
@@ -152,34 +211,65 @@ export async function updateTenant(tenantId, patch) {
   return { before: before.toObject(), after };
 }
 
-/** §3.4 list — status, plan, wallet balance, and open orders in one call. */
+/** §3.4 list — status, plan, wallet budget breakdown, and open orders in one call. */
 export async function listTenants({ status } = {}) {
   const filter = status ? { status } : {};
   const tenants = await Tenant.find(filter).sort({ createdAt: -1 }).lean();
   const ids = tenants.map((t) => t._id);
 
-  // aggregate() is not covered by the tenantScope query guard; these are
-  // intentional cross-tenant rollups for the platform list view.
-  const [walletAgg, openOrderAgg] = await Promise.all([
-    Wallet.aggregate([
-      { $match: { tenantId: { $in: ids } } },
-      { $group: { _id: '$tenantId', balance: { $sum: '$balance' } } },
-    ]),
+  // Cross-tenant rollups for the platform list (aggregate bypasses find guards).
+  const [walletRows, openOrderAgg] = await Promise.all([
+    Wallet.find({ tenantId: { $in: ids } })
+      .select('tenantId name balance totalAmount allocatedAmount status updatedAt fundingDocument')
+      .lean(),
     Order.aggregate([
       { $match: { tenantId: { $in: ids }, status: { $in: OPEN_ORDER_STATUSES } } },
       { $group: { _id: '$tenantId', count: { $sum: 1 } } },
     ]),
   ]);
 
-  const byId = (rows) => Object.fromEntries(rows.map((r) => [String(r._id), r]));
-  const wallets = byId(walletAgg);
-  const orders = byId(openOrderAgg);
+  const walletsByTenant = new Map();
+  for (const w of walletRows) {
+    const key = String(w.tenantId);
+    if (!walletsByTenant.has(key)) walletsByTenant.set(key, []);
+    walletsByTenant.get(key).push(w);
+  }
 
-  return tenants.map((t) => ({
-    ...t,
-    walletBalanceInr: wallets[String(t._id)]?.balance ?? 0,
-    openOrders: orders[String(t._id)]?.count ?? 0,
-  }));
+  const primaryByTenant = new Map();
+  const primaryWalletIds = [];
+  for (const t of tenants) {
+    const primary = pickPrimaryWallet(walletsByTenant.get(String(t._id)) ?? []);
+    if (primary) {
+      primaryByTenant.set(String(t._id), primary);
+      primaryWalletIds.push(primary._id);
+    }
+  }
+
+  const entityAgg = primaryWalletIds.length
+    ? await Entity.aggregate([
+        {
+          $match: {
+            tenantId: { $in: ids },
+            walletId: { $in: primaryWalletIds },
+            deletedAt: null,
+          },
+        },
+        { $group: { _id: '$tenantId', allocated: { $sum: '$allocatedAmount' } } },
+      ])
+    : [];
+
+  const entities = Object.fromEntries(entityAgg.map((r) => [String(r._id), r]));
+  const orders = Object.fromEntries(openOrderAgg.map((r) => [String(r._id), r]));
+
+  return tenants.map((t) => {
+    const key = String(t._id);
+    const primary = primaryByTenant.get(key);
+    return {
+      ...t,
+      ...walletBudgetFields(primary, entities[key]?.allocated ?? 0),
+      openOrders: orders[key]?.count ?? 0,
+    };
+  });
 }
 
 export async function setTenantStatus(tenantId, status) {
@@ -210,17 +300,31 @@ export async function getTenantOverview(tenantId) {
   const tenant = await getTenant(tenantId);
 
   const [wallets, activeCampaigns, openOrders, unpaidInvoices, openTickets] = await Promise.all([
-    Wallet.find({ tenantId }).select('name balance allocatedAmount status').lean(),
+    Wallet.find({ tenantId }).select('name balance totalAmount allocatedAmount status updatedAt fundingDocument').lean(),
     Campaign.countDocuments({ tenantId, status: { $in: ['approved', 'launched', 'redemption_open'] } }),
     Order.countDocuments({ tenantId, status: { $in: OPEN_ORDER_STATUSES } }),
     Invoice.find({ tenantId, status: 'issued' }).select('invoiceNumber totalAmount type dueAt').lean(),
     SupportTicket.countDocuments({ tenantId, status: { $in: ['open', 'in_progress', 'waiting_on_customer'] } }),
   ]);
 
+  const primary = pickPrimaryWallet(wallets);
+  const entityAlloc = primary
+    ? await Entity.aggregate([
+        {
+          $match: {
+            tenantId: tenant._id,
+            walletId: primary._id,
+            deletedAt: null,
+          },
+        },
+        { $group: { _id: null, allocated: { $sum: '$allocatedAmount' } } },
+      ])
+    : [];
+
   return {
     tenant,
     wallets,
-    walletBalanceInr: wallets.reduce((sum, w) => sum + (w.balance ?? 0), 0),
+    ...walletBudgetFields(primary, entityAlloc[0]?.allocated ?? 0),
     activeCampaigns,
     openOrders,
     unpaidInvoices,

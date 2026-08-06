@@ -96,15 +96,23 @@ function companyNameFromEmail(email) {
 
 async function loginExistingGoogleUser(user, { ip, userAgent }) {
   if (user.status === 'suspended') {
-    throw new ApiError(401, 'Account suspended', 'ACCOUNT_SUSPENDED');
+    throw new ApiError(
+      403,
+      'Your account has been suspended. Please contact Shelf Merch support.',
+      'ACCOUNT_SUSPENDED',
+    );
   }
   if (user.status === 'invited') {
     throw new ApiError(403, 'Invite not yet accepted — set your password first', 'INVITE_PENDING');
   }
   if (user.tenantId) {
     const tenant = await Tenant.findOne({ _id: user.tenantId }).select('status');
-    if (tenant?.status === 'archived') {
-      throw new ApiError(401, 'This workspace has been archived — contact support', 'TENANT_ARCHIVED');
+    if (tenant?.status === 'archived' || tenant?.status === 'suspended') {
+      throw new ApiError(
+        403,
+        'Your organization account has been suspended. Please contact Shelf Merch support.',
+        tenant.status === 'archived' ? 'TENANT_ARCHIVED' : 'TENANT_SUSPENDED',
+      );
     }
   }
   const roleAssignment = await getPrimaryRoleAssignment(user._id);

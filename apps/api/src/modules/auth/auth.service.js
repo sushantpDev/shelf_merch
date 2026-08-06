@@ -362,9 +362,28 @@ export async function login({ email, password, ip, userAgent }) {
   if (!user || !user.passwordHash) {
     throw new UnauthorizedError('Incorrect password.');
   }
-  if (user.status === 'suspended') throw new UnauthorizedError('Account suspended');
+  if (user.status === 'suspended') {
+    throw new ApiError(
+      403,
+      'Your account has been suspended. Please contact Shelf Merch support.',
+      'ACCOUNT_SUSPENDED',
+    );
+  }
   if (user.status === 'invited') {
     throw new ApiError(403, 'Invite not yet accepted — set your password first', 'INVITE_PENDING');
+  }
+
+  // Tell archived/suspended workspaces before the password check so users see
+  // a clear contact message instead of a generic "Incorrect password".
+  if (user.tenantId) {
+    const tenant = await Tenant.findOne({ _id: user.tenantId }).select('status');
+    if (tenant?.status === 'archived' || tenant?.status === 'suspended') {
+      throw new ApiError(
+        403,
+        'Your organization account has been suspended. Please contact Shelf Merch support.',
+        tenant.status === 'archived' ? 'TENANT_ARCHIVED' : 'TENANT_SUSPENDED',
+      );
+    }
   }
 
   // Temporary: account lockout timer disabled — clear any leftover locks.
@@ -377,13 +396,6 @@ export async function login({ email, password, ip, userAgent }) {
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) {
     throw new ApiError(401, 'Incorrect password.', 'INVALID_CREDENTIALS');
-  }
-
-  if (user.tenantId) {
-    const tenant = await Tenant.findOne({ _id: user.tenantId }).select('status');
-    if (tenant?.status === 'archived') {
-      throw new UnauthorizedError('This workspace has been archived — contact support');
-    }
   }
 
   const roleAssignment = await getPrimaryRoleAssignment(user._id);
@@ -420,6 +432,17 @@ export async function refresh({ refreshToken, ip, userAgent }) {
 
   const user = await User.findOne({ _id: userId });
   if (!user || user.status !== 'active') throw new UnauthorizedError('Invalid refresh token');
+
+  if (user.tenantId) {
+    const tenant = await Tenant.findOne({ _id: user.tenantId }).select('status');
+    if (tenant?.status === 'archived' || tenant?.status === 'suspended') {
+      throw new ApiError(
+        403,
+        'Your organization account has been suspended. Please contact Shelf Merch support.',
+        tenant.status === 'archived' ? 'TENANT_ARCHIVED' : 'TENANT_SUSPENDED',
+      );
+    }
+  }
 
   await revokeStoredRefreshToken(tokenHash, userId);
 

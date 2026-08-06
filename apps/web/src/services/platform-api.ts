@@ -32,6 +32,9 @@ export async function fetchPlatformTenants(status?: string) {
       status: string;
       plan?: string;
       walletBalanceInr: number;
+      walletBudgetBalanceInr?: number;
+      walletAllocatedInr?: number;
+      walletAvailableInr?: number;
       openOrders: number;
     }>
   >(`/platform/tenants${q}`);
