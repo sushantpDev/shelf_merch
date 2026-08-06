@@ -13,7 +13,11 @@ const addressSchema = new mongoose.Schema(
   { _id: false },
 );
 
+/** Phase 1 operational statuses. `trial` is legacy (kept for existing records). */
+export const PHASE1_TENANT_STATUSES = ['active', 'suspended', 'archived'];
 export const TENANT_STATUSES = ['trial', 'active', 'suspended', 'archived'];
+
+/** @deprecated Phase 1 has no subscription plans — kept for backward compatibility. */
 export const TENANT_PLANS = ['trial', 'starter', 'growth', 'enterprise'];
 
 const tenantSchema = new mongoose.Schema(
@@ -24,15 +28,25 @@ const tenantSchema = new mongoose.Schema(
     currency: { type: String, default: 'INR' },
     gstin: { type: String, default: '' },
     billingAddress: { type: addressSchema, default: () => ({}) },
-    // archived = logins refused (SUPER_ADMIN_FLOW §3.4).
-    status: { type: String, enum: TENANT_STATUSES, default: 'trial' },
+    // Phase 1: active | suspended | archived. `trial` is legacy only.
+    status: { type: String, enum: TENANT_STATUSES, default: 'active' },
+    /** Primary tenant administrator (tenant member). Distinct from platform admins. */
+    primaryAdminUserId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    /** @deprecated Phase 1 has no subscription plans — do not use in Phase 1 flows. */
     plan: { type: String, enum: TENANT_PLANS, default: 'trial' },
+    /**
+     * @deprecated Phase 1 does not enforce business quotas.
+     * `requestsPerMinute` remains a technical noisy-neighbor control (platform guardrails).
+     */
     limits: {
       maxCampaigns: { type: Number, default: 5 },
       maxRecipientsPerCampaign: { type: Number, default: 500 },
       maxWallets: { type: Number, default: 3 },
       maxUsers: { type: Number, default: 10 },
-      // §Gap E — per-tenant request ceiling (noisy-neighbor protection).
       requestsPerMinute: { type: Number, default: 600 },
     },
   },

@@ -114,6 +114,9 @@ async function loginExistingGoogleUser(user, { ip, userAgent }) {
         tenant.status === 'archived' ? 'TENANT_ARCHIVED' : 'TENANT_SUSPENDED',
       );
     }
+    if (tenant?.status === 'suspended') {
+      throw new ApiError(401, 'This workspace has been suspended — contact support', 'TENANT_SUSPENDED');
+    }
   }
   const roleAssignment = await getPrimaryRoleAssignment(user._id);
   user.lastLoginAt = new Date();

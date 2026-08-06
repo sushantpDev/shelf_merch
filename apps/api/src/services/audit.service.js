@@ -5,9 +5,17 @@ import { logger } from '../config/logger.js';
  * §3.6 — fire-and-forget audit write. Never let audit failures break the
  * request that triggered them.
  */
-export function writeAudit({ req, action, entityType, entityId = null, before = null, after = null }) {
+export function writeAudit({
+  req,
+  action,
+  entityType,
+  entityId = null,
+  before = null,
+  after = null,
+  tenantId,
+}) {
   const doc = {
-    tenantId: req?.tenantId ?? null,
+    tenantId: tenantId ?? req?.tenantId ?? null,
     actorUserId: req?.user?.userId ?? null,
     actorRole: req?.user?.role ?? '',
     action,

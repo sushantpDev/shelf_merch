@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { objectId } from '../users/users.validation.js';
+import { PHASE1_TENANT_STATUSES, TENANT_PLANS } from './tenant.model.js';
 
 const address = z
   .object({
@@ -12,12 +13,14 @@ const address = z
   })
   .partial();
 
+const slugSchema = z
+  .string()
+  .min(2)
+  .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase letters, digits, hyphens');
+
 export const createTenantSchema = z.object({
   name: z.string().min(1),
-  slug: z
-    .string()
-    .min(2)
-    .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase letters, digits, hyphens'),
+  slug: slugSchema,
   adminName: z.string().min(1),
   adminEmail: z.string().email(),
   gstin: z.string().optional().default(''),
@@ -33,20 +36,61 @@ export const updateTenantSchema = z
   })
   .partial();
 
-export const tenantStatusSchema = z
+/** Platform settings update — includes slug/currency with uniqueness enforced in service. */
+export const platformUpdateTenantSchema = z
   .object({
-    status: z.enum(['active', 'suspended', 'trial', 'archived']),
-    reason: z.string().optional(),
+    name: z.string().min(1),
+    slug: slugSchema,
+    logoUrl: z.string(),
+    currency: z.string().min(1),
+    gstin: z.string(),
+    billingAddress: address,
+    confirmSlugChange: z.boolean().optional(),
   })
-  .refine((body) => !['suspended', 'archived'].includes(body.status) || Boolean(body.reason), {
-    message: 'Suspending or archiving a tenant requires a reason (audited)',
-    path: ['reason'],
+  .partial()
+  .refine((body) => Object.keys(body).some((k) => k !== 'confirmSlugChange'), {
+    message: 'At least one field is required',
   });
 
-export const tenantPlanSchema = z.object({
-  plan: z.enum(['trial', 'starter', 'growth', 'enterprise']),
+export const listTenantsQuery = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().optional(),
+  /** active | suspended | archived | all — omit for default (active+suspended) */
+  status: z.enum(['active', 'suspended', 'archived', 'all', 'trial']).optional(),
+  search: z.string().optional(),
+  sort: z.enum(['name', 'createdAt', 'lastActiveAt']).optional(),
+  order: z.enum(['asc', 'desc']).optional(),
 });
 
+const reasonRequired = z.string().min(1, 'A reason is required');
+
+/** Phase 1 status change — target must be an operational status (not trial). */
+export const tenantStatusSchema = z
+  .object({
+    status: z.enum(PHASE1_TENANT_STATUSES),
+    reason: z.string().optional(),
+  })
+  .superRefine((body, ctx) => {
+    if (['suspended', 'archived'].includes(body.status) && !body.reason?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Suspending or archiving a tenant requires a reason (audited)',
+        path: ['reason'],
+      });
+    }
+  });
+
+export const setPrimaryAdminSchema = z.object({
+  userId: objectId,
+  reason: z.string().optional(),
+});
+
+/** @deprecated Phase 1 has no subscription plans — kept for backward-compatible API. */
+export const tenantPlanSchema = z.object({
+  plan: z.enum(TENANT_PLANS),
+});
+
+/** @deprecated Phase 1 does not expose business quotas in the UI. */
 export const tenantLimitsSchema = z.object({
   limits: z
     .object({
@@ -67,3 +111,5 @@ export const impersonateSchema = z.object({
 export const transferOwnershipSchema = z.object({
   newOwnerUserId: objectId,
 });
+
+export { reasonRequired };

@@ -13,9 +13,12 @@ import * as controller from './tenants.controller.js';
 import {
   createTenantSchema,
   updateTenantSchema,
+  platformUpdateTenantSchema,
+  listTenantsQuery,
   tenantStatusSchema,
   tenantPlanSchema,
   tenantLimitsSchema,
+  setPrimaryAdminSchema,
   impersonateSchema,
   transferOwnershipSchema,
 } from './tenants.validation.js';
@@ -62,7 +65,12 @@ platformTenantsRouter.use(authenticate, resolveTenant);
 const tenantsRead = platformArea('tenants', 'read');
 const tenantsWrite = platformArea('tenants', 'write'); // super admin only
 
-platformTenantsRouter.get('/', tenantsRead, asyncHandler(controller.list));
+platformTenantsRouter.get(
+  '/',
+  tenantsRead,
+  validate({ query: listTenantsQuery }),
+  asyncHandler(controller.list),
+);
 platformTenantsRouter.post(
   '/',
   tenantsWrite,
@@ -75,11 +83,23 @@ platformTenantsRouter.get(
   validate({ params: z.object({ id: objectId }) }),
   asyncHandler(controller.getOne),
 );
+platformTenantsRouter.patch(
+  '/:id',
+  tenantsWrite,
+  validate({ params: z.object({ id: objectId }), body: platformUpdateTenantSchema }),
+  asyncHandler(controller.updatePlatform),
+);
 platformTenantsRouter.get(
   '/:id/overview',
   tenantsRead,
   validate({ params: z.object({ id: objectId }) }),
   asyncHandler(controller.overview),
+);
+platformTenantsRouter.get(
+  '/:id/users',
+  tenantsRead,
+  validate({ params: z.object({ id: objectId }) }),
+  asyncHandler(controller.listUsers),
 );
 platformTenantsRouter.patch(
   '/:id/status',
@@ -88,11 +108,19 @@ platformTenantsRouter.patch(
   asyncHandler(controller.setStatus),
 );
 platformTenantsRouter.patch(
+  '/:id/primary-admin',
+  tenantsWrite,
+  validate({ params: z.object({ id: objectId }), body: setPrimaryAdminSchema }),
+  asyncHandler(controller.setPrimaryAdmin),
+);
+/** @deprecated Phase 1 has no subscription plans — kept for API compatibility. */
+platformTenantsRouter.patch(
   '/:id/plan',
   tenantsWrite,
   validate({ params: z.object({ id: objectId }), body: tenantPlanSchema }),
   asyncHandler(controller.setPlan),
 );
+/** @deprecated Phase 1 does not expose business quotas in the UI. */
 platformTenantsRouter.patch(
   '/:id/limits',
   tenantsWrite,

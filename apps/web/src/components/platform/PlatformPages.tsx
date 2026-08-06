@@ -1,5 +1,5 @@
 export { DashboardPage } from "./pages/dashboard";
-export { TenantsPage } from "./pages/tenants";
+export { TenantsPage, TenantDetailPage } from "./pages/tenants";
 export { OrdersPage, OrderFulfillmentPage } from "./pages/orders";
 export { CatalogPage } from "./pages/catalog";
 export { InventoryPage } from "./pages/inventory";

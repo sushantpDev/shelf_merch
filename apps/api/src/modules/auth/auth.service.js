@@ -398,6 +398,16 @@ export async function login({ email, password, ip, userAgent }) {
     throw new ApiError(401, 'Incorrect password.', 'INVALID_CREDENTIALS');
   }
 
+  if (user.tenantId) {
+    const tenant = await Tenant.findOne({ _id: user.tenantId }).select('status');
+    if (tenant?.status === 'archived') {
+      throw new UnauthorizedError('This workspace has been archived — contact support');
+    }
+    if (tenant?.status === 'suspended') {
+      throw new UnauthorizedError('This workspace has been suspended — contact support');
+    }
+  }
+
   const roleAssignment = await getPrimaryRoleAssignment(user._id);
   user.lastLoginAt = new Date();
   if (user.failedLoginCount || user.lockedUntil) {

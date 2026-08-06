@@ -625,19 +625,46 @@ function SwagPromoCard({ products }: { products: UiProduct[] }) {
   );
 }
 
-function BudgetSection({ account, mainBalance, hasBudget }: { account: string; mainBalance: number; hasBudget: boolean }) {
+function BudgetSection({
+  account,
+  mainBalance,
+  hasBudget,
+  isEntityManager,
+}: {
+  account: string;
+  mainBalance: number;
+  hasBudget: boolean;
+  isEntityManager: boolean;
+}) {
+  const title = isEntityManager ? "My budget" : "Organization budget";
+  const tileName = isEntityManager ? "My allocated budget" : `${account} budget`;
   return (
     <section className="dash-card card dash-wallets-card">
-      <SectionHead title="Organization budget" action={<Link to="/app/wallets" className="dash-inline-action">View budget <ArrowRight size={14} /></Link>} />
+      <SectionHead
+        title={title}
+        action={
+          <Link to="/app/wallets" className="dash-inline-action">
+            View budget <ArrowRight size={14} />
+          </Link>
+        }
+      />
       <div className="dash-wallet-preview-grid">
-        <Link to="/app/wallets" className="dash-wallet-mini" aria-label={`${account} available budget ${formatInr(mainBalance)}`}>
-          <span className="dash-wallet-mini__icon"><Landmark size={18} aria-hidden="true" /></span>
-          <span className="dash-wallet-mini__name">{account} budget <ChevronRight size={14} aria-hidden="true" /></span>
+        <Link
+          to="/app/wallets"
+          className="dash-wallet-mini"
+          aria-label={`${tileName} ${formatInr(mainBalance)}`}
+        >
+          <span className="dash-wallet-mini__icon">
+            <Landmark size={18} aria-hidden="true" />
+          </span>
+          <span className="dash-wallet-mini__name">
+            {tileName} <ChevronRight size={14} aria-hidden="true" />
+          </span>
           <strong>{formatInr(mainBalance)}</strong>
           <small>Available to spend</small>
           <i />
         </Link>
-        {!hasBudget ? (
+        {isEntityManager ? null : !hasBudget ? (
           <Link to="/app/wallets" state={{ startCreateWallet: true }} className="dash-wallet-create">
             <span>+</span>
             Setup budget
@@ -728,7 +755,14 @@ function ExistingDashboard({
   
 
       <section className="dash-existing-main">
-        <div className="dash-existing-main__wallets"><BudgetSection account={account} mainBalance={mainBalance} hasBudget={hasBudget} /></div>
+        <div className="dash-existing-main__wallets">
+          <BudgetSection
+            account={account}
+            mainBalance={mainBalance}
+            hasBudget={hasBudget}
+            isEntityManager={isEntityManager}
+          />
+        </div>
         <div className="dash-existing-main__video"><div className="dash-promo-pair"><CampaignPromoCard /><SwagPromoCard products={catalogProducts} /></div></div>
       </section>
 

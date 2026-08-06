@@ -1,5 +1,6 @@
-import { ApiError, ForbiddenError } from '../utils/errors.js';
+import { ApiError, ForbiddenError, UnauthorizedError } from '../utils/errors.js';
 import { PLATFORM_ROLES } from '../modules/roles/roleAssignment.model.js';
+import { Tenant } from '../modules/tenants/tenant.model.js';
 import { applyTenantGuardrails } from '../services/tenantGuardrails.service.js';
 import { setRequestContext } from '../config/requestContext.js';
 
@@ -11,6 +12,7 @@ import { setRequestContext } from '../config/requestContext.js';
  * - Tenant users: always their own tenantId — header overrides are ignored.
  * - Platform users: tenantId comes from an impersonation token (preferred,
  *   §6.4) — the impersonated tenantId is baked into the JWT itself.
+ * - Suspended/archived tenants: tenant users lose access; platform admins retain it.
  */
 export async function resolveTenant(req, res, next) {
   try {
@@ -21,6 +23,14 @@ export async function resolveTenant(req, res, next) {
         return next(new ForbiddenError('User has no tenant'));
       }
       req.tenantId = req.user.tenantId;
+
+      const tenant = await Tenant.findOne({ _id: req.tenantId }).select('status').lean();
+      if (tenant?.status === 'archived') {
+        return next(new UnauthorizedError('This workspace has been archived — contact support'));
+      }
+      if (tenant?.status === 'suspended') {
+        return next(new UnauthorizedError('This workspace has been suspended — contact support'));
+      }
     } else {
       // Platform user: tenant context only exists while impersonating.
       req.tenantId = req.user.tenantId ?? null;
