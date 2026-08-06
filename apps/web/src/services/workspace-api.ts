@@ -141,14 +141,17 @@ function mapWalletOrgFields(
 ): WorkspaceSnapshot["org"]["wallet"] {
   const id = String(w._id ?? w.id ?? "");
   const balance = Math.round(Number(w.balance) || 0);
+  const funded = Math.round(Number(w.totalAmount) || 0);
   const allocated = Math.round(Number(w.allocatedAmount) || 0);
   return {
     id: id || undefined,
     name: w.name || "Merchandise Budget",
     status: w.status || "",
+    // Admin Budget balance = lifetime funded amount (not reduced by department spend).
+    // Live cash stays on workspace.wallets / spendableForWallet for checkout.
     amount: isEntityManager
       ? (myEntity?.allocatedAmount ?? 0)
-      : balance,
+      : funded || balance,
     unallocated: isEntityManager
       ? Math.max(0, (myEntity?.allocatedAmount ?? 0) - (myEntity?.spentAmount ?? 0))
       : Math.max(0, balance - allocated),
